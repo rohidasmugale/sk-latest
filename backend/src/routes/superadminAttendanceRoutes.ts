@@ -1,7 +1,7 @@
 // routes/superadminAttendanceRoutes.ts
 import express from 'express';
-import { AttendanceService } from '../services/AttendanceService';
-
+import Attendance from '../models/attendance';
+import { AttendanceService } from '../services/attendanceService';
 const router = express.Router();
 
 // 1. Get all sites attendance summary

@@ -1,10 +1,10 @@
 import axios from 'axios';
 
-const API_URL = `https://${window.location.hostname}:5001/api`;
+const API_URL = process.env.API_URL || 'http://localhost:5001/api';
 
 // ✅ Use the same key as RoleContext
 const getAuthToken = (): string | null => {
-  return localStorage.getItem('sk_token');
+ return process.env.SK_TOKEN || '';
 };
 
 const apiClient = axios.create({ baseURL: API_URL });
@@ -12,7 +12,9 @@ const apiClient = axios.create({ baseURL: API_URL });
 apiClient.interceptors.request.use((config) => {
   const token = getAuthToken();
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    if (config.headers) {
+  config.headers.Authorization = `Bearer ${token}`;
+}
   }
   return config;
 });

@@ -74,16 +74,16 @@ console.log('🔍 [autoAttendance] req.body:', req.body);
     // 1. Call face recognition service (your Python endpoint)
     const formData = new FormData();
     formData.append('file', photoFile.buffer, { filename: 'photo.jpg' });
-    const pyRes = await axios.post('http://localhost:8000/match', formData, {
-      headers: { ...formData.getHeaders() },
-      timeout: 60000,
-    });
-console.log('🐍 Python /match full response:', JSON.stringify(pyRes.data));
-    if (!pyRes.data.success) {
-      return res.status(400).json({ success: false, message: pyRes.data.message || 'Face not recognised' });
+    const pyRes = await axios.post<{ success: boolean; message?: string; data?: any }>('http://localhost:8000/match', formData, {
+  headers: { ...formData.getHeaders() },
+  timeout: 60000,
+});
+    const matchData = pyRes.data as { success: boolean; message?: string; data?: any };
+console.log('🐍 Python /match full response:', JSON.stringify(matchData));
+    if (!matchData.success) {
+      return res.status(400).json({ success: false, message: matchData.message || 'Face not recognised' });
     }
-
-   const payload = pyRes.data.data || pyRes.data;
+    const payload = matchData.data || matchData;
 const { employeeId, employeeName } = payload;
     // 2. Check today's attendance status
     const today = formatDate(new Date());
@@ -199,7 +199,7 @@ export const faceRecognize = async (req: Request, res: Response) => {
 
     const formData = new FormData();
     formData.append('file', photoFile.buffer, { filename: 'photo.jpg' });
-    const pyRes = await axios.post('http://localhost:8000/embedding', formData, {
+    const pyRes = await axios.post<{ success: boolean; message?: string; data?: any }>('http://localhost:8000/embedding', formData, {
       headers: { ...formData.getHeaders() },
       timeout: 60000,
     });

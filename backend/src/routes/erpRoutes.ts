@@ -48,7 +48,7 @@ router.get("/debug", async (req: Request, res: Response) => {
     console.error("❌ [DEBUG] Error in debug endpoint:", error);
     res.status(500).json({ 
       error: "Debug failed", 
-      details: error.message 
+      details: error instanceof Error ? error.message : String(error) 
     });
   }
 });
@@ -242,7 +242,7 @@ router.post("/products", async (req: Request, res: Response) => {
 
     res.status(500).json({
       error: "Failed to create product",
-      details: error.message,
+      details: error instanceof Error ? error.message : String(error),
       errorName: error.name,
     });
   }
@@ -271,7 +271,7 @@ router.delete("/products/:id", async (req: Request, res: Response) => {
     res.json({ success: true, message: "Product deleted successfully" });
   } catch (error) {
     console.error("❌ [DEBUG] Error deleting product:", error);
-    res.status(500).json({ error: "Failed to delete product", details: error.message });
+    res.status(500).json({ error: "Failed to delete product", details: error instanceof Error ? error.message : String(error) });
   }
 });
 
@@ -306,7 +306,7 @@ router.post(
       res.json(changeData);
     } catch (error) {
       console.error("❌ [DEBUG] Error adding change history:", error);
-      res.status(500).json({ error: "Failed to add change history", details: error.message });
+      res.status(500).json({ error: "Failed to add change history", details: error instanceof Error ? error.message : String(error) });
     }
   }
 );
@@ -802,7 +802,7 @@ router.get("/machine-stats", async (req: Request, res: Response) => {
     res.json(stats);
   } catch (error) {
     console.error("❌ [DEBUG] Error fetching machine stats:", error);
-    res.status(500).json({ error: "Failed to fetch machine statistics", details: error.message });
+    res.status(500).json({ error: "Failed to fetch machine statistics", details: error instanceof Error ? error.message : String(error) });
   }
 });
 

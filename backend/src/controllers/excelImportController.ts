@@ -191,7 +191,7 @@ const mapExcelRowToEmployee = async (row: any, index: number): Promise<any> => {
 };
 
 // Main import function
-export const importEmployeesFromExcel = async (req: Request, res: Response): Promise<void> => {
+export const importEmployeesFromExcel = async (req: Request, res: Response): Promise<void | Response> => {
   try {
     if (!req.file) {
       res.status(400).json({ message: 'No file uploaded' });
@@ -232,7 +232,7 @@ export const importEmployeesFromExcel = async (req: Request, res: Response): Pro
       const row = worksheet.getRow(i);
       
       // Skip completely empty rows
-      const hasData = row.cells.some(cell => cell.value);
+    const hasData = row.hasValues;
       if (!hasData) {
         continue;
       }
@@ -336,7 +336,7 @@ export const importEmployeesFromExcel = async (req: Request, res: Response): Pro
 };
 
 // Test with direct data insertion (for debugging)
-export const testDirectImport = async (req: Request, res: Response): Promise<void> => {
+export const testDirectImport = async (req: Request, res: Response): Promise<void | Response> => {
   try {
     // Create a test employee that matches YOUR schema
     const testEmployee = {
