@@ -1,5 +1,4 @@
-// services/AttendanceService.ts
-import Attendance from '../models/Attendance';
+import axios from 'axios';
 
 export class AttendanceService {
 
