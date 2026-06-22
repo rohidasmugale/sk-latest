@@ -5,8 +5,8 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "ts-node src/server.ts",
-    "build": "tsc",
-    "start": "node dist/server.js",
+    "build": "node --max-old-space-size=512 node_modules/.bin/tsc",
+    "start": "node --max-old-space-size=512 dist/server.js",
     "watch": "tsc -w"
   },
   "dependencies": {
