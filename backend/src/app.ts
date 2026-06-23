@@ -48,7 +48,7 @@ import siteVisitRoutes from './routes/siteVisitRoutes';
 import incidentRoutes from './routes/incidentRoutes';
 import cleaningPhotoRoutes from './routes/cleaningPhotoRoutes';
 import faceRoutes from './routes/faceRoutes';
-
+import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 const app: Application = express();
 
@@ -633,8 +633,22 @@ app.get('/api/crm/stats', async (req: Request, res: Response) => {
 });
 
 
-// ==================== NOTIFICATIONS STUB ====================
-app.get('/api/notifications', (req: Request, res: Response) => {
+// Create rate limiter for notifications
+const notificationLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 5, // Only allow 5 requests per minute
+  handler: (req, res) => {
+    console.log('🚫 Rate limit exceeded for notifications');
+    res.status(429).json({
+      success: false,
+      message: 'Too many notification requests. Please wait 1 minute.'
+    });
+  }
+});
+
+// Rate limited notifications endpoint
+app.get('/api/notifications', notificationLimiter, (req: Request, res: Response) => {
+  res.set('Cache-Control', 'no-store');
   res.json({ success: true, data: [] });
 });
 app.patch('/api/notifications/:id/read', (req: Request, res: Response) => {
