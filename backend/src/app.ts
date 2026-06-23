@@ -649,8 +649,6 @@ app.delete('/api/notifications/:id', (req: Request, res: Response) => {
 
 // ==================== 404 HANDLER ====================
 app.use('*', (req: Request, res: Response) => {
-// ==================== 404 HANDLER ====================
-app.use('*', (req: Request, res: Response) => {
   console.log(`❌ 404: ${req.method} ${req.url}`);
   res.status(404).json({ success: false, message: 'Route not found', path: req.originalUrl });
 });
