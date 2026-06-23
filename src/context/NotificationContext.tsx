@@ -3,11 +3,10 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { toast } from 'sonner';
 import NotificationService, { NotificationItem } from '@/lib/notificationService';
 import { useRole } from './RoleContext';
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
 
 export type { NotificationItem as Notification };
 
-// ─── Define the shape of the API response ──────────────────────────
 interface ApiNotification {
   _id?: string;
   id?: string;
@@ -39,28 +38,39 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const pollInterval = useRef<NodeJS.Timeout | null>(null);
   const isMounted = useRef(true);
 
-  // Axios client for API calls
-  const apiClient = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5001/api',
-  });
-  apiClient.interceptors.request.use((config) => {
-    const token = localStorage.getItem('sk_token');
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-    return config;
-  });
+  // Create apiClient once using a ref so it never changes reference
+  const apiClientRef = useRef<AxiosInstance>(
+    axios.create({
+      baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5001/api',
+    })
+  );
 
-  // Function to fetch latest notifications from backend and merge with local cache
+  // Set up the auth interceptor once
+  useEffect(() => {
+    const interceptorId = apiClientRef.current.interceptors.request.use((config) => {
+      const token = localStorage.getItem('sk_token');
+      if (token) config.headers.Authorization = `Bearer ${token}`;
+      return config;
+    });
+    return () => {
+      apiClientRef.current.interceptors.request.eject(interceptorId);
+    };
+  }, []);
+
+  // refreshNotifications no longer depends on `notifications` state —
+  // it uses the functional updater form of setNotifications instead.
   const refreshNotifications = useCallback(async () => {
     try {
-      const response = await apiClient.get('/notifications');
+      const response = await apiClientRef.current.get('/notifications');
       const apiNotifs: ApiNotification[] = response.data?.data || response.data || [];
-      
-      if (Array.isArray(apiNotifs) && apiNotifs.length > 0) {
-        const currentIds = new Set(notifications.map(n => n.id));
-        let newCount = 0;
+
+      if (!Array.isArray(apiNotifs) || apiNotifs.length === 0) return;
+
+      setNotifications((prev) => {
+        const currentIds = new Set(prev.map((n) => n.id));
+        const newItems: NotificationItem[] = [];
 
         apiNotifs.forEach((notif: ApiNotification) => {
-          // Convert backend schema to frontend NotificationItem
           const item: NotificationItem = {
             id: notif._id || notif.id || `api_${Date.now()}_${Math.random()}`,
             title: notif.title || 'New Notification',
@@ -71,47 +81,56 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             metadata: notif.metadata || {},
           };
 
-          // Check if this is a new notification we haven't seen before
           if (!currentIds.has(item.id)) {
-            newCount++;
-            // Add to local service
+            newItems.push(item);
+          }
+        });
+
+        if (newItems.length === 0) {
+          // Return the exact same reference so React skips a re-render
+          return prev;
+        }
+
+        console.log(`🔔 Added ${newItems.length} new notifications`);
+
+        // Side-effects outside the setter (deferred so we don't block render)
+        setTimeout(() => {
+          newItems.forEach((item) => {
             service.addNotification({
               title: item.title,
               message: item.message,
               type: item.type,
               metadata: item.metadata,
             });
-            
-            // Trigger system notification (OS & Sound)
+
             service.showSystemNotification(item.title, {
               body: item.message,
               icon: '/favicon.ico',
             });
 
-            // Show toast alert for new items
             toast.info(item.title, {
               description: item.message,
               duration: 5000,
             });
-          }
-        });
+          });
+        }, 0);
 
-        if (newCount > 0) {
-          console.log(`🔔 Added ${newCount} new notifications`);
-        }
-      }
+        // Prepend new items so newest is first
+        return [...newItems, ...prev];
+      });
     } catch (error) {
       console.error('Failed to refresh notifications:', error);
     }
-  }, [notifications, service, apiClient]);
+  }, [service]); // `service` is a singleton so this never re-creates
 
-  // Load initial notifications and start polling
+  // Load initial notifications and start polling — runs exactly once
   useEffect(() => {
     isMounted.current = true;
-    // Load from service
+
+    // Load from local service cache
     setNotifications(service.getNotifications());
 
-    // Subscribe to service changes
+    // Subscribe to local service changes (e.g. from other tabs via BroadcastChannel)
     const unsubscribe = service.subscribe((updated) => {
       if (isMounted.current) {
         setNotifications([...updated]);
@@ -121,11 +140,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     // Immediate fetch on mount
     refreshNotifications();
 
-    // Poll every 10 seconds for new data (REAL-TIME WITHOUT REFRESH)
+    // Poll every 5 minutes — interval is set up once and never re-created
     if (pollInterval.current) clearInterval(pollInterval.current);
     pollInterval.current = setInterval(() => {
       refreshNotifications();
-    }, 300000); // 10 seconds
+    }, 300_000); // 5 minutes
 
     return () => {
       isMounted.current = false;
@@ -135,34 +154,41 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         pollInterval.current = null;
       }
     };
-  }, [service, refreshNotifications]);
+  }, [service]); // removed `refreshNotifications` — it's stable now, but keeping deps minimal
 
-  // Wrappers for service methods
-  const addNotification = useCallback((notif: Omit<NotificationItem, 'id' | 'timestamp' | 'isRead'>) => {
-    service.addNotification(notif);
-  }, [service]);
+  const addNotification = useCallback(
+    (notif: Omit<NotificationItem, 'id' | 'timestamp' | 'isRead'>) => {
+      service.addNotification(notif);
+    },
+    [service]
+  );
 
-  const markAsRead = useCallback((id: string) => {
-    service.markAsRead(id);
-    // Also call backend to mark read (optional but good)
-    apiClient.patch(`/notifications/${id}/read`).catch(() => {});
-  }, [service, apiClient]);
+  const markAsRead = useCallback(
+    (id: string) => {
+      service.markAsRead(id);
+      apiClientRef.current.patch(`/notifications/${id}/read`).catch(() => {});
+    },
+    [service]
+  );
 
   const markAllAsRead = useCallback(() => {
     service.markAllAsRead();
-    apiClient.patch('/notifications/read-all').catch(() => {});
-  }, [service, apiClient]);
+    apiClientRef.current.patch('/notifications/read-all').catch(() => {});
+  }, [service]);
 
-  const removeNotification = useCallback((id: string) => {
-    service.deleteNotification(id);
-    apiClient.delete(`/notifications/${id}`).catch(() => {});
-  }, [service, apiClient]);
+  const removeNotification = useCallback(
+    (id: string) => {
+      service.deleteNotification(id);
+      apiClientRef.current.delete(`/notifications/${id}`).catch(() => {});
+    },
+    [service]
+  );
 
   const clearAll = useCallback(() => {
     service.clearAllNotifications();
   }, [service]);
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   return (
     <NotificationContext.Provider
