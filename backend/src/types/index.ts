@@ -31,6 +31,7 @@ export type UserWithPermissions = IUser & {
 
 // Request Types
 export interface AuthenticatedRequest extends Request {
+  body: any;
   user?: {
     userId: string;
     email: string;
