@@ -33,8 +33,8 @@ import { useOutletContext } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 // ---------- API ----------
-const API_URL = import.meta.env.DEV ? "http://localhost:5001/api" : "/api";
-
+const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 // ---------- Types ----------
 interface Employee {
   _id: string;

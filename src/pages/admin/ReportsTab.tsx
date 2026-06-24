@@ -155,7 +155,8 @@ interface APIAttendance {
   hoursWorked?: number;
   remarks?: string;
 }
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOString().slice(0, 7) }: ReportsTabProps) => {
   // State for payroll data

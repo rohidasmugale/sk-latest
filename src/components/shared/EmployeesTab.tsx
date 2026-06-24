@@ -21,9 +21,8 @@ import { format, differenceInDays } from 'date-fns';
 import DocumentUpload from "../../pages/superadmin/DocumentUpload";
 
 // ─── API URL ──────────────────────────────────────────────────────────────
-const API_URL = import.meta.env.DEV
-  ? `http://localhost:5001/api`
-  : '/api';
+const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 // ─── Extended Interfaces ──────────────────────────────────────────────────
 

@@ -26,7 +26,8 @@ import axios from "axios";
 import { useOutletContext } from 'react-router-dom';
 import { motion } from "framer-motion";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 // Define interfaces
 interface RosterEntry {
   id: string;

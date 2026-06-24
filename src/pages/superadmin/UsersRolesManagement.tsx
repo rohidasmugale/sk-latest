@@ -76,10 +76,8 @@ import axios from "axios";
 import type { User, UserRole, CreateUserData } from "@/types/user";
 
 // API URL
-const API_URL = import.meta.env.DEV
-  ? `http://${window.location.hostname}:5001/api`
-  : '/api';
-
+const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 // Types for Manager Attendance (from your backend) with photo fields
 interface ManagerAttendanceRecord {
   _id: string;

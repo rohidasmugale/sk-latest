@@ -1,6 +1,8 @@
 // import { Shift, Employee, ApiResponse, AssignEmployeeRequest } from '../types/apiTypes';
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? `http://localhost:5001/api` : 'https://sk-backend-btbj.onrender.com/api');
+
 // Define interfaces if not already in a separate file
 export interface Shift {
   _id: string;

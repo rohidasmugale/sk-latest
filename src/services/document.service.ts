@@ -3,7 +3,8 @@ import axios, { AxiosError } from 'axios';
 
 // Use absolute URL - make sure this matches your backend
 const API_URL = import.meta.env.VITE_API_URL || 
-  `http://${window.location.hostname}:5001/api`;
+  (import.meta.env.DEV ? `http://localhost:5001/api` : 'https://sk-backend-btbj.onrender.com/api');
+
 export interface DocumentUploadResponse {
   success: boolean;
   message: string;

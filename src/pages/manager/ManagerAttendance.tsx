@@ -61,9 +61,8 @@ import axios from "axios";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 // API URL
-const API_URL = import.meta.env.DEV
-  ? `http://localhost:5001/api`
-  : '/api';
+const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 const apiClient = axios.create({ baseURL: API_URL });
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('sk_token');

@@ -35,7 +35,8 @@ interface ManagerAssignTaskPopupProps {
 interface SiteStaff {
   supervisors: StaffWithTaskCount[];
 }
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 const ManagerAssignTaskPopup: React.FC<ManagerAssignTaskPopupProps> = ({
   open,

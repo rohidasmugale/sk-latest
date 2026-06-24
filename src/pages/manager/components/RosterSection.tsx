@@ -24,7 +24,8 @@ import { rosterService, RosterEntryData, GetRosterParams } from "@/services/rost
 import { useRole } from "@/context/RoleContext";
 import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 // Define interfaces
 interface RosterEntry {
   id: string;

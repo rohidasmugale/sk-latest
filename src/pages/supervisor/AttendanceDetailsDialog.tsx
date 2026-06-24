@@ -47,9 +47,8 @@ import { toast } from "sonner";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 
-const API_URL = import.meta.env.DEV
-  ? `http://localhost:5001/api`
-  : '/api';
+const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 interface Employee {
   _id: string;

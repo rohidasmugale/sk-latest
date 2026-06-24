@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/select";
 import axios from "axios";
 
-const API_URL = import.meta.env.DEV ? "http://localhost:5001/api" : "/api";
+const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 const apiClient = axios.create({ baseURL: API_URL });
 apiClient.interceptors.request.use((config) => {

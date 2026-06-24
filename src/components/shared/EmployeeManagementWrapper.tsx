@@ -3,7 +3,8 @@ import { useRole } from "@/context/RoleContext";
 import EmployeesTab from "./EmployeesTab";
 import axios from "axios";
 
-const API_URL = import.meta.env.DEV ? "http://localhost:5001/api" : "/api";
+const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 // Define filter parameters type
 interface FilterParams {

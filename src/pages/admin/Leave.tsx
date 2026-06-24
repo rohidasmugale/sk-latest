@@ -504,7 +504,8 @@ const AdminLeavePage: React.FC = () => {
   });
 
   // API Base URL
- const API_URL = import.meta.env.VITE_API_URL;
+ const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
   // Fetch current user from localStorage on component mount
   useEffect(() => {
     fetchCurrentUser();

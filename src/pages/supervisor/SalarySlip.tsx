@@ -8,7 +8,8 @@ import { Loader2 } from 'lucide-react';
 import { salarySlipApi } from '@/services/payrollApi';
 import axios from 'axios';
 import { BackButton } from '@/components/shared/BackButton';
-const API_URL = import.meta.env.DEV ? 'http://localhost:5001/api' : '/api';
+const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 interface Employee {
   _id: string;

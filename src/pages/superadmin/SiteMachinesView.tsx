@@ -10,9 +10,8 @@ import { motion } from 'framer-motion';
 import axios from 'axios';
 
 // API base URL – consistent with your other components
-const API_URL = import.meta.env.DEV
-  ? `http://localhost:5001/api`
-  : '/api';
+const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 // Interface for machine data (adjust to match your backend response)
 interface Machine {

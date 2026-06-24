@@ -79,8 +79,8 @@ const Operations = () => {
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMobileView, setIsMobileView] = useState(false);
-  const API_URL = import.meta.env.DEV ? "http://localhost:5001/api" : "/api";
-
+const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
   useEffect(() => {
     const fetchData = async () => {
       try {

@@ -53,9 +53,8 @@ import { siteService, Site } from "@/services/SiteService";
 import axios from "axios";
 
 // API URL
-const API_URL = import.meta.env.DEV
-  ? `http://localhost:5001/api`
-  : '/api';
+const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 // Department data matching the dashboard
 const departmentViewData = [

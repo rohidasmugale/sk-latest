@@ -2,7 +2,9 @@
 // Use a relative URL for API calls - this works for both development and production
 // For development: http://localhost:5001/api
 // For production: /api (if using proxy) or full URL if deployed separately
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? `http://localhost:5001/api` : 'https://sk-backend-btbj.onrender.com/api');
+
 
 export interface InvoiceItem {
   description: string;

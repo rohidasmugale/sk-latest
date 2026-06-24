@@ -12,7 +12,8 @@ import axios from "axios";
 import { useRole } from "@/context/RoleContext";
 import CameraCapture from "./CameraCapture";
 
-const API_URL = import.meta.env.DEV ? "http://localhost:5001/api" : "/api";
+const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 const apiClient = axios.create({ baseURL: API_URL });
 apiClient.interceptors.request.use((config) => {

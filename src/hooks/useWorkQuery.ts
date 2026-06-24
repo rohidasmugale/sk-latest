@@ -146,7 +146,8 @@ export const useWorkQuery = ({ supervisorId, autoFetch = true, initialFilters = 
         });
         
         // Make custom fetch request
-        const API_URL = import.meta.env.VITE_API_URL;
+   const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
         const token = localStorage.getItem('access_token') || localStorage.getItem('token');
         
         const fetchResponse = await fetch(`${API_URL}/work-queries`, {
