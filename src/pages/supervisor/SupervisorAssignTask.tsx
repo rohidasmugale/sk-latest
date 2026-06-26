@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import NotificationService from '@/lib/notificationService';
+import { createNotificationForSuperadmin } from '@/lib/notificationHelper';
 import { 
   Search, 
   Clock, 
@@ -741,6 +742,22 @@ const SupervisorAssignTask: React.FC = () => {
       
 if (newStatus === 'completed') {
   NotificationService.completeTaskNotification(taskId);
+  const task = tasks.find(t => t._id === taskId);
+  if (task) {
+    createNotificationForSuperadmin(
+      `✅ Task Completed: ${task.taskTitle}`,
+      `Task "${task.taskTitle}" at ${task.siteName} completed by ${user?.name || 'Supervisor'}`,
+      'success',
+      'medium',
+      {
+        taskId: task._id,
+        siteName: task.siteName,
+        taskTitle: task.taskTitle,
+        completedBy: user?.name
+      },
+      'task_completed'
+    );
+  }
   console.log(`🔔 Stopped persistent sound for task ${taskId}`);
 }
       

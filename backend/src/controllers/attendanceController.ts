@@ -9,6 +9,7 @@ import FormData from 'form-data';
 import * as faceapi from 'face-api.js';
 import canvas from 'canvas';
 import path from 'path';
+import Notification from '../models/Notification';
 const FACE_SERVICE_URL = process.env.FACE_SERVICE_URL || 
   (process.env.NODE_ENV === 'production' 
     ? 'https://sk-face-service.onrender.com' 
@@ -311,6 +312,16 @@ export const checkInWithPhoto = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'Photo is required for check-in' });
     }
 
+    // ✅ FIX: Properly parse latitude and longitude
+    const parsedLatitude = (latitude !== undefined && latitude !== null && latitude !== '') 
+      ? Number(latitude) 
+      : null;
+    const parsedLongitude = (longitude !== undefined && longitude !== null && longitude !== '') 
+      ? Number(longitude) 
+      : null;
+
+    console.log(`📍 Location: lat=${parsedLatitude}, lng=${parsedLongitude}`);
+
     const today = formatDate(new Date());
     const existingAttendance = await Attendance.findOne({ employeeId, date: today });
     if (existingAttendance?.isCheckedIn) {
@@ -338,8 +349,16 @@ export const checkInWithPhoto = async (req: Request, res: Response) => {
           checkInPhoto: photoUrl,
           isCheckedIn: true,
           status: 'present',
-          latitude: latitude || null,
-          longitude: longitude || null,
+          // ✅ FIX: Use parsed values
+          latitude: parsedLatitude,
+          longitude: parsedLongitude,
+          checkInLatitude: parsedLatitude,
+          checkInLongitude: parsedLongitude,
+          currentLatitude: parsedLatitude,
+          currentLongitude: parsedLongitude,
+          lastLocationUpdate: new Date(),
+          isLocationTracking: parsedLatitude !== null && parsedLongitude !== null,
+          isOutOfGeofence: false,
           updatedAt: new Date(),
         },
         { new: true }
@@ -364,15 +383,16 @@ export const checkInWithPhoto = async (req: Request, res: Response) => {
         supervisorId: supervisorId || null,
         department: employee?.department || 'General',
         siteName: employee?.siteName || null,
-        latitude: latitude || null,
-        longitude: longitude || null,
-         checkInLatitude:  latitude  ? Number(latitude)  : null,
-  checkInLongitude: longitude ? Number(longitude) : null,
-  currentLatitude:  latitude  ? Number(latitude)  : null,
-  currentLongitude: longitude ? Number(longitude) : null,
-  lastLocationUpdate: new Date(),
-  isLocationTracking: !!(latitude && longitude),
-  isOutOfGeofence: false,
+        // ✅ FIX: Use parsed values
+        latitude: parsedLatitude,
+        longitude: parsedLongitude,
+        checkInLatitude: parsedLatitude,
+        checkInLongitude: parsedLongitude,
+        currentLatitude: parsedLatitude,
+        currentLongitude: parsedLongitude,
+        lastLocationUpdate: new Date(),
+        isLocationTracking: parsedLatitude !== null && parsedLongitude !== null,
+        isOutOfGeofence: false,
       });
     }
 
@@ -385,10 +405,10 @@ export const checkInWithPhoto = async (req: Request, res: Response) => {
       message: 'Checked in successfully with photo',
       data: { ...attendance.toJSON(), checkInPhoto: photoUrl },
     });
- } catch (error: any) {
-  console.error('❌ checkInWithPhoto error:', error);
-  res.status(500).json({ success: false, message: error.message });
-}
+  } catch (error: any) {
+    console.error('❌ checkInWithPhoto error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 };
 
 export const checkOutWithPhoto = async (req: Request, res: Response) => {
@@ -1396,9 +1416,10 @@ async function recognizeFace(imageBuffer: Buffer): Promise<string | null> {
 }
 
 // ==================== Geofencing ====================
+// ==================== Geofencing ====================
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371; // Earth radius in km
+  const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
@@ -1408,7 +1429,6 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
     Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
-
 export const updateEmployeeLocation = async (req: Request, res: Response) => {
   try {
     const { employeeId, latitude, longitude } = req.body;
@@ -1445,7 +1465,7 @@ export const updateEmployeeLocation = async (req: Request, res: Response) => {
         Number(latitude),
         Number(longitude),
       );
-      isOutOfGeofence = distanceKm > 0.5; // 0.5 km threshold
+      isOutOfGeofence = distanceKm > 0.5;
     }
 
     await Attendance.findByIdAndUpdate(record._id, {
@@ -1457,12 +1477,38 @@ export const updateEmployeeLocation = async (req: Request, res: Response) => {
 
     const justLeft = !wasOutOfGeofence && isOutOfGeofence;
 
+    if (justLeft) {
+      console.log(`🚨 EMPLOYEE LEFT GEOFENCE: ${record.employeeName} (${record.employeeId})`);
+
+      // ✅ FIXED: Use imported Notification directly
+      try {
+        await Notification.create({
+          title: '🚨 Employee Left Site',
+          message: `${record.employeeName} has left the ${record.siteName || 'site'} geofence (${Math.round(distanceKm * 1000)}m away)`,
+          type: 'warning',
+          priority: 'high',
+          notificationType: 'employee_left_site',
+          metadata: {
+            employeeId: record.employeeId,
+            employeeName: record.employeeName,
+            siteName: record.siteName,
+            distanceKm: Math.round(distanceKm * 1000) / 1000,
+            supervisorId: record.supervisorId,
+          },
+          createdAt: new Date(),
+        });
+        console.log('✅ Geofence notification saved to database');
+      } catch (err) {
+        console.warn('Could not save geofence notification:', err);
+      }
+    }
+
     res.json({
       success: true,
       data: {
         isOutOfGeofence,
         distanceKm: Math.round(distanceKm * 1000) / 1000,
-        justLeft, // only true when crossing from inside to outside
+        justLeft,
         employeeName: record.employeeName,
         siteName: record.siteName,
       },
@@ -1472,7 +1518,7 @@ export const updateEmployeeLocation = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
+// ✅ CORRECT: getGeofenceBreaches is a separate exported function
 export const getGeofenceBreaches = async (req: Request, res: Response) => {
   try {
     const today = formatDate(new Date());

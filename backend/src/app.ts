@@ -25,14 +25,14 @@ import clientRoutes from './routes/clientRoutes';
 import tasksRoutes from './routes/tasksRoutes';
 import employeeRoutes from './routes/employeeRoutes';
 import leadRoutes from './routes/leadRoutes';
-
+// In backend/src/server.ts
+import notificationRoutes from './routes/notificationRoutes';
 import expenseRoutes from './routes/expenseRoutes';
 
 import serviceRoutes from './routes/serviceRoutes';
 import alertRoutes from './routes/alertRoutes'
 import machineRoutes from './routes/machineRoutes';
 import payrollRoutes from './routes/payrollRoutes'
-import rosterRoutes from './routes/rosterRoutes'
 import adminLeaveRoutes from './routes/adminLeaveRoutes';
 import invoiceRoutes from './routes/invoiceRoutes';
 import managerLeaveRoutes from './routes/managerLeaveRoutes';
@@ -266,6 +266,9 @@ console.log('✅ Settings routes registered at /api/settings');
 app.use('/api', uploadRoutes);
 app.use('/uploads', express.static('uploads'));
 
+
+// After other route registrations
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/alerts',alertRoutes);
 app.use('/api/machines', machineRoutes);
 app.use('/api/services', serviceRoutes);
@@ -604,7 +607,7 @@ app.use('/api/shifts', shiftRoutes);
 app.use('/api/deductions', deductionRoutes);
 app.use('/api/salary-structures', salaryStructureRoutes);
 app.use('/api/payroll', payrollRoutes);
-app.use('/api/roster',rosterRoutes);
+
 app.use('/api/salary-slips', salarySlipRoutes);
 app.use('/api/leaves', leaveRoutes);
 app.use('/api/sites', siteRoutes);

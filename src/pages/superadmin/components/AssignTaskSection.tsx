@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { createNotificationForSuperadmin } from '@/lib/notificationHelper';
 import { 
   Calendar, 
   Clock, 
@@ -2371,6 +2372,22 @@ if (newTask && newTask.assignedSupervisors) {
       }
     }));
   });
+  // 🔔 Notify superadmin of new task creation
+if (newTask) {
+  createNotificationForSuperadmin(
+    `📋 New Task: ${newTask.taskTitle}`,
+    `Task "${newTask.taskTitle}" assigned to ${newTask.siteName} – Priority: ${newTask.priority}`,
+    'info',
+    newTask.priority === 'high' ? 'high' : 'medium',
+    {
+      taskId: newTask._id,
+      siteName: newTask.siteName,
+      priority: newTask.priority,
+      taskTitle: newTask.taskTitle
+    },
+    'task_creation'
+  );
+}
 }
 
       
@@ -2437,7 +2454,21 @@ const handleEditSubmit = async (e: React.FormEvent, updatedTask: AssignTask) => 
         }
       }));
     });
-    
+    // 🔔 Notify superadmin of task update (if status changed to 'completed')
+if (result.status === 'completed' && taskToEdit.status !== 'completed') {
+  createNotificationForSuperadmin(
+    `✅ Task Completed: ${result.taskTitle}`,
+    `Task "${result.taskTitle}" at ${result.siteName} has been completed`,
+    'success',
+    'medium',
+    {
+      taskId: result._id,
+      siteName: result.siteName,
+      taskTitle: result.taskTitle
+    },
+    'task_completed'
+  );
+}
     // 🎯 If status changed to 'completed', stop persistent sound
     if (result.status === 'completed' && taskToEdit.status !== 'completed') {
       window.dispatchEvent(new CustomEvent('task-completed', {

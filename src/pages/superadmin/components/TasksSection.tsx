@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { createNotificationForSuperadmin } from '@/lib/notificationHelper';
 import { 
   Plus, 
   Search, 
@@ -3691,6 +3692,23 @@ const TasksSection = () => {
         successMessage += ` ${skippedSites.length} site(s) were skipped: ${skippedSites.join(', ')}.`;
       }
       
+      if (createdTasks && createdTasks.length > 0) {
+  createdTasks.forEach((task: any) => {
+    createNotificationForSuperadmin(
+      `📋 New Task: ${task.title}`,
+      `Task "${task.title}" assigned to ${task.siteName} – Priority: ${task.priority}`,
+      'info',
+      task.priority === 'high' ? 'high' : 'medium',
+      {
+        taskId: task._id,
+        siteName: task.siteName,
+        priority: task.priority,
+        taskTitle: task.title
+      },
+      'task_creation'
+    );
+  });
+}
       toast.success(successMessage);
       
       // Refresh tasks list
@@ -3991,33 +4009,102 @@ const TasksSection = () => {
   };
 
   const handleUpdateStatus = async (taskId: string, status: Task["status"], userId?: string) => {
-    try {
-      const updateData: UpdateTaskStatusRequest = userId ? { status, userId } : { status };
-      await taskService.updateTaskStatus(taskId, updateData);
-      toast.success(userId ? "User status updated!" : "Task status updated!");
-      await fetchTasks();
-    } catch (error: any) {
-      console.error("Error updating task status:", error);
-      toast.error(error.message || "Failed to update task status");
+  try {
+    const updateData: UpdateTaskStatusRequest = userId ? { status, userId } : { status };
+    await taskService.updateTaskStatus(taskId, updateData);
+    
+    // 🎯 Dispatch events
+    const task = tasks.find(t => t._id === taskId);
+    if (status === 'completed') {
+  if (task) {
+    createNotificationForSuperadmin(
+      `✅ Task Completed: ${task.title}`,
+      `Task "${task.title}" at ${task.siteName} completed${userId ? ` by ${getAssigneeName(userId)}` : ''}`,
+      'success',
+      'medium',
+      {
+        taskId: task._id,
+        siteName: task.siteName,
+        taskTitle: task.title,
+        completedBy: userId ? getAssigneeName(userId) : 'Current User'
+      },
+      'task_completed'
+    );
+  }
+}
+    if (task) {
+      // Always dispatch a general update event
+      window.dispatchEvent(new CustomEvent('task-updated', {
+        detail: {
+          taskId: task._id,
+          taskTitle: task.title,
+          siteName: task.siteName,
+          newStatus: status,
+          updatedBy: userId ? getAssigneeName(userId) : 'Current User',
+          notificationType: 'task_status_update'
+        }
+      }));
+
+      // If completed, also dispatch task-completed
+      if (status === 'completed') {
+        window.dispatchEvent(new CustomEvent('task-completed', {
+          detail: {
+            taskId: task._id,
+            taskTitle: task.title,
+            siteName: task.siteName,
+            completedBy: userId ? getAssigneeName(userId) : 'Current User'
+          }
+        }));
+      }
     }
-  };
+
+    toast.success(userId ? "User status updated!" : "Task status updated!");
+    await fetchTasks();
+  } catch (error: any) {
+    console.error("Error updating task status:", error);
+    toast.error(error.message || "Failed to update task status");
+  }
+};
 
   // Handle update status for grouped tasks
-  const handleUpdateGroupStatus = async (groupedTask: GroupedTask, status: Task["status"]) => {
-    try {
-      // Update all tasks in the group
-      const updatePromises = groupedTask._groupItems.map((task: Task) => 
-        taskService.updateTaskStatus(task._id, { status })
-      );
-      
-      await Promise.all(updatePromises);
-      toast.success(`Updated status for ${groupedTask._groupCount} tasks!`);
-      await fetchTasks();
-    } catch (error: any) {
-      console.error("Error updating group status:", error);
-      toast.error(error.message || "Failed to update tasks");
+ const handleUpdateGroupStatus = async (groupedTask: GroupedTask, status: Task["status"]) => {
+  try {
+    const updatePromises = groupedTask._groupItems.map((task: Task) => 
+      taskService.updateTaskStatus(task._id, { status })
+    );
+    await Promise.all(updatePromises);
+    
+    // 🎯 Dispatch events for group
+    if (status === 'completed') {
+      window.dispatchEvent(new CustomEvent('task-completed', {
+        detail: {
+          taskId: groupedTask._id,
+          taskTitle: groupedTask.title,
+          siteName: groupedTask.siteName,
+          completedBy: 'Current User',
+          groupCount: groupedTask._groupCount
+        }
+      }));
+    } else {
+      window.dispatchEvent(new CustomEvent('task-updated', {
+        detail: {
+          taskId: groupedTask._id,
+          taskTitle: groupedTask.title,
+          siteName: groupedTask.siteName,
+          newStatus: status,
+          updatedBy: 'Current User',
+          notificationType: 'task_status_update'
+        }
+      }));
     }
-  };
+
+    toast.success(`Updated status for ${groupedTask._groupCount} tasks!`);
+    await fetchTasks();
+  } catch (error: any) {
+    console.error("Error updating group status:", error);
+    toast.error(error.message || "Failed to update tasks");
+  }
+};
 
   // Handle delete for grouped tasks
   const handleDeleteGroup = async (groupedTask: GroupedTask) => {

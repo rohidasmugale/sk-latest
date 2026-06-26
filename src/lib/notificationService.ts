@@ -540,13 +540,19 @@ class NotificationService {
     return false;
   }
 
-  clearAllNotifications(): number {
-    const count = this.notifications.length;
-    this.notifications = [];
-    this.saveNotificationsToStorage();
-    this.notifyListeners();
-    return count;
+ clearAllNotifications(): number {
+  const count = this.notifications.length;
+  this.notifications = [];
+  this.saveNotificationsToStorage();
+  this.notifyListeners();
+  
+  // ✅ Also clear from localStorage directly
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('site_notifications');
   }
+  
+  return count;
+}
 
   clearByType(type: string): number {
     const initialLength = this.notifications.length;

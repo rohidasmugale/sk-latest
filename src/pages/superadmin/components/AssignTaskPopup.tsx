@@ -24,7 +24,7 @@ import { Loader2, User, Briefcase, Building, Calendar, Edit } from 'lucide-react
 import { assignTaskService, type AssignTask, type CreateAssignTaskRequest } from '@/services/assignTaskService';
 import { taskService, type ExtendedSite, type StaffWithTaskCount } from '@/services/TaskService';
 import { useRole } from '@/context/RoleContext';
-
+import { createNotificationForSuperadmin } from '@/lib/notificationHelper';
 interface AssignTaskPopupProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -319,6 +319,19 @@ const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
               }
             }));
           });
+           createNotificationForSuperadmin(
+    `📋 New Task: ${result.taskTitle}`,
+    `Task "${result.taskTitle}" assigned to ${result.siteName} – Priority: ${result.priority}`,
+    'info',
+    result.priority === 'high' ? 'high' : 'medium',
+    {
+      taskId: result._id,
+      siteName: result.siteName,
+      priority: result.priority,
+      taskTitle: result.taskTitle
+    },
+    'task_creation'
+  );
         }
         
         toast.success('Task assigned successfully!');

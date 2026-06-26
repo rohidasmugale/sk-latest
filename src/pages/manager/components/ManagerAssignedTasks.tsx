@@ -862,14 +862,38 @@ const ManagerAssignedTasks = () => {
   };
 
   const handleStatusUpdate = async (taskId: string, status: string) => {
-    try {
-      const statusData: UpdateStatusRequest = { 
-        status: status as any,
-        userId: currentUser.id,
-        userRole: 'manager'
-      };
+     try {
+    const statusData: UpdateStatusRequest = { 
+      status: status as any,
+      userId: currentUser.id,
+      userRole: 'manager'
+    };
+    await assignTaskService.updateTaskStatus(taskId, statusData);
+    
+    // ✅ NEW: Dispatch events
+    const task = tasks.find(t => t._id === taskId);
+    if (task) {
+      window.dispatchEvent(new CustomEvent('task-updated', {
+        detail: {
+          taskId: task._id,
+          taskTitle: task.taskTitle,
+          siteName: task.siteName,
+          newStatus: status,
+          updatedBy: currentUser.name
+        }
+      }));
       
-      await assignTaskService.updateTaskStatus(taskId, statusData);
+      if (status === 'completed') {
+        window.dispatchEvent(new CustomEvent('task-completed', {
+          detail: {
+            taskId: task._id,
+            taskTitle: task.taskTitle,
+            siteName: task.siteName,
+            completedBy: currentUser.name
+          }
+        }));
+      }
+    }
       
       toast.success(`Task status updated to ${status}`);
       

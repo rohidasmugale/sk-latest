@@ -91,7 +91,6 @@ import EmployeeAttendance from "./pages/employee/EmployeeAttendance";
 
 import NotFound from "./pages/NotFound";
 import ManagerAttendance from "./pages/manager/ManagerAttendance";
-import WorkQuery from "./pages/supervisor/WorkQuery";
 import SuperAdminWorkIssues from "./pages/superadmin/SuperAdminWorkIssues";
 import AdminAttendanceView from "./pages/admin/AdminAttendanceView";
 import AdminHRMS from "./pages/admin/AdminHRMS";
@@ -104,7 +103,7 @@ import SupervisorTrainingBriefing from "./pages/supervisor/SupervisorTrainingBri
 import SiteMachinesView from "./pages/superadmin/SiteMachinesView";
 //import { AuthProvider } from "./contexts/AuthContext";
 // import AdminCRM from "./pages/admin/AdminCRM";
-import TeamAndClients from "./pages/TeamAndClients";
+
 
 import ManagerMachineStatus from '@/pages/manager/ManagerMachineStatus';
 import ManagerGrooming from '@/pages/manager/ManagerGrooming';
@@ -133,7 +132,7 @@ const App = () => (
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
-<Route path="team" element={<TeamAndClients />} />
+
             {/* Super Admin Routes */}
             <Route
               path="/superadmin"
@@ -242,7 +241,7 @@ const App = () => (
               <Route path="dashboard" element={<SupervisorDashboard />} />
               <Route path="profile" element={<SupervisorProfile />} />
               <Route path="tasks" element={<Tasks />} />
-              <Route path="query" element={<WorkQuery />} />
+             
               <Route path="inventory" element={<InventoryPage />} /> {/* ADD THIS ROUTE */}
              
               <Route path="attendance" element={<Attendance />} />

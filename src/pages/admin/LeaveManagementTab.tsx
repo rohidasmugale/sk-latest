@@ -640,372 +640,409 @@ const fetchAdminLeaves = async (page = 1) => {
     }
   };
 
-  // Handle leave action (approve/reject) - Only for non-admin leaves
   const handleLeaveAction = async (leave: any, action: "approved" | "rejected") => {
-    // Prevent admin from approving/rejecting their own leave
-    if (isOwnLeave(leave)) {
-      toast.error("You cannot approve or reject your own leave request");
+  try {
+    setIsUpdating(true);
+    setSelectedLeave(leave);
+    
+    let response;
+    let endpoint = '';
+    let requestBody = {};
+    
+    const leaveId = leave._id || leave.id || '';
+    
+    if (!leaveId) {
+      toast.error("Leave ID is missing");
+      setIsUpdating(false);
       return;
     }
 
-    try {
-      setIsUpdating(true);
-      setSelectedLeave(leave);
-      
-      let response;
-      let endpoint = '';
-      let requestBody = {};
-      
-      const leaveId = leave._id || leave.id || '';
-      
-      // Determine correct endpoint based on leave type
-    // In handleLeaveAction function, update the requestBody for manager and admin leaves:
-
-if (isAdminLeave(leave)) {
-  endpoint = `${API_URL}/admin-leaves/admin/${leaveId}/status`; // Changed from superadmin
-  requestBody = {
-    status: action,
-    [action === 'approved' ? 'approvedBy' : 'rejectedBy']: adminInfo.adminName || 'Admin',
-    adminRemarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
-  };
-} else if (isManagerLeave(leave)) {
-  endpoint = `${API_URL}/manager-leaves/admin/${leaveId}/status`; // Changed from superadmin
-  requestBody = {
-    status: action,
-    [action === 'approved' ? 'approvedBy' : 'rejectedBy']: adminInfo.adminName || 'Admin',
-    adminRemarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
-  };
-} else {
-  endpoint = `${API_URL}/leaves/${leaveId}/status`;
-  requestBody = { 
-    status: action,
-    approvedBy: action === 'approved' ? adminInfo.adminName || 'Admin' : undefined,
-    rejectedBy: action === 'rejected' ? adminInfo.adminName || 'Admin' : undefined,
-    remarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
-  };
-}
-
-      console.log(`Updating leave at ${endpoint}`, requestBody);
-      console.log('Leave type:', isAdminLeave(leave) ? 'Admin' : isManagerLeave(leave) ? 'Manager' : 'Employee/Supervisor');
-      
-      response = await fetch(endpoint, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorMessage = 'Failed to update leave status';
-        
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.message || errorMessage;
-        } catch (e) {
-          errorMessage = response.statusText || errorMessage;
-        }
-        
-        throw new Error(errorMessage);
-      }
-
-      const data = await response.json();
-      
-      // Update local state based on active tab and leave type
-      if (activeTab === "supervisor-employee") {
-        setSupervisorEmployeeLeaves(prev => 
-          prev.map(l => {
-            const lId = l._id || l.id;
-            if (lId === leaveId) {
-              return { 
-                ...l, 
-                status: action,
-                approvedBy: action === 'approved' ? adminInfo.adminName || 'Admin' : undefined,
-                rejectedBy: action === 'rejected' ? adminInfo.adminName || 'Admin' : undefined,
-                approvedAt: action === 'approved' ? new Date().toISOString() : undefined,
-                rejectedAt: action === 'rejected' ? new Date().toISOString() : undefined,
-                remarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
-              };
-            }
-            return l;
-          })
-        );
-        
-        setSupervisorEmployeeStats(prev => {
-          const newStats = { ...prev };
-          if (action === 'approved') {
-            newStats.approved++;
-            newStats.pending--;
-          } else if (action === 'rejected') {
-            newStats.rejected++;
-            newStats.pending--;
-          }
-          return newStats;
-        });
-      } else if (activeTab === "manager") {
-        setManagerLeaves(prev => 
-          prev.map(l => {
-            const lId = l._id || l.id;
-            if (lId === leaveId) {
-              return { 
-                ...l, 
-                status: action,
-                approvedBy: action === 'approved' ? adminInfo.adminName || 'Admin' : undefined,
-                rejectedBy: action === 'rejected' ? adminInfo.adminName || 'Admin' : undefined,
-                approvedAt: action === 'approved' ? new Date().toISOString() : undefined,
-                rejectedAt: action === 'rejected' ? new Date().toISOString() : undefined,
-                superadminRemarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
-              };
-            }
-            return l;
-          })
-        );
-        
-        setManagerStats(prev => {
-          const newStats = { ...prev };
-          if (action === 'approved') {
-            newStats.approved++;
-            newStats.pending--;
-          } else if (action === 'rejected') {
-            newStats.rejected++;
-            newStats.pending--;
-          }
-          return newStats;
-        });
-      } else if (activeTab === "admin") {
-        // When in admin tab, update adminLeaves
-        setAdminLeaves(prev => 
-          prev.map(l => {
-            const lId = l._id || l.id;
-            if (lId === leaveId) {
-              return { 
-                ...l, 
-                status: action,
-                approvedBy: action === 'approved' ? adminInfo.adminName || 'Admin' : undefined,
-                rejectedBy: action === 'rejected' ? adminInfo.adminName || 'Admin' : undefined,
-                approvedAt: action === 'approved' ? new Date().toISOString() : undefined,
-                rejectedAt: action === 'rejected' ? new Date().toISOString() : undefined,
-                superadminRemarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
-              };
-            }
-            return l;
-          })
-        );
-        
-        setAdminStats(prev => {
-          const newStats = { ...prev };
-          if (action === 'approved') {
-            newStats.approved++;
-            newStats.pending--;
-          } else if (action === 'rejected') {
-            newStats.rejected++;
-            newStats.pending--;
-          }
-          return newStats;
-        });
-      }
-
-      toast.success(data.message || `Leave request ${action} successfully!`);
-      setViewDialogOpen(false);
-      setRemarks("");
-      
-      // Refresh the list
-      if (activeTab === "supervisor-employee") {
-        fetchSupervisorEmployeeLeaves(currentPage);
-      } else if (activeTab === "manager") {
-        fetchManagerLeaves(currentPage);
-      } else if (activeTab === "admin") {
-        fetchAdminLeaves(currentPage);
-      }
-    } catch (error: any) {
-      console.error("Error updating leave status:", error);
-      toast.error(error.message || "Failed to update leave status");
-    } finally {
-      setIsUpdating(false);
-      setSelectedLeave(null);
+    console.log(`Processing leave action for:`, {
+      leaveId,
+      action,
+      leaveType: isAdminLeave(leave) ? 'Admin' : isManagerLeave(leave) ? 'Manager' : 'Employee/Supervisor'
+    });
+    
+    // Determine correct endpoint based on leave type
+    if (isAdminLeave(leave)) {
+      endpoint = `${API_URL}/admin-leaves/admin/${leaveId}/status`;
+      requestBody = {
+        status: action,
+        [action === 'approved' ? 'approvedBy' : 'rejectedBy']: adminInfo.adminName || 'Admin',
+        adminRemarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
+      };
+    } else if (isManagerLeave(leave)) {
+      endpoint = `${API_URL}/manager-leaves/admin/${leaveId}/status`;
+      requestBody = {
+        status: action,
+        [action === 'approved' ? 'approvedBy' : 'rejectedBy']: adminInfo.adminName || 'Admin',
+        adminRemarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
+      };
+    } else {
+      endpoint = `${API_URL}/leaves/${leaveId}/status`;
+      requestBody = { 
+        status: action,
+        approvedBy: action === 'approved' ? adminInfo.adminName || 'Admin' : undefined,
+        rejectedBy: action === 'rejected' ? adminInfo.adminName || 'Admin' : undefined,
+        remarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
+      };
     }
-  };
 
-  // Handle revert to pending - Only for non-admin leaves
-  const handleRevertToPending = async (leave: any) => {
-    // Prevent admin from reverting their own leave
-    if (isOwnLeave(leave)) {
-      toast.error("You cannot revert your own leave request");
+    console.log(`Updating leave at ${endpoint}`, requestBody);
+    
+    response = await fetch(endpoint, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = 'Failed to update leave status';
+      
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.message || errorMessage;
+      } catch (e) {
+        errorMessage = response.statusText || errorMessage;
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    
+    // Update local state based on active tab and leave type
+    if (activeTab === "supervisor-employee") {
+      setSupervisorEmployeeLeaves(prev => 
+        prev.map(l => {
+          const lId = l._id || l.id;
+          if (lId === leaveId) {
+            return { 
+              ...l, 
+              status: action,
+              approvedBy: action === 'approved' ? adminInfo.adminName || 'Admin' : undefined,
+              rejectedBy: action === 'rejected' ? adminInfo.adminName || 'Admin' : undefined,
+              approvedAt: action === 'approved' ? new Date().toISOString() : undefined,
+              rejectedAt: action === 'rejected' ? new Date().toISOString() : undefined,
+              remarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
+            };
+          }
+          return l;
+        })
+      );
+      
+      setSupervisorEmployeeStats(prev => {
+        const newStats = { ...prev };
+        if (action === 'approved') {
+          newStats.approved++;
+          newStats.pending--;
+        } else if (action === 'rejected') {
+          newStats.rejected++;
+          newStats.pending--;
+        }
+        return newStats;
+      });
+    } else if (activeTab === "manager") {
+      setManagerLeaves(prev => 
+        prev.map(l => {
+          const lId = l._id || l.id;
+          if (lId === leaveId) {
+            return { 
+              ...l, 
+              status: action,
+              approvedBy: action === 'approved' ? adminInfo.adminName || 'Admin' : undefined,
+              rejectedBy: action === 'rejected' ? adminInfo.adminName || 'Admin' : undefined,
+              approvedAt: action === 'approved' ? new Date().toISOString() : undefined,
+              rejectedAt: action === 'rejected' ? new Date().toISOString() : undefined,
+              adminRemarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
+            };
+          }
+          return l;
+        })
+      );
+      
+      setManagerStats(prev => {
+        const newStats = { ...prev };
+        if (action === 'approved') {
+          newStats.approved++;
+          newStats.pending--;
+        } else if (action === 'rejected') {
+          newStats.rejected++;
+          newStats.pending--;
+        }
+        return newStats;
+      });
+    } else if (activeTab === "admin") {
+      setAdminLeaves(prev => 
+        prev.map(l => {
+          const lId = l._id || l.id;
+          if (lId === leaveId) {
+            return { 
+              ...l, 
+              status: action,
+              approvedBy: action === 'approved' ? adminInfo.adminName || 'Admin' : undefined,
+              rejectedBy: action === 'rejected' ? adminInfo.adminName || 'Admin' : undefined,
+              approvedAt: action === 'approved' ? new Date().toISOString() : undefined,
+              rejectedAt: action === 'rejected' ? new Date().toISOString() : undefined,
+              adminRemarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
+            };
+          }
+          return l;
+        })
+      );
+      
+      setAdminStats(prev => {
+        const newStats = { ...prev };
+        if (action === 'approved') {
+          newStats.approved++;
+          newStats.pending--;
+        } else if (action === 'rejected') {
+          newStats.rejected++;
+          newStats.pending--;
+        }
+        return newStats;
+      });
+    }
+
+    // ✅ Dispatch leave-update event
+    const leaveName = leave.employeeName || leave.managerName || leave.adminName || 'Employee';
+    const leaveType = leave.leaveType || 'leave';
+    
+    window.dispatchEvent(new CustomEvent('leave-update', {
+      detail: {
+        leaveId: leaveId,
+        title: action === 'approved' ? '✅ Leave Approved' : '❌ Leave Rejected',
+        message: `${leaveName}'s ${leaveType} leave has been ${action} by ${adminInfo.adminName || 'Admin'}`,
+        notificationType: action === 'approved' ? 'leave_approved' : 'leave_rejected',
+        employeeName: leaveName,
+        leaveType: leaveType,
+        actionBy: adminInfo.adminName || 'Admin'
+      }
+    }));
+
+    toast.success(data.message || `Leave request ${action} successfully!`);
+    setViewDialogOpen(false);
+    setRemarks("");
+    
+    // Refresh the list
+    if (activeTab === "supervisor-employee") {
+      fetchSupervisorEmployeeLeaves(currentPage);
+    } else if (activeTab === "manager") {
+      fetchManagerLeaves(currentPage);
+    } else if (activeTab === "admin") {
+      fetchAdminLeaves(currentPage);
+    }
+  } catch (error: any) {
+    console.error("Error updating leave status:", error);
+    toast.error(error.message || "Failed to update leave status");
+  } finally {
+    setIsUpdating(false);
+    setSelectedLeave(null);
+  }
+};
+// Handle revert to pending
+const handleRevertToPending = async (leave: any) => {
+  try {
+    setIsUpdating(true);
+    setSelectedLeave(leave);
+    
+    let response;
+    let endpoint = '';
+    let requestBody = {};
+    
+    const leaveId = leave._id || leave.id || '';
+    
+    if (!leaveId) {
+      toast.error("Leave ID is missing");
+      setIsUpdating(false);
       return;
     }
 
-    try {
-      setIsUpdating(true);
-      setSelectedLeave(leave);
-      
-      let response;
-      let endpoint = '';
-      let requestBody = {};
-      
-      const leaveId = leave._id || leave.id || '';
-      
-      // Determine correct endpoint based on leave type
-      // In handleRevertToPending function:
-if (isAdminLeave(leave)) {
-  endpoint = `${API_URL}/admin-leaves/admin/${leaveId}/revert`; // Changed from superadmin
-  requestBody = {
-    remarks: remarks || 'Reverted to pending',
-    revertedBy: adminInfo.adminName || 'Admin'
-  };
-} else if (isManagerLeave(leave)) {
-  endpoint = `${API_URL}/manager-leaves/admin/${leaveId}/revert`; // Changed from superadmin
-  requestBody = {
-    remarks: remarks || 'Reverted to pending',
-    revertedBy: adminInfo.adminName || 'Admin'
-  };
-} else {
-  endpoint = `${API_URL}/leaves/${leaveId}/status`;
-  requestBody = { 
-    status: 'pending',
-    remarks: remarks || `Reverted to pending by ${adminInfo.adminName || 'Admin'}`,
-    revertedBy: adminInfo.adminName || 'Admin'
-  };
-}
-      console.log(`Reverting leave at ${endpoint}`, requestBody);
-      
-      response = await fetch(endpoint, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorMessage = 'Failed to revert leave status';
-        
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.message || errorMessage;
-        } catch (e) {
-          errorMessage = response.statusText || errorMessage;
-        }
-        
-        throw new Error(errorMessage);
-      }
-
-      const data = await response.json();
-      
-      // Update local state based on active tab
-      if (activeTab === "supervisor-employee") {
-        setSupervisorEmployeeLeaves(prev => 
-          prev.map(l => {
-            const lId = l._id || l.id;
-            if (lId === leaveId) {
-              return { 
-                ...l, 
-                status: 'pending',
-                approvedBy: undefined,
-                rejectedBy: undefined,
-                approvedAt: undefined,
-                rejectedAt: undefined,
-                remarks: remarks || `Reverted to pending by ${adminInfo.adminName || 'Admin'}`
-              };
-            }
-            return l;
-          })
-        );
-        
-        setSupervisorEmployeeStats(prev => {
-          const newStats = { ...prev };
-          if (leave.status === 'approved') {
-            newStats.approved--;
-            newStats.pending++;
-          } else if (leave.status === 'rejected') {
-            newStats.rejected--;
-            newStats.pending++;
-          }
-          return newStats;
-        });
-      } else if (activeTab === "manager") {
-        setManagerLeaves(prev => 
-          prev.map(l => {
-            const lId = l._id || l.id;
-            if (lId === leaveId) {
-              return { 
-                ...l, 
-                status: 'pending',
-                approvedBy: undefined,
-                rejectedBy: undefined,
-                approvedAt: undefined,
-                rejectedAt: undefined,
-                superadminRemarks: remarks || `Reverted to pending by ${adminInfo.adminName || 'Admin'}`
-              };
-            }
-            return l;
-          })
-        );
-        
-        setManagerStats(prev => {
-          const newStats = { ...prev };
-          if (leave.status === 'approved') {
-            newStats.approved--;
-            newStats.pending++;
-          } else if (leave.status === 'rejected') {
-            newStats.rejected--;
-            newStats.pending++;
-          }
-          return newStats;
-        });
-      } else if (activeTab === "admin") {
-        setAdminLeaves(prev => 
-          prev.map(l => {
-            const lId = l._id || l.id;
-            if (lId === leaveId) {
-              return { 
-                ...l, 
-                status: 'pending',
-                approvedBy: undefined,
-                rejectedBy: undefined,
-                approvedAt: undefined,
-                rejectedAt: undefined,
-                superadminRemarks: remarks || `Reverted to pending by ${adminInfo.adminName || 'Admin'}`
-              };
-            }
-            return l;
-          })
-        );
-        
-        setAdminStats(prev => {
-          const newStats = { ...prev };
-          if (leave.status === 'approved') {
-            newStats.approved--;
-            newStats.pending++;
-          } else if (leave.status === 'rejected') {
-            newStats.rejected--;
-            newStats.pending++;
-          }
-          return newStats;
-        });
-      }
-
-      toast.success(data.message || 'Leave request reverted to pending successfully!');
-      setViewDialogOpen(false);
-      setRemarks("");
-      
-      // Refresh the list
-      if (activeTab === "supervisor-employee") {
-        fetchSupervisorEmployeeLeaves(currentPage);
-      } else if (activeTab === "manager") {
-        fetchManagerLeaves(currentPage);
-      } else if (activeTab === "admin") {
-        fetchAdminLeaves(currentPage);
-      }
-    } catch (error: any) {
-      console.error("Error reverting leave:", error);
-      toast.error(error.message || "Failed to revert leave status");
-    } finally {
-      setIsUpdating(false);
-      setSelectedLeave(null);
+    console.log(`Reverting leave:`, {
+      leaveId,
+      leaveType: isAdminLeave(leave) ? 'Admin' : isManagerLeave(leave) ? 'Manager' : 'Employee/Supervisor'
+    });
+    
+    // Determine correct endpoint based on leave type
+    if (isAdminLeave(leave)) {
+      endpoint = `${API_URL}/admin-leaves/admin/${leaveId}/revert`;
+      requestBody = {
+        remarks: remarks || 'Reverted to pending',
+        revertedBy: adminInfo.adminName || 'Admin'
+      };
+    } else if (isManagerLeave(leave)) {
+      endpoint = `${API_URL}/manager-leaves/admin/${leaveId}/revert`;
+      requestBody = {
+        remarks: remarks || 'Reverted to pending',
+        revertedBy: adminInfo.adminName || 'Admin'
+      };
+    } else {
+      endpoint = `${API_URL}/leaves/${leaveId}/status`;
+      requestBody = { 
+        status: 'pending',
+        remarks: remarks || `Reverted to pending by ${adminInfo.adminName || 'Admin'}`,
+        revertedBy: adminInfo.adminName || 'Admin'
+      };
     }
-  };
+
+    console.log(`Reverting leave at ${endpoint}`, requestBody);
+    
+    response = await fetch(endpoint, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = 'Failed to revert leave status';
+      
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.message || errorMessage;
+      } catch (e) {
+        errorMessage = response.statusText || errorMessage;
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    
+    // Update local state based on active tab
+    if (activeTab === "supervisor-employee") {
+      setSupervisorEmployeeLeaves(prev => 
+        prev.map(l => {
+          const lId = l._id || l.id;
+          if (lId === leaveId) {
+            return { 
+              ...l, 
+              status: 'pending',
+              approvedBy: undefined,
+              rejectedBy: undefined,
+              approvedAt: undefined,
+              rejectedAt: undefined,
+              remarks: remarks || `Reverted to pending by ${adminInfo.adminName || 'Admin'}`
+            };
+          }
+          return l;
+        })
+      );
+      
+      setSupervisorEmployeeStats(prev => {
+        const newStats = { ...prev };
+        if (leave.status === 'approved') {
+          newStats.approved--;
+          newStats.pending++;
+        } else if (leave.status === 'rejected') {
+          newStats.rejected--;
+          newStats.pending++;
+        }
+        return newStats;
+      });
+    } else if (activeTab === "manager") {
+      setManagerLeaves(prev => 
+        prev.map(l => {
+          const lId = l._id || l.id;
+          if (lId === leaveId) {
+            return { 
+              ...l, 
+              status: 'pending',
+              approvedBy: undefined,
+              rejectedBy: undefined,
+              approvedAt: undefined,
+              rejectedAt: undefined,
+              adminRemarks: remarks || `Reverted to pending by ${adminInfo.adminName || 'Admin'}`
+            };
+          }
+          return l;
+        })
+      );
+      
+      setManagerStats(prev => {
+        const newStats = { ...prev };
+        if (leave.status === 'approved') {
+          newStats.approved--;
+          newStats.pending++;
+        } else if (leave.status === 'rejected') {
+          newStats.rejected--;
+          newStats.pending++;
+        }
+        return newStats;
+      });
+    } else if (activeTab === "admin") {
+      setAdminLeaves(prev => 
+        prev.map(l => {
+          const lId = l._id || l.id;
+          if (lId === leaveId) {
+            return { 
+              ...l, 
+              status: 'pending',
+              approvedBy: undefined,
+              rejectedBy: undefined,
+              approvedAt: undefined,
+              rejectedAt: undefined,
+              adminRemarks: remarks || `Reverted to pending by ${adminInfo.adminName || 'Admin'}`
+            };
+          }
+          return l;
+        })
+      );
+      
+      setAdminStats(prev => {
+        const newStats = { ...prev };
+        if (leave.status === 'approved') {
+          newStats.approved--;
+          newStats.pending++;
+        } else if (leave.status === 'rejected') {
+          newStats.rejected--;
+          newStats.pending++;
+        }
+        return newStats;
+      });
+    }
+
+    // ✅ Dispatch leave-update event
+    const leaveName = leave.employeeName || leave.managerName || leave.adminName || 'Employee';
+    const leaveType = leave.leaveType || 'leave';
+    
+    window.dispatchEvent(new CustomEvent('leave-update', {
+      detail: {
+        leaveId: leaveId,
+        title: '🔄 Leave Reverted to Pending',
+        message: `${leaveName}'s ${leaveType} leave has been reverted to pending by ${adminInfo.adminName || 'Admin'}`,
+        notificationType: 'leave_pending',
+        employeeName: leaveName,
+        leaveType: leaveType,
+        actionBy: adminInfo.adminName || 'Admin'
+      }
+    }));
+
+    toast.success(data.message || 'Leave request reverted to pending successfully!');
+    setViewDialogOpen(false);
+    setRemarks("");
+    
+    // Refresh the list
+    if (activeTab === "supervisor-employee") {
+      fetchSupervisorEmployeeLeaves(currentPage);
+    } else if (activeTab === "manager") {
+      fetchManagerLeaves(currentPage);
+    } else if (activeTab === "admin") {
+      fetchAdminLeaves(currentPage);
+    }
+  } catch (error: any) {
+    console.error("Error reverting leave:", error);
+    toast.error(error.message || "Failed to revert leave status");
+  } finally {
+    setIsUpdating(false);
+    setSelectedLeave(null);
+  }
+};
 
   // Handle apply for admin leave
   const validateApplyForm = (): boolean => {

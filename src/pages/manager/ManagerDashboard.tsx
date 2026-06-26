@@ -1826,19 +1826,7 @@ const CustomPayrollTooltip = ({ active, payload }: any) => {
               <span className="text-xs font-medium">Shift Deployment</span>
             </CardContent>
           </Card>
-          <Card className="cursor-pointer hover:shadow-md transition-all hover:scale-105" onClick={() => navigate('/manager/training')}>
-            <CardContent className="p-3 flex flex-col items-center text-center">
-              <div className="p-2 rounded-full bg-teal-100 text-teal-600 mb-2"><GraduationCap className="h-5 w-5" /></div>
-              <span className="text-xs font-medium">Training</span>
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:shadow-md transition-all hover:scale-105" onClick={() => navigate('/manager/briefing')}>
-            <CardContent className="p-3 flex flex-col items-center text-center">
-              <div className="p-2 rounded-full bg-emerald-100 text-emerald-600 mb-2"><Megaphone className="h-5 w-5" /></div>
-              <span className="text-xs font-medium">Briefing</span>
-            </CardContent>
-          </Card>
-        </div>
+         </div>
 </div>
 
       {/* Camera capture for check‑in/out */}

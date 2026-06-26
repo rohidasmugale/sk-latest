@@ -82,6 +82,7 @@ import { motion } from "framer-motion";
 import { useRole } from "@/context/RoleContext";
 import { useOutletContext } from "react-router-dom";
 import { taskService } from "@/services/TaskService";
+import { createNotificationForSuperadmin } from '@/lib/notificationHelper';
 import axios from "axios";
 
 interface LeaveRequest {
@@ -1236,172 +1237,136 @@ const SelfLeaveForm = ({
     handleInputChange("reason", e.target.value);
   };
   
-  return (
-    <form onSubmit={handleSelfSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label className="text-sm">Supervisor Information</Label>
-        <div className="p-3 bg-blue-50 rounded-lg">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Name</p>
-              <p className="font-medium">{user?.name || "Supervisor"}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Supervisor ID</p>
-              <p className="font-medium">{user?._id || "Not available"}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Department</p>
-              <p className="font-medium">{user?.department || supervisorDepartment || "Not assigned"}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Site</p>
-              <p className="font-medium">{supervisorSite?.name || user?.site || "Not assigned"}</p>
-            </div>
-          </div>
+ return (
+  <form onSubmit={handleSelfSubmit} className="space-y-5">
+    {/* Supervisor Information */}
+    <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
+      <h4 className="text-sm font-semibold text-blue-800 mb-3 flex items-center gap-2">
+        <Shield className="h-4 w-4" /> Supervisor Information
+      </h4>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+        <div className="flex justify-between border-b border-blue-100 pb-1">
+          <span className="text-muted-foreground">Name</span>
+          <span className="font-medium">{user?.name || "Supervisor"}</span>
+        </div>
+        <div className="flex justify-between border-b border-blue-100 pb-1">
+          <span className="text-muted-foreground">Supervisor ID</span>
+          <span className="font-medium font-mono text-xs">{user?._id || "Not available"}</span>
+        </div>
+        <div className="flex justify-between border-b border-blue-100 pb-1">
+          <span className="text-muted-foreground">Department</span>
+          <span className="font-medium">{user?.department || supervisorDepartment || "Not assigned"}</span>
+        </div>
+        <div className="flex justify-between border-b border-blue-100 pb-1">
+          <span className="text-muted-foreground">Site</span>
+          <span className="font-medium">{supervisorSite?.name || user?.site || "Not assigned"}</span>
         </div>
       </div>
+    </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="appliedBy" className="text-sm">
-          Applied By (Your Name) *
-        </Label>
-        <Input 
-          id="appliedBy"
-          value={formData.appliedBy}
-          onChange={(e) => handleInputChange("appliedBy", e.target.value)}
-          onBlur={() => {}}
-          placeholder="Enter your name"
-          className={`h-9 ${formErrors.appliedBy ? 'border-red-500' : ''}`}
-        />
-        {formErrors.appliedBy && (
-          <p className="text-xs text-red-500 mt-1">{formErrors.appliedBy}</p>
-        )}
-      </div>
+    {/* Applied By */}
+    <div className="space-y-1">
+      <Label htmlFor="self-appliedBy" className="text-sm">Applied By (Your Name) *</Label>
+      <Input
+        id="self-appliedBy"
+        value={formData.appliedBy}
+        onChange={(e) => handleInputChange("appliedBy", e.target.value)}
+        placeholder="Enter your name"
+        className={`h-9 ${formErrors.appliedBy ? 'border-red-500' : ''}`}
+      />
+      {formErrors.appliedBy && <p className="text-xs text-red-500">{formErrors.appliedBy}</p>}
+    </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="type" className="text-sm">Leave Type *</Label>
-        <Select 
-          value={formData.leaveType}
-          onValueChange={(value) => handleInputChange("leaveType", value)}
-        >
-          <SelectTrigger className={`h-9 ${formErrors.leaveType ? 'border-red-500' : ''}`}>
-            <SelectValue placeholder="Select type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="annual">Annual Leave</SelectItem>
-            <SelectItem value="sick">Sick Leave</SelectItem>
-            <SelectItem value="casual">Casual Leave</SelectItem>
-            <SelectItem value="emergency">Emergency Leave</SelectItem>
-            <SelectItem value="other">Other Leave</SelectItem>
-          </SelectContent>
-        </Select>
-        {formErrors.leaveType && (
-          <p className="text-xs text-red-500 mt-1">{formErrors.leaveType}</p>
-        )}
-      </div>
-      
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="from" className="text-sm">From Date *</Label>
-          <Input 
-            id="from" 
-            type="date" 
-            value={formData.fromDate}
-            onChange={(e) => handleInputChange("fromDate", e.target.value)}
-            onBlur={() => {}}
-            className={`h-9 ${formErrors.fromDate ? 'border-red-500' : ''}`}
-          />
-          {formErrors.fromDate && (
-            <p className="text-xs text-red-500 mt-1">{formErrors.fromDate}</p>
-          )}
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="to" className="text-sm">To Date *</Label>
-          <Input 
-            id="to" 
-            type="date" 
-            value={formData.toDate}
-            onChange={(e) => handleInputChange("toDate", e.target.value)}
-            onBlur={() => {}}
-            min={formData.fromDate}
-            className={`h-9 ${formErrors.toDate ? 'border-red-500' : ''}`}
-          />
-          {formErrors.toDate && (
-            <p className="text-xs text-red-500 mt-1">{formErrors.toDate}</p>
-          )}
-        </div>
-      </div>
-      
-      {formData.fromDate && formData.toDate && (
-        <div className="text-sm text-muted-foreground">
-          Total Days: {calculateTotalDays(formData.fromDate, formData.toDate)} days
-        </div>
-      )}
-      
-      <div className="space-y-2">
-        <Label htmlFor="reason" className="text-sm">Reason *</Label>
-        <Textarea 
-          id="reason" 
-          name="reason"
-          value={formData.reason}
-          onChange={handleReasonChange}
-          onBlur={() => {}}
-          placeholder="Enter reason for leave" 
-          className={`min-h-[80px] resize-none ${formErrors.reason ? 'border-red-500' : ''}`}
+    {/* Leave Type */}
+    <div className="space-y-1">
+      <Label htmlFor="self-leaveType" className="text-sm">Leave Type *</Label>
+      <Select
+        value={formData.leaveType}
+        onValueChange={(value) => handleInputChange("leaveType", value)}
+      >
+        <SelectTrigger className={`h-9 ${formErrors.leaveType ? 'border-red-500' : ''}`}>
+          <SelectValue placeholder="Select type" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="annual">Annual Leave</SelectItem>
+          <SelectItem value="sick">Sick Leave</SelectItem>
+          <SelectItem value="casual">Casual Leave</SelectItem>
+          <SelectItem value="emergency">Emergency Leave</SelectItem>
+          <SelectItem value="other">Other Leave</SelectItem>
+        </SelectContent>
+      </Select>
+      {formErrors.leaveType && <p className="text-xs text-red-500">{formErrors.leaveType}</p>}
+    </div>
+
+    {/* Date Range */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="space-y-1">
+        <Label htmlFor="self-from" className="text-sm">From Date *</Label>
+        <Input
+          id="self-from"
+          type="date"
+          value={formData.fromDate}
+          onChange={(e) => handleInputChange("fromDate", e.target.value)}
+          className={`h-9 ${formErrors.fromDate ? 'border-red-500' : ''}`}
         />
-        {formErrors.reason && (
-          <p className="text-xs text-red-500 mt-1">{formErrors.reason}</p>
+        {formErrors.fromDate && <p className="text-xs text-red-500">{formErrors.fromDate}</p>}
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="self-to" className="text-sm">To Date *</Label>
+        <Input
+          id="self-to"
+          type="date"
+          value={formData.toDate}
+          onChange={(e) => handleInputChange("toDate", e.target.value)}
+          min={formData.fromDate}
+          className={`h-9 ${formErrors.toDate ? 'border-red-500' : ''}`}
+        />
+        {formErrors.toDate && <p className="text-xs text-red-500">{formErrors.toDate}</p>}
+      </div>
+    </div>
+
+    {formData.fromDate && formData.toDate && (
+      <div className="text-sm text-muted-foreground">
+        Total Days: <span className="font-medium">{calculateTotalDays(formData.fromDate, formData.toDate)}</span> days
+      </div>
+    )}
+
+    {/* Reason */}
+    <div className="space-y-1">
+      <Label htmlFor="self-reason" className="text-sm">Reason *</Label>
+      <Textarea
+        id="self-reason"
+        value={formData.reason}
+        onChange={(e) => handleInputChange("reason", e.target.value)}
+        placeholder="Enter reason for leave"
+        className={`min-h-[80px] resize-none ${formErrors.reason ? 'border-red-500' : ''}`}
+      />
+      {formErrors.reason && <p className="text-xs text-red-500">{formErrors.reason}</p>}
+    </div>
+
+    {/* Info box */}
+    <div className="p-3 bg-purple-50 rounded-lg border border-purple-200 text-xs text-purple-700 space-y-1">
+      <p className="font-medium flex items-center gap-1"><Crown className="h-3 w-3" /> Your Supervisor Leave Request</p>
+      <p>Site: {supervisorSite?.name || user?.site || "Not assigned"}</p>
+      <p>Department: {user?.department || supervisorDepartment || "Not assigned"}</p>
+      <p className="text-[10px] opacity-75">User ID: {user?._id || "Not available"} (stored as supervisorId)</p>
+    </div>
+
+    {/* Buttons */}
+    <div className="flex gap-2 pt-2">
+      <Button type="button" variant="outline" className="flex-1" onClick={() => { /* reset logic */ }}>
+        Cancel
+      </Button>
+      <Button type="submit" className="flex-1" disabled={isSubmitting}>
+        {isSubmitting ? (
+          <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
+        ) : (
+          'Submit Leave'
         )}
-      </div>
-      
-      <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
-        <p className="text-xs text-purple-700 font-medium flex items-center gap-1">
-          <Crown className="h-3 w-3" />
-          Your Supervisor Leave Request
-        </p>
-        <p className="text-xs text-purple-700 mt-1">
-          Site: {supervisorSite?.name || user?.site || "Not assigned"}
-        </p>
-        <p className="text-xs text-purple-700 mt-1">
-          Department: {user?.department || supervisorDepartment || "Not assigned"}
-        </p>
-        <p className="text-xs text-purple-700 mt-1">
-          Your User ID: {user?._id || "Not available"} (stored as supervisorId)
-        </p>
-        <p className="text-xs text-purple-700 mt-1">
-          ⓘ This will be marked as a supervisor leave with your ID
-        </p>
-      </div>
-      
-      <div className="flex gap-2 pt-2">
-        <Button 
-          type="button" 
-          variant="outline" 
-          className="flex-1"
-          onClick={() => {
-            // Reset form logic will be handled by parent
-          }}
-        >
-          Cancel
-        </Button>
-        <Button 
-          type="submit" 
-          className="flex-1"
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Submitting...
-            </>
-          ) : (
-            'Submit Leave'
-          )}
-        </Button>
-      </div>
-    </form>
-  );
+      </Button>
+    </div>
+  </form>
+);
 };
 
 const Leave = () => {
@@ -2205,33 +2170,50 @@ const Leave = () => {
   };
 
   // Handle approve leave
-  const handleApproveLeave = async (leaveId: string, remarks: string) => {
-    if (!leaveId) {
-      console.error("Approve attempted with no leave ID");
-      toast.error("Cannot approve: No leave ID provided");
-      return;
-    }
+const handleApproveLeave = async (leaveId: string, remarks: string) => {
+  if (!leaveId) {
+    console.error("Approve attempted with no leave ID");
+    toast.error("Cannot approve: No leave ID provided");
+    return;
+  }
 
-    try {
-      console.log("Approving leave with ID:", leaveId);
+  try {
+    console.log("Approving leave with ID:", leaveId);
+    
+    const response = await axios.put(`${API_URL}/leaves/${leaveId}/status`, {
+      status: 'approved',
+      managerName: user?.name || 'Supervisor',
+      remarks,
+      approvedBy: user?.name
+    });
+
+    console.log("Approve response:", response.data);
+
+    if (response.data.success) {
+      toast.success('Leave approved successfully');
       
-      const response = await axios.put(`${API_URL}/leaves/${leaveId}/status`, {
-        status: 'approved',
-        managerName: user?.name || 'Supervisor',
-        remarks,
-        approvedBy: user?.name
-      });
-
-      console.log("Approve response:", response.data);
-
-      if (response.data.success) {
-        toast.success('Leave approved successfully');
-        await fetchAllLeaveRequests();
-        setViewDialogOpen(false);
-      } else {
-        toast.error(response.data.message || 'Failed to approve leave');
+      // ✅ Dispatch leave-update event
+      const leave = leaveRequests.find(l => l._id === leaveId);
+      if (leave) {
+        window.dispatchEvent(new CustomEvent('leave-update', {
+          detail: {
+            leaveId: leave._id,
+            title: '✅ Leave Approved',
+            message: `${leave.employeeName}'s ${leave.leaveType} leave has been approved by ${user?.name || 'Supervisor'}`,
+            notificationType: 'leave_approved',
+            employeeName: leave.employeeName,
+            leaveType: leave.leaveType,
+            approvedBy: user?.name
+          }
+        }));
       }
-    } catch (error: any) {
+      
+      await fetchAllLeaveRequests();
+      setViewDialogOpen(false);
+    } else {
+      toast.error(response.data.message || 'Failed to approve leave');
+    }
+  } catch (error: any) {
       console.error('Error approving leave:', error);
       if (error.response) {
         console.error("Error response:", error.response.data);
@@ -2244,32 +2226,49 @@ const Leave = () => {
 
   // Handle reject leave
   const handleRejectLeave = async (leaveId: string, remarks: string) => {
-    if (!leaveId) {
-      console.error("Reject attempted with no leave ID");
-      toast.error("Cannot reject: No leave ID provided");
-      return;
-    }
+  if (!leaveId) {
+    console.error("Reject attempted with no leave ID");
+    toast.error("Cannot reject: No leave ID provided");
+    return;
+  }
 
-    try {
-      console.log("Rejecting leave with ID:", leaveId);
+  try {
+    console.log("Rejecting leave with ID:", leaveId);
+    
+    const response = await axios.put(`${API_URL}/leaves/${leaveId}/status`, {
+      status: 'rejected',
+      managerName: user?.name || 'Supervisor',
+      remarks,
+      rejectedBy: user?.name
+    });
+
+    console.log("Reject response:", response.data);
+
+    if (response.data.success) {
+      toast.success('Leave rejected successfully');
       
-      const response = await axios.put(`${API_URL}/leaves/${leaveId}/status`, {
-        status: 'rejected',
-        managerName: user?.name || 'Supervisor',
-        remarks,
-        rejectedBy: user?.name
-      });
-
-      console.log("Reject response:", response.data);
-
-      if (response.data.success) {
-        toast.success('Leave rejected successfully');
-        await fetchAllLeaveRequests();
-        setViewDialogOpen(false);
-      } else {
-        toast.error(response.data.message || 'Failed to reject leave');
+      // ✅ Dispatch leave-update event
+      const leave = leaveRequests.find(l => l._id === leaveId);
+      if (leave) {
+        window.dispatchEvent(new CustomEvent('leave-update', {
+          detail: {
+            leaveId: leave._id,
+            title: '❌ Leave Rejected',
+            message: `${leave.employeeName}'s ${leave.leaveType} leave has been rejected by ${user?.name || 'Supervisor'}`,
+            notificationType: 'leave_rejected',
+            employeeName: leave.employeeName,
+            leaveType: leave.leaveType,
+            rejectedBy: user?.name
+          }
+        }));
       }
-    } catch (error: any) {
+      
+      await fetchAllLeaveRequests();
+      setViewDialogOpen(false);
+    } else {
+      toast.error(response.data.message || 'Failed to reject leave');
+    }
+  }catch (error: any) {
       console.error('Error rejecting leave:', error);
       if (error.response) {
         console.error("Error response:", error.response.data);
@@ -2526,8 +2525,26 @@ const Leave = () => {
       console.log("Response:", response.data);
       
       if (response.data.success) {
+
         toast.success(response.data.message || "Leave request submitted successfully for employee!");
-        
+        // 🔔 Notify superadmin about new leave request (for employee)
+const selectedEmp = employees.find(emp => emp._id === selectedEmployee);
+createNotificationForSuperadmin(
+  '📋 New Leave Request',
+  `${selectedEmp?.name} applied for ${formData.leaveType} leave (${totalDays} days) – applied by ${user?.name}`,
+  'info',
+  'medium',
+  {
+    leaveId: response.data.data?._id,
+    employeeName: selectedEmp?.name,
+    appliedBy: user?.name,
+    leaveType: formData.leaveType,
+    fromDate: formData.fromDate,
+    toDate: formData.toDate,
+    totalDays: totalDays
+  },
+  'leave_request'
+);
         setFormData({
           leaveType: "",
           fromDate: "",
@@ -2673,8 +2690,25 @@ const Leave = () => {
       console.log("Response:", response.data);
       
       if (response.data.success) {
+
+        // 🔔 Notify superadmin about new leave request (self)
+
         toast.success("Leave request submitted successfully for yourself!");
-        
+        createNotificationForSuperadmin(
+  '📋 New Leave Request',
+  `${user?.name} applied for ${formData.leaveType} leave (${totalDays} days)`,
+  'info',
+  'medium',
+  {
+    leaveId: response.data.data?._id,
+    employeeName: user?.name,
+    leaveType: formData.leaveType,
+    fromDate: formData.fromDate,
+    toDate: formData.toDate,
+    totalDays: totalDays
+  },
+  'leave_request'
+);
         setFormData({
           leaveType: "",
           fromDate: "",
@@ -3247,17 +3281,31 @@ const Leave = () => {
         <Card>
           <CardHeader className="pb-0">
             <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="all" className="text-sm md:text-base">
-                  All Leaves ({leaveRequests.length})
-                </TabsTrigger>
-                <TabsTrigger value="employee" className="text-sm md:text-base">
-                  Employee Leaves ({leaveRequests.filter(l => !l.isSupervisorLeave).length})
-                </TabsTrigger>
-                <TabsTrigger value="supervisor" className="text-sm md:text-base">
-                  Supervisor Leaves ({leaveRequests.filter(l => l.isSupervisorLeave).length})
-                </TabsTrigger>
-              </TabsList>
+             <TabsList className="flex flex-wrap w-full h-auto p-1 gap-1 sm:gap-2">
+  <TabsTrigger 
+    value="all" 
+    className="flex-1 min-w-[80px] sm:min-w-[120px] text-xs sm:text-sm whitespace-nowrap"
+  >
+    All Leaves <span className="ml-1 hidden sm:inline">({leaveRequests.length})</span>
+    <span className="ml-1 sm:hidden">({leaveRequests.length})</span>
+  </TabsTrigger>
+  <TabsTrigger 
+    value="employee" 
+    className="flex-1 min-w-[80px] sm:min-w-[120px] text-xs sm:text-sm whitespace-nowrap"
+  >
+    Employee <span className="hidden sm:inline">Leaves</span>
+    <span className="ml-1 hidden sm:inline">({leaveRequests.filter(l => !l.isSupervisorLeave).length})</span>
+    <span className="ml-1 sm:hidden">({leaveRequests.filter(l => !l.isSupervisorLeave).length})</span>
+  </TabsTrigger>
+  <TabsTrigger 
+    value="supervisor" 
+    className="flex-1 min-w-[80px] sm:min-w-[120px] text-xs sm:text-sm whitespace-nowrap"
+  >
+    Supervisor <span className="hidden sm:inline">Leaves</span>
+    <span className="ml-1 hidden sm:inline">({leaveRequests.filter(l => l.isSupervisorLeave).length})</span>
+    <span className="ml-1 sm:hidden">({leaveRequests.filter(l => l.isSupervisorLeave).length})</span>
+  </TabsTrigger>
+</TabsList>
             </Tabs>
           </CardHeader>
           <CardContent className="space-y-4 pt-4">

@@ -42,6 +42,7 @@ import { useRole } from "@/context/RoleContext";
 import taskService, { Task, Attachment } from "@/services/TaskService";
 import { siteService, Site } from "@/services/SiteService";
 import NotificationService from '@/lib/notificationService';
+import { createNotificationForSuperadmin } from '@/lib/notificationHelper';
 // Dashboard Header Component with Hamburger Menu
 interface DashboardHeaderProps {
   title: string;
@@ -328,34 +329,80 @@ const SupervisorTasksSection = () => {
     setStats(stats);
   };
 
-  const handleUpdateStatus = async (taskId: string, status: Task["status"]) => {
-    try {
-      const task = tasks.find(t => t._id === taskId);
-      
-      if (!task) {
-        toast.error("Task not found");
-        return;
-      }
-      
-      const supervisorId = authUser?._id || authUser?.id;
-      
-      if (!supervisorId) {
-        toast.error("Supervisor ID not found");
-        return;
-      }
-      
-      // Update with userId to track individual supervisor's status
-      await taskService.updateTaskStatus(taskId, { 
-        status,
-        userId: supervisorId 
-      });
-       if (status === 'completed') {
+ const handleUpdateStatus = async (taskId: string, status: Task["status"]) => {
+  try {
+    const task = tasks.find(t => t._id === taskId);
+    if (!task) {
+      toast.error("Task not found");
+      return;
+    }
+    
+    const supervisorId = authUser?._id || authUser?.id;
+    if (!supervisorId) {
+      toast.error("Supervisor ID not found");
+      return;
+    }
+    
+    // ✅ Update status (as before)
+    await taskService.updateTaskStatus(taskId, { 
+      status,
+      userId: supervisorId 
+    });
+    
+    // ✅ If status is 'completed', also stop persistent notifications (if any)
+    if (status === 'completed') {
       NotificationService.completeTaskNotification(taskId);
+       if (task) {
+    createNotificationForSuperadmin(
+      `✅ Task Completed: ${task.title}`,
+      `Task "${task.title}" at ${task.siteName} completed by ${authUser?.name || 'Supervisor'}`,
+      'success',
+      'medium',
+      {
+        taskId: task._id,
+        siteName: task.siteName,
+        taskTitle: task.title,
+        completedBy: authUser?.name
+      },
+      'task_completed'
+    );
+  }
       console.log(`🔔 Stopped persistent sound for task ${taskId}`);
     }
-      await fetchData();
-      toast.success("Task status updated!");
-    } catch (error: any) {
+    
+    // ========== DISPATCH EVENTS ==========
+    // Get the full task object (with title, siteName, etc.)
+    const updatedTask = tasks.find(t => t._id === taskId);
+    if (updatedTask) {
+      // 1) Always dispatch a general update event
+      window.dispatchEvent(new CustomEvent('task-updated', {
+        detail: {
+          taskId: updatedTask._id,
+          taskTitle: updatedTask.title,
+          siteName: updatedTask.siteName,
+          newStatus: status,
+          updatedBy: authUser?.name || 'Supervisor',
+          notificationType: 'task_status_update'
+        }
+      }));
+      
+      // 2) If completed, also dispatch task-completed
+      if (status === 'completed') {
+        window.dispatchEvent(new CustomEvent('task-completed', {
+          detail: {
+            taskId: updatedTask._id,
+            taskTitle: updatedTask.title,
+            siteName: updatedTask.siteName,
+            completedBy: authUser?.name || 'Supervisor'
+          }
+        }));
+      }
+    }
+    
+    // Refresh data and show toast (unchanged)
+    await fetchData();
+    toast.success("Task status updated!");
+  } catch (error: any) {
       console.error("Error updating task:", error);
       toast.error(error.message || "Failed to update task");
     }

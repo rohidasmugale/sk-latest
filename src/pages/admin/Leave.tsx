@@ -850,7 +850,18 @@ const handleSubmit = async (e: React.FormEvent) => {
         status: data.leave.status as LeaveStatus,
         contactNumber: data.leave.contactNumber
       };
-      
+      window.dispatchEvent(new CustomEvent('leave-update', {
+        detail: {
+          leaveId: data.leave._id || data.leave.id,
+          title: '📅 New Admin Leave Request',
+          message: `${currentUser.name} (Admin) applied for ${leaveType} leave (${totalDays} days)`,
+          notificationType: 'leave_request',
+          employeeName: currentUser.name,
+          leaveType: leaveType,
+          totalDays: totalDays,
+          department: currentUser.department
+        }
+      }));
       setLeaveRecords(prev => [newLeave, ...prev]);
       
       // Update stats

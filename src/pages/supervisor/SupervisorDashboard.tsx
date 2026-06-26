@@ -83,6 +83,12 @@ import { format } from "date-fns";
 import CameraCapture from "./CameraCapture";
 import { UnifiedCreateModal } from "@/components/shared/UnifiedCreateModal";
 import { BackButton } from '@/components/shared/BackButton';
+import { machineService } from '@/services/machineService';
+// At the top of SupervisorDashboard.tsx, make sure you have:
+
+
+// Then inside your component:
+
 // API URL
 const API_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
@@ -581,25 +587,34 @@ const SupervisorDashboard = () => {
 const [missingData, setMissingData] = useState<string[]>([]);
 
 const { addNotification } = useNotifications();
-// Inside useEffect or a separate function
-// ========== Location Tracking ==========
+
 const locationWatchRef = useRef<number | null>(null);
 const locationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+// For daily data duplicate prevention
+const lastDailyCheckRef = useRef<string>('');
+const dailyCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-const checkDailyData = async () => {
+// For task polling
+const taskPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+const knownTaskIdsRef = useRef<Set<string>>(new Set());
+const isFirstTaskLoadRef = useRef(true);
+const checkDailyData = useCallback(async () => {
   const today = new Date().toISOString().split('T')[0];
   const site = selectedSite || (supervisorSites.length > 0 ? supervisorSites[0].name : '');
   if (!site) return;
 
+  // Prevent duplicate checks in the same session for the same site+date
+  const checkKey = `${today}_${site}`;
+  if (lastDailyCheckRef.current === checkKey) return;
+  lastDailyCheckRef.current = checkKey;
+
   const missing: string[] = [];
 
   try {
-    // ----- 1. Grooming Status -----
     const gr = await apiClient.get('/grooming', { params: { date: today, site } });
     const groomingRecords = gr.data?.data || [];
     if (groomingRecords.length === 0) missing.push('Grooming Status');
 
-    // ----- 2. Cleaning Photos (filter by date manually) -----
     const ph = await apiClient.get('/cleaning-photos', { params: { site } });
     const photosToday = (ph.data?.data || []).filter((p: any) => {
       if (!p.createdAt) return false;
@@ -607,12 +622,9 @@ const checkDailyData = async () => {
     });
     if (photosToday.length === 0) missing.push('Cleaning Photos');
 
-    // ----- 3. Shift Deployment -----
     const sh = await apiClient.get('/shifts/site-deployment', { params: { site, date: today } });
     if (!sh.data?.data?.text) missing.push('Shift-wise Deployment');
-
-    // ----- 4. Machine Status (has any machine been updated today?) -----
-    const machines = await machineService.getMachines();
+const machines = await machineService.getMachines();
     const siteMachines = machines.filter((m: any) => m.location === site);
     const anyMachineUpdatedToday = siteMachines.some((m: any) => {
       if (!m.updatedAt) return false;
@@ -628,10 +640,22 @@ const checkDailyData = async () => {
 
   setMissingData(missing);
 
-  // Add persistent notification if anything is missing
   if (missing.length > 0) {
+    // Use a localStorage key to prevent duplicate notifications across page refreshes
+    const notifId = `daily_check_${today}_${site.replace(/\s/g, '_')}`;
+    const alreadyNotified = localStorage.getItem(notifId);
+    if (alreadyNotified) return;
+
+    localStorage.setItem(notifId, 'true');
+
+    // Clean up old keys (older than today)
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('daily_check_') && !key.includes(today)) {
+        localStorage.removeItem(key);
+      }
+    });
+
     const message = `Missing daily data: ${missing.join(', ')}. Please update them.`;
-    
     addNotification({
       title: '⚠️ Missing Daily Data',
       message,
@@ -639,14 +663,13 @@ const checkDailyData = async () => {
       metadata: {
         priority: 'high',
         missingItems: missing,
-        site: site,
-        date: today
+        site,
+        date: today,
       }
     });
-
-    toast.warning(message, { duration: 60000 });
+    toast.warning(message, { duration: 10000 });
   }
-};
+}, [selectedSite, supervisorSites, addNotification]);
 
   // Feature blocks
   const featureBlocks = [
@@ -1105,6 +1128,76 @@ if (response.data.success) {
     }
   }, [currentSupervisor]);
 
+
+
+  const pollForNewTasks = useCallback(async () => {
+  if (!currentSupervisor?.id) return;
+
+  try {
+    const supervisorId = currentSupervisor.id;
+    const supervisorName = currentSupervisor.name;
+
+    const response = await axios.get(`${API_URL}/assigntasks`);
+    let allTasks: any[] = [];
+    if (Array.isArray(response.data)) {
+      allTasks = response.data;
+    } else if (response.data?.tasks) {
+      allTasks = response.data.tasks;
+    } else if (response.data?.data) {
+      allTasks = response.data.data;
+    }
+
+    // Filter tasks assigned to this supervisor
+    const myTasks = allTasks.filter(task => {
+      if (!task.assignedSupervisors || !Array.isArray(task.assignedSupervisors)) return false;
+      return task.assignedSupervisors.some((supervisor: any) => {
+        return (
+          String(supervisor.userId) === String(supervisorId) ||
+          supervisor.name?.toLowerCase().trim() === supervisorName?.toLowerCase().trim()
+        );
+      });
+    });
+
+    // First load: just remember the IDs, no notification
+    if (isFirstTaskLoadRef.current) {
+      myTasks.forEach(task => knownTaskIdsRef.current.add(task._id));
+      isFirstTaskLoadRef.current = false;
+      return;
+    }
+
+    // Find new tasks
+    const newTasks = myTasks.filter(task => !knownTaskIdsRef.current.has(task._id));
+
+    if (newTasks.length > 0) {
+      newTasks.forEach(task => {
+        knownTaskIdsRef.current.add(task._id);
+
+        addNotification({
+          title: `📋 New Task Assigned: ${task.taskTitle || task.title}`,
+          message: `Task "${task.taskTitle || task.title}" at ${task.siteName} — Priority: ${task.priority || 'medium'}`,
+          type: 'task',
+          metadata: {
+            taskId: task._id,
+            taskTitle: task.taskTitle || task.title,
+            siteName: task.siteName,
+            priority: task.priority,
+            notificationType: 'task_assignment',
+          },
+        });
+
+        toast.info(`📋 New Task: ${task.taskTitle || task.title}`, {
+          description: `Site: ${task.siteName} | Priority: ${task.priority}`,
+          duration: 8000,
+        });
+      });
+
+      // Refresh the task list display
+      fetchAssignedTasks();
+    }
+  } catch (error) {
+    console.warn('Task poll error:', error);
+  }
+}, [currentSupervisor, addNotification, fetchAssignedTasks]);
   // Update personal task status
   const handleUpdatePersonalStatus = async (taskId: string, newStatus: string) => {
     try {
@@ -1475,7 +1568,54 @@ useEffect(() => {
       setLoadingEmployees(false);
     }
   }, [currentSupervisor, supervisorSites, supervisorSiteNames, fetchAllSites]);
+// ========== Geofence Breach Monitoring ==========
+useEffect(() => {
+  // Check for geofence breaches every 60 seconds
+  const checkBreaches = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/attendance/geofence-breaches`);
+      if (response.data.success && response.data.data.length > 0) {
+        response.data.data.forEach((breach: any) => {
+          // Add notification with sound
+          addNotification({
+            title: '🚨 Geofence Alert',
+            message: `${breach.employeeName} is ${breach.distanceKm || '0'}km away from site: ${breach.siteName}`,
+            type: 'geofence',
+            metadata: {
+              priority: 'high',
+              employeeId: breach.employeeId,
+              employeeName: breach.employeeName,
+              siteName: breach.siteName,
+              distance: breach.distanceKm || 0
+            }
+          });
+          
+          // Play sound for high-priority alerts
+          try {
+            const audio = new Audio('/notification-sound.mp3');
+            audio.play().catch(e => console.log('Sound play failed:', e));
+          } catch (e) {
+            console.log('Audio not available');
+          }
+          
+          toast.error(
+            `🚨 ${breach.employeeName} is outside geofence (${breach.distanceKm || 0}km away from ${breach.siteName})`,
+            { duration: 10000 }
+          );
+        });
+      }
+    } catch (error) {
+      console.error('Error checking geofence breaches:', error);
+    }
+  };
 
+  // Check immediately and then every 60 seconds
+  if (selectedSite) {
+    checkBreaches();
+    const interval = setInterval(checkBreaches, 60000);
+    return () => clearInterval(interval);
+  }
+}, [selectedSite, addNotification]);
   // Load attendance records for selected date
   const loadAttendanceRecords = async (date: string) => {
     try {

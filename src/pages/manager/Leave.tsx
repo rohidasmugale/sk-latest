@@ -2133,28 +2133,38 @@ const ManagerLeaves = () => {
   };
 
   // Handle approve leave
-  const handleApproveLeave = async (leaveId: string, remarks: string) => {
-    try {
-      const response = await fetch(`${API_URL}/leaves/${leaveId}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          status: 'approved',
-          managerId,
-          managerName,
-          remarks
-        })
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        toast.success('Leave approved successfully');
-        await fetchAllData();
-      } else {
-        toast.error(data.message || 'Failed to approve leave');
+ // Example for approve:
+const handleApproveLeave = async (leaveId: string, remarks: string) => {
+  try {
+    const response = await fetch(`${API_URL}/leaves/${leaveId}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'approved', managerId, managerName, remarks })
+    });
+    const data = await response.json();
+    if (response.ok && data.success) {
+      // ✅ NEW: Dispatch event
+      const leave = leaveRequests.find(l => l._id === leaveId);
+      if (leave) {
+        window.dispatchEvent(new CustomEvent('leave-update', {
+          detail: {
+            leaveId: leave._id,
+            title: '✅ Leave Approved',
+            message: `${leave.employeeName}'s ${leave.leaveType} leave has been approved by ${managerName}`,
+            notificationType: 'leave_approved',
+            employeeName: leave.employeeName,
+            leaveType: leave.leaveType,
+            approvedBy: managerName
+          }
+        }));
       }
-    } catch (error: any) {
+      
+      toast.success('Leave approved successfully');
+      await fetchAllData();
+    } else {
+      toast.error(data.message || 'Failed to approve leave');
+    }
+  } catch (error: any) {
       console.error('❌ Error approving leave:', error);
       toast.error('Failed to approve leave');
     }
@@ -2177,6 +2187,20 @@ const ManagerLeaves = () => {
       const data = await response.json();
 
       if (response.ok && data.success) {
+  const leave = leaveRequests.find(l => l._id === leaveId);
+      if (leave) {
+         window.dispatchEvent(new CustomEvent('leave-update', {
+    detail: {
+      leaveId: leave._id,
+      title: '❌ Leave Rejected',
+      message: `${leave.employeeName}'s ${leave.leaveType} leave has been rejected by ${managerName}`,
+      notificationType: 'leave_rejected',
+      employeeName: leave.employeeName,
+      leaveType: leave.leaveType,
+      rejectedBy: managerName
+    }
+  }));
+}
         toast.success('Leave rejected successfully');
         await fetchAllData();
       } else {
@@ -2318,87 +2342,91 @@ const ManagerLeaves = () => {
   };
 
   // Handle apply for manager leave
-  const handleApplyManagerLeave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Validation
-    if (!applyFormData.leaveType) {
-      toast.error('Please select leave type');
-      return;
-    }
-    
-    if (!applyFormData.fromDate || !applyFormData.toDate) {
-      toast.error('Please select dates');
-      return;
-    }
-    
-    const fromDate = new Date(applyFormData.fromDate);
-    const toDate = new Date(applyFormData.toDate);
-    
-    if (fromDate > toDate) {
-      toast.error('From date must be before to date');
-      return;
-    }
-    
-    const totalDays = calculateDaysBetween(applyFormData.fromDate, applyFormData.toDate);
-    
-    if (!applyFormData.reason) {
-      toast.error('Please provide a reason');
-      return;
-    }
+const handleApplyManagerLeave = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  // Validation (same as before)
+  if (!applyFormData.leaveType) {
+    toast.error('Please select leave type');
+    return;
+  }
+  if (!applyFormData.fromDate || !applyFormData.toDate) {
+    toast.error('Please select dates');
+    return;
+  }
+  const fromDate = new Date(applyFormData.fromDate);
+  const toDate = new Date(applyFormData.toDate);
+  if (fromDate > toDate) {
+    toast.error('From date must be before to date');
+    return;
+  }
+  const totalDays = calculateDaysBetween(applyFormData.fromDate, applyFormData.toDate);
+  if (!applyFormData.reason) {
+    toast.error('Please provide a reason');
+    return;
+  }
 
-    setIsSubmitting(true);
-    
-    try {
-      // Prepare data - NO EMPLOYEE VALIDATION
-      const leaveData = {
-        managerId,
-        managerName,
-        managerDepartment,
-        managerPosition: 'Manager',
-        managerEmail,
-        managerContact: managerContact || '0000000000',
-        leaveType: applyFormData.leaveType,
-        fromDate: applyFormData.fromDate,
-        toDate: applyFormData.toDate,
-        totalDays,
-        reason: applyFormData.reason,
-        appliedBy: managerName,
-        appliedDate: new Date().toISOString()
-      };
+  setIsSubmitting(true);
+  try {
+    const leaveData = {
+      managerId,
+      managerName,
+      managerDepartment,
+      managerPosition: 'Manager',
+      managerEmail,
+      managerContact: managerContact || '0000000000',
+      leaveType: applyFormData.leaveType,
+      fromDate: applyFormData.fromDate,
+      toDate: applyFormData.toDate,
+      totalDays,
+      reason: applyFormData.reason,
+      appliedBy: managerName,
+      appliedDate: new Date().toISOString()
+    };
 
-      console.log('📤 Submitting manager leave:', leaveData);
+    const response = await fetch(`${API_URL}/manager-leaves/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(leaveData)
+    });
 
-      const response = await fetch(`${API_URL}/manager-leaves/apply`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(leaveData)
+    const data = await response.json();
+
+    if (response.ok && data.success) {
+      toast.success('Leave request submitted successfully! Waiting for superadmin approval.');
+
+      // ✅ Dispatch leave-update event here, using the returned data
+      window.dispatchEvent(new CustomEvent('leave-update', {
+        detail: {
+          leaveId: data._id || data.leaveId || applyFormData.leaveId,
+          title: '📅 New Manager Leave Request',
+          message: `${managerName} applied for ${applyFormData.leaveType} leave (${totalDays} days)`,
+          notificationType: 'leave_request',
+          employeeName: managerName,
+          leaveType: applyFormData.leaveType,
+          totalDays
+        }
+      }));
+
+      setApplyDialogOpen(false);
+      setApplyFormData({
+        leaveType: '',
+        fromDate: '',
+        toDate: '',
+        reason: ''
       });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        toast.success('Leave request submitted successfully! Waiting for superadmin approval.');
-        setApplyDialogOpen(false);
-        setApplyFormData({
-          leaveType: '',
-          fromDate: '',
-          toDate: '',
-          reason: ''
-        });
-        // Refresh data
-        await fetchAllData();
-        setActiveTab('my-leaves');
-      } else {
-        toast.error(data.message || 'Failed to apply for leave');
-      }
-    } catch (error: any) {
-      console.error('❌ Error applying for leave:', error);
-      toast.error('Failed to apply for leave');
-    } finally {
-      setIsSubmitting(false);
+      await fetchAllData();
+      setActiveTab('my-leaves');
+    } else {
+      toast.error(data.message || 'Failed to apply for leave');
     }
-  };
+  } catch (error: any) {
+    console.error('❌ Error applying for leave:', error);
+    toast.error('Failed to apply for leave');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   // Handle view site details
   const handleViewSiteDetails = (site: SiteLeaveData) => {

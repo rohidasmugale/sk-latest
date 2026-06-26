@@ -57,7 +57,7 @@ import AssignTaskPopup from './AssignTaskPopup';
 import { assignTaskService, type AssignTask } from '@/services/assignTaskService';
 import { taskService } from '@/services/TaskService';
 import { format } from 'date-fns';
-
+import { createNotificationForSuperadmin } from '@/lib/notificationHelper';
 // Add interface for site staff counts
 interface SiteStaffCounts {
   [siteId: string]: {
@@ -498,52 +498,45 @@ const AssignTaskPage: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-4 gap-4">
-        <Card className="bg-blue-50 border-blue-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-blue-700">Total Tasks</p>
-                <p className="text-2xl font-bold text-blue-900">{tasks.length}</p>
-              </div>
-              <FileText className="h-8 w-8 text-blue-600" />
+        {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Total Tasks</p>
+              <p className="text-2xl font-bold">{tasks.length}</p>
             </div>
+            <FileText className="h-8 w-8 text-blue-500" />
           </CardContent>
         </Card>
         
-        <Card className="bg-yellow-50 border-yellow-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-yellow-700">In Progress</p>
-                <p className="text-2xl font-bold text-yellow-900">{getTasksByStatus('in-progress')}</p>
-              </div>
-              <Clock className="h-8 w-8 text-yellow-600" />
+        <Card className="border-l-4 border-l-yellow-500 hover:shadow-md transition-shadow">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">In Progress</p>
+              <p className="text-2xl font-bold text-yellow-600">{getTasksByStatus('in-progress')}</p>
             </div>
+            <Clock className="h-8 w-8 text-yellow-500" />
           </CardContent>
         </Card>
         
-        <Card className="bg-green-50 border-green-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-green-700">Completed</p>
-                <p className="text-2xl font-bold text-green-900">{getTasksByStatus('completed')}</p>
-              </div>
-              <CheckCircle className="h-8 w-8 text-green-600" />
+        <Card className="border-l-4 border-l-green-500 hover:shadow-md transition-shadow">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Completed</p>
+              <p className="text-2xl font-bold text-green-600">{getTasksByStatus('completed')}</p>
             </div>
+            <CheckCircle className="h-8 w-8 text-green-500" />
           </CardContent>
         </Card>
         
-        <Card className="bg-red-50 border-red-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-red-700">Cancelled</p>
-                <p className="text-2xl font-bold text-red-900">{getTasksByStatus('cancelled')}</p>
-              </div>
-              <XCircle className="h-8 w-8 text-red-600" />
+        <Card className="border-l-4 border-l-red-500 hover:shadow-md transition-shadow">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Cancelled</p>
+              <p className="text-2xl font-bold text-red-600">{getTasksByStatus('cancelled')}</p>
             </div>
+            <XCircle className="h-8 w-8 text-red-500" />
           </CardContent>
         </Card>
       </div>

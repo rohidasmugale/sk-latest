@@ -762,7 +762,6 @@ const fetchAdminLeaves = async (page = 1) => {
   };
 
   // Handle leave action (approve/reject)
- // Handle leave action (approve/reject)
 const handleLeaveAction = async (leave: any, action: "approved" | "rejected") => {
   try {
     setIsUpdating(true);
@@ -788,7 +787,6 @@ const handleLeaveAction = async (leave: any, action: "approved" | "rejected") =>
     
     // Determine correct endpoint based on leave type
     if (isAdminLeave(leave)) {
-      // For admin leaves, use the superadmin endpoint (this should exist based on your routes)
       endpoint = `${API_URL}/admin-leaves/superadmin/${leaveId}/status`;
       requestBody = {
         status: action,
@@ -796,7 +794,6 @@ const handleLeaveAction = async (leave: any, action: "approved" | "rejected") =>
         adminRemarks: remarks || `${action} by ${superAdminInfo.superAdminName || 'Super Admin'}`
       };
     } else if (isManagerLeave(leave)) {
-      // For manager leaves, use the superadmin endpoint (this should exist based on your routes)
       endpoint = `${API_URL}/manager-leaves/superadmin/${leaveId}/status`;
       requestBody = {
         status: action,
@@ -804,7 +801,6 @@ const handleLeaveAction = async (leave: any, action: "approved" | "rejected") =>
         adminRemarks: remarks || `${action} by ${superAdminInfo.superAdminName || 'Super Admin'}`
       };
     } else {
-      // For employee/supervisor leaves
       endpoint = `${API_URL}/leaves/${leaveId}/status`;
       requestBody = { 
         status: action,
@@ -933,6 +929,22 @@ const handleLeaveAction = async (leave: any, action: "approved" | "rejected") =>
       });
     }
 
+    // ✅ Dispatch leave-update event
+    const leaveName = leave.employeeName || leave.managerName || leave.adminName || 'Employee';
+    const leaveType = leave.leaveType || 'leave';
+    
+    window.dispatchEvent(new CustomEvent('leave-update', {
+      detail: {
+        leaveId: leaveId,
+        title: action === 'approved' ? '✅ Leave Approved' : '❌ Leave Rejected',
+        message: `${leaveName}'s ${leaveType} leave has been ${action} by ${superAdminInfo.superAdminName || 'Super Admin'}`,
+        notificationType: action === 'approved' ? 'leave_approved' : 'leave_rejected',
+        employeeName: leaveName,
+        leaveType: leaveType,
+        actionBy: superAdminInfo.superAdminName || 'Super Admin'
+      }
+    }));
+
     toast.success(data.message || `Leave request ${action} successfully!`);
     setViewDialogOpen(false);
     setRemarks("");
@@ -953,8 +965,6 @@ const handleLeaveAction = async (leave: any, action: "approved" | "rejected") =>
     setSelectedLeave(null);
   }
 };
-
-  // Handle revert to pending
 // Handle revert to pending
 const handleRevertToPending = async (leave: any) => {
   try {
@@ -980,21 +990,18 @@ const handleRevertToPending = async (leave: any) => {
     
     // Determine correct endpoint based on leave type
     if (isAdminLeave(leave)) {
-      // For admin leaves, use the superadmin revert endpoint
       endpoint = `${API_URL}/admin-leaves/superadmin/${leaveId}/revert`;
       requestBody = {
         remarks: remarks || 'Reverted to pending',
         revertedBy: superAdminInfo.superAdminName || 'Super Admin'
       };
     } else if (isManagerLeave(leave)) {
-      // For manager leaves, use the superadmin revert endpoint
       endpoint = `${API_URL}/manager-leaves/superadmin/${leaveId}/revert`;
       requestBody = {
         remarks: remarks || 'Reverted to pending',
         revertedBy: superAdminInfo.superAdminName || 'Super Admin'
       };
     } else {
-      // For employee/supervisor leaves
       endpoint = `${API_URL}/leaves/${leaveId}/status`;
       requestBody = { 
         status: 'pending',
@@ -1121,6 +1128,22 @@ const handleRevertToPending = async (leave: any) => {
         return newStats;
       });
     }
+
+    // ✅ Dispatch leave-update event
+    const leaveName = leave.employeeName || leave.managerName || leave.adminName || 'Employee';
+    const leaveType = leave.leaveType || 'leave';
+    
+    window.dispatchEvent(new CustomEvent('leave-update', {
+      detail: {
+        leaveId: leaveId,
+        title: '🔄 Leave Reverted to Pending',
+        message: `${leaveName}'s ${leaveType} leave has been reverted to pending by ${superAdminInfo.superAdminName || 'Super Admin'}`,
+        notificationType: 'leave_pending',
+        employeeName: leaveName,
+        leaveType: leaveType,
+        actionBy: superAdminInfo.superAdminName || 'Super Admin'
+      }
+    }));
 
     toast.success(data.message || 'Leave request reverted to pending successfully!');
     setViewDialogOpen(false);

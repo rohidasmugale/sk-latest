@@ -616,7 +616,32 @@ const ManagerAssignTask: React.FC = () => {
         if (!response.ok) {
           throw new Error('Failed to update personal status');
         }
-
+ // ✅ NEW: Dispatch event
+    const task = tasks.find(t => t._id === taskId);
+    if (task) {
+      window.dispatchEvent(new CustomEvent('task-updated', {
+        detail: {
+          taskId: task._id,
+          taskTitle: task.taskTitle,
+          siteName: task.siteName,
+          newStatus,
+          updatedBy: user?.name || 'Manager',
+          notificationType: 'task_status_update'
+        }
+      }));
+      
+      // If completed, also dispatch task-completed
+      if (newStatus === 'completed') {
+        window.dispatchEvent(new CustomEvent('task-completed', {
+          detail: {
+            taskId: task._id,
+            taskTitle: task.taskTitle,
+            siteName: task.siteName,
+            completedBy: user?.name || 'Manager'
+          }
+        }));
+      }
+    }
         toast.success(`Your status updated to ${newStatus}`);
       }
       

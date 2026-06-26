@@ -1960,11 +1960,26 @@ const PayrollTab = ({
         </CardHeader>
         <CardContent>
           <Tabs value={activePayrollTab} onValueChange={setActivePayrollTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="salary-slips">Salary Processing</TabsTrigger>
-              <TabsTrigger value="salary-structures">Salary Structures</TabsTrigger>
-              <TabsTrigger value="payroll-records">Payroll Records</TabsTrigger>
-            </TabsList>
+           <TabsList className="flex flex-wrap gap-1 sm:gap-2 w-full h-auto p-1 bg-gray-100 rounded-lg">
+  <TabsTrigger 
+    value="salary-slips" 
+    className="flex-1 min-w-[100px] sm:min-w-[140px] text-xs sm:text-sm whitespace-nowrap"
+  >
+    Salary Processing
+  </TabsTrigger>
+  <TabsTrigger 
+    value="salary-structures" 
+    className="flex-1 min-w-[100px] sm:min-w-[140px] text-xs sm:text-sm whitespace-nowrap"
+  >
+    Salary Structures
+  </TabsTrigger>
+  <TabsTrigger 
+    value="payroll-records" 
+    className="flex-1 min-w-[100px] sm:min-w-[140px] text-xs sm:text-sm whitespace-nowrap"
+  >
+    Payroll Records
+  </TabsTrigger>
+</TabsList>
 
             {/* Salary Processing Tab */}
             <TabsContent value="salary-slips" className="space-y-4">

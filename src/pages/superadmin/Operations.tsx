@@ -13,19 +13,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
+import { toast } from 'sonner';
 import { StatsCards } from "./components/StatsCards";
 import TasksSection from "./components/TasksSection";
 import AssignTaskSection from "./components/AssignTaskSection";
 import SitesSection from "./components/SitesSection";
 
-import ServicesSection from "./components/ServicesSection";
+
 import AlertsSection from "./components/AlertsSection";
 import PriceCalculator from "./components/PriceCalculator";
 import axios from "axios";
 import AssignTaskPage from "./components/AssignTaskPage";
 import {Task , Site} from "./data";
 
+const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 // Mobile responsive tab selector
 const MobileTabSelector = ({
   activeTab,

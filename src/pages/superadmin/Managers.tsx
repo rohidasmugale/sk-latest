@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, Phone, MapPin, ClipboardList, MoreHorizontal, Edit, Trash2, CheckCircle, PlayCircle } from "lucide-react";
 import { toast } from "sonner";
-import { managers } from "@/utils/dummyData";
+
 import { motion } from "framer-motion";
 import {
   DropdownMenu,

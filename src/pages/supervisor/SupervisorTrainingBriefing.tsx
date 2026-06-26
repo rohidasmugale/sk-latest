@@ -1,25 +1,25 @@
 //SupervisorTrainingBriefing.tsx
 import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
+import {
   Card, CardContent, CardHeader, CardTitle, CardDescription
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
-import { 
+import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
   DialogTrigger, DialogFooter, DialogClose
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { 
-  Calendar, Clock, Users, Image as ImageIcon, Video, File, CheckCircle, XCircle, 
+import {
+  Calendar, Clock, Users, Image as ImageIcon, Video, File, CheckCircle, XCircle,
   Plus, Search, Filter, Download, Eye, Edit, Trash2, Upload, CalendarDays,
   User, Building, Target, MessageSquare, AlertCircle, ChevronRight, ChevronLeft,
   CheckSquare, Square, X, RefreshCw, MoreVertical, ChevronDown, ChevronUp, List,
@@ -36,7 +36,7 @@ import axios from "axios";
 import { useOutletContext } from 'react-router-dom';
 import CameraCapture from './CameraCapture';
 
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 // Types (same as original, but Attachment extended with metadata)
@@ -339,7 +339,7 @@ const MobileBriefingCard = memo(({ briefing, onView, onDelete, onUpdateAction, g
       <div className="flex justify-between"><div><h3 className="font-semibold">{briefing.site}</h3><p className="text-xs text-muted-foreground">by {briefing.conductedBy}</p></div><div className="flex gap-1"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => onView(briefing)}>View</DropdownMenuItem>{canEdit && (<DropdownMenuItem onClick={() => onDelete(briefing._id)} className="text-red-600">Delete</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu><Button variant="ghost" size="icon" onClick={() => setExpanded(!expanded)}>{expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button></div></div>
       <div className="flex gap-2 mt-2"><Badge className={getShiftBadge(briefing.shift)}>{briefing.shift}</Badge><Badge variant="outline">{briefing.department}</Badge></div>
       <div className="grid grid-cols-2 gap-2 mt-2 text-xs"><div><Calendar className="inline h-3 w-3 mr-1" />{formatDate(briefing.date)}</div><div><Clock className="inline h-3 w-3 mr-1" />{briefing.time}</div><div><Users className="inline h-3 w-3 mr-1" />{briefing.attendeesCount} attendees</div></div>
-      {expanded && (<div className="mt-3 pt-3 border-t">{briefing.topics?.length > 0 && (<><p className="text-xs text-muted-foreground">Topics</p><div className="flex flex-wrap gap-1 mt-1">{briefing.topics.slice(0, 2).map((t: string, idx: number) => (<Badge key={idx} variant="outline">{t}</Badge>))}{briefing.topics.length > 2 && <Badge variant="outline">+{briefing.topics.length-2}</Badge>}</div></>)}</div>)}
+      {expanded && (<div className="mt-3 pt-3 border-t">{briefing.topics?.length > 0 && (<><p className="text-xs text-muted-foreground">Topics</p><div className="flex flex-wrap gap-1 mt-1">{briefing.topics.slice(0, 2).map((t: string, idx: number) => (<Badge key={idx} variant="outline">{t}</Badge>))}{briefing.topics.length > 2 && <Badge variant="outline">+{briefing.topics.length - 2}</Badge>}</div></>)}</div>)}
     </CardContent></Card>
   );
 });
@@ -519,39 +519,39 @@ const SupervisorTrainingBriefing: React.FC = () => {
   const [loadingData, setLoadingData] = useState({ sites: true, supervisors: true, managers: true, employees: true, trainings: true, briefings: true });
   const [isMobileView, setIsMobileView] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-  
+
   // Camera states
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraAction, setCameraAction] = useState<'training' | 'briefing' | 'editTraining' | 'editBriefing' | null>(null);
   const [photoMetadata, setPhotoMetadata] = useState<Map<string, { location: any; capturedAt: string }>>(new Map());
-  
+
   // Data states
   const [sites, setSites] = useState<Site[]>([]);
   const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
   const [managers, setManagers] = useState<Manager[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  
+
   const supervisorId = authUser?._id || authUser?.id || "";
   const supervisorName = authUser?.name || "Supervisor";
   const [supervisorAssignedSites, setSupervisorAssignedSites] = useState<string[]>([]);
   const [supervisorAssignedSiteNames, setSupervisorAssignedSiteNames] = useState<string[]>([]);
-  
+
   const [filteredSupervisors, setFilteredSupervisors] = useState<Supervisor[]>([]);
   const [filteredManagers, setFilteredManagers] = useState<Manager[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
-  
+
   const [selectedSupervisors, setSelectedSupervisors] = useState<string[]>([]);
   const [selectedManagers, setSelectedManagers] = useState<string[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
   const [supervisorSearchQuery, setSupervisorSearchQuery] = useState("");
   const [managerSearchQuery, setManagerSearchQuery] = useState("");
-  
+
   const [editSelectedSupervisors, setEditSelectedSupervisors] = useState<string[]>([]);
   const [editSelectedManagers, setEditSelectedManagers] = useState<string[]>([]);
   const [editSupervisorSearchQuery, setEditSupervisorSearchQuery] = useState("");
   const [editManagerSearchQuery, setEditManagerSearchQuery] = useState("");
-  
+
   const [trainingForm, setTrainingForm] = useState({
     title: '', description: '', type: 'safety' as const, date: '', time: '', duration: '', trainer: '', site: '', department: 'Housekeeping', maxAttendees: 20, location: '', objectives: [] as string[]
   });
@@ -573,41 +573,41 @@ const SupervisorTrainingBriefing: React.FC = () => {
   }, []);
 
   const fetchSupervisorAssignedSites = useCallback(async () => {
-  if (!supervisorId) return;
-  try {
-    // First try to get sites from tasks
-    const allTasks = await assignTaskService.getAllAssignTasks();
-    const assignedSitesSet = new Set<string>();
-    const assignedSiteNamesSet = new Set<string>();
-    allTasks.forEach((task: AssignTask) => {
-      const isSupervisorAssigned = task.assignedSupervisors?.some(sup => sup.userId === supervisorId);
-      if (isSupervisorAssigned && task.siteId) {
-        assignedSitesSet.add(task.siteId);
-        if (task.siteName) assignedSiteNamesSet.add(task.siteName);
-      }
-    });
+    if (!supervisorId) return;
+    try {
+      // First try to get sites from tasks
+      const allTasks = await assignTaskService.getAllAssignTasks();
+      const assignedSitesSet = new Set<string>();
+      const assignedSiteNamesSet = new Set<string>();
+      allTasks.forEach((task: AssignTask) => {
+        const isSupervisorAssigned = task.assignedSupervisors?.some(sup => sup.userId === supervisorId);
+        if (isSupervisorAssigned && task.siteId) {
+          assignedSitesSet.add(task.siteId);
+          if (task.siteName) assignedSiteNamesSet.add(task.siteName);
+        }
+      });
 
-    // If no tasks found, fallback to your employee site
-    if (assignedSitesSet.size === 0) {
-      const empRes = await axios.get(`${API_URL}/employees/${supervisorId}`);
-      if (empRes.data && empRes.data.siteName) {
-        const siteName = empRes.data.siteName;
-        assignedSiteNamesSet.add(siteName);
-        // Find site ID from the sites list (which will be fetched later)
-        // We'll store the name, and later when sites are loaded, we can get the ID
-        // For now, set a temporary placeholder
-        assignedSitesSet.add('fallback');
+      // If no tasks found, fallback to your employee site
+      if (assignedSitesSet.size === 0) {
+        const empRes = await axios.get(`${API_URL}/employees/${supervisorId}`);
+        if (empRes.data && empRes.data.siteName) {
+          const siteName = empRes.data.siteName;
+          assignedSiteNamesSet.add(siteName);
+          // Find site ID from the sites list (which will be fetched later)
+          // We'll store the name, and later when sites are loaded, we can get the ID
+          // For now, set a temporary placeholder
+          assignedSitesSet.add('fallback');
+        }
       }
+
+      setSupervisorAssignedSites(Array.from(assignedSitesSet));
+      setSupervisorAssignedSiteNames(Array.from(assignedSiteNamesSet));
+      console.log('Assigned sites:', Array.from(assignedSiteNamesSet));
+    } catch (error) {
+      console.error("Error fetching supervisor assigned sites:", error);
+      toast.error("Failed to load your assigned sites");
     }
-
-    setSupervisorAssignedSites(Array.from(assignedSitesSet));
-    setSupervisorAssignedSiteNames(Array.from(assignedSiteNamesSet));
-    console.log('Assigned sites:', Array.from(assignedSiteNamesSet));
-  } catch (error) {
-    console.error("Error fetching supervisor assigned sites:", error);
-    toast.error("Failed to load your assigned sites");
-  }
-}, [supervisorId]);
+  }, [supervisorId]);
 
   useEffect(() => {
     if (supervisorId && isAuthenticated) fetchSupervisorAssignedSites();
@@ -724,7 +724,7 @@ const SupervisorTrainingBriefing: React.FC = () => {
     const capturedAt = new Date().toISOString();
     const metadata = { location, capturedAt };
     setPhotoMetadata(prev => new Map(prev).set(photoFile.name, metadata));
-    
+
     if (cameraAction === 'training') {
       setTrainingAttachments(prev => [...prev, photoFile]);
     } else if (cameraAction === 'briefing') {
@@ -787,21 +787,21 @@ const SupervisorTrainingBriefing: React.FC = () => {
   const addEditObjective = () => setEditTrainingForm(p => ({ ...p, objectives: [...p.objectives, ''] }));
   const removeEditObjective = (i: number) => setEditTrainingForm(p => ({ ...p, objectives: p.objectives.filter((_, idx) => idx !== i) }));
   const updateEditObjective = (i: number, v: string) => setEditTrainingForm(p => ({ ...p, objectives: p.objectives.map((o, idx) => idx === i ? v : o) }));
-  
+
   const addTopic = () => setBriefingForm(p => ({ ...p, topics: [...p.topics, ''] }));
   const removeTopic = (i: number) => setBriefingForm(p => ({ ...p, topics: p.topics.filter((_, idx) => idx !== i) }));
   const updateTopic = (i: number, v: string) => setBriefingForm(p => ({ ...p, topics: p.topics.map((t, idx) => idx === i ? v : t) }));
   const addEditTopic = () => setEditBriefingForm(p => ({ ...p, topics: [...p.topics, ''] }));
   const removeEditTopic = (i: number) => setEditBriefingForm(p => ({ ...p, topics: p.topics.filter((_, idx) => idx !== i) }));
   const updateEditTopic = (i: number, v: string) => setEditBriefingForm(p => ({ ...p, topics: p.topics.map((t, idx) => idx === i ? v : t) }));
-  
+
   const addKeyPoint = () => setBriefingForm(p => ({ ...p, keyPoints: [...p.keyPoints, ''] }));
   const removeKeyPoint = (i: number) => setBriefingForm(p => ({ ...p, keyPoints: p.keyPoints.filter((_, idx) => idx !== i) }));
   const updateKeyPoint = (i: number, v: string) => setBriefingForm(p => ({ ...p, keyPoints: p.keyPoints.map((k, idx) => idx === i ? v : k) }));
   const addEditKeyPoint = () => setEditBriefingForm(p => ({ ...p, keyPoints: [...p.keyPoints, ''] }));
   const removeEditKeyPoint = (i: number) => setEditBriefingForm(p => ({ ...p, keyPoints: p.keyPoints.filter((_, idx) => idx !== i) }));
   const updateEditKeyPoint = (i: number, v: string) => setEditBriefingForm(p => ({ ...p, keyPoints: p.keyPoints.map((k, idx) => idx === i ? v : k) }));
-  
+
   const addActionItem = () => setBriefingForm(p => ({ ...p, actionItems: [...p.actionItems, { description: '', assignedTo: '', dueDate: '', status: 'pending', priority: 'medium' }] }));
   const removeActionItem = (i: number) => setBriefingForm(p => ({ ...p, actionItems: p.actionItems.filter((_, idx) => idx !== i) }));
   const updateActionItem = (i: number, field: string, val: string) => setBriefingForm(p => ({ ...p, actionItems: p.actionItems.map((item, idx) => idx === i ? { ...item, [field]: val } : item) }));
@@ -993,22 +993,34 @@ const SupervisorTrainingBriefing: React.FC = () => {
         <div className="mb-6">
           <div className="flex flex-col sm:flex-row justify-between gap-4 mb-4">
             <div><Badge variant="outline" className="bg-blue-50"><Building className="h-3 w-3 mr-1" />Site: {supervisorAssignedSiteNames[0] || 'Loading...'}</Badge></div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleRefresh}><RefreshCw className="h-4 w-4 mr-2" />Refresh</Button>
-              <Dialog open={showAddTraining} onOpenChange={setShowAddTraining}><DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />Add Training</Button></DialogTrigger>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={handleRefresh}>
+                <RefreshCw className="h-4 w-4 mr-1" />Refresh
+              </Button>
+              <Dialog open={showAddTraining} onOpenChange={setShowAddTraining}>
+                <DialogTrigger asChild>
+                  <Button size="sm">
+                    <Plus className="h-4 w-4 mr-1" />Add Training
+                  </Button>
+                </DialogTrigger>
                 <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
                   <DialogHeader><DialogTitle>Add New Training Session</DialogTitle></DialogHeader>
                   <AddTrainingFormComponent trainingForm={trainingForm} setTrainingForm={setTrainingForm} addObjective={addObjective} removeObjective={removeObjective} updateObjective={updateObjective} sites={sites} />
-                 
+
                   <AttachmentsSection attachments={trainingAttachments} onUpload={handleTrainingFileUpload} onRemove={removeTrainingAttachment} fileInputRef={fileInputRef} title="Training Attachments" onTakePhoto={() => handleTakePhoto('training')} />
                   <DialogFooter><Button onClick={handleAddTraining}>Add Training</Button><DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose></DialogFooter>
                 </DialogContent>
               </Dialog>
-              <Dialog open={showAddBriefing} onOpenChange={setShowAddBriefing}><DialogTrigger asChild><Button variant="secondary"><Plus className="h-4 w-4 mr-2" />Add Briefing</Button></DialogTrigger>
+              <Dialog open={showAddBriefing} onOpenChange={setShowAddBriefing}>
+                <DialogTrigger asChild>
+                  <Button variant="secondary" size="sm">
+                    <Plus className="h-4 w-4 mr-1" />Add Briefing
+                  </Button>
+                </DialogTrigger>
                 <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
                   <DialogHeader><DialogTitle>Add New Staff Briefing</DialogTitle></DialogHeader>
                   <AddBriefingFormComponent briefingForm={briefingForm} setBriefingForm={setBriefingForm} addTopic={addTopic} removeTopic={removeTopic} updateTopic={updateTopic} addKeyPoint={addKeyPoint} removeKeyPoint={removeKeyPoint} updateKeyPoint={updateKeyPoint} />
-                  
+
                   <ActionItemsSection actionItems={briefingForm.actionItems} onAdd={addActionItem} onRemove={removeActionItem} onUpdate={updateActionItem} />
                   <AttachmentsSection attachments={briefingAttachments} onUpload={handleBriefingFileUpload} onRemove={removeBriefingAttachment} fileInputRef={fileInputRef} title="Briefing Attachments" onTakePhoto={() => handleTakePhoto('briefing')} />
                   <DialogFooter><Button onClick={handleAddBriefing}>Add Briefing</Button><DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose></DialogFooter>
@@ -1076,22 +1088,22 @@ const SupervisorTrainingBriefing: React.FC = () => {
 
         <TrainingDetailDialog training={selectedTraining} open={!!selectedTraining} onClose={() => setSelectedTraining(null)} onEdit={openEditTrainingDialog} onUpdateStatus={updateTrainingStatus} getStatusBadge={getStatusBadge} getTypeColor={getTypeColor} formatDate={formatDate} trainingTypes={trainingTypes} />
         <BriefingDetailDialog briefing={selectedBriefing} open={!!selectedBriefing} onClose={() => setSelectedBriefing(null)} onEdit={openEditBriefingDialog} onUpdateAction={updateActionItemStatus} getShiftBadge={getShiftBadge} getPriorityBadge={getPriorityBadge} formatDate={formatDate} />
-        
+
         <Dialog open={showEditTrainingDialog} onOpenChange={setShowEditTrainingDialog}>
           <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Edit Training Session</DialogTitle></DialogHeader>
             <EditTrainingFormComponent editTrainingForm={editTrainingForm} setEditTrainingForm={setEditTrainingForm} addEditObjective={addEditObjective} removeEditObjective={removeEditObjective} updateEditObjective={updateEditObjective} sites={sites} />
-           
+
             <AttachmentsSection attachments={editTrainingAttachments} onUpload={handleEditTrainingFileUpload} onRemove={removeEditTrainingAttachment} fileInputRef={editTrainingFileInputRef} title="Attachments" onTakePhoto={() => handleTakePhoto('editTraining')} />
             <DialogFooter><Button onClick={handleUpdateTraining}>Update Training</Button><Button variant="outline" onClick={() => setShowEditTrainingDialog(false)}>Cancel</Button></DialogFooter>
           </DialogContent>
         </Dialog>
-        
+
         <Dialog open={showEditBriefingDialog} onOpenChange={setShowEditBriefingDialog}>
           <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Edit Staff Briefing</DialogTitle></DialogHeader>
             <EditBriefingFormComponent editBriefingForm={editBriefingForm} setEditBriefingForm={setEditBriefingForm} addEditTopic={addEditTopic} removeEditTopic={removeEditTopic} updateEditTopic={updateEditTopic} addEditKeyPoint={addEditKeyPoint} removeEditKeyPoint={removeEditKeyPoint} updateEditKeyPoint={updateEditKeyPoint} />
-            
+
             <ActionItemsSection actionItems={editBriefingForm.actionItems} onAdd={addEditActionItem} onRemove={removeEditActionItem} onUpdate={updateEditActionItem} />
             <AttachmentsSection attachments={editBriefingAttachments} onUpload={handleEditBriefingFileUpload} onRemove={removeEditBriefingAttachment} fileInputRef={editBriefingFileInputRef} title="Attachments" onTakePhoto={() => handleTakePhoto('editBriefing')} />
             <DialogFooter><Button onClick={handleUpdateBriefing}>Update Briefing</Button><Button variant="outline" onClick={() => setShowEditBriefingDialog(false)}>Cancel</Button></DialogFooter>
