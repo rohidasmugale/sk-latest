@@ -692,86 +692,93 @@ const SupervisorAssignTask: React.FC = () => {
   };
 
   // ==================== ACTIONS ====================
-
-  const handleUpdatePersonalStatus = async (taskId: string, newStatus: string) => {
-    try {
-      setUpdatingStatus(taskId);
-      
-      const task = tasks.find(t => t._id === taskId);
-      if (!task) return;
-      
-      const supervisorId = user?._id || user?.id;
-      if (!supervisorId) {
-        toast.error('Supervisor ID not found');
-        return;
-      }
-      
-      const supervisorIndex = task.assignedSupervisors?.findIndex(supervisor => {
-        const supervisorUserId = supervisor.userId;
-        const matchById = String(supervisorUserId) === String(supervisorId);
-        const matchByIdFull = String(supervisorUserId) === String(user?._id);
-        const matchByIdShort = String(supervisorUserId) === String(user?.id);
-        
-        return matchById || matchByIdFull || matchByIdShort;
-      });
-      
-      if (supervisorIndex === -1 || supervisorIndex === undefined) {
-        toast.error('Could not find your assignment in this task');
-        return;
-      }
-      
-      const updatedSupervisors = [...(task.assignedSupervisors || [])];
-      
-      updatedSupervisors[supervisorIndex] = {
-        ...updatedSupervisors[supervisorIndex],
-        status: newStatus as any
-      };
-      
-      const response = await fetch(`${API_URL}/assigntasks/${taskId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          assignedSupervisors: updatedSupervisors
-        }),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to update status');
-      }
-      
-if (newStatus === 'completed') {
-  NotificationService.completeTaskNotification(taskId);
-  const task = tasks.find(t => t._id === taskId);
-  if (task) {
-    createNotificationForSuperadmin(
-      `✅ Task Completed: ${task.taskTitle}`,
-      `Task "${task.taskTitle}" at ${task.siteName} completed by ${user?.name || 'Supervisor'}`,
-      'success',
-      'medium',
-      {
-        taskId: task._id,
-        siteName: task.siteName,
-        taskTitle: task.taskTitle,
-        completedBy: user?.name
-      },
-      'task_completed'
-    );
-  }
-  console.log(`🔔 Stopped persistent sound for task ${taskId}`);
-}
-      
-      toast.success(`Your status updated to ${newStatus}`);
-      await fetchTasks();
-      
-    } catch (error: any) {
-      console.error('Error updating status:', error);
-      toast.error(error.message || 'Failed to update status');
-    } finally {
-      setUpdatingStatus(null);
+const handleUpdatePersonalStatus = async (taskId: string, newStatus: string) => {
+  try {
+    setUpdatingStatus(taskId);
+    
+    const task = tasks.find(t => t._id === taskId);
+    if (!task) {
+      toast.error('Task not found');
+      return;
     }
-  };
-
+    
+    const supervisorId = user?._id || user?.id;
+    if (!supervisorId) {
+      toast.error('Supervisor ID not found');
+      return;
+    }
+    
+    const supervisorIndex = task.assignedSupervisors?.findIndex(supervisor => {
+      const supervisorUserId = supervisor.userId;
+      const matchById = String(supervisorUserId) === String(supervisorId);
+      const matchByIdFull = String(supervisorUserId) === String(user?._id);
+      const matchByIdShort = String(supervisorUserId) === String(user?.id);
+      
+      return matchById || matchByIdFull || matchByIdShort;
+    });
+    
+    if (supervisorIndex === -1 || supervisorIndex === undefined) {
+      toast.error('Could not find your assignment in this task');
+      return;
+    }
+    
+    const updatedSupervisors = [...(task.assignedSupervisors || [])];
+    
+    updatedSupervisors[supervisorIndex] = {
+      ...updatedSupervisors[supervisorIndex],
+      status: newStatus as any
+    };
+    
+    const response = await fetch(`${API_URL}/assigntasks/${taskId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        assignedSupervisors: updatedSupervisors
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to update status');
+    }
+    
+    // ✅ When task is marked as completed - notify Superadmin
+    if (newStatus === 'completed') {
+      const taskTitle = task.taskTitle;
+      const employeeName = user?.name || 'Supervisor';
+      
+      // ✅ Create notification for Superadmin
+      await createNotificationForSuperadmin(
+        `✅ Task Completed: ${taskTitle}`,
+        `${employeeName} completed "${taskTitle}" at ${task.siteName}`,
+        'success',
+        'medium',
+        {
+          taskId: task._id,
+          siteName: task.siteName,
+          taskTitle: taskTitle,
+          completedBy: employeeName,
+          notificationType: 'task_completed'
+        }
+      );
+      
+      // ✅ Also notify via NotificationService (for sound)
+      NotificationService.completeTaskNotification(taskId);
+      
+      console.log(`✅ Task ${taskId} marked as completed and Superadmin notified`);
+    }
+    
+    toast.success(`Your status updated to ${newStatus}`);
+    await fetchTasks();
+    
+  } catch (error: any) {
+    console.error('Error updating status:', error);
+    toast.error(error.message || 'Failed to update status');
+  } finally {
+    setUpdatingStatus(null);
+  }
+};
   const handleAddHourlyUpdate = async (taskId: string) => {
     if (!hourlyUpdateText.trim()) {
       toast.error('Please enter an update');

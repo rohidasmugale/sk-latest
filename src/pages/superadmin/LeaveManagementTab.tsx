@@ -375,13 +375,13 @@ const LeaveManagementTab = ({ leaveRequests, setLeaveRequests }: LeaveManagement
       setSupervisorEmployeeLeaves(paginatedLeaves);
       
       // Calculate stats
-      const stats = {
-        total: filteredLeaves.length,
-        pending: filteredLeaves.filter((l: any) => l.status === 'pending').length,
-        approved: filteredLeaves.filter((l: any) => l.status === 'approved').length,
-        rejected: filteredLeaves.filter((l: any) => l.status === 'rejected').length,
-        cancelled: filteredLeaves.filter((l: any) => l.status === 'cancelled').length
-      };
+     const stats = {
+  total: allLeaves.length,
+  pending: allLeaves.filter(l => l.status === 'pending').length,
+  approved: allLeaves.filter(l => l.status === 'approved').length,
+  rejected: allLeaves.filter(l => l.status === 'rejected').length,
+  cancelled: allLeaves.filter(l => l.status === 'cancelled').length,
+};
       
       setSupervisorEmployeeStats(stats);
       setTotalItems(filteredLeaves.length);

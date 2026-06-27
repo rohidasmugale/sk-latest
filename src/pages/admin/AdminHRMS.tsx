@@ -28,7 +28,7 @@ import OnboardingTab from "./OnboardingTab";
 import AttendanceTab from "./AttendanceTab";
 import LeaveManagementTab from "./LeaveManagementTab";
 
-import PayrollTab from "./PayrollTab";
+import PayrollTab from "../superadmin/PayrollTab";  // ✅ Use this
 import PerformanceTab from "./PerformanceTab";
 import ReportsTab from "./ReportsTab";
 import { 

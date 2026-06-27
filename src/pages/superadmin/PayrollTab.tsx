@@ -241,7 +241,7 @@ interface PayrollTabProps {
   selectedMonth: string;
   setSelectedMonth: (month: string) => void;
 }
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 // Helper function to get item ID
 const getItemId = (item: any): string => {
@@ -344,7 +344,8 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth }: PayrollTabProps) => {
     advance: "",
     mlwf: "",
   });
-
+  const [payrollItemsPerPage, setPayrollItemsPerPage] = useState(10);
+  const [payrollPage, setPayrollPage] = useState(1);
   // Fetch all data in one consolidated function
   useEffect(() => {
     fetchAllData();
@@ -361,149 +362,149 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth }: PayrollTabProps) => {
     });
   }, [employees, payroll, salaryStructures, selectedMonth]);
   useEffect(() => {
-  if (selectedMonth) {
-    fetchAttendanceForMonth(selectedMonth);
-  }
-}, [selectedMonth]);
-const fetchAttendanceForMonth = async (month: string) => {
-  try {
-    // Parse year and month from 'YYYY-MM'
-    const [year, monthNum] = month.split('-');
-    const startDate = `${year}-${monthNum}-01`;
-    const endDate = new Date(Number(year), Number(monthNum), 0).toISOString().split('T')[0]; // last day of month
-
-    const response = await axios.get(`${API_URL}/attendance`, {
-      params: { startDate, endDate, limit: 10000 }
-    });
-
-    let records = response.data?.data || response.data || [];
-    if (!Array.isArray(records)) records = [];
-
-    // Transform to match Attendance interface
-    const transformed = records.map((r: any) => ({
-      employeeId: r.employeeId,
-      date: r.date,
-      status: r.status, // 'present', 'absent', etc.
-      checkIn: r.checkInTime,
-      checkOut: r.checkOutTime,
-      overtimeHours: r.overtimeHours
-    }));
-
-    setAttendance(transformed);
-  } catch (error) {
-    console.error('Failed to fetch attendance for payroll:', error);
-    // Optionally keep empty array
-  }
-};
-const fetchAllData = async () => {
-  try {
-    setLoading({
-      employees: true,
-      payroll: true,
-      structures: true,
-      slips: true,
-      summary: true,
-    });
-
-    console.log("Fetching data for month:", selectedMonth);
-
-    // ✅ Use the existing API services (which include token)
-   const [employeesRes, payrollRes, structuresRes, slipsRes] = await Promise.all([
-  employeeApi.getAll({ status: 'active' }),
-  payrollApi.getAll({ month: selectedMonth }),
-  salaryStructureApi.getAll({ isActive: true }),
-  salarySlipApi.getAll({ month: selectedMonth }),   // 👈 add this line
-]);
-
-    console.log('API Responses:', { employeesRes, payrollRes, structuresRes });
-
-    if (employeesRes.success) {
-      setEmployees(employeesRes.data || []);
-    } else {
-      console.warn('No employee data received');
-      setEmployees([]);
+    if (selectedMonth) {
+      fetchAttendanceForMonth(selectedMonth);
     }
+  }, [selectedMonth]);
+  const fetchAttendanceForMonth = async (month: string) => {
+    try {
+      // Parse year and month from 'YYYY-MM'
+      const [year, monthNum] = month.split('-');
+      const startDate = `${year}-${monthNum}-01`;
+      const endDate = new Date(Number(year), Number(monthNum), 0).toISOString().split('T')[0]; // last day of month
 
-    if (payrollRes.success) {
-      setPayroll(payrollRes.data || []);
-    } else {
-      console.warn('No payroll data received');
-      setPayroll([]);
+      const response = await axios.get(`${API_URL}/attendance`, {
+        params: { startDate, endDate, limit: 10000 }
+      });
+
+      let records = response.data?.data || response.data || [];
+      if (!Array.isArray(records)) records = [];
+
+      // Transform to match Attendance interface
+      const transformed = records.map((r: any) => ({
+        employeeId: r.employeeId,
+        date: r.date,
+        status: r.status, // 'present', 'absent', etc.
+        checkIn: r.checkInTime,
+        checkOut: r.checkOutTime,
+        overtimeHours: r.overtimeHours
+      }));
+
+      setAttendance(transformed);
+    } catch (error) {
+      console.error('Failed to fetch attendance for payroll:', error);
+      // Optionally keep empty array
     }
+  };
+  const fetchAllData = async () => {
+    try {
+      setLoading({
+        employees: true,
+        payroll: true,
+        structures: true,
+        slips: true,
+        summary: true,
+      });
 
-    if (structuresRes.success) {
-      setSalaryStructures(structuresRes.data || []);
-    } else {
-      console.warn('No structures data received');
-      setSalaryStructures([]);
+      console.log("Fetching data for month:", selectedMonth);
+
+      // ✅ FIX: Pass limit: 10000 to fetch ALL employees
+      const [employeesRes, payrollRes, structuresRes, slipsRes] = await Promise.all([
+        employeeApi.getAll({ status: 'active', limit: 10000 }), // ⬅️ ADD limit: 10000
+        payrollApi.getAll({ month: selectedMonth }),
+        salaryStructureApi.getAll({ isActive: true }),
+        salarySlipApi.getAll({ month: selectedMonth }),
+      ]);
+
+      console.log('API Responses:', { employeesRes, payrollRes, structuresRes });
+
+      if (employeesRes.success) {
+        setEmployees(employeesRes.data || []);
+      } else {
+        console.warn('No employee data received');
+        setEmployees([]);
+      }
+
+      if (payrollRes.success) {
+        setPayroll(payrollRes.data || []);
+      } else {
+        console.warn('No payroll data received');
+        setPayroll([]);
+      }
+
+      if (structuresRes.success) {
+        setSalaryStructures(structuresRes.data || []);
+      } else {
+        console.warn('No structures data received');
+        setSalaryStructures([]);
+      }
+      if (slipsRes.success) {
+        setSalarySlips(slipsRes.data || []);
+      } else {
+        setSalarySlips([]);
+      }
+      // Calculate summary locally (or fetch from summary endpoint)
+      // Calculate summary using fresh data
+      const freshSummary = calculateSummaryFromFreshData(
+        employeesRes.data || [],
+        payrollRes.data || [],
+        structuresRes.data || []   // ✅ Correct name
+      );
+      setPayrollSummary(freshSummary);
+
+      toast.success('Data loaded successfully');
+    } catch (error: any) {
+      console.error("❌ Error in main fetch:", error);
+      toast.error("Failed to fetch data. Please check your API connection.");
+    } finally {
+      setLoading({
+        employees: false,
+        payroll: false,
+        structures: false,
+        slips: false,
+        summary: false,
+      });
     }
-if (slipsRes.success) {
-  setSalarySlips(slipsRes.data || []);
-} else {
-  setSalarySlips([]);
-}
-    // Calculate summary locally (or fetch from summary endpoint)
- // Calculate summary using fresh data
-const freshSummary = calculateSummaryFromFreshData(
-  employeesRes.data || [],
-  payrollRes.data || [],
-  structuresRes.data || []   // ✅ Correct name
-);
-setPayrollSummary(freshSummary);
-
-    toast.success('Data loaded successfully');
-  } catch (error: any) {
-    console.error("❌ Error in main fetch:", error);
-    toast.error("Failed to fetch data. Please check your API connection.");
-  } finally {
-    setLoading({
-      employees: false,
-      payroll: false,
-      structures: false,
-      slips: false,
-      summary: false,
-    });
-  }
-};
+  };
 
   // Helper function to calculate summary locally
- const calculateSummaryFromFreshData = (
-  employees: Employee[],
-  payroll: Payroll[],
-  salaryStructures: SalaryStructure[]
-): PayrollSummary => {
-  const totalAmount = payroll.reduce((sum, item) => sum + (item.netSalary || 0), 0);
-  const paidAmount = payroll.reduce((sum, item) => sum + (item.paidAmount || 0), 0);
-  
-  const pending = payroll.filter(p => p.status === 'pending');
-  const processed = payroll.filter(p => p.status === 'processed');
-  const paid = payroll.filter(p => p.status === 'paid');
-  const hold = payroll.filter(p => p.status === 'hold');
-  const partPaid = payroll.filter(p => p.status === 'part-paid');
+  const calculateSummaryFromFreshData = (
+    employees: Employee[],
+    payroll: Payroll[],
+    salaryStructures: SalaryStructure[]
+  ): PayrollSummary => {
+    const totalAmount = payroll.reduce((sum, item) => sum + (item.netSalary || 0), 0);
+    const paidAmount = payroll.reduce((sum, item) => sum + (item.paidAmount || 0), 0);
 
-  const employeesWithStructureCount = employees.filter(emp =>
-    salaryStructures.some(s => s.employeeId === emp.employeeId)
-  ).length;
+    const pending = payroll.filter(p => p.status === 'pending');
+    const processed = payroll.filter(p => p.status === 'processed');
+    const paid = payroll.filter(p => p.status === 'paid');
+    const hold = payroll.filter(p => p.status === 'hold');
+    const partPaid = payroll.filter(p => p.status === 'part-paid');
 
-  return {
-    totalAmount,
-    paidAmount,
-    pendingAmount: pending.reduce((sum, p) => sum + (p.netSalary || 0), 0),
-    holdAmount: hold.reduce((sum, p) => sum + (p.netSalary || 0), 0),
-    partPaidAmount: partPaid.reduce((sum, p) => sum + (p.netSalary || 0), 0),
-    processedCount: processed.length,
-    pendingCount: pending.length,
-    paidCount: paid.length,
-    holdCount: hold.length,
-    partPaidCount: partPaid.length,
-    totalEmployees: employees.length,
-    totalRecords: payroll.length,
-    activeEmployees: employees.filter(e => e.status === 'active').length,
-    employeesWithStructure: employeesWithStructureCount,
-    employeesWithoutStructure: employees.length - employeesWithStructureCount,
-    payrollMonth: selectedMonth,
+    const employeesWithStructureCount = employees.filter(emp =>
+      salaryStructures.some(s => s.employeeId === emp.employeeId)
+    ).length;
+
+    return {
+      totalAmount,
+      paidAmount,
+      pendingAmount: pending.reduce((sum, p) => sum + (p.netSalary || 0), 0),
+      holdAmount: hold.reduce((sum, p) => sum + (p.netSalary || 0), 0),
+      partPaidAmount: partPaid.reduce((sum, p) => sum + (p.netSalary || 0), 0),
+      processedCount: processed.length,
+      pendingCount: pending.length,
+      paidCount: paid.length,
+      holdCount: hold.length,
+      partPaidCount: partPaid.length,
+      totalEmployees: employees.length,
+      totalRecords: payroll.length,
+      activeEmployees: employees.filter(e => e.status === 'active').length,
+      employeesWithStructure: employeesWithStructureCount,
+      employeesWithoutStructure: employees.length - employeesWithStructureCount,
+      payrollMonth: selectedMonth,
+    };
   };
-};
 
   // Get employees with salary structure
   const employeesWithStructure = useMemo(() => {
@@ -519,7 +520,8 @@ setPayrollSummary(freshSummary);
     );
   }, [employees, salaryStructures]);
 
-  // Filter employees based on search and status
+  // Add this before the filteredEmployees mapping
+  // ✅ CORRECT - filteredEmployees declared FIRST
   const filteredEmployees = useMemo(() => {
     return employees.filter((employee) => {
       const matchesSearch =
@@ -541,36 +543,62 @@ setPayrollSummary(freshSummary);
     });
   }, [employees, searchTerm, statusFilter, salaryStructures]);
 
-  // Mock attendance function - Replace with actual API call
-  const getEmployeeAttendance = (employeeId: string) => {
-    // Mock attendance data
-    const monthAttendance = attendance.filter(
-      (a) => a.employeeId === employeeId && a.date?.startsWith(selectedMonth)
-    );
-    const presentDays = monthAttendance.filter(
-      (a) => a.status === "present"
-    ).length;
-    const absentDays = monthAttendance.filter(
-      (a) => a.status === "absent"
-    ).length;
-    const halfDays = monthAttendance.filter(
-      (a) => a.status === "half-day"
-    ).length;
+  // ✅ Then paginatedFilteredEmployees uses filteredEmployees
+  const paginatedFilteredEmployees = useMemo(() => {
+    const start = (payrollPage - 1) * payrollItemsPerPage;
+    return filteredEmployees.slice(start, start + payrollItemsPerPage);
+  }, [filteredEmployees, payrollPage, payrollItemsPerPage]);
+const getEmployeeAttendance = (employeeId: string) => {
+  // Find employee by both ID formats
+  const employee = employees.find(e => 
+    e.employeeId === employeeId || 
+    e._id === employeeId
+  );
+  
+  if (!employee) {
+    return { presentDays: 0, absentDays: 0, halfDays: 0, totalWorkingDays: 22 };
+  }
 
-    return { presentDays, absentDays, halfDays, totalWorkingDays: 22 };
-  };
+  // Match using both _id and employeeId
+  const monthAttendance = attendance.filter(
+    (a) => {
+      const matchesEmpId = a.employeeId === employee._id || 
+                           a.employeeId === employee.employeeId;
+      const matchesMonth = a.date?.startsWith(selectedMonth);
+      return matchesEmpId && matchesMonth;
+    }
+  );
+  
+  let presentDays = 0;
+  let absentDays = 0;
+  let halfDays = 0;
+  
+  monthAttendance.forEach(a => {
+    const status = a.status?.toLowerCase() || '';
+    if (status === 'present') {
+      presentDays++;
+    } else if (status === 'half-day' || status === 'half day') {
+      halfDays++;
+    } else if (status === 'leave') {
+      // ✅ COUNT LEAVES AS ABSENT
+      absentDays++;
+    } else if (status === 'absent') {
+      absentDays++;
+    } else {
+      // Any other status counts as absent
+      absentDays++;
+    }
+  });
+
+  return { presentDays, absentDays, halfDays, totalWorkingDays: 22 };
+};
 
   // Mock leaves function - Replace with actual API call
   const getEmployeeLeaves = (employeeId: string) => {
-    const monthLeaves = leaves.filter(
-      (l) =>
-        l.employeeId === employeeId &&
-        l.startDate?.startsWith(selectedMonth) &&
-        l.status === "approved"
-    );
-    return monthLeaves.length;
-  };
-
+  // Return 0 because leaves are now counted as absent
+  // This prevents double counting
+  return 0;
+};
   // Calculate salary based on attendance and leaves
   const calculateSalary = (employeeId: string, structure: SalaryStructure) => {
     if (!structure || !structure.basicSalary) return 0;
@@ -628,9 +656,9 @@ setPayrollSummary(freshSummary);
     const structure = salaryStructures.find((s) => s.employeeId === employeeId);
     if (!structure) return null;
 
-  const attendance = getEmployeeAttendance(employeeId);
-const totalLeaves = getEmployeeLeaves(employeeId);
-const calculatedSalary = structure ? calculateSalary(employeeId, structure) : 0;
+    const attendance = getEmployeeAttendance(employeeId);
+    const totalLeaves = getEmployeeLeaves(employeeId);
+    const calculatedSalary = structure ? calculateSalary(employeeId, structure) : 0;
     const totalAllowances =
       (structure.hra || 0) +
       (structure.da || 0) +
@@ -773,7 +801,7 @@ const calculatedSalary = structure ? calculateSalary(employeeId, structure) : 0;
           action: {
             label: "View",
             onClick: () => {
-              const newPayroll = payroll.find(p => 
+              const newPayroll = payroll.find(p =>
                 p.employeeId === employeeId && p.month === selectedMonth
               );
               if (newPayroll) {
@@ -1102,42 +1130,42 @@ const calculatedSalary = structure ? calculateSalary(employeeId, structure) : 0;
 
   // Generate salary slip
   const handleGenerateSalarySlip = async (payrollId: string) => {
-  if (!payrollId) {
-    toast.error("Payroll ID is missing");
-    return;
-  }
-
-  try {
-    const response = await salarySlipApi.generate({ payrollId });
-    if (response.success) {
-      toast.success("Salary slip generated successfully");
-      if (response.data) {
-        setSalarySlips((prev) => [...prev, response.data!]);
-        setSlipDialog({ open: true, salarySlip: response.data! });
-      }
-    } else {
-      toast.error(response.message || "Failed to generate salary slip");
-    }
-  } catch (error: any) {
-    // Check if the error is due to an existing slip
-    const existingSlip = error.response?.data?.data;
-    if (error.response?.status === 400 && existingSlip) {
-      // Slip already exists – show it instead of treating as error
-      setSalarySlips((prev) => {
-        // Avoid duplicates if already in state
-        if (!prev.find(s => s._id === existingSlip._id)) {
-          return [...prev, existingSlip];
-        }
-        return prev;
-      });
-      setSlipDialog({ open: true, salarySlip: existingSlip });
-      toast.info("Salary slip already exists, showing it");
+    if (!payrollId) {
+      toast.error("Payroll ID is missing");
       return;
     }
-    console.error("Error generating salary slip:", error);
-    toast.error(error.response?.data?.message || "Failed to generate salary slip");
-  }
-};
+
+    try {
+      const response = await salarySlipApi.generate({ payrollId });
+      if (response.success) {
+        toast.success("Salary slip generated successfully");
+        if (response.data) {
+          setSalarySlips((prev) => [...prev, response.data!]);
+          setSlipDialog({ open: true, salarySlip: response.data! });
+        }
+      } else {
+        toast.error(response.message || "Failed to generate salary slip");
+      }
+    } catch (error: any) {
+      // Check if the error is due to an existing slip
+      const existingSlip = error.response?.data?.data;
+      if (error.response?.status === 400 && existingSlip) {
+        // Slip already exists – show it instead of treating as error
+        setSalarySlips((prev) => {
+          // Avoid duplicates if already in state
+          if (!prev.find(s => s._id === existingSlip._id)) {
+            return [...prev, existingSlip];
+          }
+          return prev;
+        });
+        setSlipDialog({ open: true, salarySlip: existingSlip });
+        toast.info("Salary slip already exists, showing it");
+        return;
+      }
+      console.error("Error generating salary slip:", error);
+      toast.error(error.response?.data?.message || "Failed to generate salary slip");
+    }
+  };
 
   // View salary slip
   const handleViewSalarySlip = (salarySlip: SalarySlip) => {
@@ -1202,20 +1230,17 @@ const calculatedSalary = structure ? calculateSalary(employeeId, structure) : 0;
               <strong>Name:</strong> ${employee.name}<br>
               <strong>Employee ID:</strong> ${employee.employeeId}<br>
               <strong>Department:</strong> ${employee.department}<br>
-              <strong>Bank Account:</strong> ${
-                employee.accountNumber || "N/A"
-              }<br>
-              <strong>Bank:</strong> ${employee.bankName || "N/A"} - ${
-        employee.bankBranch || "N/A"
-      }
+              <strong>Bank Account:</strong> ${employee.accountNumber || "N/A"
+        }<br>
+              <strong>Bank:</strong> ${employee.bankName || "N/A"} - ${employee.bankBranch || "N/A"
+        }
             </div>
             <div>
               <strong>Generated Date:</strong> ${new Date(
-                slipDialog.salarySlip.generatedDate
-              ).toLocaleDateString()}<br>
-              <strong>Slip Number:</strong> ${
-                slipDialog.salarySlip.slipNumber
-              }<br>
+          slipDialog.salarySlip.generatedDate
+        ).toLocaleDateString()}<br>
+              <strong>Slip Number:</strong> ${slipDialog.salarySlip.slipNumber
+        }<br>
               <strong>Aadhar:</strong> ${employee.aadharNumber || "N/A"}<br>
               <strong>PAN:</strong> ${employee.panNumber || "N/A"}
             </div>
@@ -1233,50 +1258,50 @@ const calculatedSalary = structure ? calculateSalary(employeeId, structure) : 0;
                 <tr>
                   <td>DA</td>
                   <td class="amount">₹${(
-                    structure?.da || 0
-                  ).toLocaleString()}</td>
+          structure?.da || 0
+        ).toLocaleString()}</td>
                 </tr>
                 <tr>
                   <td>HRA</td>
                   <td class="amount">₹${(
-                    structure?.hra || 0
-                  ).toLocaleString()}</td>
+          structure?.hra || 0
+        ).toLocaleString()}</td>
                 </tr>
                 <tr>
                   <td>CCA</td>
                   <td class="amount">₹${(
-                    structure?.conveyance || 0
-                  ).toLocaleString()}</td>
+          structure?.conveyance || 0
+        ).toLocaleString()}</td>
                 </tr>
                 <tr>
                   <td>BONUS</td>
                   <td class="amount">₹${(
-                    structure?.specialAllowance || 0
-                  ).toLocaleString()}</td>
+          structure?.specialAllowance || 0
+        ).toLocaleString()}</td>
                 </tr>
                 <tr>
                   <td>LEAVE</td>
                   <td class="amount">₹${(
-                    structure?.leaveEncashment || 0
-                  ).toLocaleString()}</td>
+          structure?.leaveEncashment || 0
+        ).toLocaleString()}</td>
                 </tr>
                 <tr>
                   <td>MEDICAL</td>
                   <td class="amount">₹${(
-                    structure?.medicalAllowance || 0
-                  ).toLocaleString()}</td>
+          structure?.medicalAllowance || 0
+        ).toLocaleString()}</td>
                 </tr>
                 <tr>
                   <td>ARREARS</td>
                   <td class="amount">₹${(
-                    structure?.arrears || 0
-                  ).toLocaleString()}</td>
+          structure?.arrears || 0
+        ).toLocaleString()}</td>
                 </tr>
                 <tr>
                   <td>OTHER ALL</td>
                   <td class="amount">₹${(
-                    structure?.otherAllowances || 0
-                  ).toLocaleString()}</td>
+          structure?.otherAllowances || 0
+        ).toLocaleString()}</td>
                 </tr>
                 <tr class="total">
                   <td><strong>TOTAL EARNINGS</strong></td>
@@ -1292,32 +1317,32 @@ const calculatedSalary = structure ? calculateSalary(employeeId, structure) : 0;
                 <tr>
                   <td>PF</td>
                   <td class="amount">-₹${(
-                    structure?.providentFund || 0
-                  ).toLocaleString()}</td>
+          structure?.providentFund || 0
+        ).toLocaleString()}</td>
                 </tr>
                 <tr>
                   <td>ESIC</td>
                   <td class="amount">-₹${(
-                    structure?.esic || 0
-                  ).toLocaleString()}</td>
+          structure?.esic || 0
+        ).toLocaleString()}</td>
                 </tr>
                 <tr>
                   <td>ADVANCE</td>
                   <td class="amount">-₹${(
-                    structure?.advance || 0
-                  ).toLocaleString()}</td>
+          structure?.advance || 0
+        ).toLocaleString()}</td>
                 </tr>
                 <tr>
                   <td>MLWF</td>
                   <td class="amount">-₹${(
-                    structure?.mlwf || 0
-                  ).toLocaleString()}</td>
+          structure?.mlwf || 0
+        ).toLocaleString()}</td>
                 </tr>
                 <tr>
                   <td>Profession Tax</td>
                   <td class="amount">-₹${(
-                    structure?.professionalTax || 0
-                  ).toLocaleString()}</td>
+          structure?.professionalTax || 0
+        ).toLocaleString()}</td>
                 </tr>
                 <tr class="total">
                   <td><strong>TOTAL DEDUCTIONS</strong></td>
@@ -1341,27 +1366,23 @@ const calculatedSalary = structure ? calculateSalary(employeeId, structure) : 0;
             <div class="section-title">Attendance Summary</div>
             <div class="attendance-grid">
               <div class="attendance-item present">
-                <div style="font-size: 18px; font-weight: bold;">${
-                  slipDialog.salarySlip.presentDays
-                }</div>
+                <div style="font-size: 18px; font-weight: bold;">${slipDialog.salarySlip.presentDays
+        }</div>
                 <div>Present</div>
               </div>
               <div class="attendance-item absent">
-                <div style="font-size: 18px; font-weight: bold;">${
-                  slipDialog.salarySlip.absentDays
-                }</div>
+                <div style="font-size: 18px; font-weight: bold;">${slipDialog.salarySlip.absentDays
+        }</div>
                 <div>Absent</div>
               </div>
               <div class="attendance-item half-day">
-                <div style="font-size: 18px; font-weight: bold;">${
-                  slipDialog.salarySlip.halfDays
-                }</div>
+                <div style="font-size: 18px; font-weight: bold;">${slipDialog.salarySlip.halfDays
+        }</div>
                 <div>Half Days</div>
               </div>
               <div class="attendance-item leaves">
-                <div style="font-size: 18px; font-weight: bold;">${
-                  slipDialog.salarySlip.leaves
-                }</div>
+                <div style="font-size: 18px; font-weight: bold;">${slipDialog.salarySlip.leaves
+        }</div>
                 <div>Leaves</div>
               </div>
             </div>
@@ -1402,10 +1423,10 @@ const calculatedSalary = structure ? calculateSalary(employeeId, structure) : 0;
           prev.map((slip) =>
             getItemId(slip) === slipId
               ? {
-                  ...slip,
-                  emailSent: true,
-                  emailSentAt: new Date().toISOString(),
-                }
+                ...slip,
+                emailSent: true,
+                emailSentAt: new Date().toISOString(),
+              }
               : slip
           )
         );
@@ -1423,53 +1444,53 @@ const calculatedSalary = structure ? calculateSalary(employeeId, structure) : 0;
   };
 
   // Export payroll data to Excel format
- const handleExportPayrollExcel = async () => {
-  if (!payroll || payroll.length === 0) {
-    toast.error("No payroll data to export");
-    return;
-  }
-
-  try {
-    const response = await payrollApi.export({
-      month: selectedMonth,
-      format: "csv",
-    });
-
-    // Create download link
-    const url = window.URL.createObjectURL(new Blob([response]));
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `payroll-${selectedMonth}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-
-    toast.success("Payroll exported successfully");
-  } catch (error: any) {
-  let errorMessage = "Failed to export payroll";
-  if (error.response?.data instanceof Blob) {
-    try {
-      const text = await error.response.data.text();
-      const json = JSON.parse(text);
-      console.log("Export error response:", json); // <-- ADD THIS
-      errorMessage = json.message || errorMessage;
-    } catch (parseError) {
-      errorMessage = await error.response.data.text() || errorMessage;
+  const handleExportPayrollExcel = async () => {
+    if (!payroll || payroll.length === 0) {
+      toast.error("No payroll data to export");
+      return;
     }
-  } else {
-    console.log("Export error response:", error.response?.data); // <-- ADD THIS
-    errorMessage = error.response?.data?.message || error.message || errorMessage;
-  }
-  console.error("Error exporting payroll:", error);
-  toast.error(errorMessage);
-}
- };
+
+    try {
+      const response = await payrollApi.export({
+        month: selectedMonth,
+        format: "csv",
+      });
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `payroll-${selectedMonth}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      toast.success("Payroll exported successfully");
+    } catch (error: any) {
+      let errorMessage = "Failed to export payroll";
+      if (error.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          const json = JSON.parse(text);
+          console.log("Export error response:", json); // <-- ADD THIS
+          errorMessage = json.message || errorMessage;
+        } catch (parseError) {
+          errorMessage = await error.response.data.text() || errorMessage;
+        }
+      } else {
+        console.log("Export error response:", error.response?.data); // <-- ADD THIS
+        errorMessage = error.response?.data?.message || error.message || errorMessage;
+      }
+      console.error("Error exporting payroll:", error);
+      toast.error(errorMessage);
+    }
+  };
 
   // Get status badge
   const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { 
-      label: string; 
-      bgColor: string; 
+    const statusConfig: Record<string, {
+      label: string;
+      bgColor: string;
       textColor: string;
       borderColor: string;
       icon?: React.ReactNode;
@@ -1629,21 +1650,21 @@ const calculatedSalary = structure ? calculateSalary(employeeId, structure) : 0;
   };
 
   const getMonthOptions = () => {
-  const options = [];
-  const currentYear = new Date().getFullYear();
-  const startYear = 2024; // or whatever your earliest data year is
-  for (let year = startYear; year <= currentYear + 1; year++) {
-    for (let month = 1; month <= 12; month++) {
-      const value = `${year}-${String(month).padStart(2, '0')}`;
-      const label = new Date(year, month - 1).toLocaleString('default', { month: 'long' }) + ` ${year}`;
-      options.push({ value, label });
+    const options = [];
+    const currentYear = new Date().getFullYear();
+    const startYear = 2024; // or whatever your earliest data year is
+    for (let year = startYear; year <= currentYear + 1; year++) {
+      for (let month = 1; month <= 12; month++) {
+        const value = `${year}-${String(month).padStart(2, '0')}`;
+        const label = new Date(year, month - 1).toLocaleString('default', { month: 'long' }) + ` ${year}`;
+        options.push({ value, label });
+      }
     }
-  }
-  return options;
-};
+    return options;
+  };
 
-// Then in your component:
-const monthOptions = getMonthOptions();
+  // Then in your component:
+  const monthOptions = getMonthOptions();
   // Refresh data
   const handleRefreshData = () => {
     fetchAllData();
@@ -1799,15 +1820,7 @@ const monthOptions = getMonthOptions();
                             Half Days
                           </div>
                         </div>
-                        <div className="text-center">
-                          <div className="font-medium text-blue-600">
-                            {calculation.totalLeaves}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            Leaves
-                          </div>
                         </div>
-                      </div>
                     </div>
 
                     <div className="border rounded-lg p-3">
@@ -1991,22 +2004,22 @@ const monthOptions = getMonthOptions();
 
               {(paymentStatusForm.status === "paid" ||
                 paymentStatusForm.status === "part-paid") && (
-                <div className="space-y-2">
-                  <Label htmlFor="paymentDate">Payment Date *</Label>
-                  <Input
-                    id="paymentDate"
-                    type="date"
-                    value={paymentStatusForm.paymentDate}
-                    onChange={(e) =>
-                      setPaymentStatusForm((prev) => ({
-                        ...prev,
-                        paymentDate: e.target.value,
-                      }))
-                    }
-                    required
-                  />
-                </div>
-              )}
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentDate">Payment Date *</Label>
+                    <Input
+                      id="paymentDate"
+                      type="date"
+                      value={paymentStatusForm.paymentDate}
+                      onChange={(e) =>
+                        setPaymentStatusForm((prev) => ({
+                          ...prev,
+                          paymentDate: e.target.value,
+                        }))
+                      }
+                      required
+                    />
+                  </div>
+                )}
 
               <div className="space-y-2">
                 <Label htmlFor="notes">Notes (Optional)</Label>
@@ -2281,7 +2294,7 @@ const monthOptions = getMonthOptions();
               </div>
             </div>
           </div>
-          
+
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex items-center gap-2">
               <div className="relative">
@@ -2299,7 +2312,7 @@ const monthOptions = getMonthOptions();
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <Button
                 variant="outline"
                 onClick={handleRefreshData}
@@ -2309,7 +2322,7 @@ const monthOptions = getMonthOptions();
                 <RefreshCw className={`h-4 w-4 ${loading.payroll ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
-              
+
               <Button
                 variant="outline"
                 onClick={handleExportPayrollExcel}
@@ -2345,15 +2358,15 @@ const monthOptions = getMonthOptions();
               </div>
               <div className="flex items-center gap-1 mt-1">
                 <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-blue-500 rounded-full" 
+                  <div
+                    className="h-full bg-blue-500 rounded-full"
                     style={{ width: `${Math.min((payrollSummary.processedCount / payrollSummary.totalEmployees) * 100, 100)}%` }}
                   ></div>
                 </div>
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="border-l-4 border-l-green-500 transition-all duration-200 hover:shadow-md border">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center justify-between">
@@ -2374,7 +2387,7 @@ const monthOptions = getMonthOptions();
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="border-l-4 border-l-amber-500 transition-all duration-200 hover:shadow-md border">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center justify-between">
@@ -2395,7 +2408,7 @@ const monthOptions = getMonthOptions();
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="border-l-4 border-l-red-500 transition-all duration-200 hover:shadow-md border">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center justify-between">
@@ -2477,26 +2490,26 @@ const monthOptions = getMonthOptions();
               onValueChange={setActivePayrollTab}
               className="w-full"
             >
-             <TabsList className="flex flex-wrap gap-1 sm:gap-2 w-full h-auto p-1 bg-gray-100 rounded-lg">
-  <TabsTrigger 
-    value="salary-slips" 
-    className="flex-1 min-w-[100px] sm:min-w-[140px] text-xs sm:text-sm whitespace-nowrap"
-  >
-    Salary Processing
-  </TabsTrigger>
-  <TabsTrigger 
-    value="salary-structures" 
-    className="flex-1 min-w-[100px] sm:min-w-[140px] text-xs sm:text-sm whitespace-nowrap"
-  >
-    Salary Structures
-  </TabsTrigger>
-  <TabsTrigger 
-    value="payroll-records" 
-    className="flex-1 min-w-[100px] sm:min-w-[140px] text-xs sm:text-sm whitespace-nowrap"
-  >
-    Payroll Records
-  </TabsTrigger>
-</TabsList>
+              <TabsList className="flex flex-wrap gap-1 sm:gap-2 w-full h-auto p-1 bg-gray-100 rounded-lg">
+                <TabsTrigger
+                  value="salary-slips"
+                  className="flex-1 min-w-[100px] sm:min-w-[140px] text-xs sm:text-sm whitespace-nowrap"
+                >
+                  Salary Processing
+                </TabsTrigger>
+                <TabsTrigger
+                  value="salary-structures"
+                  className="flex-1 min-w-[100px] sm:min-w-[140px] text-xs sm:text-sm whitespace-nowrap"
+                >
+                  Salary Structures
+                </TabsTrigger>
+                <TabsTrigger
+                  value="payroll-records"
+                  className="flex-1 min-w-[100px] sm:min-w-[140px] text-xs sm:text-sm whitespace-nowrap"
+                >
+                  Payroll Records
+                </TabsTrigger>
+              </TabsList>
 
               {/* Salary Processing Tab */}
               <TabsContent value="salary-slips" className="space-y-4">
@@ -2536,221 +2549,256 @@ const monthOptions = getMonthOptions();
                     Process All Payroll
                   </Button>
                 </div>
-
                 {loading.employees ? (
                   <div className="flex justify-center items-center h-64">
                     <Loader2 className="h-8 w-8 animate-spin" />
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Employee</TableHead>
-                          <TableHead>Department</TableHead>
-                          <TableHead>Salary Structure</TableHead>
-                          <TableHead>Attendance</TableHead>
-                          <TableHead>Leaves</TableHead>
-                          <TableHead>Calculated Salary</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredEmployees.length === 0 ? (
+                  <>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
                           <TableRow>
-                            <TableCell colSpan={7} className="py-12">
-                              <div className="flex flex-col items-center justify-center text-center space-y-4">
-                                <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center">
-                                  <Users className="h-8 w-8 text-gray-400" />
-                                </div>
-                                <div className="space-y-1">
-                                  <p className="font-medium text-gray-900">
-                                    {searchTerm ? "No matching employees found" : "No employees available"}
-                                  </p>
-                                  <p className="text-sm text-gray-500 max-w-sm">
-                                    {searchTerm 
-                                      ? "Try adjusting your search terms or filters"
-                                      : employees.length === 0 
-                                        ? "No employees have been added yet"
-                                        : "All employees already have salary structures configured"
-                                    }
-                                  </p>
-                                </div>
-                                {searchTerm && (
-                                  <Button 
-                                    variant="outline" 
-                                    onClick={() => {
-                                      setSearchTerm("");
-                                      setStatusFilter("all");
-                                    }}
-                                    size="sm"
-                                  >
-                                    Clear search
-                                  </Button>
-                                )}
-                              </div>
-                            </TableCell>
+                            <TableHead>Employee</TableHead>
+                            <TableHead>Department</TableHead>
+                            <TableHead>Salary Structure</TableHead>
+                            <TableHead>Attendance</TableHead>
+                            <TableHead>Calculated Salary</TableHead>
+                            <TableHead>Actions</TableHead>
                           </TableRow>
-                        ) : (
-                          filteredEmployees.map((employee, index) => {
-                            const structure = salaryStructures.find(
-                              s => s.employeeId === employee.employeeId
-                            );
-                            const payrollRecord = payroll.find(
-                              p => p.employeeId === employee.employeeId && p.month === selectedMonth
-                            );
-                            const attendance = getEmployeeAttendance(
-                              employee.employeeId
-                            );
-                            const totalLeaves = getEmployeeLeaves(
-                              employee.employeeId
-                            );
-                            const calculatedSalary = structure
-                              ? calculateSalary(employee.employeeId, structure)
-                              : 0;
-
-                            return (
-                              <TableRow
-                                key={
-                                  employee.employeeId ||
-                                  employee._id ||
-                                  `employee-${index}`
-                                }
-                                className="transition-all duration-200 hover:bg-gray-50/50 border-b border-gray-100"
-                              >
-                                <TableCell>
-                                  <div className="flex items-start space-x-3">
-                                    <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                                      <span className="font-medium text-blue-700">
-                                        {employee.name?.charAt(0) || 'E'}
-                                      </span>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <p className="font-medium text-gray-900 truncate">{employee.name}</p>
-                                      <p className="text-sm text-gray-500">{employee.employeeId}</p>
-                                      <p className="text-xs text-gray-400 mt-0.5">{employee.department}</p>
-                                      {employee.accountNumber && (
-                                        <div className="flex items-center gap-1 mt-1">
-                                          <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                                          <span className="text-xs text-gray-500">Bank account configured</span>
-                                        </div>
-                                      )}
-                                    </div>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredEmployees.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={7} className="py-12">
+                                <div className="flex flex-col items-center justify-center text-center space-y-4">
+                                  <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center">
+                                    <Users className="h-8 w-8 text-gray-400" />
                                   </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="text-sm text-gray-700">{employee.department}</div>
-                                </TableCell>
-                                <TableCell>
-                                  {structure ? (
-                                    <div className="flex items-center gap-2">
-                                      <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                        Configured
-                                      </Badge>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center gap-2">
-                                      <div className="h-2 w-2 rounded-full bg-red-500"></div>
-                                      <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                                        Not Configured
-                                      </Badge>
-                                    </div>
+                                  <div className="space-y-1">
+                                    <p className="font-medium text-gray-900">
+                                      {searchTerm ? "No matching employees found" : "No employees available"}
+                                    </p>
+                                    <p className="text-sm text-gray-500 max-w-sm">
+                                      {searchTerm
+                                        ? "Try adjusting your search terms or filters"
+                                        : employees.length === 0
+                                          ? "No employees have been added yet"
+                                          : "All employees already have salary structures configured"
+                                      }
+                                    </p>
+                                  </div>
+                                  {searchTerm && (
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => {
+                                        setSearchTerm("");
+                                        setStatusFilter("all");
+                                      }}
+                                      size="sm"
+                                    >
+                                      Clear search
+                                    </Button>
                                   )}
-                                </TableCell>
-                             <TableCell>
-  <div className="text-sm">
-    <div className="flex items-center gap-1">
-      <span className="text-green-600">P: {attendance.presentDays}</span>
-      <span className="text-red-600">A: {attendance.absentDays + totalLeaves}</span>  {/* ← ADD LEAVES */}
-      <span className="text-yellow-600">H: {attendance.halfDays}</span>
-    </div>
-  </div>
-</TableCell>
-                                <TableCell>
-                                  <Badge variant="secondary" className="bg-blue-50 text-blue-700">
-                                    {totalLeaves} day{totalLeaves !== 1 ? 's' : ''}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="font-medium text-gray-900">
-                                    ₹{calculatedSalary.toFixed(2)}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex gap-2">
-                                    {structure ? (
-                                      payrollRecord ? (
-                                        <div className="flex items-center gap-2">
-                                          {getStatusBadge(payrollRecord.status)}
-                                          <div className="flex gap-1">
-                                            <Button
-                                              size="sm"
-                                              variant="ghost"
-                                              onClick={() => handleOpenPaymentStatus(payrollRecord)}
-                                              className="h-8 w-8 p-0"
-                                              title="Update payment status"
-                                            >
-                                              <Edit className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                              size="sm"
-                                              variant="ghost"
-                                              onClick={() => {
-                                                const payrollId = getItemId(payrollRecord);
-                                                if (!payrollId) {
-                                                  toast.error("Cannot generate slip: Payroll ID missing");
-                                                  return;
-                                                }
-                                                const slip = salarySlips.find(s => s.payrollId === payrollId);
-                                                if (slip) {
-                                                  handleViewSalarySlip(slip);
-                                                } else {
-                                                  handleGenerateSalarySlip(payrollId);
-                                                }
-                                              }}
-                                              className="h-8 w-8 p-0"
-                                              title="View salary slip"
-                                            >
-                                              <Eye className="h-4 w-4" />
-                                            </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            paginatedFilteredEmployees.map((employee, index) => {
+                              const structure = salaryStructures.find(
+                                s => s.employeeId === employee.employeeId
+                              );
+                              const payrollRecord = payroll.find(
+                                p => p.employeeId === employee.employeeId && p.month === selectedMonth
+                              );
+                              const attendance = getEmployeeAttendance(employee.employeeId);
+                              const totalLeaves = getEmployeeLeaves(employee.employeeId);
+                              const calculatedSalary = structure
+                                ? calculateSalary(employee.employeeId, structure)
+                                : 0;
+
+                              return (
+                                <TableRow
+                                  key={employee.employeeId || employee._id || `employee-${index}`}
+                                  className="transition-all duration-200 hover:bg-gray-50/50 border-b border-gray-100"
+                                >
+                                  <TableCell>
+                                    <div className="flex items-start space-x-3">
+                                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                        <span className="font-medium text-blue-700">
+                                          {employee.name?.charAt(0) || 'E'}
+                                        </span>
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-medium text-gray-900 truncate">{employee.name}</p>
+                                        <p className="text-sm text-gray-500">{employee.employeeId}</p>
+                                        <p className="text-xs text-gray-400 mt-0.5">{employee.department}</p>
+                                        {employee.accountNumber && (
+                                          <div className="flex items-center gap-1 mt-1">
+                                            <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                                            <span className="text-xs text-gray-500">Bank account configured</span>
                                           </div>
-                                        </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="text-sm text-gray-700">{employee.department}</div>
+                                  </TableCell>
+                                  <TableCell>
+                                    {structure ? (
+                                      <div className="flex items-center gap-2">
+                                        <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                          Configured
+                                        </Badge>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-2">
+                                        <div className="h-2 w-2 rounded-full bg-red-500"></div>
+                                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                          Not Configured
+                                        </Badge>
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="text-sm">
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-green-600">P: {attendance.presentDays}</span>
+                                      <span className="text-red-600">A: {attendance.absentDays}</span>
+                                        <span className="text-yellow-600">H: {attendance.halfDays}</span>
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                    <TableCell>
+                                    <div className="font-medium text-gray-900">
+                                      ₹{calculatedSalary.toFixed(2)}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex gap-2">
+                                      {structure ? (
+                                        payrollRecord ? (
+                                          <div className="flex items-center gap-2">
+                                            {getStatusBadge(payrollRecord.status)}
+                                            <div className="flex gap-1">
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => handleOpenPaymentStatus(payrollRecord)}
+                                                className="h-8 w-8 p-0"
+                                                title="Update payment status"
+                                              >
+                                                <Edit className="h-4 w-4" />
+                                              </Button>
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => {
+                                                  const payrollId = getItemId(payrollRecord);
+                                                  if (!payrollId) {
+                                                    toast.error("Cannot generate slip: Payroll ID missing");
+                                                    return;
+                                                  }
+                                                  const slip = salarySlips.find(s => s.payrollId === payrollId);
+                                                  if (slip) {
+                                                    handleViewSalarySlip(slip);
+                                                  } else {
+                                                    handleGenerateSalarySlip(payrollId);
+                                                  }
+                                                }}
+                                                className="h-8 w-8 p-0"
+                                                title="View salary slip"
+                                              >
+                                                <Eye className="h-4 w-4" />
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <Button
+                                            size="sm"
+                                            onClick={() => setProcessDialog({ open: true, employee })}
+                                            className="bg-blue-600 hover:bg-blue-700"
+                                          >
+                                            Process Salary
+                                          </Button>
+                                        )
                                       ) : (
                                         <Button
                                           size="sm"
-                                          onClick={() => setProcessDialog({ open: true, employee })}
-                                          className="bg-blue-600 hover:bg-blue-700"
+                                          variant="outline"
+                                          onClick={() => {
+                                            handleEmployeeSelect(employee.employeeId);
+                                            setIsAddingStructure(true);
+                                            setActivePayrollTab("salary-structures");
+                                          }}
+                                          className="border-red-200 text-red-700 hover:bg-red-50"
                                         >
-                                          Process Salary
+                                          Add Structure
                                         </Button>
-                                      )
-                                    ) : (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => {
-                                          handleEmployeeSelect(employee.employeeId);
-                                          setIsAddingStructure(true);
-                                          setActivePayrollTab("salary-structures");
-                                        }}
-                                        className="border-red-200 text-red-700 hover:bg-red-50"
-                                      >
-                                        Add Structure
-                                      </Button>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    {filteredEmployees.length > payrollItemsPerPage && (
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+                        <div className="text-sm text-muted-foreground">
+                          Showing {Math.min((payrollPage - 1) * payrollItemsPerPage + 1, filteredEmployees.length)} to{" "}
+                          {Math.min(payrollPage * payrollItemsPerPage, filteredEmployees.length)} of {filteredEmployees.length} employees
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={String(payrollItemsPerPage)}
+                            onValueChange={(value) => {
+                              setPayrollItemsPerPage(parseInt(value));
+                              setPayrollPage(1);
+                            }}
+                          >
+                            <SelectTrigger className="w-20 h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="10">10</SelectItem>
+                              <SelectItem value="25">25</SelectItem>
+                              <SelectItem value="50">50</SelectItem>
+                              <SelectItem value="100">100</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPayrollPage(p => Math.max(1, p - 1))}
+                            disabled={payrollPage === 1}
+                            className="h-8 w-8 p-0"
+                          >
+                            ‹
+                          </Button>
+                          <span className="text-sm">
+                            {payrollPage} / {Math.ceil(filteredEmployees.length / payrollItemsPerPage)}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPayrollPage(p => Math.min(Math.ceil(filteredEmployees.length / payrollItemsPerPage), p + 1))}
+                            disabled={payrollPage === Math.ceil(filteredEmployees.length / payrollItemsPerPage)}
+                            className="h-8 w-8 p-0"
+                          >
+                            ›
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </TabsContent>
-
               {/* Salary Structures Tab */}
               <TabsContent value="salary-structures" className="space-y-4">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -3475,7 +3523,7 @@ const monthOptions = getMonthOptions();
                         );
                       })}
                     </div>
-                    
+
                     {/* Show total count and link to full table */}
                     <div className="text-center">
                       <p className="text-sm text-muted-foreground">

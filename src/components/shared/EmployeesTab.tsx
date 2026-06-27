@@ -194,7 +194,7 @@ const EmployeesTab = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [employeesPage, setEmployeesPage] = useState(1);
-  const [employeesItemsPerPage, setEmployeesItemsPerPage] = useState(100);
+const [employeesItemsPerPage, setEmployeesItemsPerPage] = useState(25);
   const [sortBy, setSortBy] = useState<string>("");
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
   const [selectedSite, setSelectedSite] = useState<string>("all");
@@ -288,6 +288,11 @@ const EmployeesTab = ({
     physicalClaimFiled: false
   });
 
+  const [statsData, setStatsData] = useState({
+  total: 0,
+  active: 0,
+  left: 0
+});
   // ─── Effects ─────────────────────────────────────────────────────────────
 
   // Handle resize for mobile detection
@@ -299,6 +304,7 @@ const EmployeesTab = ({
 
   useEffect(() => {
     fetchEmployees();
+    fetchEmployeeStats();
   }, [employeesPage, employeesItemsPerPage, searchTerm, selectedDepartment, selectedSite, selectedJoinDate, sortBy, refreshDocuments]);
 
   useEffect(() => {
@@ -314,15 +320,18 @@ const EmployeesTab = ({
   // ─── Data Fetching ──────────────────────────────────────────────────────
 
   const fetchEmployees = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  try {
+    setLoading(true);
+    setError(null);
 
-      const params: any = {
-        page: employeesPage,
-        limit: employeesItemsPerPage,
-      };
-
+    // When 'showPagination' is false (total <= 10), fetch ALL employees
+    // Otherwise respect pagination
+    const shouldFetchAll = totalEmployees > 0 && totalEmployees <= 10;
+    
+    const params: any = {
+      page: employeesPage,
+      limit: shouldFetchAll ? 10000 : employeesItemsPerPage, // Fetch all if <= 10 employees
+    };
       if (searchTerm) params.search = searchTerm;
       if (selectedDepartment !== "all") params.department = selectedDepartment;
       if (selectedSite !== "all") params.siteName = selectedSite;
@@ -444,7 +453,25 @@ const EmployeesTab = ({
       setLoading(false);
     }
   };
-
+const fetchEmployeeStats = async () => {
+  try {
+    // Fetch ALL employees just for counting (no pagination)
+    const response = await axios.get(`${API_URL}/employees`, { 
+      params: { limit: 10000 } // Get all
+    });
+    
+    if (response.data && response.data.success) {
+      const allEmps = response.data.data || response.data.employees || [];
+      setStatsData({
+        total: allEmps.length,
+        active: allEmps.filter((e: any) => e.status === 'active').length,
+        left: allEmps.filter((e: any) => e.status === 'left' || e.status === 'inactive').length
+      });
+    }
+  } catch (err) {
+    console.error('Error fetching stats:', err);
+  }
+};
   const fetchSites = async () => {
     try {
       setLoadingSites(true);
@@ -695,9 +722,9 @@ const EmployeesTab = ({
     }
     return 0;
   });
-
-  const activeEmployees = employees.filter(emp => emp.status === "active").length;
-  const leftEmployeesCount = employees.filter(emp => emp.status === "left").length;
+const showPagination = totalEmployees > employeesItemsPerPage;
+  const activeEmployees = statsData.active;
+const leftEmployeesCount = statsData.left;
 
   // ─── Selection Handlers ──────────────────────────────────────────────
 
@@ -711,14 +738,15 @@ const EmployeesTab = ({
     });
   };
 
-  const handleSelectAll = () => {
-    if (selectAll) {
-      setSelectedEmployees([]);
-    } else {
-      setSelectedEmployees(sortedEmployees.map(emp => emp.id || emp._id || ''));
-    }
-    setSelectAll(!selectAll);
-  };
+ const handleSelectAll = () => {
+  if (selectAll) {
+    setSelectedEmployees([]);
+  } else {
+    // Select ALL employees (not just filtered/sorted)
+    setSelectedEmployees(employees.map(emp => emp.id || emp._id || ''));
+  }
+  setSelectAll(!selectAll);
+};
 
   useEffect(() => {
     if (sortedEmployees.length > 0 && selectedEmployees.length === sortedEmployees.length) {
@@ -4637,20 +4665,19 @@ const EmployeesTab = ({
       </Dialog>
 
       {/* ─── Stats Cards ────────────────────────────────────────────────── */}
-      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard title="Total Employees" value={totalEmployees} />
-        <StatCard 
-          title="Active Employees" 
-          value={activeEmployees} 
-          className="text-green-600" 
-        />
-        <StatCard 
-          title="Left/Inactive Employees" 
-          value={leftEmployeesCount} 
-          className="text-red-600" 
-        />
-      </div>
-
+     <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+  <StatCard title="Total Employees" value={totalEmployees} />
+  <StatCard 
+    title="Active Employees" 
+    value={activeEmployees}    // ← Now uses real count
+    className="text-green-600" 
+  />
+  <StatCard 
+    title="Left/Inactive Employees" 
+    value={leftEmployeesCount} // ← Now uses real count
+    className="text-red-600" 
+  />
+</div>
       {/* ─── Select All row ────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-4">
@@ -5227,16 +5254,94 @@ const EmployeesTab = ({
           )}
 
           {/* Pagination */}
-          {sortedEmployees.length > 0 && (
-            <Pagination
-              currentPage={employeesPage}
-              totalPages={Math.ceil(totalEmployees / employeesItemsPerPage)} 
-              totalItems={totalEmployees} 
-              itemsPerPage={employeesItemsPerPage}
-              onPageChange={setEmployeesPage}
-              onItemsPerPageChange={setEmployeesItemsPerPage}
-            />
-          )}
+         {/* ─── Pagination ────────────────────────────────────────────────────────── */}
+{sortedEmployees.length > 0 && (
+  <div className="border-t pt-4 mt-4">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="text-sm text-muted-foreground">
+        Showing {Math.min((employeesPage - 1) * employeesItemsPerPage + 1, totalEmployees)} to{" "}
+        {Math.min(employeesPage * employeesItemsPerPage, totalEmployees)} of {totalEmployees} employees
+      </div>
+      
+      <div className="flex flex-wrap items-center gap-4">
+        {/* Items per page selector - only show if total > min */}
+        {totalEmployees > 10 && (
+          <div className="flex items-center gap-2">
+            <Label htmlFor="itemsPerPage" className="text-sm whitespace-nowrap">
+              Show:
+            </Label>
+            <Select
+              value={String(employeesItemsPerPage)}
+              onValueChange={(value) => {
+                const newSize = parseInt(value);
+                setEmployeesItemsPerPage(newSize);
+                setEmployeesPage(1); // Reset to first page
+              }}
+            >
+              <SelectTrigger id="itemsPerPage" className="w-20 h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+                <SelectItem value="999999">All</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {/* Pagination controls - only show if more than one page */}
+        {totalEmployees > employeesItemsPerPage && (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEmployeesPage(1)}
+              disabled={employeesPage === 1}
+              className="h-8 w-8 p-0"
+            >
+              «
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEmployeesPage(p => Math.max(1, p - 1))}
+              disabled={employeesPage === 1}
+              className="h-8 w-8 p-0"
+            >
+              ‹
+            </Button>
+            
+            <span className="px-2 text-sm">
+              {employeesPage} / {Math.ceil(totalEmployees / employeesItemsPerPage)}
+            </span>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEmployeesPage(p => Math.min(Math.ceil(totalEmployees / employeesItemsPerPage), p + 1))}
+              disabled={employeesPage === Math.ceil(totalEmployees / employeesItemsPerPage)}
+              className="h-8 w-8 p-0"
+            >
+              ›
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEmployeesPage(Math.ceil(totalEmployees / employeesItemsPerPage))}
+              disabled={employeesPage === Math.ceil(totalEmployees / employeesItemsPerPage)}
+              className="h-8 w-8 p-0"
+            >
+              »
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
         </CardContent>
       </Card>
 

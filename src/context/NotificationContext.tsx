@@ -224,74 +224,107 @@ const shownNotificationIds = useRef<Set<string>>(new Set());
   }, [role, addNotification]);
 
   // ========== Poll /leaves for status changes ==========
-  useEffect(() => {
-    if (!role) return;
+// Replace the entire leave polling useEffect with this:
 
-    const checkLeaves = async () => {
-      try {
-        const storedUser = localStorage.getItem('sk_user');
-        const userData = storedUser ? JSON.parse(storedUser) : null;
-        const userId = userData?._id || userData?.id;
+useEffect(() => {
+  if (!role) return;
 
-        const response = await apiClientRef.current.get('/leaves');
-        const data = response.data;
-        const leaves: any[] = Array.isArray(data) ? data : data?.data || [];
+  // ✅ Track which leave IDs we've already notified about (per status)
+  // Key format: "leaveId_status" e.g. "abc123_approved"
+  const notifiedLeaveActions = new Set<string>();
 
-        if (isFirstLeaveLoad.current) {
-          leaves.forEach((l: any) => knownLeaveStatuses.current.set(l._id, l.status));
-          isFirstLeaveLoad.current = false;
+  const checkLeaves = async () => {
+    try {
+      const storedUser = localStorage.getItem('sk_user');
+      const userData = storedUser ? JSON.parse(storedUser) : null;
+      const userId = userData?._id || userData?.id;
+
+      const response = await apiClientRef.current.get('/leaves');
+      const data = response.data;
+      const leaves: any[] = Array.isArray(data) ? data : data?.data || [];
+
+      leaves.forEach((leave: any) => {
+        const currentStatus = leave.status;
+        const leaveId = leave._id;
+
+        // ✅ Create a unique key for this specific leave + status combination
+        const actionKey = `${leaveId}_${currentStatus}`;
+
+        // ✅ Skip if we've already sent a notification for this exact leave+status
+        if (notifiedLeaveActions.has(actionKey)) return;
+
+        // ✅ Only notify for final states (approved/rejected), not pending
+        if (currentStatus !== 'approved' && currentStatus !== 'rejected') {
+          // Still track pending so we know the "previous" state
+          knownLeaveStatuses.current.set(leaveId, currentStatus);
           return;
         }
 
-        leaves.forEach((leave: any) => {
-          const prev = knownLeaveStatuses.current.get(leave._id);
-          if (prev === leave.status) return;
-          knownLeaveStatuses.current.set(leave._id, leave.status);
+        const previousStatus = knownLeaveStatuses.current.get(leaveId);
 
-          // Superadmin/admin see new pending requests
-          if ((role === 'superadmin' || role === 'admin') && leave.status === 'pending' && !prev) {
-            addNotification({
-              title: `📅 New Leave Request`,
-              message: `${leave.employeeName} applied for ${leave.leaveType} leave (${leave.totalDays} days)`,
-              type: 'leave',
-              metadata: { leaveId: leave._id, notificationType: 'leave_request' },
-            });
-            return;
-          }
+        // ✅ Update tracked status
+        knownLeaveStatuses.current.set(leaveId, currentStatus);
 
-          // Manager/supervisor see pending requests in their site/department
-          if ((role === 'manager' || role === 'supervisor') && leave.status === 'pending' && !prev) {
-            addNotification({
-              title: `📅 Leave Request`,
-              message: `${leave.employeeName} applied for ${leave.leaveType} leave`,
-              type: 'leave',
-              metadata: { leaveId: leave._id, notificationType: 'leave_request' },
-            });
-            return;
-          }
+        // ✅ Skip on first load - just record statuses, don't notify
+        if (isFirstLeaveLoad.current) return;
 
-          // Employee/supervisor see their own leave status change
-          const isMyLeave = leave.employeeId === userId ||
-            (leave.isSupervisorLeave && leave.supervisorId === userId);
+        // ✅ Only notify if status actually CHANGED from something else
+        if (previousStatus === currentStatus) return;
 
-          if (isMyLeave && (leave.status === 'approved' || leave.status === 'rejected')) {
-            addNotification({
-              title: leave.status === 'approved' ? '✅ Leave Approved' : '❌ Leave Rejected',
-              message: `Your ${leave.leaveType} leave has been ${leave.status}`,
-              type: 'leave',
-              metadata: { leaveId: leave._id, notificationType: `leave_${leave.status}` },
-            });
-          }
-        });
-      } catch {
-        // silent
+        // ✅ Mark this leave+status as notified BEFORE sending notification
+        notifiedLeaveActions.add(actionKey);
+
+        // Superadmin/admin see new pending requests only
+        if ((role === 'superadmin' || role === 'admin') && currentStatus === 'pending' && !previousStatus) {
+          addNotification({
+            title: `📅 New Leave Request`,
+            message: `${leave.employeeName} applied for ${leave.leaveType} leave (${leave.totalDays} days)`,
+            type: 'leave',
+            metadata: { leaveId: leave._id, notificationType: 'leave_request' },
+          });
+          return;
+        }
+
+        // Manager/supervisor see pending requests
+        if ((role === 'manager' || role === 'supervisor') && currentStatus === 'pending' && !previousStatus) {
+          addNotification({
+            title: `📅 Leave Request`,
+            message: `${leave.employeeName} applied for ${leave.leaveType} leave`,
+            type: 'leave',
+            metadata: { leaveId: leave._id, notificationType: 'leave_request' },
+          });
+          return;
+        }
+
+        // Employee/supervisor see their OWN leave status change
+        const isMyLeave = leave.employeeId === userId ||
+          (leave.isSupervisorLeave && leave.supervisorId === userId);
+
+        if (isMyLeave) {
+          addNotification({
+            title: currentStatus === 'approved' ? '✅ Leave Approved' : '❌ Leave Rejected',
+            message: `Your ${leave.leaveType} leave has been ${currentStatus}`,
+            type: 'leave',
+            metadata: { leaveId: leave._id, notificationType: `leave_${currentStatus}` },
+          });
+        }
+      });
+
+      // ✅ Mark first load complete AFTER processing
+      if (isFirstLeaveLoad.current) {
+        isFirstLeaveLoad.current = false;
       }
-    };
 
-    checkLeaves();
-    const interval = setInterval(checkLeaves, 20_000);
-    return () => clearInterval(interval);
-  }, [role, addNotification]);
+    } catch {
+      // silent
+    }
+  };
+
+  // ✅ Increase interval to 60 seconds to reduce hammering
+  checkLeaves();
+  const interval = setInterval(checkLeaves, 60_000);
+  return () => clearInterval(interval);
+}, [role, addNotification]);
 
   // ========== Poll /attendance/geofence-breaches ==========
   useEffect(() => {
@@ -480,22 +513,13 @@ useEffect(() => {
 
   // ========== Refresh (reset all internal caches) ==========
 const refresh = useCallback(async () => {
-  // Reset all known IDs so the next poll triggers notifications again
   knownTaskIds.current = new Set();
   isFirstTaskLoad.current = true;
   knownCompletedIds.current = new Set();
   isFirstCompletedLoad.current = true;
-  knownLeaveStatuses.current = new Map();
-  isFirstLeaveLoad.current = true;
   knownBreachIds.current = new Set();
   isFirstBreachLoad.current = true;
-  
-  // ✅ Also clear shown notification IDs
   shownNotificationIds.current.clear();
-  
-  // Optionally re-fetch notifications from API
-  // (already handled by polling intervals)
-  toast.info('Refreshed notification caches');
 }, []);
 
   // ========== CRUD operations (now use setNotifications) ==========
