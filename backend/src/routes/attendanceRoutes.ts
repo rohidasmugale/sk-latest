@@ -44,10 +44,28 @@ router.post('/face-recognize', upload.single('photo'), faceRecognize);
 router.post('/register-face/:employeeId', upload.single('photo'), registerFace);
 // Update attendance (admin/supervisor)
 router.put('/:id', updateAttendance);
+
+// ✅ FIX: Add this DEBUG route to see what's happening
+router.get('/auto-attendance', (req, res) => {
+  console.log('⚠️ GET /auto-attendance called!');
+  console.log('⚠️ This endpoint requires POST, but received GET');
+  console.log('⚠️ Query params:', req.query);
+  console.log('⚠️ Headers:', req.headers);
+  
+  res.status(405).json({
+    success: false,
+    message: 'Method not allowed. This endpoint requires POST, but received GET.',
+    requiredMethod: 'POST',
+    receivedMethod: 'GET',
+    suggestion: 'Please use POST method with multipart/form-data containing a "photo" field'
+  });
+});
+
+// ✅ MAIN ROUTE - POST for auto-attendance
 router.post('/auto-attendance', upload.single('photo'), autoAttendance);
+
 // Update attendance status (admin/supervisor)
 router.post('/update-status', updateAttendanceStatus);
-
 
 // Geofencing routes
 router.post('/update-location', updateEmployeeLocation);
@@ -58,4 +76,5 @@ router.get('/weekly-summary', getWeeklySummary);
 router.get('/test', (req, res) => {
   res.json({ success: true, message: 'Attendance router works' });
 });
+
 export default router;
