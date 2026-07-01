@@ -493,6 +493,141 @@ const Attendance = () => {
     toast.success("Attendance exported successfully!");
   };
 
+
+  const handleExportFullMonth = async () => {
+  try {
+    toast.loading('Fetching full month data...');
+
+    // Get the month from selectedDate
+    const month = selectedDate.substring(0, 7);
+    const monthStart = `${month}-01`;
+    const monthEnd = new Date(
+      parseInt(month.split('-')[0]),
+      parseInt(month.split('-')[1]),
+      0
+    ).toISOString().split('T')[0];
+
+    // Fetch ALL attendance records for the month
+    const response = await axios.get(`${API_URL}/attendance`, {
+      params: { 
+        startDate: monthStart, 
+        endDate: monthEnd, 
+        limit: 10000 
+      }
+    });
+
+    let allRecords = response.data?.data || response.data || [];
+    if (!Array.isArray(allRecords)) allRecords = [];
+
+    // Filter records for supervisor's employees
+    const employeeIds = new Set(employees.map(e => e._id));
+    const filteredRecords = allRecords.filter((r: AttendanceRecord) => 
+      employeeIds.has(r.employeeId)
+    );
+
+    if (filteredRecords.length === 0) {
+      toast.dismiss();
+      toast.warning('No attendance records found for this month');
+      return;
+    }
+
+    toast.dismiss();
+
+    // Group records by employee
+    const employeeRecordMap = new Map();
+    filteredRecords.forEach((record: AttendanceRecord) => {
+      if (!employeeRecordMap.has(record.employeeId)) {
+        employeeRecordMap.set(record.employeeId, []);
+      }
+      employeeRecordMap.get(record.employeeId).push(record);
+    });
+
+    // Build CSV data
+    const headers = [
+      'Date', 'Employee Name', 'Employee ID', 'Department', 'Site',
+      'Check In', 'Check Out', 'Total Hours', 'Status', 'Remarks'
+    ];
+
+    const rows: string[][] = [];
+    let totalPresent = 0, totalAbsent = 0, totalHalfDay = 0, totalWeeklyOff = 0, totalLeave = 0;
+
+    // Sort records by date
+    filteredRecords.sort((a: AttendanceRecord, b: AttendanceRecord) => 
+      a.date.localeCompare(b.date)
+    );
+
+    filteredRecords.forEach((record: AttendanceRecord) => {
+      const emp = employees.find(e => e._id === record.employeeId);
+      const status = record.status || 'absent';
+      
+      // Count statuses
+      if (status === 'present') totalPresent++;
+      else if (status === 'absent') totalAbsent++;
+      else if (status === 'half-day') totalHalfDay++;
+      else if (status === 'weekly-off') totalWeeklyOff++;
+      else if (status === 'leave') totalLeave++;
+
+      rows.push([
+        record.date,
+        emp?.name || record.employeeName || 'Unknown',
+        emp?.employeeId || 'N/A',
+        emp?.department || 'N/A',
+        emp?.siteName || 'N/A',
+        record.checkInTime ? formatTimeForDisplay(record.checkInTime) : '-',
+        record.checkOutTime ? formatTimeForDisplay(record.checkOutTime) : '-',
+        record.totalHours ? record.totalHours.toFixed(2) : '0',
+        status.replace('-', ' '),
+        record.remarks || ''
+      ]);
+    });
+
+    // Summary row
+    const totalEmployees = employees.length;
+    const totalDays = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0).getDate();
+    const totalRequired = totalEmployees * totalDays;
+
+    const summaryRow = [
+      '=== SUMMARY ===',
+      `Total Employees: ${totalEmployees}`,
+      `Total Days: ${totalDays}`,
+      `Total Required: ${totalRequired}`,
+      `Present: ${totalPresent}`,
+      `Absent: ${totalAbsent}`,
+      `Half Day: ${totalHalfDay}`,
+      `Weekly Off: ${totalWeeklyOff}`,
+      `Leave: ${totalLeave}`,
+      `Attendance Rate: ${totalRequired > 0 ? ((totalPresent / totalRequired) * 100).toFixed(1) + '%' : '0.0%'}`
+    ];
+
+    const emptyRow = headers.map(() => '');
+
+    // Create CSV
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(',')),
+      emptyRow.join(','),
+      summaryRow.join(',')
+    ].join('\n');
+
+    // Download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `attendance_${month}_full_month.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success(`Full month data exported successfully!`);
+
+  } catch (error) {
+    console.error('Error exporting full month:', error);
+    toast.dismiss();
+    toast.error('Failed to export full month data');
+  }
+};
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -542,6 +677,15 @@ const Attendance = () => {
             <Button variant="outline" size="sm" onClick={exportToExcel}>
               <FileSpreadsheet className="h-4 w-4 mr-1" /> Export
             </Button>
+              <Button 
+    variant="default" 
+    size="sm" 
+    onClick={handleExportFullMonth}
+    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
+  >
+    <FileSpreadsheet className="h-4 w-4" />
+    Export Full Month
+  </Button>
           </div>
         </div>
 

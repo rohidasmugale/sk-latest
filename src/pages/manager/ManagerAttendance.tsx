@@ -1410,6 +1410,163 @@ const saveShiftDeployment = async () => {
     toast.success("Exported");
   };
 
+  // Add this function after handleExport in SiteEmployeeDetails
+const handleExportFullMonth = async () => {
+  if (!siteData || !siteData.employees || siteData.employees.length === 0) {
+    toast.error('No data to export');
+    return;
+  }
+
+  try {
+    toast.loading('Fetching full month data...');
+
+    // Get the month from startDate
+    const month = siteData.startDate?.substring(0, 7) || new Date().toISOString().substring(0, 7);
+    const monthStart = `${month}-01`;
+    const monthEnd = new Date(
+      parseInt(month.split('-')[0]),
+      parseInt(month.split('-')[1]),
+      0
+    ).toISOString().split('T')[0];
+
+    // Fetch full month data
+    const fullMonthEmployees = await generateEmployeeData(
+      siteData.siteName || siteData.name,
+      monthStart,
+      monthEnd
+    );
+
+    if (!fullMonthEmployees || fullMonthEmployees.length === 0) {
+      toast.dismiss();
+      toast.error('No data found for this month');
+      return;
+    }
+
+    toast.dismiss();
+
+    // Group employees by employeeId
+    const uniqueEmployees = new Map();
+    fullMonthEmployees.forEach((emp: any) => {
+      if (emp.employeeId && !uniqueEmployees.has(emp.employeeId)) {
+        uniqueEmployees.set(emp.employeeId, {
+          employeeId: emp.employeeId,
+          name: emp.name,
+          department: emp.department,
+          position: emp.position,
+          isManager: emp.isManager || false,
+          isSupervisor: emp.isSupervisor || false,
+          site: emp.site || siteData.siteName || siteData.name,
+        });
+      }
+    });
+
+    // Count attendance per employee
+    const attendanceCounts = new Map();
+    fullMonthEmployees.forEach((emp: any) => {
+      const key = emp.employeeId || emp.id;
+      if (!attendanceCounts.has(key)) {
+        attendanceCounts.set(key, { present: 0, absent: 0, weeklyOff: 0, leave: 0, total: 0 });
+      }
+      const counts = attendanceCounts.get(key);
+      counts.total++;
+      if (emp.status === 'present') counts.present++;
+      else if (emp.status === 'weekly-off') counts.weeklyOff++;
+      else if (emp.status === 'leave') counts.leave++;
+      else counts.absent++;
+    });
+
+    const daysInMonth = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0).getDate();
+
+    let totalPresent = 0, totalAbsent = 0, totalWeeklyOff = 0, totalLeave = 0;
+    let totalManagers = 0, totalSupervisors = 0, totalStaff = 0;
+
+    const rows: string[][] = [];
+
+    uniqueEmployees.forEach((emp: any) => {
+      const counts = attendanceCounts.get(emp.employeeId) || { present: 0, absent: 0, weeklyOff: 0, leave: 0, total: 0 };
+      if (emp.isManager) totalManagers++;
+      else if (emp.isSupervisor) totalSupervisors++;
+      else totalStaff++;
+
+      totalPresent += counts.present;
+      totalAbsent += counts.absent;
+      totalWeeklyOff += counts.weeklyOff;
+      totalLeave += counts.leave;
+
+      const attendanceRate = daysInMonth > 0 ? ((counts.present / daysInMonth) * 100).toFixed(1) + '%' : '0.0%';
+
+      rows.push([
+        `"${emp.employeeId}"`,
+        `"${emp.name}"`,
+        `"${emp.department}"`,
+        `"${emp.position}"`,
+        `"${emp.isManager ? 'Manager' : emp.isSupervisor ? 'Supervisor' : 'Staff'}"`,
+        counts.present.toString(),
+        counts.absent.toString(),
+        counts.weeklyOff.toString(),
+        counts.leave.toString(),
+        daysInMonth.toString(),
+        attendanceRate
+      ]);
+    });
+
+    rows.sort((a, b) => a[1].localeCompare(b[1]));
+
+    const headers = [
+      'Employee ID', 'Employee Name', 'Department', 'Position', 'Role',
+      'Present', 'Absent', 'Weekly Off', 'Leave', 'Total Working Days', 'Attendance Rate'
+    ];
+
+    const totalEmployees = uniqueEmployees.size;
+    const totalRequired = totalEmployees * daysInMonth;
+    const totalAbsentAll = totalAbsent + totalLeave;
+    const overallRate = totalRequired > 0 ? ((totalPresent / totalRequired) * 100).toFixed(1) + '%' : '0.0%';
+
+    const summaryRow = [
+      `"📊 GRAND TOTAL"`,
+      `"${siteData.siteName || siteData.name}"`,
+      `"All Departments"`,
+      `"${totalEmployees} Employees"`,
+      `"M:${totalManagers} S:${totalSupervisors} St:${totalStaff}"`,
+      totalPresent.toString(),
+      totalAbsentAll.toString(),
+      totalWeeklyOff.toString(),
+      totalLeave.toString(),
+      totalRequired.toString(),
+      overallRate
+    ];
+
+    const emptyRow = headers.map(() => '');
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(',')),
+      emptyRow.join(','),
+      ['=== SUMMARY ===', '', '', '', '', '', '', '', '', '', ''],
+      summaryRow.join(',')
+    ].join('\n');
+
+    const filename = `Attendance_${(siteData.siteName || siteData.name).replace(/\s/g, '_')}_${month}.csv`;
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success(`Full month data exported to ${filename} with summary`);
+
+  } catch (error) {
+    console.error('Error exporting full month:', error);
+    toast.dismiss();
+    toast.error('Failed to export full month data');
+  }
+};
+
   const handleViewPhoto = (photoUrl: string | null | undefined, type: "checkin" | "checkout") => {
     if (photoUrl) {
       setSelectedPhoto(photoUrl);
@@ -2095,7 +2252,7 @@ const renderEmployeesTab = () => (
             </p>
           </div>
         </div>
-        <div className="flex gap-2 items-center">
+       <div className="flex gap-2 items-center flex-wrap">
   <Button variant="outline" size="sm" onClick={refreshEmployeeData} disabled={refreshing}>
     <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`} /> Refresh
   </Button>
@@ -2104,6 +2261,17 @@ const renderEmployeesTab = () => (
   </Button>
   <Button variant="default" size="sm" onClick={() => handleExport(true)}>
     <FileText className="h-4 w-4 mr-1" /> Details
+  </Button>
+  {/* ✅ ADD THIS BUTTON */}
+  <Button 
+    variant="default" 
+    size="sm" 
+    onClick={handleExportFullMonth}
+    disabled={employees.length === 0}
+    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
+  >
+    <FileSpreadsheet className="h-4 w-4" />
+    Export Full Month
   </Button>
   <Badge variant="outline" className="bg-yellow-50 ml-auto">
     Grooming issues: {groomingCount}
@@ -2604,6 +2772,158 @@ useEffect(() => {
     toast.success(`Data exported to ${filename}`);
   };
 
+  const handleExportFullMonth = () => {
+  // Get the month from startDate
+  const month = startDate.substring(0, 7); // YYYY-MM
+  const monthStart = `${month}-01`;
+  const monthEnd = new Date(
+    parseInt(month.split('-')[0]),
+    parseInt(month.split('-')[1]),
+    0
+  ).toISOString().split('T')[0];
+  
+  // Re-fetch data for full month
+  const fetchFullMonthData = async () => {
+    try {
+      setRefreshing(true);
+      toast.loading('Fetching full month data...');
+      
+      const fullMonthData = [];
+      for (const site of sites) {
+        let siteData;
+        if (viewType === 'department' && selectedDepartment) {
+          siteData = await calculateDepartmentSiteData(site, monthStart, monthEnd, selectedDepartment);
+        } else {
+          siteData = await calculateSiteAttendanceData(site, monthStart, monthEnd);
+        }
+        fullMonthData.push(siteData);
+      }
+      
+      toast.dismiss();
+      
+      const dataToExport = fullMonthData;
+      if (dataToExport.length === 0) {
+        toast.error('No data to export');
+        return;
+      }
+
+      const filename = viewType === 'department'
+        ? `Attendance_${selectedDepartment}_${month}.csv`
+        : `Sitewise_Attendance_${month}.csv`;
+
+      const headers = [
+        'Site Name', 'Department', 'Period', 'Days',
+        'Daily Staff Requirement', 'Total Required', 'Weekly Off (Staff)',
+        'On Site Requirement', 'Total Present (Staff)', 'Leave (Staff)',
+        'Absent (Staff)', 'Managers', 'Supervisors', 'Total Staff',
+        'Attendance Rate', 'Data Source'
+      ];
+
+      const rows = dataToExport.map(item => {
+        const dailyRequirement = item.dailyRequirement || 0;
+        const totalRequired = item.totalRequiredForPeriod || item.durationTotalRequired || dailyRequirement * 30;
+        const weeklyOff = item.totalWeeklyOff || item.weeklyOffCount || 0;
+        const onSiteRequirement = totalRequired - weeklyOff;
+        const present = item.totalPresent || item.presentCount || 0;
+        const leave = item.totalLeave || item.leaveCount || 0;
+        const absent = item.totalAbsent || item.absentCount || 0;
+        const managers = item.deploymentStats?.managerCount || 0;
+        const supervisors = item.deploymentStats?.supervisorCount || 0;
+        const staff = item.deploymentStats?.staffCount || 0;
+        const rate = totalRequired > 0 ? ((present / totalRequired) * 100).toFixed(1) + '%' : '0.0%';
+        const dataSource = item.isRealData ? 'Real Data' : 'Demo Data';
+        return [
+          `"${item.siteName || item.name}"`,
+          `"${viewType === 'department' ? selectedDepartment : 'General'}"`,
+          `"${monthStart} to ${monthEnd}"`,
+          item.daysInPeriod || 30,
+          dailyRequirement,
+          totalRequired,
+          weeklyOff,
+          onSiteRequirement,
+          present,
+          leave,
+          absent,
+          managers,
+          supervisors,
+          staff,
+          rate,
+          dataSource
+        ];
+      });
+
+      // Summary Row
+      const totalRequiredAll = dataToExport.reduce((sum, item) => 
+        sum + (item.totalRequiredForPeriod || item.durationTotalRequired || 0), 0
+      );
+      const totalPresentAll = dataToExport.reduce((sum, item) => 
+        sum + (item.totalPresent || item.presentCount || 0), 0
+      );
+      const totalLeaveAll = dataToExport.reduce((sum, item) => 
+        sum + (item.totalLeave || item.leaveCount || 0), 0
+      );
+      const totalAbsentAll = dataToExport.reduce((sum, item) => 
+        sum + (item.totalAbsent || item.absentCount || 0), 0
+      );
+      const totalWeeklyOffAll = dataToExport.reduce((sum, item) => 
+        sum + (item.totalWeeklyOff || item.weeklyOffCount || 0), 0
+      );
+      const overallRate = totalRequiredAll > 0 
+        ? ((totalPresentAll / totalRequiredAll) * 100).toFixed(1) + '%' 
+        : '0.0%';
+
+      const summaryRow = [
+        `"📊 GRAND TOTAL"`,
+        `"${viewType === 'department' ? selectedDepartment : 'All'}"`,
+        `"${monthStart} to ${monthEnd}"`,
+        dataToExport.reduce((sum, item) => sum + (item.daysInPeriod || 30), 0),
+        dataToExport.reduce((sum, item) => sum + (item.dailyRequirement || 0), 0),
+        totalRequiredAll,
+        totalWeeklyOffAll,
+        totalRequiredAll - totalWeeklyOffAll,
+        totalPresentAll,
+        totalLeaveAll,
+        totalAbsentAll,
+        dataToExport.reduce((sum, item) => sum + (item.deploymentStats?.managerCount || 0), 0),
+        dataToExport.reduce((sum, item) => sum + (item.deploymentStats?.supervisorCount || 0), 0),
+        dataToExport.reduce((sum, item) => sum + (item.deploymentStats?.staffCount || 0), 0),
+        overallRate,
+        'SUMMARY'
+      ];
+
+      const emptyRow = headers.map(() => '');
+      
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.join(',')),
+        emptyRow.join(','),
+        ['=== SUMMARY ===', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+        summaryRow.join(',')
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success(`Full month data exported to ${filename} with summary`);
+    } catch (error) {
+      toast.dismiss();
+      toast.error('Failed to fetch full month data');
+      console.error(error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+  
+  fetchFullMonthData();
+};
   const handleBack = () => {
     navigate('/superadmin/dashboard');
   };
@@ -2899,6 +3219,16 @@ useEffect(() => {
                 >
                   <Download className="h-4 w-4 mr-2" /> Export to Excel
                 </Button>
+                <Button 
+    variant="default" 
+    size="sm" 
+    onClick={handleExportFullMonth}
+    disabled={filteredData.length === 0}
+    className="flex items-center gap-2"
+  >
+    <FileSpreadsheet className="h-4 w-4" />
+    Export Full Month
+  </Button>
               </div>
             </div>
           </CardHeader>

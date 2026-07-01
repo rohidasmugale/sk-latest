@@ -742,7 +742,7 @@ const handlePhotoCapture = async (photoFile: File) => {
     // If it's face recognition mode (auto)
     if (cameraAction === 'recognize') {
       const formData = new FormData();
-      formData.append('photo', photoFile);
+      formData.append('photo', photoFile);  // ✅ Keep as 'photo' (matches multer)
       formData.append('supervisorId', currentSupervisor.id);
       formData.append('siteName', selectedSite || supervisorSites[0]?.name || '');
 
