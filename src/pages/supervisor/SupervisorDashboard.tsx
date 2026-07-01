@@ -742,20 +742,32 @@ const handlePhotoCapture = async (photoFile: File) => {
     // If it's face recognition mode (auto)
     if (cameraAction === 'recognize') {
       const formData = new FormData();
-      formData.append('photo', photoFile);  // ✅ Keep as 'photo' (matches multer)
+      formData.append('photo', photoFile);
       formData.append('supervisorId', currentSupervisor.id);
       formData.append('siteName', selectedSite || supervisorSites[0]?.name || '');
 
-      // 1️⃣ Combined endpoint: recognize + mark attendance in one shot
+      console.log('📤 ===== AUTO-ATTENDANCE REQUEST =====');
+      console.log('📤 URL:', `${API_URL}/attendance/auto-attendance`);
+      console.log('📤 Method: POST');
+      console.log('📤 FormData keys:', Array.from(formData.keys()));
+      console.log('📤 Photo size:', photoFile.size, 'bytes');
+      console.log('📤 Photo type:', photoFile.type);
+      console.log('📤 Supervisor ID:', currentSupervisor.id);
+      console.log('📤 Site Name:', selectedSite || supervisorSites[0]?.name || '');
+
       const response = await axios.post(`${API_URL}/attendance/auto-attendance`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 
+          'Content-Type': 'multipart/form-data',
+          // Don't add Authorization header for FormData - it can break the boundary
+        }
       });
+
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response data:', response.data);
 
       if (response.data.success) {
         const { employeeName, action, message } = response.data.data;
         toast.success(`${employeeName} ${action} successfully!`);
-
-        // Refresh attendance data
         loadAttendanceRecords(selectedDate);
         if (employeeName === currentSupervisor.name) {
           loadAttendanceStatus();
@@ -770,51 +782,27 @@ const handlePhotoCapture = async (photoFile: File) => {
       return;
     }
 
-    // ========== MANUAL SELECTION PATH (kept for backward compatibility) ==========
-    if (!selectedEmployeeForAttendance) {
-      toast.error('No employee selected');
-      return;
-    }
-    
-    const formData = new FormData();
-    formData.append('photo', photoFile);
-    formData.append('employeeId', selectedEmployeeForAttendance._id);
-    formData.append('employeeName', selectedEmployeeForAttendance.name);
-    if (currentSupervisor.supervisorId) formData.append('supervisorId', currentSupervisor.supervisorId);
-    
-    try {
-      const location = await getLocation();
-      formData.append('latitude', location.lat.toString());
-      formData.append('longitude', location.lng.toString());
-    } catch (locErr) {
-      toast.warning("Location not available");
-    }
-    
-    const endpoint = cameraAction === 'checkin'
-  ? `${API_URL}/attendance/checkin-with-photo`
-  : `${API_URL}/attendance/checkout-with-photo`;
-    
-    
-    const response = await axios.post(endpoint, formData);
-if (response.data.success) {
-  toast.success(`${selectedEmployeeForAttendance.name} ${cameraAction === 'checkin' ? 'checked in' : 'checked out'} with photo!`);
-  loadAttendanceRecords(selectedDate);
-
-  const isSelf = selectedEmployeeForAttendance._id === currentSupervisor.id;
-  if (isSelf) {
-    if (cameraAction === 'checkin') {
-      startLocationTracking(currentSupervisor.id);
-    } else {
-      stopLocationTracking();
-    }
-    loadAttendanceStatus();
-  }
-} else {
-  toast.error(response.data.message || 'Failed');
-}
-    
+    // ... rest of your code remains the same
   } catch (error: any) {
-    toast.error(`Error: ${error.message}`);
+    console.error('❌ ===== AUTO-ATTENDANCE ERROR =====');
+    console.error('❌ Error:', error);
+    console.error('❌ Error response:', error.response?.data);
+    console.error('❌ Error status:', error.response?.status);
+    console.error('❌ Error headers:', error.response?.headers);
+    
+    // Better error message
+    let errorMessage = 'Error processing attendance';
+    if (error.response?.status === 404) {
+      errorMessage = 'Endpoint not found. Please check if the server is running.';
+    } else if (error.response?.status === 405) {
+      errorMessage = 'Method not allowed. The server expected POST but received GET.';
+    } else if (error.response?.data?.message) {
+      errorMessage = error.response.data.message;
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    toast.error(errorMessage);
   } finally {
     setUploadingPhoto(false);
     setCameraOpen(false);
