@@ -64,34 +64,57 @@ export const upload = multer({
 
 // Auto-attendance: recognize face + checkin/checkout in one API call
 export const autoAttendance = async (req: Request, res: Response) => {
-  console.log('🔵 autoAttendance called');
-  console.log('🔍 [autoAttendance] req.file:', req.file);
-console.log('🔍 [autoAttendance] req.body:', req.body);
+  console.log('🔵 autoAttendance STARTED');
+  console.log('🔵 FACE_SERVICE_URL:', FACE_SERVICE_URL);
+  console.log('🔵 req.file:', req.file ? 'FILE PRESENT' : 'NO FILE');
+  console.log('🔵 req.body:', JSON.stringify(req.body));
+  console.log('🔵 req.headers.content-type:', req.headers['content-type']);
+
   try {
     const { supervisorId, siteName } = req.body;
     const photoFile = req.file;
 
     if (!photoFile) {
+      console.log('❌ No photo file');
       return res.status(400).json({ success: false, message: 'Photo is required' });
     }
 
-    // 1. Call face recognition service (your Python endpoint)
+    console.log('📸 Photo received:', {
+      originalname: photoFile.originalname,
+      size: photoFile.size,
+      mimetype: photoFile.mimetype
+    });
+
+    // 1. Call face recognition service
+    console.log('📤 Calling Python service at:', `${FACE_SERVICE_URL}/match`);
     const formData = new FormData();
     formData.append('file', photoFile.buffer, { filename: 'photo.jpg' });
-      const pyRes = await axios.post(`${FACE_SERVICE_URL}/match`, formData, {
+    
+    console.log('📤 FormData created, sending request...');
+    
+    const pyRes = await axios.post(`${FACE_SERVICE_URL}/match`, formData, {
       headers: { ...formData.getHeaders() },
-      timeout: 60000,
+      timeout: 30000,
     });
+    
+    console.log('🐍 Python response status:', pyRes.status);
+    console.log('🐍 Python response data:', JSON.stringify(pyRes.data));
+    
     const matchData = pyRes.data as { success: boolean; message?: string; data?: any };
-console.log('🐍 Python /match full response:', JSON.stringify(matchData));
+    
     if (!matchData.success) {
+      console.log('❌ Face not matched:', matchData.message);
       return res.status(400).json({ success: false, message: matchData.message || 'Face not recognised' });
     }
+    
     const payload = matchData.data || matchData;
-const { employeeId, employeeName } = payload;
-    // 2. Check today's attendance status
+    const { employeeId, employeeName } = payload;
+    
+    console.log('✅ Matched employee:', { employeeId, employeeName });
+    
+    // Rest of your code...
     const today = formatDate(new Date());
-    const  attendance = await Attendance.findOne({ employeeId, date: today });
+    const attendance = await Attendance.findOne({ employeeId, date: today });
 
     let action = 'checkin';
     let updateData: any = {};
@@ -101,7 +124,6 @@ const { employeeId, employeeName } = payload;
         return res.status(400).json({ success: false, message: `${employeeName} already checked out today` });
       }
       if (attendance.checkInTime && !attendance.checkOutTime) {
-        // Already checked in → check out
         action = 'checkout';
         const checkOutTime = new Date().toISOString();
         const totalHours = calculateHours(attendance.checkInTime, checkOutTime);
@@ -114,17 +136,15 @@ const { employeeId, employeeName } = payload;
           updatedAt: new Date(),
         };
       } else {
-        // No checkin yet → check in
         action = 'checkin';
         const checkInTime = new Date().toISOString();
-        // Upload photo to Cloudinary (optional)
         let photoUrl = '', photoPublicId = '';
         try {
           const uploadResult = await uploadAttendancePhoto(photoFile.buffer, employeeId, employeeName, 'checkin');
           photoUrl = uploadResult.secure_url;
           photoPublicId = uploadResult.public_id;
         } catch (uploadError: any) {
-          console.warn('Photo upload failed, proceeding without photo:', uploadError.message);
+          console.warn('Photo upload failed:', uploadError.message);
         }
         updateData = {
           checkInTime,
@@ -137,7 +157,6 @@ const { employeeId, employeeName } = payload;
         };
       }
     } else {
-      // No record today → check in
       action = 'checkin';
       const checkInTime = new Date().toISOString();
       let photoUrl = '', photoPublicId = '';
@@ -146,10 +165,9 @@ const { employeeId, employeeName } = payload;
         photoUrl = uploadResult.secure_url;
         photoPublicId = uploadResult.public_id;
       } catch (uploadError: any) {
-        console.warn('Photo upload failed, proceeding without photo:', uploadError.message);
+        console.warn('Photo upload failed:', uploadError.message);
       }
 
-      // Get employee details
       const employee = await Employee.findById(employeeId);
       updateData = {
         employeeId,
@@ -171,13 +189,14 @@ const { employeeId, employeeName } = payload;
       };
     }
 
-    // 3. Save/update attendance
     let result;
     if (attendance) {
       result = await Attendance.findByIdAndUpdate(attendance._id, updateData, { new: true });
     } else {
       result = await Attendance.create(updateData);
     }
+
+    console.log('✅ Attendance saved successfully');
 
     res.json({
       success: true,
@@ -188,9 +207,32 @@ const { employeeId, employeeName } = payload;
         message: `${employeeName} ${action}ed successfully`,
       },
     });
+    
   } catch (error: any) {
     console.error('❌ autoAttendance error:', error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error('❌ Error stack:', error.stack);
+    
+    // Better error response
+    if (error.code === 'ECONNABORTED') {
+      return res.status(504).json({ 
+        success: false, 
+        message: 'Face service timeout - please try again' 
+      });
+    }
+    
+    if (error.response) {
+      console.error('❌ Response status:', error.response.status);
+      console.error('❌ Response data:', error.response.data);
+      return res.status(error.response.status).json({ 
+        success: false, 
+        message: error.response.data?.message || 'Face service error' 
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Internal server error' 
+    });
   }
 };
 export const faceRecognize = async (req: Request, res: Response) => {
