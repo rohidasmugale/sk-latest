@@ -63,6 +63,7 @@ export const upload = multer({
 });
 
 // Auto-attendance: recognize face + checkin/checkout in one API call
+// Auto-attendance: recognize face + checkin/checkout in one API call
 export const autoAttendance = async (req: Request, res: Response) => {
   console.log('🔵 autoAttendance STARTED');
   console.log('🔵 FACE_SERVICE_URL:', FACE_SERVICE_URL);
@@ -85,16 +86,30 @@ export const autoAttendance = async (req: Request, res: Response) => {
       mimetype: photoFile.mimetype
     });
 
+    // ✅ FIX: Use the correct URL with HTTPS
+    const pythonUrl = FACE_SERVICE_URL.endsWith('/') 
+      ? `${FACE_SERVICE_URL}match` 
+      : `${FACE_SERVICE_URL}/match`;
+    
+    console.log('📤 Calling Python service at:', pythonUrl);
+
     // 1. Call face recognition service
-    console.log('📤 Calling Python service at:', `${FACE_SERVICE_URL}/match`);
     const formData = new FormData();
     formData.append('file', photoFile.buffer, { filename: 'photo.jpg' });
     
     console.log('📤 FormData created, sending request...');
+    console.log('📤 Headers being sent:', formData.getHeaders());
     
-    const pyRes = await axios.post(`${FACE_SERVICE_URL}/match`, formData, {
-      headers: { ...formData.getHeaders() },
-      timeout: 30000,
+    // ✅ FIX: Add proper headers and handle redirects
+    const pyRes = await axios.post(pythonUrl, formData, {
+      headers: { 
+        ...formData.getHeaders(),
+        'Accept': 'application/json',
+        'User-Agent': 'sk-backend/1.0'
+      },
+      timeout: 60000,  // Increased timeout
+      maxRedirects: 0,  // Don't follow redirects
+      validateStatus: (status) => status < 500  // Accept 400-499 as valid responses
     });
     
     console.log('🐍 Python response status:', pyRes.status);
@@ -212,7 +227,7 @@ export const autoAttendance = async (req: Request, res: Response) => {
     console.error('❌ autoAttendance error:', error);
     console.error('❌ Error stack:', error.stack);
     
-    // Better error response
+    // ✅ Better error handling
     if (error.code === 'ECONNABORTED') {
       return res.status(504).json({ 
         success: false, 
@@ -223,9 +238,26 @@ export const autoAttendance = async (req: Request, res: Response) => {
     if (error.response) {
       console.error('❌ Response status:', error.response.status);
       console.error('❌ Response data:', error.response.data);
+      
+      // ✅ Handle 502 specifically
+      if (error.response.status === 502) {
+        return res.status(502).json({
+          success: false,
+          message: 'Face service is temporarily unavailable. Please try again in a moment.'
+        });
+      }
+      
       return res.status(error.response.status).json({ 
         success: false, 
         message: error.response.data?.message || 'Face service error' 
+      });
+    }
+    
+    if (error.request) {
+      console.error('❌ No response from Python service');
+      return res.status(503).json({
+        success: false,
+        message: 'Face recognition service is not responding. Please try again later.'
       });
     }
     

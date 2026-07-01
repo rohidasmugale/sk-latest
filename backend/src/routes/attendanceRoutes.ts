@@ -61,6 +61,28 @@ router.get('/auto-attendance', (req, res) => {
   });
 });
 
+
+// Add this right before your POST route
+router.all('/auto-attendance', (req, res, next) => {
+  console.log('🔍 ===== AUTO-ATTENDANCE REQUEST =====');
+  console.log('🔍 Method:', req.method);
+  console.log('🔍 URL:', req.url);
+  console.log('🔍 Headers:', JSON.stringify(req.headers));
+  console.log('🔍 Body:', req.body);
+  
+  if (req.method === 'GET') {
+    console.log('⚠️ GET request received - sending 405');
+    return res.status(405).json({
+      success: false,
+      message: 'Method not allowed. Please use POST.',
+      receivedMethod: 'GET',
+      requiredMethod: 'POST',
+      fix: 'Change your frontend to use POST method'
+    });
+  }
+  next();
+});
+
 // ✅ MAIN ROUTE - POST for auto-attendance
 router.post('/auto-attendance', upload.single('photo'), autoAttendance);
 
