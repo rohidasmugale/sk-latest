@@ -12,7 +12,8 @@ interface CameraCaptureProps {
   title?: string;
   description?: string;
   actionLabel?: string;
-    continuous?: boolean;   // <-- add this
+  continuous?: boolean;
+  onAutoCapture?: (photoFile: File) => void;
 }
 
 const CameraCapture: React.FC<CameraCaptureProps> = ({
@@ -23,6 +24,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
   description = "Take a photo for attendance verification",
   actionLabel = "Use Photo",
   continuous = false,
+  onAutoCapture,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -32,6 +34,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  
+  // ✅ Add capture counter to prevent infinite auto-capture
+  const [captureCount, setCaptureCount] = useState(0);
+  const MAX_CAPTURES = 10; // Stop after 10 captures
 
   // Stop all tracks in the stream
   const stopCameraTracks = useCallback(() => {
@@ -65,8 +71,9 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
       const constraints: MediaStreamConstraints = {
         video: {
           facingMode: { exact: facingMode },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30 }
         },
         audio: false
       };
@@ -85,6 +92,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
                 console.log('Video playing successfully');
                 setIsCameraReady(true);
                 setIsLoading(false);
+                // Reset capture count when camera starts
+                setCaptureCount(0);
               })
               .catch((err) => {
                 console.error('Error playing video:', err);
@@ -143,61 +152,60 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
   }, [facingMode]);
 
   // Capture photo
-// Capture photo
-const capturePhoto = useCallback(async () => {
-  if (!videoRef.current || !canvasRef.current || !isCameraReady) {
-    toast.error('Camera not ready');
-    return;
-  }
-
-  const video = videoRef.current;
-  const canvas = canvasRef.current;
-
-  // Wait for valid dimensions
-  if (video.videoWidth === 0 || video.videoHeight === 0) {
-    toast.error('Camera is not ready yet. Please wait.');
-    return;
-  }
-
-  // Set canvas dimensions to match video
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-
-  const context = canvas.getContext('2d');
-  if (context) {
-    // Draw the video frame to canvas
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    // Get image as data URL with high quality
-    const imageDataUrl = canvas.toDataURL('image/jpeg', 0.95);
-
-    // Convert data URL to File
-    try {
-      const response = await fetch(imageDataUrl);
-      const blob = await response.blob();
-      const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
-
-      if (continuous) {
-          onCapture(file);
-           setCapturedImage(null);
-        // Ensure camera is still running
-        if (!streamRef.current || !isCameraReady) {
-          startCamera();
-        }
-      } else {
-        // Standard mode: show preview and wait for user action
-        setCapturedImage(imageDataUrl);
-        stopCameraTracks();
-        setIsCameraReady(false);
-      }
-    } catch (err) {
-      console.error('Error processing photo:', err);
-      toast.error('Failed to process photo');
+  const capturePhoto = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current || !isCameraReady) {
+      toast.error('Camera not ready');
+      return;
     }
-  } else {
-    toast.error('Failed to capture photo');
-  }
-}, [isCameraReady, continuous, onCapture, startCamera, stopCameraTracks]);
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    // Wait for valid dimensions
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      toast.error('Camera is not ready yet. Please wait.');
+      return;
+    }
+
+    // Set canvas dimensions to match video
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const context = canvas.getContext('2d');
+    if (context) {
+      // Draw the video frame to canvas
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Get image as data URL with high quality
+      const imageDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+
+      // Convert data URL to File
+      try {
+        const response = await fetch(imageDataUrl);
+        const blob = await response.blob();
+        const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
+
+        if (continuous) {
+          onCapture(file);
+          setCapturedImage(null);
+          // Ensure camera is still running
+          if (!streamRef.current || !isCameraReady) {
+            startCamera();
+          }
+        } else {
+          // Standard mode: show preview and wait for user action
+          setCapturedImage(imageDataUrl);
+          stopCameraTracks();
+          setIsCameraReady(false);
+        }
+      } catch (err) {
+        console.error('Error processing photo:', err);
+        toast.error('Failed to process photo');
+      }
+    } else {
+      toast.error('Failed to capture photo');
+    }
+  }, [isCameraReady, continuous, onCapture, startCamera, stopCameraTracks]);
 
   // Retake photo
   const retakePhoto = useCallback(() => {
@@ -230,6 +238,7 @@ const capturePhoto = useCallback(async () => {
     setError(null);
     setIsLoading(true);
     setIsCameraReady(false);
+    setCaptureCount(0); // ✅ Reset capture count on close
     onOpenChange(false);
   }, [stopCameraTracks, onOpenChange]);
 
@@ -248,6 +257,7 @@ const capturePhoto = useCallback(async () => {
       setError(null);
       setIsLoading(true);
       setIsCameraReady(false);
+      setCaptureCount(0); // ✅ Reset capture count when closed
     }
     
     return () => {
@@ -261,6 +271,76 @@ const capturePhoto = useCallback(async () => {
       stopCameraTracks();
     };
   }, [stopCameraTracks]);
+
+  // ✅ Auto-capture effect with max capture limit
+  useEffect(() => {
+    if (!open || !isCameraReady || !continuous) return;
+
+    console.log('📷 Auto-capture started, max captures:', MAX_CAPTURES);
+
+    const captureInterval = setInterval(() => {
+      // ✅ Stop after max captures
+      if (captureCount >= MAX_CAPTURES) {
+        console.log('📷 Max captures reached, stopping auto-capture');
+        clearInterval(captureInterval);
+        toast.info(`Auto-capture completed (${MAX_CAPTURES} captures)`);
+        return;
+      }
+
+      if (!videoRef.current || !canvasRef.current) return;
+      
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      
+      if (video.videoWidth === 0 || video.videoHeight === 0) return;
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return;
+
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Brightness check - prevent black photos
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const pixels = imageData.data;
+      let totalBrightness = 0;
+      const step = 16;
+      for (let i = 0; i < pixels.length; i += step * 4) {
+        totalBrightness += (pixels[i] + pixels[i+1] + pixels[i+2]) / 3;
+      }
+      const avgBrightness = totalBrightness / (pixels.length / (step * 4));
+      
+      // Skip dark frames
+      if (avgBrightness < 8) {
+        console.log('📷 Skipping dark frame, brightness:', avgBrightness.toFixed(1));
+        return;
+      }
+
+      console.log(`📷 Capturing frame ${captureCount + 1}/${MAX_CAPTURES}, brightness:`, avgBrightness.toFixed(1));
+
+      // ✅ FIX: Increase quality to 0.95
+      canvas.toBlob((blob) => {
+        if (blob && onAutoCapture) {
+          const file = new File([blob], `auto_${Date.now()}.jpg`, { type: 'image/jpeg' });
+          console.log('📷 Auto-captured frame', { 
+            captureNumber: captureCount + 1, 
+            size: blob.size, 
+            brightness: avgBrightness.toFixed(1) 
+          });
+          onAutoCapture(file);
+          setCaptureCount(prev => prev + 1); // ✅ Increment counter
+        }
+      }, 'image/jpeg', 0.95);
+
+    }, 2000);
+
+    return () => {
+      clearInterval(captureInterval);
+      console.log('📷 Auto-capture stopped');
+    };
+  }, [open, isCameraReady, continuous, onAutoCapture, captureCount]);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -314,6 +394,13 @@ const capturePhoto = useCallback(async () => {
                       Switch
                     </Button>
                   </div>
+
+                  {/* ✅ Show capture count in continuous mode */}
+                  {continuous && (
+                    <div className="absolute top-4 left-4 bg-black/60 text-white text-xs px-3 py-1 rounded-full">
+                      {captureCount}/{MAX_CAPTURES}
+                    </div>
+                  )}
                 </>
               )}
               

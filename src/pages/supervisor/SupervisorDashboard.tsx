@@ -467,6 +467,10 @@ const SupervisorDashboard = () => {
   const { onMenuClick } = useOutletContext<OutletContext>();
   const navigate = useNavigate();
   
+  const [isProcessing, setIsProcessing] = useState(false);
+const [attendanceResult, setAttendanceResult] = useState<string | null>(null);
+const [lastCaptureTime, setLastCaptureTime] = useState(0);
+const [isAutoMode, setIsAutoMode] = useState(false); // <-- Add this
   // Camera states
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraAction, setCameraAction] = useState<'checkin' | 'checkout' | 'recognize' | null>(null);
@@ -694,8 +698,26 @@ const handleOpenWeeklyOffDialog = () => {
   setWeeklyOffDialogOpen(true);
 };
 
-
-
+const markAttendanceInBackend = async (employeeId: string, employeeName: string, photoFile: File) => {
+  try {
+    const formData = new FormData();
+    formData.append('employeeId', employeeId);
+    formData.append('employeeName', employeeName);
+    formData.append('supervisorId', currentSupervisor.id);
+    formData.append('siteName', selectedSite || supervisorSites[0]?.name || '');
+    formData.append('photo', photoFile);
+    
+    // ✅ Increase timeout and add retry logic
+    await axios.post(`${API_URL}/attendance/checkin-photo`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 15000  // Increased from 5000
+    });
+    console.log('✅ Attendance marked in backend successfully');
+  } catch (error) {
+    // Don't throw - face recognition already succeeded
+    console.warn('⚠️ Could not mark attendance in backend:', error);
+  }
+};
 
 const handleMarkWeeklyOff = async () => {
   if (!selectedEmployeeForWeeklyOff) {
@@ -736,61 +758,140 @@ const handleAttendanceCamera = () => {
   
 const handlePhotoCapture = async (photoFile: File) => {
   if (!cameraAction) return;
-  setUploadingPhoto(true);
-
-  try {
-    // If it's face recognition mode (auto)
-    if (cameraAction === 'recognize') {
-      const formData = new FormData();
-      formData.append('photo', photoFile);
-      formData.append('supervisorId', currentSupervisor.id);
-      formData.append('siteName', selectedSite || supervisorSites[0]?.name || '');
-
-      console.log('📤 ===== AUTO-ATTENDANCE REQUEST =====');
-      console.log('📤 URL:', `${API_URL}/attendance/auto-attendance`);
-      console.log('📤 Method: POST');
-      console.log('📤 FormData keys:', Array.from(formData.keys()));
-      console.log('📤 Photo size:', photoFile.size, 'bytes');
-      console.log('📤 Photo type:', photoFile.type);
-      console.log('📤 Supervisor ID:', currentSupervisor.id);
-      console.log('📤 Site Name:', selectedSite || supervisorSites[0]?.name || '');
-
-      const response = await axios.post(`${API_URL}/attendance/auto-attendance`, formData, {
-        headers: { 
-          'Content-Type': 'multipart/form-data',
-          // Don't add Authorization header for FormData - it can break the boundary
-        }
-      });
-
-      console.log('📥 Response status:', response.status);
-      console.log('📥 Response data:', response.data);
-
-      if (response.data.success) {
-        const { employeeName, action, message } = response.data.data;
-        toast.success(`${employeeName} ${action} successfully!`);
-        loadAttendanceRecords(selectedDate);
-        if (employeeName === currentSupervisor.name) {
-          loadAttendanceStatus();
-        }
-      } else {
-        toast.error(response.data.message || 'Face not recognised or attendance failed');
-      }
-
-      setCameraOpen(false);
-      setSelectedEmployeeForAttendance(null);
-      setCameraAction(null);
+  
+  // ✅ Auto face recognition mode (fast path)
+  if (cameraAction === 'recognize') {
+    const now = Date.now();
+    if (isProcessing || now - lastCaptureTime < 3000) {
       return;
     }
 
-    // ... rest of your code remains the same
-  } catch (error: any) {
-    console.error('❌ ===== AUTO-ATTENDANCE ERROR =====');
-    console.error('❌ Error:', error);
-    console.error('❌ Error response:', error.response?.data);
-    console.error('❌ Error status:', error.response?.status);
-    console.error('❌ Error headers:', error.response?.headers);
+    setIsProcessing(true);
+    setLastCaptureTime(now);
+
+    const formData = new FormData();
+    formData.append('file', photoFile);
+    formData.append('siteName', selectedSite || supervisorSites[0]?.name || '');
+
+    try {
+      console.log('📤 Sending match request to face service...');
+      
+      // ✅ Call the face service directly on port 8000
+      const response = await axios.post(`http://localhost:8000/match`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 10000
+      });
+
+      console.log('📥 Match response:', response.data);
+
+      if (response.data.success) {
+        const { employeeId, employeeName, confidence } = response.data.data;
+        setAttendanceResult(`✅ ${employeeName} (${Math.round(confidence * 100)}%)`);
+        toast.success(`${employeeName} marked present!`);
+        
+        // ✅ Mark attendance in the main backend
+       markAttendanceInBackend(employeeId, employeeName, photoFile);
+        
+        setTimeout(() => setAttendanceResult(null), 2500);
+        loadAttendanceRecords(selectedDate);
+      } else {
+        setAttendanceResult(`❌ ${response.data.message}`);
+        setTimeout(() => setAttendanceResult(null), 2000);
+      }
+    } catch (error: any) {
+      console.error('❌ Match error:', error);
+      
+      // ✅ Better error messages
+      if (error.response?.status === 404) {
+        setAttendanceResult('❌ Face service not found (port 8000)');
+        toast.error('Face service is not running on port 8000');
+      } else if (error.code === 'ECONNREFUSED') {
+        setAttendanceResult('❌ Cannot connect to face service');
+        toast.error('Face service is not running. Start with: python main.py');
+      } else if (error.response?.data?.message) {
+        setAttendanceResult(`❌ ${error.response.data.message}`);
+      } else {
+        setAttendanceResult(`❌ ${error.message || 'Unknown error'}`);
+      }
+      setTimeout(() => setAttendanceResult(null), 3000);
+    } finally {
+      setIsProcessing(false);
+    }
+    return; // ✅ Don't close camera
+  }
+
+  // ✅ Check-in / Check-out with photo
+  setUploadingPhoto(true);
+  try {
+    // Determine if this is check-in or check-out based on current state
+    const isCheckIn = cameraAction === 'checkin';
     
-    // Better error message
+    // Get employee ID
+    const employeeId = selectedEmployeeForAttendance?._id || currentSupervisor.id;
+    const employeeName = selectedEmployeeForAttendance?.name || currentSupervisor.name;
+    
+    const formData = new FormData();
+    formData.append('employeeId', employeeId);
+    formData.append('employeeName', employeeName);
+    formData.append('photo', photoFile);
+    formData.append('supervisorId', currentSupervisor.id);
+    
+    // ✅ FIX: Get location if available (returns { lat, lng })
+    try {
+      const location = await getLocation();
+      if (location) {
+        // ✅ Use lat and lng (not latitude and longitude)
+        formData.append('latitude', String(location.lat));
+        formData.append('longitude', String(location.lng));
+      }
+    } catch (locError) {
+      console.warn('Could not get location:', locError);
+    }
+    
+    const endpoint = isCheckIn ? '/attendance/checkin-photo' : '/attendance/checkout-photo';
+    
+    const response = await axios.post(`${API_URL}${endpoint}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 10000
+    });
+    
+    if (response.data.success) {
+      toast.success(`✅ ${isCheckIn ? 'Check-in' : 'Check-out'} successful!`);
+      
+      // Update local attendance state
+      const updatedAttendance = response.data.data;
+      if (updatedAttendance) {
+        setAttendance({
+          ...attendance,
+          isCheckedIn: updatedAttendance.isCheckedIn || false,
+          isOnBreak: updatedAttendance.isOnBreak || false,
+          checkInTime: updatedAttendance.checkInTime || attendance.checkInTime,
+          checkOutTime: updatedAttendance.checkOutTime || attendance.checkOutTime,
+          checkInPhoto: updatedAttendance.checkInPhoto || attendance.checkInPhoto,
+          checkOutPhoto: updatedAttendance.checkOutPhoto || attendance.checkOutPhoto,
+          totalHours: updatedAttendance.totalHours || attendance.totalHours || 0,
+          hasCheckedInToday: updatedAttendance.hasCheckedInToday || false,
+          hasCheckedOutToday: updatedAttendance.hasCheckedOutToday || false,
+        });
+      }
+      
+      // Refresh attendance records
+      loadAttendanceRecords(selectedDate);
+      loadSupervisorAttendanceRecords();
+      
+      // Add activity
+      addActivity(
+        isCheckIn ? 'checkin' : 'checkout', 
+        `${isCheckIn ? 'Checked in' : 'Checked out'} at ${new Date().toLocaleTimeString()}`
+      );
+      
+    } else {
+      toast.error(response.data.message || 'Attendance failed');
+    }
+    
+  } catch (error: any) {
+    console.error('❌ Attendance error:', error);
+    
     let errorMessage = 'Error processing attendance';
     if (error.response?.status === 404) {
       errorMessage = 'Endpoint not found. Please check if the server is running.';
@@ -801,8 +902,8 @@ const handlePhotoCapture = async (photoFile: File) => {
     } else if (error.message) {
       errorMessage = error.message;
     }
-    
     toast.error(errorMessage);
+    
   } finally {
     setUploadingPhoto(false);
     setCameraOpen(false);
@@ -2563,14 +2664,24 @@ return (
     />
 
     {/* Camera Capture Dialog for Face Recognition */}
-    <CameraCapture
-      open={cameraOpen}
-      onOpenChange={setCameraOpen}
-      onCapture={handlePhotoCapture}
-      title={`${cameraAction === 'checkin' ? 'Check-in' : 'Check-out'} with Face Recognition`}
-      description="Look into the camera for verification"
-      actionLabel={cameraAction === 'checkin' ? "Confirm Check-in" : "Confirm Check-out"}
-    />
+   <CameraCapture
+  open={cameraOpen}
+  onOpenChange={setCameraOpen}
+  onCapture={handlePhotoCapture}
+  title={cameraAction === 'checkin' ? 'Check-in' : 
+        cameraAction === 'checkout' ? 'Check-out' : 
+        'Face Recognition Attendance'}
+  description={
+    cameraAction === 'recognize' 
+      ? attendanceResult || (isProcessing ? '🔄 Processing...' : '👤 Look at camera for instant attendance')
+      : 'Look into the camera for verification'
+  }
+  actionLabel={cameraAction === 'checkin' ? "Confirm Check-in" : 
+              cameraAction === 'checkout' ? "Confirm Check-out" : 
+              "Done"}
+  continuous={cameraAction === 'recognize'} // ✅ Auto-capture mode
+  onAutoCapture={handlePhotoCapture} // ✅ Auto-capture handler
+/>
 
     <Dialog open={weeklyOffDialogOpen} onOpenChange={setWeeklyOffDialogOpen}>
   <DialogContent>
