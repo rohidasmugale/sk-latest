@@ -48,7 +48,7 @@ import assignTaskRoutes from './routes/assignTaskRoutes';
 import siteVisitRoutes from './routes/siteVisitRoutes';
 import incidentRoutes from './routes/incidentRoutes';
 import cleaningPhotoRoutes from './routes/cleaningPhotoRoutes';
-import faceRoutes from './routes/faceRoutes';
+
 import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 const app: Application = express();
@@ -284,7 +284,7 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/manager-attendance', managerAttendanceRoutes);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 console.log('📁 Static files being served from:', path.join(__dirname, '../uploads'));
-app.use('/api/face', faceRoutes);
+
 
 // ==================== BASIC TEST ENDPOINTS ====================
 app.get('/', (req: Request, res: Response) => {
