@@ -19,9 +19,9 @@ import axios from "axios";
 import * as XLSX from 'xlsx';
 import { format, differenceInDays } from 'date-fns';
 import DocumentUpload from "../../pages/superadmin/DocumentUpload";
-
+import { FaceRegisterButton } from "@/pages/supervisor/FaceRegisterButton";
 // ─── API URL ──────────────────────────────────────────────────────────────
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 // ─── Extended Interfaces ──────────────────────────────────────────────────
@@ -44,6 +44,7 @@ interface ExtendedEmployee extends Employee {
   uanNumber: string;
   dateOfJoining: string;
   _id?: string;
+  faceEmbeddings?: number[][];  // ✅ ADD THIS
 }
 
 interface EPFForm11Data {
@@ -194,7 +195,7 @@ const EmployeesTab = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [employeesPage, setEmployeesPage] = useState(1);
-const [employeesItemsPerPage, setEmployeesItemsPerPage] = useState(25);
+  const [employeesItemsPerPage, setEmployeesItemsPerPage] = useState(25);
   const [sortBy, setSortBy] = useState<string>("");
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
   const [selectedSite, setSelectedSite] = useState<string>("all");
@@ -289,10 +290,10 @@ const [employeesItemsPerPage, setEmployeesItemsPerPage] = useState(25);
   });
 
   const [statsData, setStatsData] = useState({
-  total: 0,
-  active: 0,
-  left: 0
-});
+    total: 0,
+    active: 0,
+    left: 0
+  });
   // ─── Effects ─────────────────────────────────────────────────────────────
 
   // Handle resize for mobile detection
@@ -320,18 +321,18 @@ const [employeesItemsPerPage, setEmployeesItemsPerPage] = useState(25);
   // ─── Data Fetching ──────────────────────────────────────────────────────
 
   const fetchEmployees = async () => {
-  try {
-    setLoading(true);
-    setError(null);
+    try {
+      setLoading(true);
+      setError(null);
 
-    // When 'showPagination' is false (total <= 10), fetch ALL employees
-    // Otherwise respect pagination
-    const shouldFetchAll = totalEmployees > 0 && totalEmployees <= 10;
-    
-    const params: any = {
-      page: employeesPage,
-      limit: shouldFetchAll ? 10000 : employeesItemsPerPage, // Fetch all if <= 10 employees
-    };
+      // When 'showPagination' is false (total <= 10), fetch ALL employees
+      // Otherwise respect pagination
+      const shouldFetchAll = totalEmployees > 0 && totalEmployees <= 10;
+
+      const params: any = {
+        page: employeesPage,
+        limit: shouldFetchAll ? 10000 : employeesItemsPerPage, // Fetch all if <= 10 employees
+      };
       if (searchTerm) params.search = searchTerm;
       if (selectedDepartment !== "all") params.department = selectedDepartment;
       if (selectedSite !== "all") params.siteName = selectedSite;
@@ -411,7 +412,8 @@ const [employeesItemsPerPage, setEmployeesItemsPerPage] = useState(25);
             siteHistory: siteHistory,
             kycDocuments: emp.kycDocuments || [],
             isManager: false,
-            isSupervisor: false
+            isSupervisor: false,
+            faceEmbeddings: (emp as any).faceEmbeddings || [],  // ✅ ADD THIS
           };
 
           if (employee.siteName && siteHistory.length === 0) {
@@ -453,25 +455,25 @@ const [employeesItemsPerPage, setEmployeesItemsPerPage] = useState(25);
       setLoading(false);
     }
   };
-const fetchEmployeeStats = async () => {
-  try {
-    // Fetch ALL employees just for counting (no pagination)
-    const response = await axios.get(`${API_URL}/employees`, { 
-      params: { limit: 10000 } // Get all
-    });
-    
-    if (response.data && response.data.success) {
-      const allEmps = response.data.data || response.data.employees || [];
-      setStatsData({
-        total: allEmps.length,
-        active: allEmps.filter((e: any) => e.status === 'active').length,
-        left: allEmps.filter((e: any) => e.status === 'left' || e.status === 'inactive').length
+  const fetchEmployeeStats = async () => {
+    try {
+      // Fetch ALL employees just for counting (no pagination)
+      const response = await axios.get(`${API_URL}/employees`, {
+        params: { limit: 10000 } // Get all
       });
+
+      if (response.data && response.data.success) {
+        const allEmps = response.data.data || response.data.employees || [];
+        setStatsData({
+          total: allEmps.length,
+          active: allEmps.filter((e: any) => e.status === 'active').length,
+          left: allEmps.filter((e: any) => e.status === 'left' || e.status === 'inactive').length
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching stats:', err);
     }
-  } catch (err) {
-    console.error('Error fetching stats:', err);
-  }
-};
+  };
   const fetchSites = async () => {
     try {
       setLoadingSites(true);
@@ -722,9 +724,9 @@ const fetchEmployeeStats = async () => {
     }
     return 0;
   });
-const showPagination = totalEmployees > employeesItemsPerPage;
+  const showPagination = totalEmployees > employeesItemsPerPage;
   const activeEmployees = statsData.active;
-const leftEmployeesCount = statsData.left;
+  const leftEmployeesCount = statsData.left;
 
   // ─── Selection Handlers ──────────────────────────────────────────────
 
@@ -738,15 +740,15 @@ const leftEmployeesCount = statsData.left;
     });
   };
 
- const handleSelectAll = () => {
-  if (selectAll) {
-    setSelectedEmployees([]);
-  } else {
-    // Select ALL employees (not just filtered/sorted)
-    setSelectedEmployees(employees.map(emp => emp.id || emp._id || ''));
-  }
-  setSelectAll(!selectAll);
-};
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedEmployees([]);
+    } else {
+      // Select ALL employees (not just filtered/sorted)
+      setSelectedEmployees(employees.map(emp => emp.id || emp._id || ''));
+    }
+    setSelectAll(!selectAll);
+  };
 
   useEffect(() => {
     if (sortedEmployees.length > 0 && selectedEmployees.length === sortedEmployees.length) {
@@ -2563,6 +2565,8 @@ const leftEmployeesCount = statsData.left;
 
   // ─── Mobile Employee Card Component ────────────────────────────────────
 
+  // ─── Mobile Employee Card Component ────────────────────────────────────
+
   const MobileEmployeeCard = ({ employee, selected, onSelect, onEdit, onViewHistory, onUpload, onViewDocs, onEPF, onMarkLeft, onDelete, onViewID, onDownloadID }: any) => {
     const [expanded, setExpanded] = useState(false);
     const photoUrl = getPhotoUrl(employee);
@@ -2611,24 +2615,63 @@ const leftEmployeesCount = statsData.left;
         </div>
 
         {expanded && (
-          <div className="mt-2 pt-2 border-t grid grid-cols-3 gap-1">
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onEdit(employee)}><Edit className="h-3 w-3 mr-1" />Edit</Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onViewHistory(employee)}><History className="h-3 w-3 mr-1" />History</Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUpload(employee)}><Upload className="h-3 w-3 mr-1" />Upload</Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onViewDocs(employee)}><Files className="h-3 w-3 mr-1" />Docs</Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onViewID(employee)}><Eye className="h-3 w-3 mr-1" />ID</Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onDownloadID(employee)}><Download className="h-3 w-3 mr-1" />ID Card</Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onEPF(employee)}><FileText className="h-3 w-3 mr-1" />EPF 11</Button>
-            {employee.status !== 'left' && (
-              <Button variant="outline" size="sm" className="h-7 text-xs text-amber-600" onClick={() => onMarkLeft(employee)}>Mark Left</Button>
-            )}
-            <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => onDelete(employee.id || employee._id)}><Trash2 className="h-3 w-3 mr-1" /></Button>
+          <div className="mt-2 pt-2 border-t">
+            {/* Row 1: Edit and Register Face - side by side */}
+            <div className="grid grid-cols-2 gap-1 mb-1">
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onEdit(employee)}>
+                <Edit className="h-3 w-3 mr-1" />Edit
+              </Button>
+              <div className="w-full">
+                <FaceRegisterButton
+                  employeeId={employee._id || employee.id || ''}
+                  employeeName={employee.name}
+                  currentEmbeddingDim={(employee as any).faceEmbeddings?.[0]?.length}
+                />
+              </div>
+            </div>
+
+            {/* Row 2: History, Upload, Docs */}
+            <div className="grid grid-cols-3 gap-1 mb-1">
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onViewHistory(employee)}>
+                <History className="h-3 w-3 mr-1" />History
+              </Button>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUpload(employee)}>
+                <Upload className="h-3 w-3 mr-1" />Upload
+              </Button>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onViewDocs(employee)}>
+                <Files className="h-3 w-3 mr-1" />Docs
+              </Button>
+            </div>
+
+            {/* Row 3: ID, ID Card, EPF 11 */}
+            <div className="grid grid-cols-3 gap-1 mb-1">
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onViewID(employee)}>
+                <Eye className="h-3 w-3 mr-1" />ID
+              </Button>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onDownloadID(employee)}>
+                <Download className="h-3 w-3 mr-1" />ID Card
+              </Button>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onEPF(employee)}>
+                <FileText className="h-3 w-3 mr-1" />EPF 11
+              </Button>
+            </div>
+
+            {/* Row 4: Mark Left and Delete */}
+            <div className="grid grid-cols-2 gap-1">
+              {employee.status !== 'left' && (
+                <Button variant="outline" size="sm" className="h-7 text-xs text-amber-600" onClick={() => onMarkLeft(employee)}>
+                  Mark Left
+                </Button>
+              )}
+              <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => onDelete(employee.id || employee._id)}>
+                <Trash2 className="h-3 w-3 mr-1" />Delete
+              </Button>
+            </div>
           </div>
         )}
       </div>
     );
   };
-
   // ─── ID Card Functions ──────────────────────────────────────────────────
 
   const generateIDCard = (employee: ExtendedEmployee) => {
@@ -2752,11 +2795,11 @@ const leftEmployeesCount = statsData.left;
               <div class="subtitle">ID CARD</div>
             </div>
             <div class="photo-section">
-              ${photoUrl 
-                ? `<img src="${photoUrl}" alt="Employee Photo" class="employee-photo" onerror="this.style.display='none'; document.getElementById('no-photo').style.display='flex';" />` +
-                  `<div id="no-photo" class="no-photo" style="display: none;">No Photo</div>`
-                : '<div class="no-photo">No Photo</div>'
-              }
+              ${photoUrl
+        ? `<img src="${photoUrl}" alt="Employee Photo" class="employee-photo" onerror="this.style.display='none'; document.getElementById('no-photo').style.display='flex';" />` +
+        `<div id="no-photo" class="no-photo" style="display: none;">No Photo</div>`
+        : '<div class="no-photo">No Photo</div>'
+      }
             </div>
             <div class="details">
               <div class="detail-row">
@@ -3037,9 +3080,9 @@ const leftEmployeesCount = statsData.left;
                   ${employee.fatherName ? `<tr><td>${employee.fatherName}</td><td>Father</td><td>________________</td><td>________________</td></tr>` : ""}
                   ${employee.motherName ? `<tr><td>${employee.motherName}</td><td>Mother</td><td>________________</td><td>________________</td></tr>` : ""}
                   ${employee.spouseName ? `<tr><td>${employee.spouseName}</td><td>Spouse</td><td>________________</td><td>________________</td></tr>` : ""}
-                  ${employee.numberOfChildren ? Array(parseInt(employee.numberOfChildren) || 0).fill(0).map((_, i) => 
-                    `<tr><td>________________</td><td>Child ${i + 1}</td><td>________________</td><td>________________</td></tr>`
-                  ).join("") : ""}
+                  ${employee.numberOfChildren ? Array(parseInt(employee.numberOfChildren) || 0).fill(0).map((_, i) =>
+      `<tr><td>________________</td><td>Child ${i + 1}</td><td>________________</td><td>________________</td></tr>`
+    ).join("") : ""}
                 </tbody>
               </table>
             </div>
@@ -3103,7 +3146,7 @@ const leftEmployeesCount = statsData.left;
               </div>
               <div className="space-y-1">
                 <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className="h-full bg-primary transition-all duration-300"
                     style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
                   />
@@ -3169,8 +3212,8 @@ const leftEmployeesCount = statsData.left;
             </SelectContent>
           </Select>
           <div className="flex flex-wrap gap-2 w-full">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setBulkSiteDialogOpen(true)}
               disabled={selectedEmployees.length === 0}
               className={`flex-1 sm:flex-none ${selectedEmployees.length > 0 ? "border-blue-500 text-blue-600" : ""}`}
@@ -3179,8 +3222,8 @@ const leftEmployeesCount = statsData.left;
               <span className="hidden sm:inline">Assign Site </span>
               {selectedEmployees.length > 0 && `(${selectedEmployees.length})`}
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setBulkDeleteDialogOpen(true)}
               disabled={selectedEmployees.length === 0}
               className={`flex-1 sm:flex-none ${selectedEmployees.length > 0 ? "border-red-500 text-red-600 hover:bg-red-50" : ""}`}
@@ -3189,8 +3232,8 @@ const leftEmployeesCount = statsData.left;
               <span className="hidden sm:inline">Bulk Delete </span>
               {selectedEmployees.length > 0 && `(${selectedEmployees.length})`}
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setImportDialogOpen(true)}
               className="flex-1 sm:flex-none"
               disabled={isImporting}
@@ -3202,9 +3245,9 @@ const leftEmployeesCount = statsData.left;
               )}
               {isImporting ? "Importing..." : "Import"}
             </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleExportEmployees} 
+            <Button
+              variant="outline"
+              onClick={handleExportEmployees}
               className="flex-1 sm:flex-none"
               disabled={isExporting}
             >
@@ -3267,7 +3310,7 @@ const leftEmployeesCount = statsData.left;
       </div>
 
       {/* ─── Import Dialog ────────────────────────────────────────────── */}
-      <ExcelImportDialog 
+      <ExcelImportDialog
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
         onImport={handleImportEmployees}
@@ -3286,15 +3329,15 @@ const leftEmployeesCount = statsData.left;
               Employee ID: {selectedEmployeeForDocumentUpload?.employeeId} | Department: {selectedEmployeeForDocumentUpload?.department}
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedEmployeeForDocumentUpload && (
-            <DocumentUpload 
+            <DocumentUpload
               employeeId={selectedEmployeeForDocumentUpload.id || selectedEmployeeForDocumentUpload._id || ''}
               employeeName={selectedEmployeeForDocumentUpload.name}
               existingDocuments={selectedEmployeeForDocumentUpload.kycDocuments || []}
               onDocumentUploaded={() => {
                 handleDocumentUploaded();
-                const updatedEmp = employees.find(e => 
+                const updatedEmp = employees.find(e =>
                   (e.id === selectedEmployeeForDocumentUpload.id || e._id === selectedEmployeeForDocumentUpload._id)
                 );
                 if (updatedEmp) {
@@ -3303,7 +3346,7 @@ const leftEmployeesCount = statsData.left;
               }}
             />
           )}
-          
+
           <div className="flex justify-end pt-4 border-t">
             <Button variant="outline" onClick={() => setDocumentUploadDialogOpen(false)}>
               Close
@@ -3321,11 +3364,11 @@ const leftEmployeesCount = statsData.left;
               EPF Form 11 - Declaration Form
             </DialogTitle>
             <p className="text-sm text-muted-foreground">
-              For Employee: <span className="font-semibold">{selectedEmployeeForEPF?.name}</span> 
+              For Employee: <span className="font-semibold">{selectedEmployeeForEPF?.name}</span>
               | Employee ID: <span className="font-semibold">{selectedEmployeeForEPF?.employeeId}</span>
             </p>
           </DialogHeader>
-          
+
           <div className="space-y-6">
             <div className="text-center border-b-2 border-black pb-4">
               <h2 className="text-xl font-bold">New Form : 11 - Declaration Form</h2>
@@ -3504,7 +3547,7 @@ const leftEmployeesCount = statsData.left;
 
             <div className="border rounded-lg p-4 space-y-4">
               <h4 className="font-semibold border-b pb-2">Previous Membership Details</h4>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>7. Whether earlier member of the Employee's Provident Fund Scheme, 1952 ?</Label>
@@ -3607,7 +3650,7 @@ const leftEmployeesCount = statsData.left;
 
             <div className="border rounded-lg p-4 space-y-4">
               <h4 className="font-semibold border-b pb-2">10. International Worker Details</h4>
-              
+
               <div className="space-y-2">
                 <Label>a) International Worker</Label>
                 <div className="flex flex-wrap gap-4">
@@ -3674,7 +3717,7 @@ const leftEmployeesCount = statsData.left;
 
             <div className="border rounded-lg p-4 space-y-4">
               <h4 className="font-semibold border-b pb-2">11. KYC Details : (attach self attested copies of following KYC's)</h4>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="bankAccountNumber">a) Bank Account No. & IFS Code</Label>
@@ -3744,7 +3787,7 @@ const leftEmployeesCount = statsData.left;
 
             <div className="border rounded-lg p-4 space-y-4">
               <h4 className="font-semibold border-b pb-2">12. Declaration Details</h4>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>First EPF Member</Label>
@@ -3903,7 +3946,7 @@ const leftEmployeesCount = statsData.left;
 
             <div className="border rounded-lg p-4 space-y-4">
               <h4 className="font-semibold">Employee Declaration</h4>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="declarationDate">Date</Label>
@@ -3924,7 +3967,7 @@ const leftEmployeesCount = statsData.left;
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Signature of Member</Label>
                 <div className="border-2 border-dashed rounded-lg p-4 text-center h-20 flex items-center justify-center">
@@ -3935,7 +3978,7 @@ const leftEmployeesCount = statsData.left;
 
             <div className="border rounded-lg p-4 space-y-4">
               <div className="section-title">DECLARATION BY PRESENT EMPLOYER</div>
-              
+
               <div className="space-y-2">
                 <Label>A. The member Mr./Ms./Mrs. {epfFormData.memberName} has joined on {epfFormData.enrolledDate} and has been allotted PF Number ${selectedEmployeeForEPF?.uan || epfFormData.pfNumber || "Pending"}</Label>
               </div>
@@ -4003,7 +4046,7 @@ const leftEmployeesCount = statsData.left;
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Signature of Employer with Seal of Establishment</Label>
                 <div className="border-2 border-dashed rounded-lg p-4 text-center h-20 flex items-center justify-center">
@@ -4042,7 +4085,7 @@ const leftEmployeesCount = statsData.left;
               Make changes to employee information below. Click save when you're done.
             </DialogDescription>
           </DialogHeader>
-          
+
           {editFormData && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-4">
               <div className="space-y-2">
@@ -4132,8 +4175,8 @@ const leftEmployeesCount = statsData.left;
 
               <div className="space-y-2">
                 <Label htmlFor="edit-bloodGroup">Blood Group</Label>
-                <Select 
-                  value={editFormData.bloodGroup} 
+                <Select
+                  value={editFormData.bloodGroup}
                   onValueChange={(value) => handleEditFormChange('bloodGroup', value)}
                 >
                   <SelectTrigger>
@@ -4154,8 +4197,8 @@ const leftEmployeesCount = statsData.left;
 
               <div className="space-y-2">
                 <Label htmlFor="edit-gender">Gender</Label>
-                <Select 
-                  value={editFormData.gender} 
+                <Select
+                  value={editFormData.gender}
                   onValueChange={(value) => handleEditFormChange('gender', value)}
                 >
                   <SelectTrigger>
@@ -4171,8 +4214,8 @@ const leftEmployeesCount = statsData.left;
 
               <div className="space-y-2">
                 <Label htmlFor="edit-maritalStatus">Marital Status</Label>
-                <Select 
-                  value={editFormData.maritalStatus} 
+                <Select
+                  value={editFormData.maritalStatus}
                   onValueChange={(value) => handleEditFormChange('maritalStatus', value)}
                 >
                   <SelectTrigger>
@@ -4190,8 +4233,8 @@ const leftEmployeesCount = statsData.left;
 
               <div className="space-y-2">
                 <Label htmlFor="edit-department">Department *</Label>
-                <Select 
-                  value={editFormData.department} 
+                <Select
+                  value={editFormData.department}
                   onValueChange={(value) => handleEditFormChange('department', value)}
                 >
                   <SelectTrigger>
@@ -4217,8 +4260,8 @@ const leftEmployeesCount = statsData.left;
 
               <div className="space-y-2">
                 <Label htmlFor="edit-siteName">Site Name *</Label>
-                <Select 
-                  value={editFormData.siteName} 
+                <Select
+                  value={editFormData.siteName}
                   onValueChange={(value) => handleEditFormChange('siteName', value)}
                 >
                   <SelectTrigger>
@@ -4247,8 +4290,8 @@ const leftEmployeesCount = statsData.left;
 
               <div className="space-y-2">
                 <Label htmlFor="edit-status">Status</Label>
-                <Select 
-                  value={editFormData.status} 
+                <Select
+                  value={editFormData.status}
                   onValueChange={(value: "active" | "inactive" | "left") => handleEditFormChange('status', value)}
                 >
                   <SelectTrigger>
@@ -4442,8 +4485,8 @@ const leftEmployeesCount = statsData.left;
 
               <div className="space-y-2">
                 <Label htmlFor="edit-pantSize">Pant Size</Label>
-                <Select 
-                  value={editFormData.pantSize} 
+                <Select
+                  value={editFormData.pantSize}
                   onValueChange={(value) => handleEditFormChange('pantSize', value)}
                 >
                   <SelectTrigger>
@@ -4463,8 +4506,8 @@ const leftEmployeesCount = statsData.left;
 
               <div className="space-y-2">
                 <Label htmlFor="edit-shirtSize">Shirt Size</Label>
-                <Select 
-                  value={editFormData.shirtSize} 
+                <Select
+                  value={editFormData.shirtSize}
                   onValueChange={(value) => handleEditFormChange('shirtSize', value)}
                 >
                   <SelectTrigger>
@@ -4482,8 +4525,8 @@ const leftEmployeesCount = statsData.left;
 
               <div className="space-y-2">
                 <Label htmlFor="edit-capSize">Cap Size</Label>
-                <Select 
-                  value={editFormData.capSize} 
+                <Select
+                  value={editFormData.capSize}
                   onValueChange={(value) => handleEditFormChange('capSize', value)}
                 >
                   <SelectTrigger>
@@ -4510,7 +4553,7 @@ const leftEmployeesCount = statsData.left;
                     />
                     <Label htmlFor="edit-idCardIssued">ID Card Issued</Label>
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     <input
                       type="checkbox"
@@ -4521,7 +4564,7 @@ const leftEmployeesCount = statsData.left;
                     />
                     <Label htmlFor="edit-westcoatIssued">Westcoat Issued</Label>
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     <input
                       type="checkbox"
@@ -4570,7 +4613,7 @@ const leftEmployeesCount = statsData.left;
               Employee ID: {selectedEmployeeForHistory?.employeeId}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="px-0 py-4 max-h-[60vh] overflow-y-auto">
             {selectedEmployeeForHistory?.siteHistory && selectedEmployeeForHistory.siteHistory.length > 0 ? (
               <div className="space-y-4">
@@ -4580,9 +4623,9 @@ const leftEmployeesCount = statsData.left;
                     {selectedEmployeeForHistory.siteHistory.map((history, index) => {
                       const isLastEntry = index === selectedEmployeeForHistory.siteHistory.length - 1;
                       const hasLeftDate = history.leftDate !== undefined && history.leftDate !== null && history.leftDate !== '';
-                      
+
                       let displaySiteName = history.siteName;
-                      
+
                       if (!displaySiteName || displaySiteName === '') {
                         if (!hasLeftDate && isLastEntry && selectedEmployeeForHistory.siteName) {
                           displaySiteName = selectedEmployeeForHistory.siteName;
@@ -4590,12 +4633,11 @@ const leftEmployeesCount = statsData.left;
                           displaySiteName = 'Unknown Site';
                         }
                       }
-                      
+
                       return (
                         <div key={index} className="relative pl-10">
-                          <div className={`absolute left-2 top-1 w-4 h-4 rounded-full border-4 border-white ${
-                            !hasLeftDate && isLastEntry ? 'bg-green-500' : 'bg-blue-500'
-                          }`}></div>
+                          <div className={`absolute left-2 top-1 w-4 h-4 rounded-full border-4 border-white ${!hasLeftDate && isLastEntry ? 'bg-green-500' : 'bg-blue-500'
+                            }`}></div>
                           <div className="bg-white p-4 rounded-lg border shadow-sm">
                             <div className="flex items-center gap-2 mb-2">
                               <MapPin className="h-4 w-4 text-blue-600" />
@@ -4665,19 +4707,19 @@ const leftEmployeesCount = statsData.left;
       </Dialog>
 
       {/* ─── Stats Cards ────────────────────────────────────────────────── */}
-     <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-  <StatCard title="Total Employees" value={totalEmployees} />
-  <StatCard 
-    title="Active Employees" 
-    value={activeEmployees}    // ← Now uses real count
-    className="text-green-600" 
-  />
-  <StatCard 
-    title="Left/Inactive Employees" 
-    value={leftEmployeesCount} // ← Now uses real count
-    className="text-red-600" 
-  />
-</div>
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+        <StatCard title="Total Employees" value={totalEmployees} />
+        <StatCard
+          title="Active Employees"
+          value={activeEmployees}    // ← Now uses real count
+          className="text-green-600"
+        />
+        <StatCard
+          title="Left/Inactive Employees"
+          value={leftEmployeesCount} // ← Now uses real count
+          className="text-red-600"
+        />
+      </div>
       {/* ─── Select All row ────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-4">
@@ -4816,9 +4858,9 @@ const leftEmployeesCount = statsData.left;
                     </div>
                     <h5 className="font-medium mb-2">ID Card</h5>
                     <p className="text-sm text-muted-foreground mb-3">Employee identification card</p>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
+                    <Button
+                      size="sm"
+                      variant="outline"
                       onClick={() => {
                         generateIDCard(selectedEmployeeForDocuments);
                         setDocumentsDialogOpen(false);
@@ -4836,9 +4878,9 @@ const leftEmployeesCount = statsData.left;
                     </div>
                     <h5 className="font-medium mb-2">Nominee Form</h5>
                     <p className="text-sm text-muted-foreground mb-3">PF nominee declaration</p>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
+                    <Button
+                      size="sm"
+                      variant="outline"
                       onClick={() => {
                         downloadNomineeForm(selectedEmployeeForDocuments);
                         setDocumentsDialogOpen(false);
@@ -4856,9 +4898,9 @@ const leftEmployeesCount = statsData.left;
                     </div>
                     <h5 className="font-medium mb-2">PF Form</h5>
                     <p className="text-sm text-muted-foreground mb-3">Provident fund declaration</p>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
+                    <Button
+                      size="sm"
+                      variant="outline"
                       onClick={() => {
                         downloadPFForm(selectedEmployeeForDocuments);
                         setDocumentsDialogOpen(false);
@@ -4876,9 +4918,9 @@ const leftEmployeesCount = statsData.left;
                     </div>
                     <h5 className="font-medium mb-2">ESIC Form</h5>
                     <p className="text-sm text-muted-foreground mb-3">Health insurance form</p>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
+                    <Button
+                      size="sm"
+                      variant="outline"
                       onClick={() => {
                         downloadESICForm(selectedEmployeeForDocuments);
                         setDocumentsDialogOpen(false);
@@ -4896,9 +4938,9 @@ const leftEmployeesCount = statsData.left;
                     </div>
                     <h5 className="font-medium mb-2">EPF Form 11</h5>
                     <p className="text-sm text-muted-foreground mb-3">Employee declaration form</p>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
+                    <Button
+                      size="sm"
+                      variant="outline"
                       onClick={() => {
                         handleOpenEPFForm11(selectedEmployeeForDocuments);
                         setDocumentsDialogOpen(false);
@@ -4916,8 +4958,8 @@ const leftEmployeesCount = statsData.left;
                 <div>
                   <h4 className="font-semibold text-lg mb-4">Employee Photo</h4>
                   <div className="border rounded-lg p-4 text-center">
-                    <img 
-                      src={getPhotoUrl(selectedEmployeeForDocuments)} 
+                    <img
+                      src={getPhotoUrl(selectedEmployeeForDocuments)}
                       alt={selectedEmployeeForDocuments.name}
                       className="w-32 h-32 rounded-full object-cover mx-auto border-4 border-gray-200"
                       onError={(e) => {
@@ -4979,8 +5021,8 @@ const leftEmployeesCount = statsData.left;
               ))}
               {sortedEmployees.length === 0 && !loading && (
                 <div className="text-center py-8 text-muted-foreground">
-                  {searchTerm || selectedDepartment !== "all" || selectedSite !== "all" || selectedJoinDate ? 
-                    "No employees found matching your filters. Try clearing filters." : 
+                  {searchTerm || selectedDepartment !== "all" || selectedSite !== "all" || selectedJoinDate ?
+                    "No employees found matching your filters. Try clearing filters." :
                     "No employees found. Add your first employee above."}
                 </div>
               )}
@@ -4998,10 +5040,10 @@ const leftEmployeesCount = statsData.left;
                         onChange={() => handleSelectEmployee(employee.id || employee._id || '')}
                         className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary mt-1"
                       />
-                      
+
                       {employee.photo || employee.photoPublicId ? (
-                        <img 
-                          src={getPhotoUrl(employee)} 
+                        <img
+                          src={getPhotoUrl(employee)}
                           alt={employee.name}
                           className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 flex-shrink-0"
                           onError={(e) => {
@@ -5014,7 +5056,7 @@ const leftEmployeesCount = statsData.left;
                           <User className="h-6 w-6 text-gray-400" />
                         </div>
                       )}
-                      
+
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2 mb-1">
                           <h4 className="font-semibold truncate">{employee.name}</h4>
@@ -5067,7 +5109,7 @@ const leftEmployeesCount = statsData.left;
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="flex flex-wrap gap-2 lg:w-auto">
                       <Button
                         size="sm"
@@ -5079,6 +5121,13 @@ const leftEmployeesCount = statsData.left;
                         Edit
                       </Button>
 
+                      {/* ✅ REPLACE THIS with the smaller version */}
+                      <FaceRegisterButton
+                        employeeId={employee._id || employee.id || ''}
+                        employeeName={employee.name}
+                        currentEmbeddingDim={(employee as any).faceEmbeddings?.[0]?.length}
+                      />
+
                       <Button
                         size="sm"
                         variant="outline"
@@ -5088,7 +5137,6 @@ const leftEmployeesCount = statsData.left;
                         <History className="h-3 w-3" />
                         History
                       </Button>
-                      
                       <Button
                         size="sm"
                         variant="outline"
@@ -5099,7 +5147,7 @@ const leftEmployeesCount = statsData.left;
                         <Upload className="h-3 w-3" />
                         <span className="hidden sm:inline">Upload</span>
                       </Button>
-                      
+
                       <Button
                         size="sm"
                         variant="outline"
@@ -5109,7 +5157,7 @@ const leftEmployeesCount = statsData.left;
                         <Files className="h-3 w-3" />
                         Documents
                       </Button>
-                      
+
                       <Dialog>
                         <DialogTrigger asChild>
                           <Button size="sm" variant="outline" className="flex-1 sm:flex-none">
@@ -5135,7 +5183,7 @@ const leftEmployeesCount = statsData.left;
                               <div><strong>Site:</strong> {employee.siteName || "Not specified"}</div>
                               <div><strong>Join Date:</strong> {employee.joinDate}</div>
                               <div><strong>Salary:</strong> ₹{employee.salary.toLocaleString()}</div>
-                              <div><strong>Status:</strong> 
+                              <div><strong>Status:</strong>
                                 <Badge variant={getStatusColor(employee.status)} className="ml-2">
                                   {employee.status}
                                 </Badge>
@@ -5145,8 +5193,8 @@ const leftEmployeesCount = statsData.left;
                               <div>
                                 <strong>Employee Photo:</strong>
                                 <div className="mt-2">
-                                  <img 
-                                    src={getPhotoUrl(employee)} 
+                                  <img
+                                    src={getPhotoUrl(employee)}
                                     alt={employee.name}
                                     className="w-32 h-32 rounded-full object-cover border-4 border-gray-200"
                                     onError={(e) => {
@@ -5183,7 +5231,7 @@ const leftEmployeesCount = statsData.left;
                           </div>
                         </DialogContent>
                       </Dialog>
-                      
+
                       <Button
                         size="sm"
                         variant="outline"
@@ -5193,7 +5241,7 @@ const leftEmployeesCount = statsData.left;
                         <Eye className="h-3 w-3 mr-1" />
                         View ID
                       </Button>
-                      
+
                       <Button
                         size="sm"
                         variant="outline"
@@ -5213,7 +5261,7 @@ const leftEmployeesCount = statsData.left;
                         <FileText className="h-3 w-3 mr-1" />
                         EPF Form 11
                       </Button>
-                      
+
                       {employee.status !== "left" && (
                         <Button
                           size="sm"
@@ -5224,7 +5272,7 @@ const leftEmployeesCount = statsData.left;
                           Mark as Left
                         </Button>
                       )}
-                      
+
                       <Button
                         size="sm"
                         variant="destructive"
@@ -5242,11 +5290,11 @@ const leftEmployeesCount = statsData.left;
                   </div>
                 </div>
               ))}
-              
+
               {sortedEmployees.length === 0 && !loading && (
                 <div className="text-center py-8 text-muted-foreground">
-                  {searchTerm || selectedDepartment !== "all" || selectedSite !== "all" || selectedJoinDate ? 
-                    "No employees found matching your filters. Try clearing filters." : 
+                  {searchTerm || selectedDepartment !== "all" || selectedSite !== "all" || selectedJoinDate ?
+                    "No employees found matching your filters. Try clearing filters." :
                     "No employees found. Add your first employee above."}
                 </div>
               )}
@@ -5254,94 +5302,94 @@ const leftEmployeesCount = statsData.left;
           )}
 
           {/* Pagination */}
-         {/* ─── Pagination ────────────────────────────────────────────────────────── */}
-{sortedEmployees.length > 0 && (
-  <div className="border-t pt-4 mt-4">
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-      <div className="text-sm text-muted-foreground">
-        Showing {Math.min((employeesPage - 1) * employeesItemsPerPage + 1, totalEmployees)} to{" "}
-        {Math.min(employeesPage * employeesItemsPerPage, totalEmployees)} of {totalEmployees} employees
-      </div>
-      
-      <div className="flex flex-wrap items-center gap-4">
-        {/* Items per page selector - only show if total > min */}
-        {totalEmployees > 10 && (
-          <div className="flex items-center gap-2">
-            <Label htmlFor="itemsPerPage" className="text-sm whitespace-nowrap">
-              Show:
-            </Label>
-            <Select
-              value={String(employeesItemsPerPage)}
-              onValueChange={(value) => {
-                const newSize = parseInt(value);
-                setEmployeesItemsPerPage(newSize);
-                setEmployeesPage(1); // Reset to first page
-              }}
-            >
-              <SelectTrigger id="itemsPerPage" className="w-20 h-8">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="25">25</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-                <SelectItem value="100">100</SelectItem>
-                <SelectItem value="999999">All</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+          {/* ─── Pagination ────────────────────────────────────────────────────────── */}
+          {sortedEmployees.length > 0 && (
+            <div className="border-t pt-4 mt-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="text-sm text-muted-foreground">
+                  Showing {Math.min((employeesPage - 1) * employeesItemsPerPage + 1, totalEmployees)} to{" "}
+                  {Math.min(employeesPage * employeesItemsPerPage, totalEmployees)} of {totalEmployees} employees
+                </div>
 
-        {/* Pagination controls - only show if more than one page */}
-        {totalEmployees > employeesItemsPerPage && (
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setEmployeesPage(1)}
-              disabled={employeesPage === 1}
-              className="h-8 w-8 p-0"
-            >
-              «
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setEmployeesPage(p => Math.max(1, p - 1))}
-              disabled={employeesPage === 1}
-              className="h-8 w-8 p-0"
-            >
-              ‹
-            </Button>
-            
-            <span className="px-2 text-sm">
-              {employeesPage} / {Math.ceil(totalEmployees / employeesItemsPerPage)}
-            </span>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setEmployeesPage(p => Math.min(Math.ceil(totalEmployees / employeesItemsPerPage), p + 1))}
-              disabled={employeesPage === Math.ceil(totalEmployees / employeesItemsPerPage)}
-              className="h-8 w-8 p-0"
-            >
-              ›
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setEmployeesPage(Math.ceil(totalEmployees / employeesItemsPerPage))}
-              disabled={employeesPage === Math.ceil(totalEmployees / employeesItemsPerPage)}
-              className="h-8 w-8 p-0"
-            >
-              »
-            </Button>
-          </div>
-        )}
-      </div>
-    </div>
-  </div>
-)}
+                <div className="flex flex-wrap items-center gap-4">
+                  {/* Items per page selector - only show if total > min */}
+                  {totalEmployees > 10 && (
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="itemsPerPage" className="text-sm whitespace-nowrap">
+                        Show:
+                      </Label>
+                      <Select
+                        value={String(employeesItemsPerPage)}
+                        onValueChange={(value) => {
+                          const newSize = parseInt(value);
+                          setEmployeesItemsPerPage(newSize);
+                          setEmployeesPage(1); // Reset to first page
+                        }}
+                      >
+                        <SelectTrigger id="itemsPerPage" className="w-20 h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="25">25</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                          <SelectItem value="999999">All</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Pagination controls - only show if more than one page */}
+                  {totalEmployees > employeesItemsPerPage && (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEmployeesPage(1)}
+                        disabled={employeesPage === 1}
+                        className="h-8 w-8 p-0"
+                      >
+                        «
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEmployeesPage(p => Math.max(1, p - 1))}
+                        disabled={employeesPage === 1}
+                        className="h-8 w-8 p-0"
+                      >
+                        ‹
+                      </Button>
+
+                      <span className="px-2 text-sm">
+                        {employeesPage} / {Math.ceil(totalEmployees / employeesItemsPerPage)}
+                      </span>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEmployeesPage(p => Math.min(Math.ceil(totalEmployees / employeesItemsPerPage), p + 1))}
+                        disabled={employeesPage === Math.ceil(totalEmployees / employeesItemsPerPage)}
+                        className="h-8 w-8 p-0"
+                      >
+                        ›
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEmployeesPage(Math.ceil(totalEmployees / employeesItemsPerPage))}
+                        disabled={employeesPage === Math.ceil(totalEmployees / employeesItemsPerPage)}
+                        className="h-8 w-8 p-0"
+                      >
+                        »
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -5354,7 +5402,7 @@ const leftEmployeesCount = statsData.left;
               Assign Site to Multiple Employees
             </DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Selected Employees</Label>
@@ -5397,8 +5445,8 @@ const leftEmployeesCount = statsData.left;
                           <div className="flex flex-col items-start">
                             <span>{status.siteName}</span>
                             <span className="text-xs text-muted-foreground">
-                              Managers: {status.managerCount}/{status.managerRequirement} | 
-                              Supervisors: {status.supervisorCount}/{status.supervisorRequirement} | 
+                              Managers: {status.managerCount}/{status.managerRequirement} |
+                              Supervisors: {status.supervisorCount}/{status.supervisorRequirement} |
                               Staff: {status.staffCount}/{status.staffRequirement}
                             </span>
                           </div>
@@ -5431,7 +5479,7 @@ const leftEmployeesCount = statsData.left;
                     </span>
                     <span className={siteDeploymentStatus.get(selectedSiteForBulk)?.isManagerFull ? 'text-red-600 font-bold' : 'text-green-600'}>
                       {siteDeploymentStatus.get(selectedSiteForBulk)?.managerCount} / {siteDeploymentStatus.get(selectedSiteForBulk)?.managerRequirement}
-                      {siteDeploymentStatus.get(selectedSiteForBulk)?.remainingManagers > 0 && 
+                      {siteDeploymentStatus.get(selectedSiteForBulk)?.remainingManagers > 0 &&
                         ` (${siteDeploymentStatus.get(selectedSiteForBulk)?.remainingManagers} left)`
                       }
                     </span>
@@ -5443,7 +5491,7 @@ const leftEmployeesCount = statsData.left;
                     </span>
                     <span className={siteDeploymentStatus.get(selectedSiteForBulk)?.isSupervisorFull ? 'text-red-600 font-bold' : 'text-green-600'}>
                       {siteDeploymentStatus.get(selectedSiteForBulk)?.supervisorCount} / {siteDeploymentStatus.get(selectedSiteForBulk)?.supervisorRequirement}
-                      {siteDeploymentStatus.get(selectedSiteForBulk)?.remainingSupervisors > 0 && 
+                      {siteDeploymentStatus.get(selectedSiteForBulk)?.remainingSupervisors > 0 &&
                         ` (${siteDeploymentStatus.get(selectedSiteForBulk)?.remainingSupervisors} left)`
                       }
                     </span>
@@ -5455,7 +5503,7 @@ const leftEmployeesCount = statsData.left;
                     </span>
                     <span className={siteDeploymentStatus.get(selectedSiteForBulk)?.isStaffFull ? 'text-red-600 font-bold' : 'text-green-600'}>
                       {siteDeploymentStatus.get(selectedSiteForBulk)?.staffCount} / {siteDeploymentStatus.get(selectedSiteForBulk)?.staffRequirement}
-                      {siteDeploymentStatus.get(selectedSiteForBulk)?.remainingStaff > 0 && 
+                      {siteDeploymentStatus.get(selectedSiteForBulk)?.remainingStaff > 0 &&
                         ` (${siteDeploymentStatus.get(selectedSiteForBulk)?.remainingStaff} left)`
                       }
                     </span>
@@ -5468,7 +5516,7 @@ const leftEmployeesCount = statsData.left;
               <Button variant="outline" onClick={() => setBulkSiteDialogOpen(false)} className="w-full sm:w-auto">
                 Cancel
               </Button>
-              <Button 
+              <Button
                 onClick={handleBulkSiteAssignment}
                 disabled={isBulkUpdating || !selectedSiteForBulk || allSiteNames.length === 0}
                 className="w-full sm:w-auto"
@@ -5499,11 +5547,11 @@ const leftEmployeesCount = statsData.left;
               Confirm Bulk Deletion
             </DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <p className="text-sm text-red-800">
-                You are about to delete <strong>{selectedEmployees.length} employee{selectedEmployees.length !== 1 ? 's' : ''}</strong>. 
+                You are about to delete <strong>{selectedEmployees.length} employee{selectedEmployees.length !== 1 ? 's' : ''}</strong>.
                 This action cannot be undone.
               </p>
             </div>
@@ -5530,7 +5578,7 @@ const leftEmployeesCount = statsData.left;
               <Button variant="outline" onClick={() => setBulkDeleteDialogOpen(false)} className="w-full sm:w-auto">
                 Cancel
               </Button>
-              <Button 
+              <Button
                 variant="destructive"
                 onClick={handleBulkDelete}
                 disabled={isBulkDeleting}
