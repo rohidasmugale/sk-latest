@@ -708,7 +708,7 @@ const markAttendanceInBackend = async (employeeId: string, employeeName: string,
     formData.append('photo', photoFile);
     
     // ✅ Increase timeout and add retry logic
-    await axios.post(`${API_URL}/attendance/checkin-photo`, formData, {
+    await axios.post(`${API_URL}/attendance/checkin-with-photo`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 15000  // Increased from 5000
     });
@@ -848,7 +848,8 @@ const handlePhotoCapture = async (photoFile: File) => {
       console.warn('Could not get location:', locError);
     }
     
-    const endpoint = isCheckIn ? '/attendance/checkin-photo' : '/attendance/checkout-photo';
+   // ✅ NEW CODE (CORRECT)
+const endpoint = isCheckIn ? '/attendance/checkin-with-photo' : '/attendance/checkout-with-photo';
     
     const response = await axios.post(`${API_URL}${endpoint}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
