@@ -27,7 +27,7 @@ export interface CreateUserData {
   username?: string;
   email: string;
   password: string;
-  role: 'superadmin' | 'admin' | 'manager' | 'supervisor' | 'employee';
+  role: UserRole; 
   firstName?: string;
   lastName?: string;
   department?: string;

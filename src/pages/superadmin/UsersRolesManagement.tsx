@@ -1956,6 +1956,7 @@ interface FormUserData {
   username?: string;
   firstName?: string;
   lastName?: string;
+   photoFile?: File | null;  // ✅ Add this if not present
 }
 
 const departments = ['Housekeeping', 'Security', 'Parking', 'Waste Management', 'Others'];
@@ -2095,11 +2096,15 @@ const UserForm = ({
     return () => stopCamera();
   }, []);
 // Inside UserForm component, after the stopCamera cleanup useEffect
+// In UserForm component, update the useEffect:
+// In UserForm component, update the useEffect:
 useEffect(() => {
-  if (user?.photo) {
-    setPhotoPreview(user.photo);
+  if (user && 'photo' in user && user.photo) {
+    // ✅ Cast photo to string since it's a URL
+    setPhotoPreview(user.photo as string);
   }
 }, [user]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit({ ...formData, photoFile });
@@ -2385,6 +2390,7 @@ const UserList = ({
   roleFilter: UserRole[];
   description: string;
   refreshTrigger: number;
+   autoOpen?: boolean;  // ✅ Add this
 }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2442,37 +2448,52 @@ useEffect(() => {
     return matchesSearch && matchesFilter;
   });
 
-  const handleAddUser = async (formData: FormUserData) => {
-    try {
-      const [firstName, ...lastNameParts] = formData.name.split(' ');
-      const lastName = lastNameParts.join(' ');
-      
-      const userData: CreateUserData = {
-        username: formData.email.split('@')[0],
-        email: formData.email,
-        password: formData.password,
-        role: formData.role,
-        firstName,
-        lastName,
-        department: formData.department,
-        phone: formData.phone,
-        joinDate: formatDateForAPI(formData.joinDate)
-      };
+const handleAddUser = async (formData: FormUserData) => {
+  try {
+    const [firstName, ...lastNameParts] = formData.name.split(' ');
+    const lastName = lastNameParts.join(' ');
+    
+    // ✅ Fix: Use the correct type
+    const userData: CreateUserData = {
+      username: formData.email.split('@')[0],
+      email: formData.email,
+      password: formData.password,
+      role: formData.role as 'admin' | 'manager' | 'supervisor' | 'employee' | 'superadmin',
+      firstName,
+      lastName,
+      department: formData.department,
+      phone: formData.phone,
+      joinDate: formatDateForAPI(formData.joinDate),
+      site: formData.department || '', // ✅ Add site property
+    };
 
-      const newUser = await userService.createUser(userData);
-      setUsers(prev => [newUser, ...prev]);
-      toast.success(`${title.slice(0, -1)} added successfully`, {
-        icon: <CheckCircle className="h-5 w-5 text-green-500" />
-      });
-      setDialogOpen(false);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to add user');
+    const newUser = await userService.createUser(userData);
+    setUsers(prev => [...prev, newUser as User]);
+    
+    // ✅ Register face if photo was taken
+    if (formData.photoFile && newUser._id) {
+      try {
+        const faceFormData = new FormData();
+        faceFormData.append("photo", formData.photoFile);
+        await axios.post(`${API_URL}/attendance/register-face/${newUser._id}`, faceFormData);
+        toast.success(`Face registered for ${newUser.name}`);
+      } catch (faceError) {
+        console.error('Face registration failed:', faceError);
+        toast.warning(`User created but face registration failed. They can register later.`);
+      }
     }
-  };
+    
+    toast.success(`${title.slice(0, -1)} added successfully`, {
+      icon: <CheckCircle className="h-5 w-5 text-green-500" />
+    });
+    setDialogOpen(false);
+  } catch (error: any) {
+    toast.error(error.response?.data?.message || 'Failed to add user');
+  }
+};
 
  const handleEditUser = async (formData: FormUserData, userId: string) => {
   try {
-    // Build FormData to handle file upload
     const updateData = new FormData();
     updateData.append('name', formData.name);
     updateData.append('email', formData.email);
@@ -2482,15 +2503,25 @@ useEffect(() => {
     updateData.append('isActive', String(formData.status === 'active'));
     updateData.append('joinDate', formatDateForAPI(formData.joinDate));
 
-    // If a new photo file was selected, append it
     if (formData.photoFile) {
       updateData.append('profilePhoto', formData.photoFile);
     }
 
-    // Call the service method that sends FormData
     const updatedUser = await userService.updateUserWithPhoto(userId, updateData);
 
-    // Update local state
+    // ✅ If photo was updated, re-register face
+    if (formData.photoFile) {
+      try {
+        const faceFormData = new FormData();
+        faceFormData.append("photo", formData.photoFile);
+        await axios.post(`${API_URL}/attendance/register-face/${userId}`, faceFormData);
+        toast.success(`Face updated for ${updatedUser.name}`);
+      } catch (faceError) {
+        console.error('Face update failed:', faceError);
+        toast.warning('User updated but face registration failed.');
+      }
+    }
+
     setUsers(prev => prev.map(user =>
       user._id === userId ? { ...user, ...updatedUser, status: updatedUser.isActive ? 'active' : 'inactive' } : user
     ));
@@ -2501,7 +2532,6 @@ useEffect(() => {
     toast.error(error.response?.data?.message || 'Failed to update user');
   }
 };
-
   const handleDeleteUser = async (userId: string) => {
     try {
       await userService.deleteUser(userId);
@@ -2978,24 +3008,12 @@ useEffect(() => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <DashboardHeader 
-          title={
-            <div className="flex items-center gap-2 md:gap-3">
-              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent text-sm md:text-base lg:text-lg">
-                Users & Roles Management
-              </span>
-              <motion.div
-                animate={{ rotate: [0, 360] }}
-                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                className="text-blue-400"
-              >
-                <Sparkles className="h-4 w-4 md:h-5 md:w-5" />
-              </motion.div>
-            </div>
-          }
-          subtitle="Manage your team with precision and elegance"
-          onMenuClick={handleMenuClick}
-        />
+      
+<DashboardHeader 
+  title="Users & Roles Management"  // ✅ Use a string, not JSX
+  subtitle="Manage your team with precision and elegance"
+  onMenuClick={handleMenuClick}
+/>
       </motion.div>
       
       {mobileSidebarOpen && (

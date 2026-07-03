@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { UnifiedCreateModal } from "@/components/shared/UnifiedCreateModal";
 import CameraCapture from "../supervisor/CameraCapture";
+import { getLocation } from "@/utils/geo";
 import {
   PieChart as PieChartIcon,
   ChevronLeft,
