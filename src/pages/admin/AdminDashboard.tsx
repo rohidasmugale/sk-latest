@@ -71,7 +71,7 @@ import axios from 'axios';
 
 // Import site service
 import { siteService, Site } from "@/services/SiteService";
-
+import { PullToRefreshWrapper } from '@/components/shared/PullToRefreshWrapper';
 
 interface Employee {
   _id: string;
@@ -1533,7 +1533,21 @@ const fetchRealPayroll = async () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-gray-50/50">
+    <PullToRefreshWrapper
+    pageName="Admin Dashboard"
+    onRefresh={async () => {
+      // Refresh all data
+      await Promise.all([
+        loadAttendanceData(true),
+        loadSites(),
+        fetchEmployeesData(),
+        fetchRealPayroll(),
+        loadMyAttendanceStatus()
+      ]);
+    }}
+    className="min-h-screen bg-gradient-to-b from-background to-gray-50/50 relative overflow-y-auto"
+  >
+   
       <DashboardHeader
         title={
           <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent text-base sm:text-lg">
@@ -1971,7 +1985,8 @@ const fetchRealPayroll = async () => {
     </DialogFooter>
   </DialogContent>
 </Dialog>
-    </div>
+    
+    </PullToRefreshWrapper>
   );
 };
 

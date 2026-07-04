@@ -72,11 +72,13 @@ interface SiteStaffCounts {
 interface AssignTaskWithDerivedStatus extends AssignTask {
   derivedStatus?: 'pending' | 'in-progress' | 'completed' | 'cancelled';
 }
-
+interface AssignTaskPageProps {
+  refreshTrigger?: number;
+}
 const API_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
-const AssignTaskPage: React.FC = () => {
+const AssignTaskPage: React.FC<AssignTaskPageProps> = ({ refreshTrigger = 0 }) => {
   const [showPopup, setShowPopup] = useState(false);
   const [tasks, setTasks] = useState<AssignTaskWithDerivedStatus[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -101,7 +103,33 @@ const AssignTaskPage: React.FC = () => {
   }>({ managers: [], supervisors: [] });
   
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
-
+useEffect(() => {
+    if (refreshTrigger > 0) {
+      fetchTasks();
+    }
+  }, [refreshTrigger]);
+   useEffect(() => {
+    const handleRefresh = (event: CustomEvent) => {
+      if (event.detail?.tasks) {
+        const fetchedTasks = event.detail.tasks;
+        // Calculate derived status for each task
+        const tasksWithDerivedStatus = fetchedTasks.map((task: AssignTask) => {
+          const derivedStatus = calculateTaskStatusFromAssignments(task);
+          return {
+            ...task,
+            derivedStatus
+          };
+        });
+        setTasks(tasksWithDerivedStatus);
+        toast.success('Tasks updated');
+      } else {
+        // If no data provided, fetch fresh
+        fetchTasks();
+      }
+    };
+     window.addEventListener('refreshOperations', handleRefresh as EventListener);
+    return () => window.removeEventListener('refreshOperations', handleRefresh as EventListener);
+  }, []);
   // Fetch tasks on mount
   useEffect(() => {
     fetchTasks();

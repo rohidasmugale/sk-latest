@@ -10,7 +10,7 @@ import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { UnifiedCreateModal } from "@/components/shared/UnifiedCreateModal";
-
+import { PullToRefreshWrapper } from '@/components/shared/PullToRefreshWrapper';
 import {
   PieChart as PieChartIcon,
   ChevronLeft,
@@ -148,7 +148,7 @@ interface SalaryStructure {
 }
 
 // API URL
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 // Chart color constants
 const CHART_COLORS = {
@@ -318,20 +318,20 @@ const fetchEmployeesAssignedToSites = async (): Promise<{ employees: Employee[],
 
       if (hasValidSite || hasValidAssignedSites) {
         const employeeSite = hasValidSite ? siteName : (assignedSites.find((site: string) => validSiteNames.has(site)) || 'Unknown Site');
-const employee: Employee = {
-  _id: emp._id || emp.id,
-  employeeId: emp.employeeId || emp.employeeID || `EMP${String(Math.random()).slice(2, 6)}`,
-  name: emp.name || emp.employeeName || "Unknown Employee",
-  email: emp.email || "",
-  phone: emp.phone || emp.mobile || "",
-  aadharNumber: emp.aadharNumber || "",
-  department: emp.department || "Unknown Department",
-  position: emp.position || emp.designation || emp.role || "Employee",
-  site: employeeSite,
-  siteName: employeeSite,
-  assignedSites: assignedSites || [],
-  salary: emp.salary || 0,
-  status: emp.status || "active",
+        const employee: Employee = {
+          _id: emp._id || emp.id,
+          employeeId: emp.employeeId || emp.employeeID || `EMP${String(Math.random()).slice(2, 6)}`,
+          name: emp.name || emp.employeeName || "Unknown Employee",
+          email: emp.email || "",
+          phone: emp.phone || emp.mobile || "",
+          aadharNumber: emp.aadharNumber || "",
+          department: emp.department || "Unknown Department",
+          position: emp.position || emp.designation || emp.role || "Employee",
+          site: employeeSite,
+          siteName: employeeSite,
+          assignedSites: assignedSites || [],
+          salary: emp.salary || 0,
+          status: emp.status || "active",
           isManager: (emp.position?.toLowerCase() || '').includes('manager') || (emp.department?.toLowerCase() || '').includes('manager'),
           isSupervisor: (emp.position?.toLowerCase() || '').includes('supervisor') || (emp.department?.toLowerCase() || '').includes('supervisor')
         };
@@ -374,8 +374,8 @@ const fetchAttendanceData = async (days: number = 30): Promise<DailyAttendanceSu
     const employeesWithCounts = await fetchEmployeesAssignedToSites();
     const siteAssignedEmployees = employeesWithCounts.employees;
 
-   const staffEmployees = siteAssignedEmployees; // include everyone
-const totalStaffAssignedToSites = staffEmployees.length;
+    const staffEmployees = siteAssignedEmployees; // include everyone
+    const totalStaffAssignedToSites = staffEmployees.length;
 
     // Build lookup: MongoDB _id → employee (for matching attendance records)
     const staffById = new Map<string, Employee>();
@@ -383,18 +383,18 @@ const totalStaffAssignedToSites = staffEmployees.length;
       if (emp._id) staffById.set(emp._id, emp);
       if (emp.id) staffById.set(emp.id, emp);
     });
-// Also build lookup by name (fallback)
-const staffByName = new Map<string, Employee>();
-staffEmployees.forEach(emp => {
-  if (emp.name) staffByName.set(emp.name, emp);
-});
+    // Also build lookup by name (fallback)
+    const staffByName = new Map<string, Employee>();
+    staffEmployees.forEach(emp => {
+      if (emp.name) staffByName.set(emp.name, emp);
+    });
     // Build employee ID → siteName map for backfilling missing siteName on records
-   // Build employee ID → siteName map from ALL employees (not just staff)
-const empIdToSite = new Map<string, string>();
-siteAssignedEmployees.forEach(emp => {
-  const mongoId = emp._id || emp.id;
-  if (mongoId) empIdToSite.set(mongoId, emp.site || emp.siteName || '');
-});
+    // Build employee ID → siteName map from ALL employees (not just staff)
+    const empIdToSite = new Map<string, string>();
+    siteAssignedEmployees.forEach(emp => {
+      const mongoId = emp._id || emp.id;
+      if (mongoId) empIdToSite.set(mongoId, emp.site || emp.siteName || '');
+    });
 
     // Fetch attendance records
     let allRecords: AttendanceRecord[] = [];
@@ -431,9 +431,9 @@ siteAssignedEmployees.forEach(emp => {
 
     // Keep only staff records
     const staffRecords = allRecords.filter(r =>
-  staffById.has(r.employeeId) ||
-  (r.employeeName && staffByName.has(r.employeeName))
-);
+      staffById.has(r.employeeId) ||
+      (r.employeeName && staffByName.has(r.employeeName))
+    );
 
     // Build per-site staff counts
     const staffSiteCounts: { [site: string]: number } = {};
@@ -452,7 +452,7 @@ siteAssignedEmployees.forEach(emp => {
         date: dateStr,
         day: dateStr === formatDate(new Date()) ? 'Today'
           : dateStr === formatDate(new Date(Date.now() - 86400000)) ? 'Yesterday'
-          : dayName,
+            : dayName,
         present: 0, absent: 0, weeklyOff: 0, leave: 0,
         total: 0, rate: '0.0%', index: 0,
         totalEmployees: totalStaffAssignedToSites,
@@ -996,8 +996,8 @@ const SuperAdminDashboard = () => {
   const [sixDaysStartIndex, setSixDaysStartIndex] = useState(1);
   const [selectedYear, setSelectedYear] = useState('2024');
   const [selectedMonth, setSelectedMonth] = useState('01');
- const [payrollData, setPayrollData] = useState<any[]>([]);
-const [loadingPayroll, setLoadingPayroll] = useState(false);
+  const [payrollData, setPayrollData] = useState<any[]>([]);
+  const [loadingPayroll, setLoadingPayroll] = useState(false);
   const [payrollTab, setPayrollTab] = useState('list-view');
   const [selectedSite, setSelectedSite] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -1016,12 +1016,12 @@ const [loadingPayroll, setLoadingPayroll] = useState(false);
   };
 
   useEffect(() => {
-  const interval = setInterval(() => {
-    loadAttendanceData(); // refresh without showing toast
-  }, 300000); // every 30 seconds
+    const interval = setInterval(() => {
+      loadAttendanceData(); // refresh without showing toast
+    }, 300000); // every 30 seconds
 
-  return () => clearInterval(interval);
-}, []);
+    return () => clearInterval(interval);
+  }, []);
   useEffect(() => {
     fetchEmployeesData();
   }, []);
@@ -1087,43 +1087,43 @@ const [loadingPayroll, setLoadingPayroll] = useState(false);
       setRefreshingAttendance(false);
     }
   };
-const fetchRealPayroll = async () => {
-  try {
-    setLoadingPayroll(true);
-    // Format month as YYYY-MM (e.g., "2024-01")
-    const monthStr = `${selectedYear}-${selectedMonth}`;
-    
-    const response = await axios.get(`${API_URL}/payroll`, {
-      params: { month: monthStr, limit: 1000 }
-    });
+  const fetchRealPayroll = async () => {
+    try {
+      setLoadingPayroll(true);
+      // Format month as YYYY-MM (e.g., "2024-01")
+      const monthStr = `${selectedYear}-${selectedMonth}`;
 
-    let records = response.data?.data || response.data || [];
-    if (!Array.isArray(records)) records = [];
+      const response = await axios.get(`${API_URL}/payroll`, {
+        params: { month: monthStr, limit: 1000 }
+      });
 
-    // Transform to match the UI table structure
-    const transformed = records.map((p: any) => ({
-      id: p._id,
-      // If your payroll records contain employeeName, use it; otherwise fallback to employeeId
-      siteName: p.employeeName || p.employeeId || 'Unknown Employee',
-      billingAmount: p.netSalary || 0,
-      totalPaid: p.paymentStatus === 'paid' ? p.netSalary : 0,
-      holdSalary: p.paymentStatus === 'hold' ? p.netSalary : 0,
-      status: p.paymentStatus === 'paid' ? 'Paid' : p.paymentStatus === 'hold' ? 'Hold' : 'Pending',
-      remark: p.notes || 'Processed',
-      // Keep original data if needed
-      ...p
-    }));
+      let records = response.data?.data || response.data || [];
+      if (!Array.isArray(records)) records = [];
 
-    setPayrollData(transformed);
-  } catch (error) {
-    console.error('Failed to fetch payroll:', error);
-    toast.error('Could not load payroll data');
-    // Optionally keep demo data as fallback (comment out if you prefer empty)
-    setPayrollData(generatePayrollData());
-  } finally {
-    setLoadingPayroll(false);
-  }
-};
+      // Transform to match the UI table structure
+      const transformed = records.map((p: any) => ({
+        id: p._id,
+        // If your payroll records contain employeeName, use it; otherwise fallback to employeeId
+        siteName: p.employeeName || p.employeeId || 'Unknown Employee',
+        billingAmount: p.netSalary || 0,
+        totalPaid: p.paymentStatus === 'paid' ? p.netSalary : 0,
+        holdSalary: p.paymentStatus === 'hold' ? p.netSalary : 0,
+        status: p.paymentStatus === 'paid' ? 'Paid' : p.paymentStatus === 'hold' ? 'Hold' : 'Pending',
+        remark: p.notes || 'Processed',
+        // Keep original data if needed
+        ...p
+      }));
+
+      setPayrollData(transformed);
+    } catch (error) {
+      console.error('Failed to fetch payroll:', error);
+      toast.error('Could not load payroll data');
+      // Optionally keep demo data as fallback (comment out if you prefer empty)
+      setPayrollData(generatePayrollData());
+    } finally {
+      setLoadingPayroll(false);
+    }
+  };
   // Handle refresh
   const handleRefreshAttendance = () => {
     loadAttendanceData(true);
@@ -1171,13 +1171,13 @@ const fetchRealPayroll = async () => {
   ].filter(item => item.value > 0);
 
   const payrollSummary = useMemo(() => {
-  const totalBilling = payrollData.reduce((sum, item) => sum + (item.billingAmount || 0), 0);
-  const totalPaid = payrollData.reduce((sum, item) => sum + (item.totalPaid || 0), 0);
-  const totalHold = payrollData.reduce((sum, item) => sum + (item.holdSalary || 0), 0);
-  const totalDifference = payrollData.reduce((sum, item) => sum + (item.billingAmount - item.totalPaid + item.holdSalary), 0);
+    const totalBilling = payrollData.reduce((sum, item) => sum + (item.billingAmount || 0), 0);
+    const totalPaid = payrollData.reduce((sum, item) => sum + (item.totalPaid || 0), 0);
+    const totalHold = payrollData.reduce((sum, item) => sum + (item.holdSalary || 0), 0);
+    const totalDifference = payrollData.reduce((sum, item) => sum + (item.billingAmount - item.totalPaid + item.holdSalary), 0);
 
-  return { totalBilling, totalPaid, totalHold, totalDifference, completionRate: '0.0' };
-}, [payrollData]);
+    return { totalBilling, totalPaid, totalHold, totalDifference, completionRate: '0.0' };
+  }, [payrollData]);
 
   // Filtered payroll data
   const filteredPayrollData = useMemo(() => {
@@ -1244,17 +1244,17 @@ const fetchRealPayroll = async () => {
     return `${formatDate(firstDate)} - ${formatDate(lastDate)}`;
   };
 
- const handlePayrollFilterChange = () => {
-  fetchRealPayroll();
-  setCurrentPage(1);
-  toast.success(`Payroll data updated for ${months.find(m => m.value === selectedMonth)?.label} ${selectedYear}`);
-};
+  const handlePayrollFilterChange = () => {
+    fetchRealPayroll();
+    setCurrentPage(1);
+    toast.success(`Payroll data updated for ${months.find(m => m.value === selectedMonth)?.label} ${selectedYear}`);
+  };
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
-useEffect(() => {
-  fetchRealPayroll();
-}, [selectedYear, selectedMonth]);
+  useEffect(() => {
+    fetchRealPayroll();
+  }, [selectedYear, selectedMonth]);
   const handleExportToExcel = () => {
     const monthName = months.find(m => m.value === selectedMonth)?.label;
     const filename = `Payroll_Data_${monthName}_${selectedYear}.csv`;
@@ -1327,13 +1327,31 @@ useEffect(() => {
   const calculateDifference = (item: any) => {
     return item.billingAmount - item.totalPaid + item.holdSalary;
   };
-
+  // Refresh all data function
+  const refreshAllData = async () => {
+    try {
+      await Promise.all([
+        loadAttendanceData(true),
+        loadSites(),
+        fetchEmployeesData(),
+        fetchRealPayroll()
+      ]);
+      toast.success('Dashboard refreshed successfully');
+    } catch (error) {
+      toast.error('Failed to refresh dashboard');
+    }
+  };
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-gray-50/50">
+    <PullToRefreshWrapper
+      pageName="Super Admin Dashboard"
+      onRefresh={refreshAllData}
+      className="min-h-screen bg-gradient-to-b from-background to-gray-50/50 relative overflow-y-auto"
+    >
+
       <DashboardHeader
         title=" Super Admin Dashboard"
-         
-        
+
+
         onMenuClick={onMenuClick}
       />
 
@@ -1584,7 +1602,7 @@ useEffect(() => {
             </CardContent>
           </Card>
         </motion.div>
-                {/* Payroll Section */}
+        {/* Payroll Section */}
         <Card className="shadow-lg">
           <CardHeader className="px-3 sm:px-4 py-3 bg-gradient-to-r from-blue-50 to-blue-100/30 rounded-t-lg">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1613,7 +1631,7 @@ useEffect(() => {
                 <Button onClick={handlePayrollFilterChange} className="w-full bg-blue-600 hover:bg-blue-700 h-8 text-sm"><Filter className="h-3 w-3 mr-1" />Apply</Button>
               </div>
             </div>
-            
+
             {/* Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
               <MobileStatCard title="Total Billing" value={formatCurrency(payrollSummary.totalBilling)} icon={DollarSign} color="primary" />
@@ -1621,19 +1639,21 @@ useEffect(() => {
               <MobileStatCard title="Hold Salary" value={formatCurrency(payrollSummary.totalHold)} icon={Clock} color="warning" />
               <MobileStatCard title="Difference" value={formatCurrency(payrollSummary.totalDifference)} icon={AlertCircle} color="danger" />
             </div>
-            
+
             {/* Tab Switcher */}
             <div className="flex gap-4 mb-4 border-b">
               <button className={`py-1.5 text-sm font-medium border-b-2 transition-all ${payrollTab === 'list-view' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'}`} onClick={() => setPayrollTab('list-view')}><List className="h-3 w-3 inline mr-1" />List</button>
               <button className={`py-1.5 text-sm font-medium border-b-2 transition-all ${payrollTab === 'pie-chart' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'}`} onClick={() => setPayrollTab('pie-chart')}><PieChart className="h-3 w-3 inline mr-1" />Chart</button>
             </div>
-            
+
             <AnimatePresence mode="wait">
               {payrollTab === 'list-view' ? (
                 <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                   <div className="flex flex-col sm:flex-row gap-2 mb-3">
                     <div className="relative flex-1"><Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-muted-foreground" /><Input placeholder="Search site..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="pl-7 h-8 text-sm" /></div>
-                    <Button onClick={() => exportToExcel(filteredPayrollData, filename)}><Download className="h-3 w-3 mr-1" />Export</Button>
+                    <Button onClick={handleExportToExcel} className="h-8 text-xs">
+                      <Download className="h-3 w-3 mr-1" />Export
+                    </Button>
                   </div>
                   <div className="hidden md:block overflow-x-auto rounded-lg border">
                     <table className="w-full text-sm">
@@ -1695,7 +1715,7 @@ useEffect(() => {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </PullToRefreshWrapper>
   );
 };
 

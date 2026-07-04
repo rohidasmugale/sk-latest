@@ -492,7 +492,8 @@ const [isAutoMode, setIsAutoMode] = useState(false); // <-- Add this
     productivity: 0,
     pendingRequests: 0
   });
-  
+  const recentMatchesRef = useRef<Map<string, number>>(new Map());
+const MATCH_COOLDOWN_MS = 12000; // 12 seconds
   const [activities, setActivities] = useState<Activity[]>([]);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [tasks, setTasks] = useState<TaskWithPersonalStatus[]>([]);
@@ -760,66 +761,62 @@ const handlePhotoCapture = async (photoFile: File) => {
   if (!cameraAction) return;
   
   // ✅ Auto face recognition mode (fast path)
-  if (cameraAction === 'recognize') {
-    const now = Date.now();
-    if (isProcessing || now - lastCaptureTime < 3000) {
-      return;
-    }
-
-    setIsProcessing(true);
-    setLastCaptureTime(now);
-
-    const formData = new FormData();
-    formData.append('file', photoFile);
-    formData.append('siteName', selectedSite || supervisorSites[0]?.name || '');
-
-    try {
-      console.log('📤 Sending match request to face service...');
-      
-      // ✅ Call the face service directly on port 8000
-      const response = await axios.post(`http://localhost:8000/match`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 10000
-      });
-
-      console.log('📥 Match response:', response.data);
-
-      if (response.data.success) {
-        const { employeeId, employeeName, confidence } = response.data.data;
-        setAttendanceResult(`✅ ${employeeName} (${Math.round(confidence * 100)}%)`);
-        toast.success(`${employeeName} marked present!`);
-        
-        // ✅ Mark attendance in the main backend
-       markAttendanceInBackend(employeeId, employeeName, photoFile);
-        
-        setTimeout(() => setAttendanceResult(null), 2500);
-        loadAttendanceRecords(selectedDate);
-      } else {
-        setAttendanceResult(`❌ ${response.data.message}`);
-        setTimeout(() => setAttendanceResult(null), 2000);
-      }
-    } catch (error: any) {
-      console.error('❌ Match error:', error);
-      
-      // ✅ Better error messages
-      if (error.response?.status === 404) {
-        setAttendanceResult('❌ Face service not found (port 8000)');
-        toast.error('Face service is not running on port 8000');
-      } else if (error.code === 'ECONNREFUSED') {
-        setAttendanceResult('❌ Cannot connect to face service');
-        toast.error('Face service is not running. Start with: python main.py');
-      } else if (error.response?.data?.message) {
-        setAttendanceResult(`❌ ${error.response.data.message}`);
-      } else {
-        setAttendanceResult(`❌ ${error.message || 'Unknown error'}`);
-      }
-      setTimeout(() => setAttendanceResult(null), 3000);
-    } finally {
-      setIsProcessing(false);
-    }
-    return; // ✅ Don't close camera
+if (cameraAction === 'recognize') {
+  const now = Date.now();
+  if (isProcessing || now - lastCaptureTime < 3000) {
+    return;
   }
 
+  setIsProcessing(true);
+  setLastCaptureTime(now);
+
+  const formData = new FormData();
+  formData.append('photo', photoFile);
+  formData.append('supervisorId', currentSupervisor.id);
+  formData.append('siteName', selectedSite || supervisorSites[0]?.name || '');
+
+  try {
+    console.log('📤 Sending to backend auto-attendance...');
+    const response = await axios.post(`${API_URL}/attendance/auto-attendance`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 15000
+    });
+
+    console.log('📥 Auto-attendance response:', response.data);
+
+    if (response.data.success) {
+      const { employeeName, action } = response.data.data;
+      const actionDisplay = action === 'checkin' ? 'checked in' : 'checked out';
+      setAttendanceResult(`✅ ${employeeName} ${actionDisplay}!`);
+      toast.success(`${employeeName} ${actionDisplay}!`);
+      
+      setTimeout(() => setAttendanceResult(null), 2500);
+      loadAttendanceRecords(selectedDate);
+    } else {
+      setAttendanceResult(`❌ ${response.data.message}`);
+      setTimeout(() => setAttendanceResult(null), 2000);
+    }
+  } catch (error: any) {
+    console.error('❌ Auto-attendance error:', error);
+    
+    // ✅ Better error messages
+    if (error.response?.status === 404) {
+      setAttendanceResult('❌ Auto-attendance endpoint not found');
+      toast.error('Backend attendance route not found');
+    } else if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
+      setAttendanceResult('❌ Cannot connect to backend');
+      toast.error('Backend server is not running');
+    } else if (error.response?.data?.message) {
+      setAttendanceResult(`❌ ${error.response.data.message}`);
+    } else {
+      setAttendanceResult(`❌ ${error.message || 'Unknown error'}`);
+    }
+    setTimeout(() => setAttendanceResult(null), 3000);
+  } finally {
+    setIsProcessing(false);
+  }
+  return; // ✅ Don't close camera
+}
   // ✅ Check-in / Check-out with photo
   setUploadingPhoto(true);
   try {

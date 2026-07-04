@@ -36,6 +36,9 @@ const StaffRoles = [
   "Waste Collector"
 ];
 
+interface SitesSectionProps {
+  refreshTrigger?: number;
+}
 // Unified Client Service to fetch from CRM
 class ClientService {
   async getAllClients(searchTerm?: string): Promise<Client[]> {
@@ -75,8 +78,7 @@ class ClientService {
     return this.getAllClients(query);
   }
 }
-
-const SitesSection = () => {
+const SitesSection = ({ refreshTrigger = 0 }: SitesSectionProps) =>  {
   const [sites, setSites] = useState<Site[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -110,7 +112,39 @@ const SitesSection = () => {
 
   // Initialize client service
   const clientService = new ClientService();
+useEffect(() => {
+    if (refreshTrigger > 0) {
+      fetchSites();
+      fetchStats();
+      fetchClients();
+    }
+  }, [refreshTrigger]);
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      fetchSites();
+      fetchStats();
+      fetchClients();
+    }
+  }, [refreshTrigger]);
 
+  // Add this useEffect to listen for custom events
+  useEffect(() => {
+    const handleRefresh = (event: CustomEvent) => {
+      if (event.detail?.sites) {
+        setSites(event.detail.sites);
+        toast.success('Sites updated');
+        fetchStats();
+      } else {
+        // If no data provided, fetch fresh
+        fetchSites();
+        fetchStats();
+        fetchClients();
+      }
+    };
+
+    window.addEventListener('refreshOperations', handleRefresh as EventListener);
+    return () => window.removeEventListener('refreshOperations', handleRefresh as EventListener);
+  }, []);
   // Fetch sites, stats, and clients on component mount
   useEffect(() => {
     fetchSites();

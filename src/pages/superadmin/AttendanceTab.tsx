@@ -61,7 +61,7 @@ import { toast } from "sonner";
 import { siteService, Site } from "@/services/SiteService";
 import axios from "axios";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-
+import { PullToRefreshWrapper } from '@/components/shared/PullToRefreshWrapper';
 // OR use toast directly (we'll use toast with long duration)
 // API URL
 const API_URL = import.meta.env.VITE_API_URL || 
@@ -3253,240 +3253,249 @@ const handleExportFullMonth = () => {
   fetchFullMonthData();
 };
 
-  return (
-    <div className="min-h-screen bg-background p-4 sm:p-6">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(-1)}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Back</span>
-            </Button>
-
-          </div>
-          <div className="flex items-center gap-4">
-
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                {viewType === 'department'
-                  ? `${selectedDepartment} Department Attendance`
-                  : 'Site-wise Attendance Overview'}
-              </h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefreshAll}
-              disabled={refreshing || loading}
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
-              All
-            </Button>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Loading indicator */}
-      {(refreshing || loading) && (
-        <div className="mb-6">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-center gap-3">
-                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-                <span className="text-sm text-muted-foreground">
-                  {refreshing
-                    ? 'Refreshing employee data...'
-                    : 'Loading data...'}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-      {/* Data Table – unchanged from your original */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-      >
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <CardTitle>
-                {viewType === 'department'
-                  ? `${selectedDepartment} Sites Attendance - Cumulative Totals (${daysInPeriod} days)`
-                  : `All Sites Attendance - Cumulative Totals (${daysInPeriod} days)`}
-              </CardTitle>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRefreshAll}
-                  disabled={refreshing || loading}
-                >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
-                  Data
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleExportToExcel}
-                  disabled={filteredData.length === 0}
-                >
-                  <Download className="h-4 w-4 mr-2" /> Export to Excel
-                </Button>
-                <Button 
-    variant="default" 
-    size="sm" 
-    onClick={handleExportFullMonth}
-    disabled={filteredData.length === 0}
-    className="flex items-center gap-2"
+return (
+  <PullToRefreshWrapper
+    pageName="Attendance View"
+    onRefresh={async () => {
+      try {
+        toast.loading('Refreshing all data...');
+        await fetchSitesData();
+        if (viewType === 'department') {
+          await loadDepartmentAttendance();
+        }
+        toast.dismiss();
+        toast.success('All data refreshed successfully');
+      } catch (error) {
+        toast.dismiss();
+        toast.error('Failed to refresh data');
+        console.error('Refresh error:', error);
+      }
+    }}
+    className="min-h-screen bg-background p-4 sm:p-6 relative overflow-y-auto"
   >
-    <FileSpreadsheet className="h-4 w-4" />
-    Export Full Month
-  </Button>
-              </div>
-            </div>
-          </CardHeader>
-         <CardContent>
-  {filteredData.length === 0 ? (
-    <div className="text-center py-12">
-      <Building className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-      <h3 className="text-lg font-medium text-gray-900 mb-2">No Sites Found</h3>
-      <p className="text-gray-500 mb-6">
-        {searchTerm
-          ? 'No sites match your search criteria. Try a different search term.'
-          : 'No sites available or all sites are filtered out.'}
-      </p>
-      {searchTerm && (
-        <Button variant="outline" onClick={() => setSearchTerm('')}>
-          Clear Search
-        </Button>
-      )}
-    </div>
-  ) : isMobileSiteView ? (
-    // ✅ Mobile Card View (like supervisor dashboard)
-    <div className="space-y-3">
-      {paginatedData.map((item, index) => {
-        const dailyRequirement = item.dailyRequirement || 0;
-        const totalRequired = item.totalRequiredForPeriod || item.durationTotalRequired || dailyRequirement * daysInPeriod;
-        const present = item.totalPresent || item.presentCount || 0;
-        const absent = (item.totalAbsent || 0) + (item.totalLeave || 0);
-        const rate = totalRequired > 0 ? ((present / totalRequired) * 100).toFixed(1) : '0.0';
-        const status = parseFloat(rate) >= 90 ? 'Excellent' : parseFloat(rate) >= 80 ? 'Good' : parseFloat(rate) >= 70 ? 'Average' : 'Poor';
-
-        return (
-          <Card key={item.siteId || item.id || index} className="p-3">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-semibold">{item.siteName || item.name}</h3>
-                <p className="text-xs text-muted-foreground">{item.daysInPeriod} {item.daysInPeriod === 1 ? 'day' : 'days'}</p>
-              </div>
-              <Badge variant={status === 'Excellent' ? 'default' : status === 'Good' ? 'secondary' : 'outline'}>{status}</Badge>
-            </div>
-            <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
-              <div><span className="text-muted-foreground">Daily Req:</span> <strong>{dailyRequirement}</strong></div>
-              <div><span className="text-muted-foreground">Total Required:</span> <strong>{totalRequired}</strong></div>
-              <div className="text-green-600"><span className="text-muted-foreground">Present:</span> <strong>{present}</strong></div>
-              <div className="text-red-600"><span className="text-muted-foreground">Absent:</span> <strong>{absent}</strong></div>
-              <div><span className="text-muted-foreground">Rate:</span> <strong>{rate}%</strong></div>
-            </div>
-            <div className="flex gap-2 mt-3">
-              <Button variant="outline" size="sm" onClick={() => handleViewDetails(item)}>
-                <Eye className="h-4 w-4 mr-1" /> Details
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => navigate(`/superadmin/machines/${encodeURIComponent(item.siteName || item.name)}`)}>
-                <Settings className="h-4 w-4 mr-1" /> Machines
-              </Button>
-            </div>
-          </Card>
-        );
-      })}
-    </div>
-  ) : (
-    // ✅ Desktop Table (unchanged)
-    <div className="rounded-md border">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Site Name</th>
-              <th className="h-12 px-4 text-left align-middle font-medium text-indigo-700 bg-indigo-50">Daily Req</th>
-              <th className="h-12 px-4 text-left align-middle font-medium text-blue-700 bg-blue-50">Total Required</th>
-              <th className="h-12 px-4 text-left align-middle font-medium text-green-700 bg-green-50">Present</th>
-               <th className="h-12 px-4 text-left align-middle font-medium text-purple-700 bg-purple-50">Weekly Off</th>
-              <th className="h-12 px-4 text-left align-middle font-medium text-red-700 bg-red-50">Absent</th>
-              <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Rate</th>
-              <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Status</th>
-              <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Attendance</th>
-              
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedData.map((item, index) => {
-              const dailyRequirement = item.dailyRequirement || 0;
-              const totalRequired = item.totalRequiredForPeriod || item.durationTotalRequired || dailyRequirement * daysInPeriod;
-              const present = item.totalPresent || item.presentCount || 0;
-              const absent = (item.totalAbsent || 0) + (item.totalLeave || 0);
-              const rate = totalRequired > 0 ? ((present / totalRequired) * 100).toFixed(1) : '0.0';
-              const status = parseFloat(rate) >= 90 ? 'Excellent' : parseFloat(rate) >= 80 ? 'Good' : parseFloat(rate) >= 70 ? 'Average' : 'Poor';
-
-              return (
-                <tr key={item.siteId || item.id || index} className="border-b hover:bg-muted/50">
-                  <td className="p-4 align-middle font-medium">
-                    <div className="font-medium text-sm">{item.siteName || item.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {item.daysInPeriod} {item.daysInPeriod === 1 ? 'day' : 'days'}
-                    </div>
-                  </td>
-                  <td className="p-4 align-middle font-bold text-indigo-700 bg-indigo-50">{dailyRequirement}</td>
-                  <td className="p-4 align-middle font-bold text-blue-700 bg-blue-50">{totalRequired}</td>
-                  <td className="p-4 align-middle font-bold text-green-700 bg-green-50">{present}</td>
-                  <td className="p-4 align-middle font-bold text-purple-700 bg-purple-50">
-  {item.totalWeeklyOff || item.weeklyOffCount || 0}
-</td>
-                  <td className="p-4 align-middle font-bold text-red-700 bg-red-50">{absent}</td>
-
-                  <td className="p-4 align-middle font-bold">{rate}%</td>
-                  <td className="p-4 align-middle">
-                    <Badge variant={status === 'Excellent' ? 'default' : status === 'Good' ? 'secondary' : status === 'Average' ? 'outline' : 'destructive'}>
-                      {status}
-                    </Badge>
-                  </td>
-                  <td className="p-4 align-middle">
-                    <Button variant="outline" size="sm" onClick={() => handleViewDetails(item)}>
-                      <Eye className="h-4 w-4 mr-1" /> Details
-                    </Button>
-                  </td>
-                 
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+    {/* Header */}
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mb-6"
+    >
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Back</span>
+          </Button>
+        </div>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {viewType === 'department'
+                ? `${selectedDepartment} Department Attendance`
+                : 'Site-wise Attendance Overview'}
+            </h1>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefreshAll}
+            disabled={refreshing || loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} /> Refresh All
+          </Button>
+        </div>
       </div>
-      {filteredData.length > 0 && <Pagination />}
-    </div>
-  )}
-</CardContent>
+    </motion.div>
+
+    {/* Loading indicator */}
+    {(refreshing || loading) && (
+      <div className="mb-6">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-center gap-3">
+              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+              <span className="text-sm text-muted-foreground">
+                {refreshing ? 'Refreshing employee data...' : 'Loading data...'}
+              </span>
+            </div>
+          </CardContent>
         </Card>
-      </motion.div>
+      </div>
+    )}
 
+    {/* Data Table */}
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.4 }}
+    >
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <CardTitle>
+              {viewType === 'department'
+                ? `${selectedDepartment} Sites Attendance - Cumulative Totals (${daysInPeriod} days)`
+                : `All Sites Attendance - Cumulative Totals (${daysInPeriod} days)`}
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefreshAll}
+                disabled={refreshing || loading}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} /> Refresh Data
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportToExcel}
+                disabled={filteredData.length === 0}
+              >
+                <Download className="h-4 w-4 mr-2" /> Export to Excel
+              </Button>
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={handleExportFullMonth}
+                disabled={filteredData.length === 0}
+                className="flex items-center gap-2"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                Export Full Month
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {/* THIS IS WHERE YOUR EXISTING CardContent GOES - KEEP IT EXACTLY AS IS */}
+          {filteredData.length === 0 ? (
+            <div className="text-center py-12">
+              <Building className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Sites Found</h3>
+              <p className="text-gray-500 mb-6">
+                {searchTerm
+                  ? 'No sites match your search criteria. Try a different search term.'
+                  : 'No sites available or all sites are filtered out.'}
+              </p>
+              {searchTerm && (
+                <Button variant="outline" onClick={() => setSearchTerm('')}>
+                  Clear Search
+                </Button>
+              )}
+            </div>
+          ) : isMobileSiteView ? (
+            // Mobile Card View
+            <div className="space-y-3">
+              {paginatedData.map((item, index) => {
+                const dailyRequirement = item.dailyRequirement || 0;
+                const totalRequired = item.totalRequiredForPeriod || item.durationTotalRequired || dailyRequirement * daysInPeriod;
+                const present = item.totalPresent || item.presentCount || 0;
+                const absent = (item.totalAbsent || 0) + (item.totalLeave || 0);
+                const rate = totalRequired > 0 ? ((present / totalRequired) * 100).toFixed(1) : '0.0';
+                const status = parseFloat(rate) >= 90 ? 'Excellent' : parseFloat(rate) >= 80 ? 'Good' : parseFloat(rate) >= 70 ? 'Average' : 'Poor';
 
-    </div>
-  );
+                return (
+                  <Card key={item.siteId || item.id || index} className="p-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-semibold">{item.siteName || item.name}</h3>
+                        <p className="text-xs text-muted-foreground">{item.daysInPeriod} {item.daysInPeriod === 1 ? 'day' : 'days'}</p>
+                      </div>
+                      <Badge variant={status === 'Excellent' ? 'default' : status === 'Good' ? 'secondary' : 'outline'}>{status}</Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
+                      <div><span className="text-muted-foreground">Daily Req:</span> <strong>{dailyRequirement}</strong></div>
+                      <div><span className="text-muted-foreground">Total Required:</span> <strong>{totalRequired}</strong></div>
+                      <div className="text-green-600"><span className="text-muted-foreground">Present:</span> <strong>{present}</strong></div>
+                      <div className="text-red-600"><span className="text-muted-foreground">Absent:</span> <strong>{absent}</strong></div>
+                      <div><span className="text-muted-foreground">Rate:</span> <strong>{rate}%</strong></div>
+                    </div>
+                    <div className="flex gap-2 mt-3">
+                      <Button variant="outline" size="sm" onClick={() => handleViewDetails(item)}>
+                        <Eye className="h-4 w-4 mr-1" /> Details
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => navigate(`/superadmin/machines/${encodeURIComponent(item.siteName || item.name)}`)}>
+                        <Settings className="h-4 w-4 mr-1" /> Machines
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            // Desktop Table
+            <div className="rounded-md border">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Site Name</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium text-indigo-700 bg-indigo-50">Daily Req</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium text-blue-700 bg-blue-50">Total Required</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium text-green-700 bg-green-50">Present</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium text-purple-700 bg-purple-50">Weekly Off</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium text-red-700 bg-red-50">Absent</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Rate</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Status</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Attendance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedData.map((item, index) => {
+                      const dailyRequirement = item.dailyRequirement || 0;
+                      const totalRequired = item.totalRequiredForPeriod || item.durationTotalRequired || dailyRequirement * daysInPeriod;
+                      const present = item.totalPresent || item.presentCount || 0;
+                      const absent = (item.totalAbsent || 0) + (item.totalLeave || 0);
+                      const rate = totalRequired > 0 ? ((present / totalRequired) * 100).toFixed(1) : '0.0';
+                      const status = parseFloat(rate) >= 90 ? 'Excellent' : parseFloat(rate) >= 80 ? 'Good' : parseFloat(rate) >= 70 ? 'Average' : 'Poor';
+
+                      return (
+                        <tr key={item.siteId || item.id || index} className="border-b hover:bg-muted/50">
+                          <td className="p-4 align-middle font-medium">
+                            <div className="font-medium text-sm">{item.siteName || item.name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {item.daysInPeriod} {item.daysInPeriod === 1 ? 'day' : 'days'}
+                            </div>
+                          </td>
+                          <td className="p-4 align-middle font-bold text-indigo-700 bg-indigo-50">{dailyRequirement}</td>
+                          <td className="p-4 align-middle font-bold text-blue-700 bg-blue-50">{totalRequired}</td>
+                          <td className="p-4 align-middle font-bold text-green-700 bg-green-50">{present}</td>
+                          <td className="p-4 align-middle font-bold text-purple-700 bg-purple-50">
+                            {item.totalWeeklyOff || item.weeklyOffCount || 0}
+                          </td>
+                          <td className="p-4 align-middle font-bold text-red-700 bg-red-50">{absent}</td>
+                          <td className="p-4 align-middle font-bold">{rate}%</td>
+                          <td className="p-4 align-middle">
+                            <Badge variant={status === 'Excellent' ? 'default' : status === 'Good' ? 'secondary' : status === 'Average' ? 'outline' : 'destructive'}>
+                              {status}
+                            </Badge>
+                          </td>
+                          <td className="p-4 align-middle">
+                            <Button variant="outline" size="sm" onClick={() => handleViewDetails(item)}>
+                              <Eye className="h-4 w-4 mr-1" /> Details
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {filteredData.length > 0 && <Pagination />}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
+  </PullToRefreshWrapper>
+);
 };
 
 export default SuperAdminAttendanceView;

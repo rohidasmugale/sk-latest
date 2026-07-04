@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { DashboardHeader } from "@/components/shared/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building, Calculator, ClipboardList, ChevronDown, ChevronUp, Filter, Menu, Loader2 } from "lucide-react";
+import { Building, ClipboardList, ChevronDown, ChevronUp, Loader2, RefreshCw, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { useOutletContext } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -14,20 +14,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from 'sonner';
-import { StatsCards } from "./components/StatsCards";
-import TasksSection from "./components/TasksSection";
-import AssignTaskSection from "./components/AssignTaskSection";
-import SitesSection from "./components/SitesSection";
-
-
-import AlertsSection from "./components/AlertsSection";
-import PriceCalculator from "./components/PriceCalculator";
-import axios from "axios";
 import AssignTaskPage from "./components/AssignTaskPage";
-import {Task , Site} from "./data";
+import SitesSection from "./components/SitesSection";
+import { PullToRefreshWrapper } from '@/components/shared/PullToRefreshWrapper';
+import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
+
 // Mobile responsive tab selector
 const MobileTabSelector = ({
   activeTab,
@@ -78,32 +72,72 @@ const MobileTabSelector = ({
 
 const Operations = () => {
   const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
-  const [activeTab, setActiveTab] = useState("tasks");
- const [tasks, setTasks] = useState<Task[]>([]);
-const [sites, setSites] = useState<Site[]>([]);
-const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("assign");
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // ✅ ADDED
   
   // Mobile responsive state
   const [isMobileView, setIsMobileView] = useState(false);
-useEffect(() => {
-  const fetchData = async () => {
+
+  // Define tabs for mobile selector
+  const tabs = [
+    { value: "assign", label: "Assign Task", icon: <ClipboardList className="h-4 w-4" /> },
+    { value: "sites", label: "Sites", icon: <Building className="h-4 w-4" /> },
+  ];
+
+  // Fetch all data
+  const fetchAllData = async (showToast: boolean = false) => {
     try {
-      setLoading(true);
-      // Fetch tasks (adjust endpoint as needed)
-      const tasksRes = await axios.get(`${API_URL}/tasks`);
-      const sitesRes = await axios.get(`${API_URL}/sites`);
-      
-      setTasks(tasksRes.data.data || tasksRes.data || []);
-      setSites(sitesRes.data.data || sitesRes.data || []);
-    } catch (error) {
+      setError(null);
+      if (showToast) {
+        setRefreshing(true);
+        toast.loading('Refreshing operations data...');
+      } else {
+        setLoading(true);
+      }
+
+      // Fetch tasks and sites in parallel
+      const [tasksRes, sitesRes] = await Promise.all([
+        axios.get(`${API_URL}/tasks`),
+        axios.get(`${API_URL}/sites`)
+      ]);
+
+      window.dispatchEvent(new CustomEvent('refreshOperations', { 
+        detail: { 
+          tasks: tasksRes.data.data || tasksRes.data || [],
+          sites: sitesRes.data.data || sitesRes.data || []
+        } 
+      }));
+
+      setRefreshTrigger(prev => prev + 1); // ✅ ADDED - increment trigger
+
+      if (showToast) {
+        toast.dismiss();
+        toast.success('Data refreshed successfully');
+      }
+    } catch (error: any) {
       console.error("Error fetching operations data:", error);
-      toast.error("Failed to load data");
+      setError(error.message || "Failed to load data");
+      
+      if (showToast) {
+        toast.dismiss();
+        toast.error('Failed to refresh data');
+      } else {
+        toast.error('Failed to load data');
+      }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
-  fetchData();
-}, []);
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchAllData(false);
+  }, []);
+
   // Check for mobile view on mount and resize
   useEffect(() => {
     const checkMobile = () => {
@@ -116,14 +150,14 @@ useEffect(() => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Define tabs for mobile selector
-  const tabs = [
-     { value: "assign", label: "Assign Task", icon: <ClipboardList className="h-4 w-4" /> },
-    { value: "sites", label: "Sites", icon: <Building className="h-4 w-4" /> },
-     ];
-
   return (
-    <div className="min-h-screen bg-background">
+    <PullToRefreshWrapper
+      pageName="Operations"
+      onRefresh={async () => {
+        await fetchAllData(true);
+      }}
+      className="min-h-screen bg-background relative overflow-y-auto"
+    >
       <DashboardHeader 
         title="Operations & Task Management" 
         onMenuClick={onMenuClick}
@@ -134,42 +168,85 @@ useEffect(() => {
         animate={{ opacity: 1, y: 0 }}
         className="p-4 md:p-6 space-y-4 md:space-y-6"
       >
-        {/* Mobile Tab Selector */}
-        <MobileTabSelector
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          tabs={tabs}
-        />
+        {/* Error Display */}
+        {error && (
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-red-700">
+                  <AlertCircle className="h-5 w-5" />
+                  <span>{error}</span>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setError(null)}
+                  className="text-red-700 hover:text-red-900"
+                >
+                  Dismiss
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Desktop Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 md:space-y-6">
-          <TabsList className="hidden lg:grid w-full grid-cols-7">
-           
-           <TabsTrigger value="assign" className="text-sm">
-              <ClipboardList className="h-4 w-4 mr-2" />
-              Assign Task
-            </TabsTrigger>
-            <TabsTrigger value="sites" className="text-sm">
-              <Building className="h-4 w-4 mr-2" />
-              Sites
-            </TabsTrigger>
-          
-           
-          </TabsList>
+        {/* Refresh Button */}
+        <div className="flex justify-end">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => fetchAllData(true)}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Refreshing...' : 'Refresh Data'}
+          </Button>
+        </div>
 
-         {/* Assign Task Tab */}
-          <TabsContent value="assign">
-            <AssignTaskPage />
-          </TabsContent> 
+        {/* Loading State */}
+        {loading ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              <p className="mt-4 text-muted-foreground">Loading operations data...</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* Mobile Tab Selector */}
+            <MobileTabSelector
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              tabs={tabs}
+            />
 
-          {/* Sites Tab */}
-          <TabsContent value="sites">
-            <SitesSection />
-          </TabsContent>
-          
-        </Tabs>
+            {/* Desktop Tabs */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 md:space-y-6">
+              <TabsList className="hidden lg:grid w-full grid-cols-2">
+                <TabsTrigger value="assign" className="text-sm">
+                  <ClipboardList className="h-4 w-4 mr-2" />
+                  Assign Task
+                </TabsTrigger>
+                <TabsTrigger value="sites" className="text-sm">
+                  <Building className="h-4 w-4 mr-2" />
+                  Sites
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Assign Task Tab - ✅ WITH refreshTrigger */}
+              <TabsContent value="assign">
+                <AssignTaskPage refreshTrigger={refreshTrigger} />
+              </TabsContent> 
+
+              {/* Sites Tab - ✅ WITH refreshTrigger */}
+              <TabsContent value="sites">
+                <SitesSection refreshTrigger={refreshTrigger} />
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
       </motion.div>
-    </div>
+    </PullToRefreshWrapper>
   );
 };
 
