@@ -14,6 +14,7 @@ const FACE_SERVICE_URL = process.env.FACE_SERVICE_URL ||
   (process.env.NODE_ENV === 'production' 
     ? 'https://sk-face-service.onrender.com' 
     : 'http://localhost:8000');
+console.log("FACE_SERVICE_URL =", FACE_SERVICE_URL);
 // ------------------ Types and helpers ------------------
 let modelsLoaded = false;
 
