@@ -67,6 +67,7 @@ app.use(cors({
       'http://localhost:5001',
       'http://localhost:5173',
       'http://localhost:3000',
+      'https://sk-latest.vercel.app',
       'https://sk-project-ecru.vercel.app',
       'https://sk-backend-btbj.onrender.com',
       /\.vercel\.app$/,
