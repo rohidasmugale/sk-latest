@@ -33,12 +33,12 @@ interface RoleContextType {
 const getApiUrl = () => {
   // If VITE_API_URL is set in environment variables
   if (import.meta.env.VITE_API_URL) {
-    return `${import.meta.env.VITE_API_URL}/auth`;
+    return `${import.meta.env.VITE_API_URL}/api/auth`;
   }
   
   // For production (Vercel) - use your Render backend URL
   if (import.meta.env.PROD) {
-    return 'https://sk-backend-btbj.onrender.com/api/auth';
+    return 'https://sk-backend-d743.onrender.com/api/auth';
   }
   
   // For development (localhost)
