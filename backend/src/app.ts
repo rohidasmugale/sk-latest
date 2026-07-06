@@ -69,6 +69,8 @@ app.use(cors({
       'http://localhost:3000',
       'https://sk-latest.vercel.app',
       'https://sk-project-ecru.vercel.app',
+      'https://app.skfacilitymanagement.com',
+      'http://app.skfacilitymanagement.com',
       'https://sk-backend-btbj.onrender.com',
       /\.vercel\.app$/,
       /\.onrender\.com$/
