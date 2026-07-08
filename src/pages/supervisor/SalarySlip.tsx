@@ -8,6 +8,7 @@ import { Loader2 } from 'lucide-react';
 import { salarySlipApi } from '@/services/payrollApi';
 import axios from 'axios';
 import { BackButton } from '@/components/shared/BackButton';
+import { DashboardHeader } from "@/components/shared/DashboardHeader";
 const API_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
@@ -326,8 +327,11 @@ export default function SupervisorSalarySlip() {
 
   return (
     <div className="p-4 space-y-6">
-      <BackButton /> 
-      <h1 className="text-2xl font-bold">Salary Slip</h1>
+    <DashboardHeader 
+  title="Salary Slip" 
+  subtitle="Download your salary slips"
+  onMenuClick={() => {}}
+/>
 
       <Card>
         <CardHeader><CardTitle>My Salary Slip</CardTitle></CardHeader>

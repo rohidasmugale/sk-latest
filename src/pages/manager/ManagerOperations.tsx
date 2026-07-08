@@ -3,11 +3,11 @@ import { useState, useEffect } from "react";
 import { DashboardHeader } from "@/components/shared/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building, Calculator, ClipboardList, ChevronDown, ChevronUp, Menu, Filter } from "lucide-react";
+import { Building, ClipboardList, ChevronDown, ChevronUp, Calendar } from "lucide-react";
 import { motion } from "framer-motion";
 import { useOutletContext } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,8 +20,9 @@ import TasksSection from "./components/TasksSection";
 import SitesSection from "./components/SitesSection";
 import ServicesSection from "./components/ServicesSection";
 import AlertsSection from "./components/AlertsSection";
-import PriceCalculator from "./components/PriceCalculator";
-import { initialTasks, initialSites,  serviceTypes, initialAlerts } from "./data";
+// ✅ CORRECT IMPORT - Use the fully working component
+import TrainingBriefingSectionManager from "./components/TrainingBriefingSectionManager";
+import { initialTasks, initialSites } from "./data";
 
 // Mobile responsive tab selector
 const MobileTabSelector = ({
@@ -61,9 +62,7 @@ const MobileTabSelector = ({
               {tab.icon}
               <span className="ml-2">{tab.label}</span>
               {activeTab === tab.value && (
-                <span className="ml-auto text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
-                  Active
-                </span>
+                <Badge variant="secondary" className="ml-auto">Active</Badge>
               )}
             </DropdownMenuItem>
           ))}
@@ -77,30 +76,23 @@ const ManagerOperations = () => {
   const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
   const [activeTab, setActiveTab] = useState("tasks");
   const [tasks] = useState(initialTasks);
-  
-  // Mobile responsive state
   const [isMobileView, setIsMobileView] = useState(false);
 
-  // Check for mobile view on mount and resize
   useEffect(() => {
     const checkMobile = () => {
       setIsMobileView(window.innerWidth < 1024);
     };
-    
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Define tabs for mobile selector (without My Tasks)
+  // Define tabs - changed "calculator" to "training"
   const tabs = [
     { value: "tasks", label: "All Tasks", icon: <ClipboardList className="h-4 w-4" /> },
     { value: "sites", label: "Sites", icon: <Building className="h-4 w-4" /> },
-
-    { value: "services", label: "Services", icon: <ClipboardList className="h-4 w-4" /> },
-    { value: "alerts", label: "Alerts & Issues", icon: <ClipboardList className="h-4 w-4" /> },
-    { value: "calculator", label: "Training", icon: <Calculator className="h-4 w-4" /> },
+    
+    { value: "training", label: "Training & Briefing", icon: <Calendar className="h-4 w-4" /> },
   ];
 
   return (
@@ -117,7 +109,6 @@ const ManagerOperations = () => {
       >
         <StatsCards tasks={tasks} sites={initialSites} />
         
-        {/* Mobile Tab Selector */}
         <MobileTabSelector
           activeTab={activeTab}
           onTabChange={setActiveTab}
@@ -125,8 +116,8 @@ const ManagerOperations = () => {
         />
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 md:space-y-6">
-          {/* Desktop Tabs - Hidden on mobile (without My Tasks) */}
-          <TabsList className="hidden lg:grid w-full grid-cols-6">
+          {/* Desktop Tabs - 5 columns */}
+          <TabsList className="hidden lg:grid w-full grid-cols-5">
             <TabsTrigger value="tasks" className="text-sm">
               <ClipboardList className="h-4 w-4 mr-2" />
               All Tasks
@@ -135,44 +126,25 @@ const ManagerOperations = () => {
               <Building className="h-4 w-4 mr-2" />
               Sites
             </TabsTrigger>
-            
-            <TabsTrigger value="services" className="text-sm">
-              <ClipboardList className="h-4 w-4 mr-2" />
-              Services
-            </TabsTrigger>
-            <TabsTrigger value="alerts" className="text-sm">
-              <ClipboardList className="h-4 w-4 mr-2" />
-              Alerts & Issues
-            </TabsTrigger>
-            <TabsTrigger value="calculator" className="text-sm">
-              <Calculator className="h-4 w-4 mr-2" />
-              Training
+          
+            <TabsTrigger value="training" className="text-sm">
+              <Calendar className="h-4 w-4 mr-2" />
+              Training & Briefing
             </TabsTrigger>
           </TabsList>
 
-          {/* Tasks Tab */}
           <TabsContent value="tasks" className="space-y-4 md:space-y-6">
             <TasksSection />
           </TabsContent>
 
-          {/* Sites Tab */}
           <TabsContent value="sites">
             <SitesSection />
           </TabsContent>
 
-          {/* Services Tab */}
-          <TabsContent value="services">
-            <ServicesSection />
-          </TabsContent>
-
-          {/* Alerts Tab */}
-          <TabsContent value="alerts">
-            <AlertsSection />
-          </TabsContent>
-
-          {/* Calculator/Training Tab */}
-          <TabsContent value="calculator">
-            <PriceCalculator />
+          
+          {/* ✅ CORRECT - Using TrainingBriefingSectionManager */}
+          <TabsContent value="training">
+            <TrainingBriefingSectionManager />
           </TabsContent>
         </Tabs>
       </motion.div>

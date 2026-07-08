@@ -2032,6 +2032,17 @@ const AssignTaskSection = () => {
     total: 0,
     pages: 0
   });
+
+  useEffect(() => {
+  if (!pagination) {
+    setPagination({
+      page: 1,
+      limit: 10,
+      total: 0,
+      pages: 0
+    });
+  }
+}, [pagination]);
   const [showFilters, setShowFilters] = useState(false);
   
   // Form state
@@ -2183,33 +2194,52 @@ const AssignTaskSection = () => {
   };
 
   // Fetch assign tasks with filters
-  const fetchAssignTasks = async () => {
-    try {
-      setIsLoadingTasks(true);
-      console.log('📋 Fetching assign tasks with filters:', filters);
-      
-      const response = await assignTaskService.getAllAssignTasks({
-        status: filters.status || undefined,
-        priority: filters.priority || undefined,
-        siteId: filters.siteId || undefined,
-        taskType: filters.taskType || undefined,
-        page: pagination.page,
-        limit: pagination.limit,
-        sortBy: 'createdAt',
-        sortOrder: 'desc'
-      });
-      
-      console.log('✅ Assign tasks fetched:', response);
-      setAssignTasks(response.tasks || []);
+ const fetchAssignTasks = async () => {
+  try {
+    setIsLoadingTasks(true);
+    console.log('📋 Fetching assign tasks with filters:', filters);
+    
+    const response = await assignTaskService.getAllAssignTasks({
+      status: filters.status || undefined,
+      priority: filters.priority || undefined,
+      siteId: filters.siteId || undefined,
+      taskType: filters.taskType || undefined,
+      page: pagination.page,
+      limit: pagination.limit,
+      sortBy: 'createdAt',
+      sortOrder: 'desc'
+    });
+    
+    console.log('✅ Assign tasks fetched:', response);
+    setAssignTasks(response.tasks || []);
+    
+    // ✅ Add fallback for pagination
+    if (response.pagination) {
       setPagination(response.pagination);
-    } catch (error: any) {
-      console.error("❌ Error fetching assign tasks:", error);
-      toast.error(error.message || "Failed to load tasks");
-      setAssignTasks([]);
-    } finally {
-      setIsLoadingTasks(false);
+    } else {
+      // If no pagination from API, use defaults
+      setPagination({
+        page: 1,
+        limit: 10,
+        total: response.tasks?.length || 0,
+        pages: 1
+      });
     }
-  };
+  } catch (error: any) {
+    console.error("❌ Error fetching assign tasks:", error);
+    toast.error(error.message || "Failed to load tasks");
+    setAssignTasks([]);
+    // ✅ Set default pagination on error
+    setPagination({
+      page: 1,
+      limit: 10,
+      total: 0,
+      pages: 0
+    });
+  } finally {
+    setIsLoadingTasks(false);
+  }
+};
 
   // Apply filters when they change
   useEffect(() => {
@@ -3063,7 +3093,7 @@ if (result.status === 'completed' && taskToEdit.status !== 'completed') {
               </Table>
 
               {/* Pagination */}
-              {pagination.pages > 1 && (
+             {pagination && pagination.pages > 1 && (
                 <div className="flex items-center justify-between mt-4">
                   <div className="text-sm text-muted-foreground">
                     Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}

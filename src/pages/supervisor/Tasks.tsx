@@ -43,6 +43,7 @@ import taskService, { Task, Attachment } from "@/services/TaskService";
 import { siteService, Site } from "@/services/SiteService";
 import NotificationService from '@/lib/notificationService';
 import { createNotificationForSuperadmin } from '@/lib/notificationHelper';
+import { DashboardHeader } from "@/components/shared/DashboardHeader";
 // Dashboard Header Component with Hamburger Menu
 interface DashboardHeaderProps {
   title: string;
@@ -50,55 +51,6 @@ interface DashboardHeaderProps {
   onMenuClick?: () => void;
   showMenu?: boolean;
 }
-
-const DashboardHeader = ({ title, subtitle, onMenuClick, showMenu = true }: DashboardHeaderProps) => {
-  return (
-    <motion.header
-      initial={{ y: -20, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 md:px-6 py-4 sticky top-0 z-40 shadow-sm"
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {/* Hamburger Menu for Mobile */}
-          {showMenu && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onMenuClick}
-              className="lg:hidden hover:bg-gray-100 dark:hover:bg-gray-700"
-              aria-label="Toggle menu"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-          )}
-          
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">{title}</h1>
-            {subtitle && (
-              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-1">
-                {subtitle}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Mobile Menu Button Alternative (if needed) */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden"
-            onClick={onMenuClick}
-            aria-label="Menu"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-        </div>
-      </div>
-    </motion.header>
-  );
-};
 
 // Mobile Navigation Drawer Component
 interface MobileNavDrawerProps {

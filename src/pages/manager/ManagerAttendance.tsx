@@ -51,7 +51,7 @@ import {
   ShieldCheck,
   Camera,
   ExternalLink, Home, Car, Trash2, Droplets, ShoppingCart,Settings,Images,Cpu,        // missing
-  Shirt,  Factory    // missing
+  Shirt,  Factory ,MessageSquare   // missing
   
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -969,7 +969,7 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
 
   // ----- New tab state -----
   const [mainTab, setMainTab] = useState<
-    "employees" | "machines" | "grooming" | "incidents" | "photos" | "shift"
+    "employees" | "machines" | "grooming" | "incidents" | "photos" | "shift"  | "training"
   >("employees");
 
   // Machines
@@ -1007,7 +1007,10 @@ const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null
 const [editingRemarkId, setEditingRemarkId] = useState<string | null>(null);
 const [remarkValue, setRemarkValue] = useState<string>("");
 const [savingRemarkId, setSavingRemarkId] = useState<string | null>(null);
-
+// Training & Briefing states
+const [trainingSessions, setTrainingSessions] = useState<any[]>([]);
+const [staffBriefings, setStaffBriefings] = useState<any[]>([]);
+const [loadingTraining, setLoadingTraining] = useState(false);
 const handleSaveRemark = async (machineId: string) => {
   setSavingRemarkId(machineId);
   try {
@@ -1190,6 +1193,8 @@ useEffect(() => {
     setLoadingShift(false);
   }
 };
+
+
 const saveShiftDeployment = async () => {
   try {
     const today = new Date().toISOString().split('T')[0];

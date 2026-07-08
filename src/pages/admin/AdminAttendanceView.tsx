@@ -49,7 +49,7 @@ import {
   ShieldCheck,
   Camera,
   ExternalLink, Home, Car, Trash2, Droplets, ShoppingCart,Settings,  Images,Cpu,        // missing
-  Shirt,   Factory   // missing
+  Shirt,   Factory  ,MessageSquare // missing
   
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -981,7 +981,7 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
 
   // ----- New tab state -----
   const [mainTab, setMainTab] = useState<
-    "employees" | "machines" | "grooming" | "incidents" | "photos" | "shift"
+    "employees" | "machines" | "grooming" | "incidents" | "photos" | "shift"| "training"
   >("employees");
 
   // Machines
@@ -1018,6 +1018,10 @@ const [groomingCount, setGroomingCount] = useState(0);
 const [loadingGroomingCount, setLoadingGroomingCount] = useState(false);
 const [isMobileView, setIsMobileView] = useState(false);
 
+// Training & Briefing states
+const [trainingSessions, setTrainingSessions] = useState<any[]>([]);
+const [staffBriefings, setStaffBriefings] = useState<any[]>([]);
+const [loadingTraining, setLoadingTraining] = useState(false);
 const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null);
 // Remark editing for machines (inside SiteEmployeeDetails)
 const [editingRemarkId, setEditingRemarkId] = useState<string | null>(null);
@@ -1206,6 +1210,39 @@ const fetchShiftDeployment = async () => {
   }
 };
 
+// Fetch Training & Briefing data for this site
+const fetchTrainingData = async () => {
+  if (!siteName) return;
+  setLoadingTraining(true);
+  try {
+    // Fetch ALL trainings and filter on frontend
+    const trainingsRes = await apiClient.get('/trainings', {
+      params: { limit: 1000 }
+    });
+    const trainings = trainingsRes.data?.trainings || [];
+    const siteTrainings = trainings.filter((t: any) => 
+      t.site && t.site.toLowerCase() === siteName.toLowerCase()
+    );
+    setTrainingSessions(siteTrainings);
+    console.log(`✅ Found ${siteTrainings.length} trainings for site: ${siteName}`);
+
+    // Fetch ALL briefings and filter on frontend
+    const briefingsRes = await apiClient.get('/briefings', {
+      params: { limit: 1000 }
+    });
+    const briefings = briefingsRes.data?.briefings || [];
+    const siteBriefings = briefings.filter((b: any) => 
+      b.site && b.site.toLowerCase() === siteName.toLowerCase()
+    );
+    setStaffBriefings(siteBriefings);
+    console.log(`✅ Found ${siteBriefings.length} briefings for site: ${siteName}`);
+  } catch (error) {
+    console.error('Error fetching training data:', error);
+    toast.error('Failed to load training & briefing data');
+  } finally {
+    setLoadingTraining(false);
+  }
+};
 const saveShiftDeployment = async () => {
   try {
     const today = new Date().toISOString().split('T')[0];
@@ -1231,6 +1268,7 @@ const saveShiftDeployment = async () => {
     if (mainTab === "incidents") fetchIncidents();
     if (mainTab === "photos") fetchCleaningPhotos();
     if (mainTab === "shift") fetchShiftDeployment();
+    if (mainTab === "training") fetchTrainingData(); // ← Add this
   }, [mainTab, selectedDate, siteName]);
 
   // Update machine status (allowed for admin/manager/superadmin)
@@ -2235,6 +2273,136 @@ const exportOldPhotos = () => {
     </Card>
   );
 };
+
+const renderTrainingTab = () => {
+  if (loadingTraining) {
+    return (
+      <div className="flex justify-center py-8">
+        <Loader2 className="animate-spin" />
+      </div>
+    );
+  }
+
+  const hasTrainings = trainingSessions.length > 0;
+  const hasBriefings = staffBriefings.length > 0;
+
+  if (!hasTrainings && !hasBriefings) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        <Calendar className="h-12 w-12 mx-auto mb-2" />
+        <p>No training or briefing sessions found for this site.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Training Sessions */}
+      {hasTrainings && (
+        <div>
+          <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            Training Sessions ({trainingSessions.length})
+          </h3>
+          <div className="space-y-3">
+            {trainingSessions.map((training: any) => (
+              <Card key={training._id} className="p-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="font-semibold text-sm">{training.title}</h4>
+                    <p className="text-xs text-muted-foreground">{training.description}</p>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      <Badge variant="outline" className="text-xs">{training.type}</Badge>
+                      <Badge 
+                        variant={
+                          training.status === 'completed' ? 'default' : 
+                          training.status === 'ongoing' ? 'secondary' : 'outline'
+                        }
+                        className="text-xs"
+                      >
+                        {training.status}
+                      </Badge>
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{training.date}</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-xs">
+                  <div><span className="text-muted-foreground">Trainer:</span> {training.trainer}</div>
+                  <div><span className="text-muted-foreground">Time:</span> {training.time}</div>
+                  <div><span className="text-muted-foreground">Duration:</span> {training.duration}</div>
+                  <div><span className="text-muted-foreground">Attendees:</span> {training.attendees?.length || 0}/{training.maxAttendees}</div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Staff Briefings */}
+      {hasBriefings && (
+        <div>
+          <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            Staff Briefings ({staffBriefings.length})
+          </h3>
+          <div className="space-y-3">
+            {staffBriefings.map((briefing: any) => (
+              <Card key={briefing._id} className="p-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="font-semibold text-sm">
+                      {briefing.site} - {briefing.shift} Shift
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                      Conducted by: {briefing.conductedBy || 'N/A'}
+                    </p>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      <Badge variant="outline" className="text-xs">{briefing.department}</Badge>
+                      <Badge 
+                        variant={
+                          briefing.shift === 'morning' ? 'default' : 
+                          briefing.shift === 'evening' ? 'secondary' : 'outline'
+                        }
+                        className="text-xs"
+                      >
+                        {briefing.shift}
+                      </Badge>
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{briefing.date}</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2 text-xs">
+                  <div><span className="text-muted-foreground">Time:</span> {briefing.time}</div>
+                  <div><span className="text-muted-foreground">Attendees:</span> {briefing.attendeesCount}</div>
+                </div>
+                {briefing.topics?.length > 0 && (
+                  <div className="mt-2">
+                    <span className="text-xs text-muted-foreground">Topics:</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {briefing.topics.map((topic: string, idx: number) => (
+                        <Badge key={idx} variant="outline" className="text-[10px]">{topic}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {briefing.keyPoints?.length > 0 && (
+                  <div className="mt-2">
+                    <span className="text-xs text-muted-foreground">Key Points:</span>
+                    <ul className="list-disc list-inside text-xs mt-1">
+                      {briefing.keyPoints.map((point: string, idx: number) => (
+                        <li key={idx}>{point}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
   // ----- Main render -----
   if (!siteData) {
     return (
@@ -2362,6 +2530,17 @@ const exportOldPhotos = () => {
       <span className="text-xs font-medium">Shift</span>
     </CardContent>
   </Card>
+  <Card
+  className="cursor-pointer hover:shadow-md transition-all"
+  onClick={() => setMainTab("training")}
+>
+  <CardContent className="p-2 flex flex-col items-center text-center">
+    <div className="p-2 rounded-full bg-orange-500 text-white mb-1">
+      <Calendar className="h-4 w-4" />
+    </div>
+    <span className="text-xs font-medium">Training</span>
+  </CardContent>
+</Card>
 </div>
       {/* Main Tabs */}
       
@@ -2373,6 +2552,7 @@ const exportOldPhotos = () => {
         <TabsContent value="incidents">{renderIncidentsTab()}</TabsContent>
         <TabsContent value="photos">{renderPhotosTab()}</TabsContent>
         <TabsContent value="shift">{renderShiftTab()}</TabsContent>
+        <TabsContent value="training">{renderTrainingTab()}</TabsContent> {/* ← Add this */}
       </Tabs>
 
       {/* Photo Modal (for attendance photos) */}

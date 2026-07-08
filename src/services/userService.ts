@@ -4,8 +4,6 @@ import axios, { AxiosInstance, AxiosResponse, AxiosError, InternalAxiosRequestCo
 export interface User {
   updatedAt: string;
   createdAt: string;
-  createdAt: string;
-  updatedAt: string;
   _id: string;
   id: string;
   username: string;
@@ -16,22 +14,26 @@ export interface User {
   role: 'superadmin' | 'admin' | 'manager' | 'supervisor' | 'employee';
   department: string;
   site: string;
+  siteName?: string;
+  assignedSites?: string[];
   phone: string;
   isActive: boolean;
   status: 'active' | 'inactive';
   joinDate: string;
-  photo?: string; 
+  photo?: string;
 }
 
 export interface CreateUserData {
   username?: string;
   email: string;
   password: string;
-  role: UserRole; 
+  role: UserRole;
   firstName?: string;
   lastName?: string;
   department?: string;
   site?: string;
+  siteName?: string;
+  assignedSites?: string[];
   phone?: string;
   joinDate?: string;
 }
@@ -43,6 +45,8 @@ export interface UpdateUserData {
   lastName?: string;
   department?: string;
   site?: string;
+  siteName?: string;
+  assignedSites?: string[];
   phone?: string;
   role?: 'superadmin' | 'admin' | 'manager' | 'supervisor' | 'employee';
   isActive?: boolean;
@@ -67,20 +71,18 @@ export type UserRole = 'superadmin' | 'admin' | 'manager' | 'supervisor' | 'empl
 const API_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.DEV ? `http://localhost:5001/api` : 'https://sk-backend-btbj.onrender.com/api');
 
-
 // Create axios instance with auth interceptor
 const api: AxiosInstance = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000, // 10 second timeout
+  timeout: 10000,
 });
 
 // Request interceptor to add token
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // Check if running in browser (not SSR)
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('sk_token');
       if (token && config.headers) {
@@ -97,7 +99,6 @@ api.interceptors.request.use(
 // Response interceptor to handle errors
 api.interceptors.response.use(
   (response: AxiosResponse) => {
-    // Log successful responses for debugging
     console.log(`✅ ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`);
     return response;
   },
@@ -105,11 +106,9 @@ api.interceptors.response.use(
     console.error(`❌ ${error.config?.method?.toUpperCase()} ${error.config?.url} - ${error.response?.status}`);
     
     if (error.response?.status === 401) {
-      // Handle unauthorized access
       if (typeof window !== 'undefined') {
         localStorage.removeItem('sk_token');
         localStorage.removeItem('sk_user');
-        // Redirect to login
         window.location.href = '/login';
       }
     }
@@ -126,7 +125,6 @@ api.interceptors.response.use(
       console.error('Request timeout:', error.config?.url);
     }
     
-    // Return a more detailed error
     return Promise.reject({
       message: error.response?.data?.message || error.message,
       status: error.response?.status,
@@ -168,9 +166,18 @@ export const userService = {
     try {
       console.log('📤 Creating user with data:', userData);
       
-      // Generate username from email if not provided
       if (!userData.username && userData.email) {
         userData.username = userData.email.split('@')[0];
+      }
+
+      // Ensure siteName is set from site if not provided
+      if (!userData.siteName && userData.site) {
+        userData.siteName = userData.site;
+      }
+
+      // Ensure assignedSites is set from site if not provided
+      if (!userData.assignedSites && userData.site) {
+        userData.assignedSites = [userData.site];
       }
 
       const response = await api.post<{ 
@@ -204,27 +211,29 @@ export const userService = {
       throw new Error(error.message || `Failed to update user ${id}`);
     }
   },
-// Update user with photo (multipart/form-data)
-async updateUserWithPhoto(id: string, formData: FormData): Promise<User> {
-  try {
-    console.log(`📤 Updating user ${id} with photo...`);
-    const response = await api.put<{ 
-      success: boolean;
-      user: User; 
-      message: string 
-    }>(`/users/${id}`, formData, {
-      headers: {
-        // Do NOT set 'Content-Type' – browser will set it with boundary
-      }
-    });
-    
-    console.log(`✅ User ${id} updated with photo`);
-    return response.data.user;
-  } catch (error: any) {
-    console.error(`❌ Error updating user ${id} with photo:`, error);
-    throw new Error(error.message || `Failed to update user ${id}`);
-  }
-},
+
+  // Update user with photo (multipart/form-data)
+  async updateUserWithPhoto(id: string, formData: FormData): Promise<User> {
+    try {
+      console.log(`📤 Updating user ${id} with photo...`);
+      const response = await api.put<{ 
+        success: boolean;
+        user: User; 
+        message: string 
+      }>(`/users/${id}`, formData, {
+        headers: {
+          // Do NOT set 'Content-Type' – browser will set it with boundary
+        }
+      });
+      
+      console.log(`✅ User ${id} updated with photo`);
+      return response.data.user;
+    } catch (error: any) {
+      console.error(`❌ Error updating user ${id} with photo:`, error);
+      throw new Error(error.message || `Failed to update user ${id}`);
+    }
+  },
+
   // Delete user
   async deleteUser(id: string): Promise<void> {
     try {

@@ -200,21 +200,71 @@ class SiteService {
   }
 
   // Site-related methods
-  async getAllSites(): Promise<Site[]> {
-    try {
-      console.log('📡 Fetching all sites...');
-      const sites = await this.fetchApi<any[]>('/sites');
-      console.log(`📡 Raw sites data:`, sites);
-      
-      // Transform data to ensure it matches Site interface
-      const transformedSites = this.transformSitesData(sites);
-      console.log(`📡 Transformed ${transformedSites.length} sites:`, transformedSites);
-      return transformedSites;
-    } catch (error) {
-      console.error('❌ Error fetching sites:', error);
+  // services/SiteService.ts - Fix the getAllSites method
+
+async getAllSites(): Promise<Site[]> {
+  try {
+    console.log('📡 Fetching all sites...');
+    
+    const token = localStorage.getItem('sk_token');
+    const response = await fetch(`${API_URL}/sites`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      }
+    });
+    
+    console.log('📡 Response status:', response.status);
+    
+    if (!response.ok) {
+      console.error(`❌ API Error: ${response.status}`);
       return [];
     }
+    
+    const data = await response.json();
+    console.log('📡 Raw sites data:', data);
+    
+    // Handle different response formats
+    let sitesArray = [];
+    if (data.success && Array.isArray(data.data)) {
+      sitesArray = data.data;
+    } else if (Array.isArray(data)) {
+      sitesArray = data;
+    } else if (Array.isArray(data.sites)) {
+      sitesArray = data.sites;
+    } else {
+      console.warn('⚠️ Unknown response format:', data);
+      return [];
+    }
+    
+    // Transform to Site interface
+    const transformedSites = sitesArray.map((site: any) => ({
+      _id: site._id || site.id || `site-${Date.now()}`,
+      name: site.name || 'Unnamed Site',
+      clientName: site.clientName || site.client || 'Unknown Client',
+      clientId: site.clientId || '',
+      location: site.location || 'Unknown Location',
+      areaSqft: Number(site.areaSqft || site.area || 0),
+      manager: site.manager || '',
+      managerCount: Number(site.managerCount || 0),
+      supervisorCount: Number(site.supervisorCount || 0),
+      services: Array.isArray(site.services) ? site.services : [],
+      staffDeployment: Array.isArray(site.staffDeployment) ? site.staffDeployment : [],
+      contractValue: Number(site.contractValue || site.contract || 0),
+      contractEndDate: site.contractEndDate || site.endDate || new Date().toISOString(),
+      status: site.status === 'inactive' ? 'inactive' : 'active',
+      createdAt: site.createdAt || site.created || new Date().toISOString(),
+      updatedAt: site.updatedAt || site.updated || new Date().toISOString()
+    }));
+    
+    console.log(`✅ Transformed ${transformedSites.length} sites`);
+    return transformedSites;
+  } catch (error) {
+    console.error('❌ Error fetching sites:', error);
+    return [];
   }
+}
 
   async getSiteById(siteId: string): Promise<Site | null> {
     try {

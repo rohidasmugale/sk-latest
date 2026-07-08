@@ -3,14 +3,20 @@ import axios from "axios";
 const API_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.DEV ? `http://localhost:5001/api` : 'https://sk-backend-btbj.onrender.com/api');
 
+// ✅ Create axios instance with authentication
 const api = axios.create({
   baseURL: API_URL,
   headers: { "Content-Type": "application/json" },
   timeout: 30000,
 });
 
+// ✅ Add request interceptor to attach token
 api.interceptors.request.use(
   (config) => {
+    const token = localStorage.getItem('sk_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     console.log(`🚀 ${config.method?.toUpperCase()} ${config.url}`);
     if (config.data && !(config.data instanceof FormData)) {
       console.log("📦 Request data:", config.data);
@@ -23,6 +29,7 @@ api.interceptors.request.use(
   }
 );
 
+// ✅ Add response interceptor for error handling
 api.interceptors.response.use(
   (response) => {
     console.log(`✅ ${response.status} ${response.config.url}`);
@@ -31,6 +38,13 @@ api.interceptors.response.use(
   (error) => {
     console.error("❌ Response error:", error.response?.status, error.config?.url);
     console.error("Error details:", error.response?.data || error.message);
+    if (error.response?.status === 401) {
+      localStorage.removeItem('sk_token');
+      localStorage.removeItem('user');
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+      }
+    }
     return Promise.reject(error);
   }
 );
@@ -97,7 +111,7 @@ export const briefingApi = {
       const briefingData = {
         date: data.date,
         time: data.time || '',
-        conductedBy: data.conductedBy,
+        conductedBy: data.conductedBy || '',
         site: data.site,
         department: data.department || '',
         attendeesCount: data.attendeesCount || 0,
