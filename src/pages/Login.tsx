@@ -18,6 +18,7 @@ const Login = () => {
   const [selectedRole, setSelectedRole] = useState<UserRole>("superadmin");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const { login } = useRole();
   const navigate = useNavigate();
 
@@ -32,9 +33,9 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      await login(email, password, selectedRole);
+      await login(email, password, selectedRole, rememberMe);
       toast.success("Login successful!", {
-        description: `Welcome back, ${selectedRole}!`,
+        description: rememberMe ? "You will stay logged in for 30 days" : `Welcome back, ${selectedRole}!`,
         icon: <Sparkles className="h-4 w-4" />,
       });
 
@@ -66,11 +67,14 @@ const Login = () => {
       setIsLoading(false);
     }
   };
-const getEmailPlaceholder = (role: UserRole) => {
-  return role === "employee" 
-    ? "Enter Employee ID or Email" 
-    : "Enter your email";
-};
+
+
+
+  const getEmailPlaceholder = (role: UserRole) => {
+    return role === "employee"
+      ? "Enter Employee ID or Email"
+      : "Enter your email";
+  };
   const roleIcons = {
     superadmin: <KeyRound className="h-5 w-5" />,
     admin: <Shield className="h-5 w-5" />,
@@ -90,32 +94,32 @@ const getEmailPlaceholder = (role: UserRole) => {
   // Helper function to get input placeholder text based on role
   const getInputPlaceholder = (field: "email" | "password", role: UserRole) => {
     if (role === "superadmin") {
-      return field === "email" 
-        ? "Enter super admin email" 
+      return field === "email"
+        ? "Enter super admin email"
         : "Enter super admin password";
     }
     if (role === "admin") {
-      return field === "email" 
-        ? "Enter admin email" 
+      return field === "email"
+        ? "Enter admin email"
         : "Enter admin password";
     }
     if (role === "manager") {
-      return field === "email" 
-        ? "Enter manager email" 
+      return field === "email"
+        ? "Enter manager email"
         : "Enter manager password";
     }
     if (role === "supervisor") {
-      return field === "email" 
-        ? "Enter supervisor email" 
+      return field === "email"
+        ? "Enter supervisor email"
         : "Enter supervisor password";
     }
     if (role === "employee") {
-      return field === "email" 
-        ? "Enter employee email" 
+      return field === "email"
+        ? "Enter employee email"
         : "Enter employee password";
     }
-    return field === "email" 
-      ? "Enter your email" 
+    return field === "email"
+      ? "Enter your email"
       : "Enter your password";
   };
 
@@ -335,7 +339,7 @@ const getEmailPlaceholder = (role: UserRole) => {
                   <Input
                     id="email"
                     type="text"
-                      placeholder={getEmailPlaceholder(selectedRole)}
+                    placeholder={getEmailPlaceholder(selectedRole)}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className={cn(
@@ -390,7 +394,29 @@ const getEmailPlaceholder = (role: UserRole) => {
                   </motion.button>
                 </div>
               </motion.div>
-
+              {/* Remember Me Checkbox - ADD THIS BEFORE THE SIGN IN BUTTON */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.65 }}
+                className="flex items-center justify-between"
+              >
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="rememberMe"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <Label htmlFor="rememberMe" className="ml-2 text-sm text-gray-300">
+                    Remember Me
+                  </Label>
+                </div>
+                <a href="#" className="text-sm text-blue-400 hover:text-blue-300">
+                  Forgot Password?
+                </a>
+              </motion.div>
               {/* Sign In Button */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -406,8 +432,8 @@ const getEmailPlaceholder = (role: UserRole) => {
                     "bg-gradient-to-r hover:shadow-xl",
                     roleColors[selectedRole],
                     // Update button shadow color based on role
-                    selectedRole === "employee" 
-                      ? "hover:shadow-purple-500/20" 
+                    selectedRole === "employee"
+                      ? "hover:shadow-purple-500/20"
                       : "hover:shadow-blue-500/20"
                   )}
                   disabled={isLoading}

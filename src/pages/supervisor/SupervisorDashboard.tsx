@@ -1638,11 +1638,7 @@ useEffect(() => {
           totalEmployees: fetchedEmployees.length
         }));
         
-        if (fetchedEmployees.length > 0) {
-          toast.success(`Loaded ${fetchedEmployees.length} employees for your task-assigned sites`);
-        } else {
-          toast.warning(`No employees found for your task-assigned sites: ${supervisorSiteNameList.join(', ')}`);
-        }
+        
       }
       
       setEmployees(fetchedEmployees);

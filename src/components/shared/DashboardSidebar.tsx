@@ -3,12 +3,12 @@ import { NavLink, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { 
-  LayoutDashboard, 
-  Users, 
-  FileText, 
-  Calendar, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Users,
+  FileText,
+  Calendar,
+  Settings,
   LogOut,
   Building2,
   ClipboardList,
@@ -31,22 +31,22 @@ import {
 } from "lucide-react";
 import { useRole, UserRole } from "@/context/RoleContext";
 import { motion, AnimatePresence } from "framer-motion";
-import SKLogo from "@/assets/images/SKLogo.ico"; 
-import path from "path";
+import SKLogo from "@/assets/images/SKLogo.ico";
+
 
 // Separate component for Inventory button
-const InventoryNavItem = ({ 
-  collapsed, 
-  mobileOpen, 
-  basePath 
-}: { 
-  collapsed: boolean; 
-  mobileOpen: boolean; 
+const InventoryNavItem = ({
+  collapsed,
+  mobileOpen,
+  basePath
+}: {
+  collapsed: boolean;
+  mobileOpen: boolean;
   basePath: string;
 }) => {
   const location = useLocation();
   const isActive = location.pathname.includes('/inventory');
-  
+
   return (
     <motion.div
       initial={{ opacity: 0, x: -10 }}
@@ -66,8 +66,8 @@ const InventoryNavItem = ({
       >
         <div className={cn(
           "p-2 rounded-lg transition-all duration-200",
-          isActive 
-            ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm" 
+          isActive
+            ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
             : "bg-sidebar-accent/10 group-hover:bg-sidebar-accent/20"
         )}>
           <Package className="h-4 w-4" />
@@ -102,57 +102,57 @@ const getSidebarItems = (role: UserRole) => {
     case "superadmin":
       return [
         ...baseItems,
-      
-       
+
+
         { name: "Operations", icon: ClipboardList, path: "operations" },
-         { name: "Machine Invetory", icon: ClipboardList, path: "erp" },
+        { name: "Machine Invetory", icon: ClipboardList, path: "erp" },
         { name: "Billing & Finance", icon: DollarSign, path: "billing" },
         { name: "Site Visits", icon: Calendar, path: "site-visits" },
         { name: "Users & Roles", icon: UserCog, path: "users" },
         { name: "HRMS", icon: Users, path: "hrms" },
-        
+
       ];
 
     case "admin":
       return [
         ...baseItems,
-      
-       
-      
-      { name: "Machine Inventory", icon: ClipboardList, path: "erp" },
+
+
+
+        { name: "Machine Inventory", icon: ClipboardList, path: "erp" },
         // Inside getSidebarItems for each role, add:
- { name: "HRMS", icon: Users, path: "hrms" },
-       
+        { name: "HRMS", icon: Users, path: "hrms" },
+
         { name: "Billing & Finance", icon: DollarSign, path: "billing" },
         { name: "Operations", icon: ClipboardList, path: "operations" },
-       
-        
-       
+
+
+
       ];
 
     case "manager":
       return [
         ...baseItems,
-       
-      
-    { name: "Assign Task", icon: ClipboardList, path: "assigntask" },
-    { name: "Operations", icon: Workflow, path: "operations" }, 
-     { name: "My Sites", icon: Building2, path: "sites" },  // ADD THIS
-    
+
+
+        { name: "Assign Task", icon: ClipboardList, path: "assigntask" },
+        { name: "Operations", icon: Workflow, path: "operations" },
+        { name: "My Sites", icon: Building2, path: "sites" },  // ADD THIS
+
         { name: "Leave", icon: Calendar, path: "leave" },
-        
+
       ];
 
     case "supervisor":
       return [
         ...baseItems,
-        
+
         { name: "My Tasks", icon: ClipboardList, path: "tasks" },
-        
-    { name: "Assigned task", icon: ClipboardList, path: "assigntask" },
-       
+
+        { name: "Assigned task", icon: ClipboardList, path: "assigntask" },
+
         { name: "Leave", icon: Calendar, path: "leave" },
-        {name: "Training & Briefing", icon: User2Icon, path: "supervisortraining"},
+        { name: "Training & Briefing", icon: User2Icon, path: "supervisortraining" },
       ];
 
     case "employee":
@@ -161,7 +161,7 @@ const getSidebarItems = (role: UserRole) => {
         { name: "My Tasks", icon: ClipboardList, path: "tasks" },
         { name: "Attendance", icon: Calendar, path: "attendance" },
         { name: "Apply Leave", icon: Calendar, path: "leave" },
-        
+
       ];
 
     default:
@@ -175,16 +175,16 @@ interface DashboardSidebarProps {
   onMobileClose?: () => void;
 }
 
-export const DashboardSidebar = ({ 
+export const DashboardSidebar = ({
   collapsed: initialCollapsed = false,
   mobileOpen = false,
-  onMobileClose 
+  onMobileClose
 }: DashboardSidebarProps) => {
   const { role, user, logout } = useRole();
   const location = useLocation();
   const sidebarItems = getSidebarItems(role);
   const basePath = `/${role}`;
-  
+
   const [collapsed, setCollapsed] = useState(() => {
     const stored = localStorage.getItem('sidebar-collapsed');
     return stored ? JSON.parse(stored) : initialCollapsed;
@@ -216,12 +216,12 @@ export const DashboardSidebar = ({
       {/* Sidebar */}
       <motion.aside
         initial={{ x: -20, opacity: 0 }}
-        animate={{ 
+        animate={{
           x: mobileOpen ? 0 : (window.innerWidth < 1024 ? -280 : 0),
           opacity: 1,
           width: collapsed && window.innerWidth >= 1024 ? "5rem" : "18rem"
         }}
-        transition={{ 
+        transition={{
           duration: 0.3,
           type: "spring",
           stiffness: 300,
@@ -264,7 +264,7 @@ export const DashboardSidebar = ({
 
         {/* Header */}
         <div className="p-4 md:p-6 border-b border-sidebar-border">
-          <motion.div 
+          <motion.div
             className="flex items-center gap-3"
             whileHover={{ scale: 1.02 }}
             transition={{ type: "spring", stiffness: 400 }}
@@ -272,7 +272,7 @@ export const DashboardSidebar = ({
             <div className="relative">
               <div className="w-12 h-12 bg-sidebar-accent rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
                 {/* Logo Image - Updated Option A */}
-                <img 
+                <img
                   src={SKLogo}
                   alt="SK PROJECT Logo"
                   className="h-8 w-8 object-contain"
@@ -315,7 +315,7 @@ export const DashboardSidebar = ({
             <AnimatePresence>
               {sidebarItems.map((item, index) => {
                 const isActive = location.pathname === `${basePath}/${item.path}`;
-                
+
                 if (role === "supervisor" && item.path === "query") {
                   return (
                     <div key="supervisor-navigation-group">
@@ -342,8 +342,8 @@ export const DashboardSidebar = ({
                         >
                           <div className={cn(
                             "p-2 rounded-lg transition-all duration-200",
-                            isActive 
-                              ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm" 
+                            isActive
+                              ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
                               : "bg-sidebar-accent/10 group-hover:bg-sidebar-accent/20"
                           )}>
                             <item.icon className="h-4 w-4" />
@@ -366,17 +366,17 @@ export const DashboardSidebar = ({
                           )}
                         </NavLink>
                       </motion.div>
-                      
+
                       {/* Inventory button */}
-                      <InventoryNavItem 
-                        collapsed={collapsed} 
-                        mobileOpen={mobileOpen} 
+                      <InventoryNavItem
+                        collapsed={collapsed}
+                        mobileOpen={mobileOpen}
                         basePath={basePath}
                       />
                     </div>
                   );
                 }
-                
+
                 return (
                   <motion.div
                     key={item.path}
@@ -400,8 +400,8 @@ export const DashboardSidebar = ({
                     >
                       <div className={cn(
                         "p-2 rounded-lg transition-all duration-200",
-                        isActive 
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm" 
+                        isActive
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
                           : "bg-sidebar-accent/10 group-hover:bg-sidebar-accent/20"
                       )}>
                         <item.icon className="h-4 w-4" />
@@ -432,32 +432,32 @@ export const DashboardSidebar = ({
 
         {/* User Profile & Logout */}
         <div className="p-4 border-t border-sidebar-border space-y-2">
-        {(!collapsed || mobileOpen) && user && (
-  <motion.div
-    initial={{ opacity: 0, y: 10 }}
-    animate={{ opacity: 1, y: 0 }}
-    exit={{ opacity: 0, y: 10 }}
-  >
-    <NavLink
-      to={`${basePath}/profile`}
-      onClick={onMobileClose}
-      className="block px-3 py-3 rounded-xl bg-sidebar-accent/5 backdrop-blur-sm hover:bg-sidebar-accent/10 transition-all duration-200"
-    >
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-sidebar-accent/10 flex items-center justify-center border border-sidebar-accent/20">
-          <span className="font-semibold text-sm text-sidebar-foreground">
-            {user.name.charAt(0).toUpperCase()}
-          </span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-medium truncate text-sm">{user.name}</p>
-          <p className="text-xs text-sidebar-foreground/60 truncate">{user.email}</p>
-        </div>
-      </div>
-    </NavLink>
-  </motion.div>
-)}
-          
+          {(!collapsed || mobileOpen) && user && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+            >
+              <NavLink
+                to={`${basePath}/profile`}
+                onClick={onMobileClose}
+                className="block px-3 py-3 rounded-xl bg-sidebar-accent/5 backdrop-blur-sm hover:bg-sidebar-accent/10 transition-all duration-200"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-sidebar-accent/10 flex items-center justify-center border border-sidebar-accent/20">
+                    <span className="font-semibold text-sm text-sidebar-foreground">
+                      {user.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate text-sm">{user.name}</p>
+                    <p className="text-xs text-sidebar-foreground/60 truncate">{user.email}</p>
+                  </div>
+                </div>
+              </NavLink>
+            </motion.div>
+          )}
+
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             <Button
               variant="ghost"
@@ -472,7 +472,7 @@ export const DashboardSidebar = ({
             >
               <LogOut className="h-4 w-4" />
               {(!collapsed || mobileOpen) && (
-                <motion.span 
+                <motion.span
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   className="ml-3 font-medium"
