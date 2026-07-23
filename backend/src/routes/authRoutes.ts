@@ -86,7 +86,7 @@ router.post('/signup', async (req: Request, res: Response) => {
     const token = jwt.sign(
       { userId: newUser._id, role: newUser.role },
       process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '7d' }
+       { expiresIn: '30d' }
     );
 
     const userResponse = {
@@ -191,7 +191,7 @@ router.post('/login', async (req: Request, res: Response) => {
         name: user.name
       },
       process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '7d' }
+       { expiresIn: '30d' }
     );
 
     const userResponse = {
@@ -287,6 +287,51 @@ router.post('/verify', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Token verification error:', error);
+    res.status(401).json({
+      success: false,
+      message: 'Invalid token'
+    });
+  }
+});
+
+// =============================================
+// ADD: Token Refresh Endpoint
+// =============================================
+router.post('/refresh', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.body;
+    
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: 'Token is required'
+      });
+    }
+
+    // Verify old token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
+    
+    // Generate new token with extended expiry
+    const newToken = jwt.sign(
+      { 
+        userId: decoded.userId, 
+        role: decoded.role,
+        email: decoded.email,
+        name: decoded.name
+      },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '30d' }
+    );
+    
+    console.log('✅ Token refreshed for user:', decoded.email);
+    
+    res.status(200).json({
+      success: true,
+      token: newToken,
+      message: 'Token refreshed successfully'
+    });
+  } catch (error: any) {
+    console.error('❌ Token refresh error:', error);
     res.status(401).json({
       success: false,
       message: 'Invalid token'

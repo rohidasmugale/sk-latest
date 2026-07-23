@@ -113,19 +113,14 @@ export interface IEmployee extends Document {
 const EmployeeSchema: Schema = new Schema(
   {
     // Basic Information
-    employeeId: {
-      type: String,
-      unique: true,
-      trim: true,
-      default: function() {
-        const date = new Date();
-        const dateStr = date.getFullYear().toString().slice(2) + 
-                      (date.getMonth() + 1).toString().padStart(2, '0') + 
-                      date.getDate().toString().padStart(2, '0');
-        const random = Math.floor(1000 + Math.random() * 9000);
-        return `EMP${dateStr}${random}`;
-      }
-    },
+    // REPLACE the employeeId field definition
+employeeId: {
+  type: String,
+  unique: true,
+  trim: true,
+  required: [true, 'Employee ID is required']
+  // REMOVE the 'default' function completely
+},
     name: {
       type: String,
       required: [true, 'Name is required'],
