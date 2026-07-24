@@ -51,7 +51,7 @@ import {
   ShieldCheck,
   Camera,
   ExternalLink, Home, Car, Trash2, Droplets, ShoppingCart,Settings,Images,Cpu,        // missing
-  Shirt,  Factory    // missing
+  Shirt,  Factory ,MessageSquare   // missing
   
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -969,7 +969,7 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
 
   // ----- New tab state -----
   const [mainTab, setMainTab] = useState<
-    "employees" | "machines" | "grooming" | "incidents" | "photos" | "shift"
+    "employees" | "machines" | "grooming" | "incidents" | "photos" | "shift"  | "training"
   >("employees");
 
   // Machines
@@ -1007,7 +1007,10 @@ const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null
 const [editingRemarkId, setEditingRemarkId] = useState<string | null>(null);
 const [remarkValue, setRemarkValue] = useState<string>("");
 const [savingRemarkId, setSavingRemarkId] = useState<string | null>(null);
-
+// Training & Briefing states
+const [trainingSessions, setTrainingSessions] = useState<any[]>([]);
+const [staffBriefings, setStaffBriefings] = useState<any[]>([]);
+const [loadingTraining, setLoadingTraining] = useState(false);
 const handleSaveRemark = async (machineId: string) => {
   setSavingRemarkId(machineId);
   try {
@@ -1190,6 +1193,8 @@ useEffect(() => {
     setLoadingShift(false);
   }
 };
+
+
 const saveShiftDeployment = async () => {
   try {
     const today = new Date().toISOString().split('T')[0];
@@ -2424,7 +2429,28 @@ const ManagerAttendanceView = () => {
 
   const itemsPerPage = 10;
 const [isMobileSiteView, setIsMobileSiteView] = useState(false);
-
+useEffect(() => {
+  const params = new URLSearchParams(location.search);
+  const dateParam = params.get('date');
+  const startDateParam = params.get('startDate');
+  const endDateParam = params.get('endDate');
+  
+  if (dateParam) {
+    // Single date (from clicking historical day on dashboard)
+    setStartDate(dateParam);
+    setEndDate(dateParam);
+  } else if (startDateParam && endDateParam) {
+    // Date range (from manual selection)
+    setStartDate(startDateParam);
+    setEndDate(endDateParam);
+  }
+}, [location.search]);
+// ✅ ADD THIS - Force refresh when date changes
+useEffect(() => {
+  if (sites.length > 0) {
+    calculateDisplayData(sites);
+  }
+}, [startDate, endDate, viewType, selectedDepartment]);
 useEffect(() => {
   const checkMobile = () => setIsMobileSiteView(window.innerWidth < 768);
   checkMobile();
@@ -2500,87 +2526,215 @@ useEffect(() => {
   // =======================================================================
 
   // Fetch sites data – unchanged from your original
-  const fetchSitesData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      console.log('🔄 Fetching sites from server...');
-      const sitesData = await siteService.getAllSites();
-      if (sitesData && Array.isArray(sitesData)) {
-        console.log(`✅ Successfully fetched ${sitesData.length} sites`);
-        setSites(sitesData);
-        await calculateDisplayData(sitesData);
-      } else {
-        console.warn('⚠️ No sites data received or invalid format');
-        setSites([]);
-        setDisplayData([]);
-        toast.error('No sites data available');
+ const fetchSitesData = async () => {
+  try {
+    setLoading(true);
+    setError(null);
+    console.log('🔄 Fetching sites from server...');
+    const sitesData = await siteService.getAllSites();
+    if (sitesData && Array.isArray(sitesData)) {
+      console.log(`✅ Successfully fetched ${sitesData.length} sites`);
+      setSites(sitesData);
+      // ✅ REMOVED: await calculateDisplayData(sitesData);
+    } else {
+      console.warn('⚠️ No sites data received or invalid format');
+      setSites([]);
+      setDisplayData([]);
+      toast.error('No sites data available');
+    }
+  } catch (err: any) {
+    console.error('❌ Error fetching sites:', err);
+    setError(err.message || 'Failed to fetch sites');
+    toast.error('Failed to fetch sites', {
+      description: err.message || 'Please try again later',
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+// ✅ ADD THIS - Helper function for in-memory calculation
+const calculateSiteAttendanceFromMemory = (
+  site: Site,
+  employees: Employee[],
+  attendanceMap: Map<string, any>,
+  startDate: string,
+  endDate: string
+) => {
+  const daysInPeriod = calculateDaysBetween(startDate, endDate);
+  
+  // Build employee data with attendance status
+  const employeeData: Employee[] = [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
+    const currentDate = formatDate(date);
+    for (const employee of employees) {
+      const mongoId = employee._id || employee.id || '';
+      const attendance = attendanceMap.get(`${mongoId}_${currentDate}`);
+      
+      let status: 'present' | 'absent' | 'leave' | 'weekly-off' = 'absent';
+      let checkInTime = '';
+      let checkOutTime = '';
+      let checkInPhoto = '';
+      let checkOutPhoto = '';
+      let remark = '';
+      let totalHours = 0;
+      
+      if (attendance) {
+        status = attendance.status as any;
+        checkInTime = attendance.checkInTime ? formatTimeForDisplay(attendance.checkInTime) : '';
+        checkOutTime = attendance.checkOutTime ? formatTimeForDisplay(attendance.checkOutTime) : '';
+        checkInPhoto = attendance.checkInPhoto || '';
+        checkOutPhoto = attendance.checkOutPhoto || '';
+        remark = attendance.remarks || '';
+        totalHours = attendance.totalHours || 0;
       }
-    } catch (err: any) {
-      console.error('❌ Error fetching sites:', err);
-      setError(err.message || 'Failed to fetch sites');
-      toast.error('Failed to fetch sites', {
-        description: err.message || 'Please try again later',
+      
+      employeeData.push({
+        ...employee,
+        status,
+        checkInTime,
+        checkOutTime,
+        checkInPhoto,
+        checkOutPhoto,
+        totalHours,
+        site: site.name,
+        siteName: site.name,
+        date: currentDate,
+        remark,
+        action: 'none'
       });
-    } finally {
-      setLoading(false);
     }
+  }
+  
+  // Calculate deployment stats
+  const deploymentStats = calculateSiteDeploymentStats(site, employeeData);
+  const dailyRequirement = deploymentStats.dailyStaffRequirement;
+  const totalRequiredForPeriod = dailyRequirement * daysInPeriod;
+  
+  // Count attendance
+  let totalPresentCount = 0;
+  let totalAbsentCount = 0;
+  let totalWeeklyOffCount = 0;
+  let totalLeaveCount = 0;
+  
+  employeeData.forEach(emp => {
+    if (emp.isManager || emp.isSupervisor) return;
+    if (emp.status === 'present') totalPresentCount++;
+    else if (emp.status === 'absent') totalAbsentCount++;
+    else if (emp.status === 'weekly-off') totalWeeklyOffCount++;
+    else if (emp.status === 'leave') totalLeaveCount++;
+    else totalAbsentCount++;
+  });
+  
+  return {
+    id: `${site._id}-${startDate}-${endDate}`,
+    siteId: `${site._id}-${startDate}-${endDate}`,
+    name: site.name,
+    siteName: site.name,
+    dailyRequirement,
+    totalEmployees: dailyRequirement,
+    deploymentStats,
+    totalRequiredForPeriod,
+    totalPresent: totalPresentCount,
+    totalWeeklyOff: totalWeeklyOffCount,
+    totalLeave: totalLeaveCount,
+    totalAbsent: totalAbsentCount,
+    present: totalPresentCount,
+    weeklyOff: totalWeeklyOffCount,
+    leave: totalLeaveCount,
+    absent: totalAbsentCount,
+    daysInPeriod,
+    startDate,
+    endDate,
+    employees: employeeData,
+    originalSite: site,
+    isRealData: employeeData.length > 0 && employeeData[0]?.employeeId?.startsWith?.('DEMO') === false
   };
-
+};
   // Calculate display data – unchanged
-  const calculateDisplayData = async (sitesData: Site[]) => {
-    try {
-      setRefreshing(true);
-      const calculatedData = [];
-      for (const site of sitesData) {
-        let siteData;
-        if (viewType === 'department' && selectedDepartment) {
-          siteData = await calculateDepartmentSiteData(site, startDate, endDate, selectedDepartment);
-        } else {
-          siteData = await calculateSiteAttendanceData(site, startDate, endDate);
-        }
-        if (!siteData.employees) siteData.employees = [];
-        calculatedData.push(siteData);
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      setDisplayData(calculatedData);
-      console.log(`✅ Calculated display data for ${calculatedData.length} sites`);
-    } catch (error) {
-      console.error('Error calculating display data:', error);
-      setDisplayData(
-        sitesData.map(site => ({
-          ...site,
-          employees: [],
-          isRealData: false,
-          daysInPeriod: calculateDaysBetween(startDate, endDate),
-          startDate,
-          endDate,
-          dailyRequirement: 0,
-          totalEmployees: 0,
-          totalRequiredForPeriod: 0,
-          totalPresent: 0,
-          totalWeeklyOff: 0,
-          totalLeave: 0,
-          totalAbsent: 0,
-          deploymentStats: {
-            totalStaff: 0,
-            managerCount: 0,
-            supervisorCount: 0,
-            staffCount: 0,
-            managerRequirement: site.managerCount || 0,
-            supervisorRequirement: site.supervisorCount || 0,
-            staffRequirement: 0,
-            dailyStaffRequirement: 0,
-            totalStaffRequirementForPeriod: 0,
-            isStaffFull: false,
-            remainingStaff: 0,
-          },
-        }))
+// ✅ NEW - Fetch once, filter in memory
+const calculateDisplayData = async (sitesData: Site[]) => {
+  try {
+    setRefreshing(true);
+
+    // STEP 1: Fetch ALL employees ONCE
+    const allEmployees = await fetchEmployees();
+    console.log(`📊 Fetched ${allEmployees.length} employees once`);
+
+    // STEP 2: Fetch ALL attendance ONCE for the date range
+    const attendanceRecords = await fetchAttendanceRecords(startDate, endDate);
+    console.log(`📊 Fetched ${attendanceRecords.length} attendance records once`);
+
+    // STEP 3: Build lookup map for O(1) access
+    const attendanceMap = new Map<string, any>();
+    attendanceRecords.forEach(record => {
+      attendanceMap.set(`${record.employeeId}_${record.date}`, record);
+    });
+
+    // STEP 4: Process each site using already-fetched data
+    const calculatedData = [];
+    for (const site of sitesData) {
+      // Filter employees for this site
+      const siteEmployees = allEmployees.filter(
+        emp => emp.site === site.name || emp.siteName === site.name
       );
-    } finally {
-      setRefreshing(false);
+
+      // Calculate stats using in-memory data
+      const siteData = calculateSiteAttendanceFromMemory(
+        site,
+        siteEmployees,
+        attendanceMap,
+        startDate,
+        endDate
+      );
+
+      if (!siteData.employees) siteData.employees = [];
+      calculatedData.push(siteData);
+      // ✅ REMOVED the setTimeout delay!
     }
-  };
+
+    setDisplayData(calculatedData);
+    console.log(`✅ Calculated ${calculatedData.length} sites in memory (0 API calls)`);
+
+  } catch (error) {
+    console.error('Error calculating display data:', error);
+    // Fallback to demo data
+    setDisplayData(
+      sitesData.map(site => ({
+        ...site,
+        employees: [],
+        isRealData: false,
+        daysInPeriod: calculateDaysBetween(startDate, endDate),
+        startDate,
+        endDate,
+        dailyRequirement: 0,
+        totalEmployees: 0,
+        totalRequiredForPeriod: 0,
+        totalPresent: 0,
+        totalWeeklyOff: 0,
+        totalLeave: 0,
+        totalAbsent: 0,
+        deploymentStats: {
+          totalStaff: 0,
+          managerCount: 0,
+          supervisorCount: 0,
+          staffCount: 0,
+          managerRequirement: site.managerCount || 0,
+          supervisorRequirement: site.supervisorCount || 0,
+          staffRequirement: 0,
+          dailyStaffRequirement: 0,
+          totalStaffRequirementForPeriod: 0,
+          isStaffFull: false,
+          remainingStaff: 0,
+        },
+      }))
+    );
+  } finally {
+    setRefreshing(false);
+  }
+};
 
   // Initial data fetch – unchanged
   useEffect(() => {

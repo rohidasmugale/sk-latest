@@ -28,14 +28,14 @@ import {
 } from "lucide-react";
 import { format } from 'date-fns';
 import { useRole } from "@/context/RoleContext";
-import { trainingApi } from '@/api/trainingApi';
-import { briefingApi } from '@/api/briefingApi';
+import { trainingApi } from '@/services/trainingApi';
+import { briefingApi } from '@/services/briefingApi';
 import { siteService, Site } from '@/services/SiteService';
 import assignTaskService, { AssignTask } from '@/services/assignTaskService';
 import axios from "axios";
 import { useOutletContext } from 'react-router-dom';
 import CameraCapture from './CameraCapture';
-
+import { DashboardHeader } from "@/components/shared/DashboardHeader";
 const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
@@ -810,46 +810,99 @@ const SupervisorTrainingBriefing: React.FC = () => {
   const updateEditActionItem = (i: number, field: string, val: string) => setEditBriefingForm(p => ({ ...p, actionItems: p.actionItems.map((item, idx) => idx === i ? { ...item, [field]: val } : item) }));
 
   const handleAddTraining = async () => {
-    if (!trainingForm.title || !trainingForm.date || !trainingForm.trainer) { toast.error('Please fill required fields'); return; }
-    if (selectedSupervisors.length === 0) { toast.error('Please select at least one supervisor'); return; }
-    if (selectedManagers.length === 0) { toast.error('Please select at least one manager'); return; }
-    try {
-      setLoading(true);
-      const supervisorsList = selectedSupervisors.map(id => { const s = filteredSupervisors.find(sup => sup._id === id); return s ? { id: s._id, name: s.name } : null; }).filter(Boolean);
-      const managersList = selectedManagers.map(id => { const m = filteredManagers.find(mgr => mgr._id === id); return m ? { id: m._id, name: m.name } : null; }).filter(Boolean);
-      const response = await trainingApi.createTraining({
-        title: trainingForm.title, description: trainingForm.description, type: trainingForm.type, date: trainingForm.date, time: trainingForm.time,
-        duration: trainingForm.duration, trainer: trainingForm.trainer, site: trainingForm.site, department: trainingForm.department,
-        maxAttendees: trainingForm.maxAttendees, location: trainingForm.location, objectives: trainingForm.objectives.filter(o => o.trim() !== ''),
-        supervisors: supervisorsList, managers: managersList, attendees: selectedEmployees
-      }, trainingAttachments);
-      if (response.success) { toast.success('Training added'); await fetchTrainings(); resetTrainingForm(); setTrainingAttachments([]); setShowAddTraining(false); }
-      else throw new Error(response.message);
-    } catch (error: any) { toast.error(error.message); }
-    finally { setLoading(false); }
-  };
-
-  const handleAddBriefing = async () => {
-    if (!briefingForm.date) { toast.error('Date is required'); return; }
-    if (selectedSupervisors.length === 0) { toast.error('Please select at least one supervisor'); return; }
-    if (selectedManagers.length === 0) { toast.error('Please select at least one manager'); return; }
-    try {
-      setLoading(true);
-      const siteName = supervisorAssignedSiteNames[0];
-      if (!siteName) { toast.error('No site assigned'); return; }
-      const supervisorsList = selectedSupervisors.map(id => { const s = filteredSupervisors.find(sup => sup._id === id); return s ? { id: s._id, name: s.name } : null; }).filter(Boolean);
-      const managersList = selectedManagers.map(id => { const m = filteredManagers.find(mgr => mgr._id === id); return m ? { id: m._id, name: m.name } : null; }).filter(Boolean);
-      const actionItems = briefingForm.actionItems.map((item: any) => ({ description: item.description, assignedTo: item.assignedTo, dueDate: item.dueDate, status: item.status || 'pending', priority: item.priority || 'medium' }));
-      const response = await briefingApi.createBriefing({
-        date: briefingForm.date, time: briefingForm.time, conductedBy: briefingForm.conductedBy, site: siteName, department: briefingForm.department,
-        attendeesCount: briefingForm.attendeesCount, topics: briefingForm.topics.filter(t => t.trim() !== ''), keyPoints: briefingForm.keyPoints.filter(k => k.trim() !== ''),
-        actionItems: actionItems, notes: briefingForm.notes, shift: briefingForm.shift, supervisors: supervisorsList, managers: managersList
-      }, briefingAttachments);
-      if (response.success) { toast.success('Briefing added'); await fetchBriefings(); resetBriefingForm(); setBriefingAttachments([]); setShowAddBriefing(false); }
-      else throw new Error(response.message);
-    } catch (error: any) { toast.error(error.message); }
-    finally { setLoading(false); }
-  };
+  if (!trainingForm.title || !trainingForm.date || !trainingForm.trainer) { 
+    toast.error('Please fill required fields'); 
+    return; 
+  }
+  // ✅ REMOVED: Supervisor and Manager validation
+  // No longer require supervisors or managers
+  try {
+    setLoading(true);
+    // ✅ supervisors and managers can be empty arrays
+    const supervisorsList = [];
+    const managersList = [];
+    const response = await trainingApi.createTraining({
+      title: trainingForm.title, 
+      description: trainingForm.description, 
+      type: trainingForm.type, 
+      date: trainingForm.date, 
+      time: trainingForm.time,
+      duration: trainingForm.duration, 
+      trainer: trainingForm.trainer, 
+      site: trainingForm.site, 
+      department: trainingForm.department,
+      maxAttendees: trainingForm.maxAttendees, 
+      location: trainingForm.location, 
+      objectives: trainingForm.objectives.filter(o => o.trim() !== ''),
+      supervisors: supervisorsList, 
+      managers: managersList, 
+      attendees: selectedEmployees
+    }, trainingAttachments);
+    if (response.success) { 
+      toast.success('Training added'); 
+      await fetchTrainings(); 
+      resetTrainingForm(); 
+      setTrainingAttachments([]); 
+      setShowAddTraining(false); 
+    }
+    else throw new Error(response.message);
+  } catch (error: any) { 
+    toast.error(error.message); 
+  }
+  finally { setLoading(false); }
+};
+const handleAddBriefing = async () => {
+  if (!briefingForm.date) { 
+    toast.error('Date is required'); 
+    return; 
+  }
+  // ✅ REMOVED: Supervisor and Manager validation
+  // No longer require supervisors or managers
+  try {
+    setLoading(true);
+    const siteName = supervisorAssignedSiteNames[0];
+    if (!siteName) { 
+      toast.error('No site assigned'); 
+      return; 
+    }
+    // ✅ supervisors and managers can be empty arrays
+    const supervisorsList = [];
+    const managersList = [];
+    const actionItems = briefingForm.actionItems.map((item: any) => ({ 
+      description: item.description, 
+      assignedTo: item.assignedTo, 
+      dueDate: item.dueDate, 
+      status: item.status || 'pending', 
+      priority: item.priority || 'medium' 
+    }));
+    const response = await briefingApi.createBriefing({
+      date: briefingForm.date, 
+      time: briefingForm.time, 
+      conductedBy: briefingForm.conductedBy, 
+      site: siteName, 
+      department: briefingForm.department,
+      attendeesCount: briefingForm.attendeesCount, 
+      topics: briefingForm.topics.filter(t => t.trim() !== ''), 
+      keyPoints: briefingForm.keyPoints.filter(k => k.trim() !== ''),
+      actionItems: actionItems, 
+      notes: briefingForm.notes, 
+      shift: briefingForm.shift, 
+      supervisors: supervisorsList, 
+      managers: managersList
+    }, briefingAttachments);
+    if (response.success) { 
+      toast.success('Briefing added'); 
+      await fetchBriefings(); 
+      resetBriefingForm(); 
+      setBriefingAttachments([]); 
+      setShowAddBriefing(false); 
+    }
+    else throw new Error(response.message);
+  } catch (error: any) { 
+    toast.error(error.message); 
+  }
+  finally { setLoading(false); }
+};
 
   const handleUpdateTraining = async () => {
     if (!editingTraining) return;
@@ -980,14 +1033,11 @@ const SupervisorTrainingBriefing: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <motion.header className="bg-card border-b px-4 md:px-6 py-4 sticky top-0 z-40">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={onMenuClick} className="lg:hidden"><Menu className="h-5 w-5" /></Button>
-            <div><h1 className="text-xl md:text-2xl font-bold">Training & Staff Briefing</h1><p className="text-xs text-muted-foreground">Manage sessions for your assigned sites</p></div>
-          </div>
-        </div>
-      </motion.header>
+     <DashboardHeader 
+  title="Training & Staff Briefing" 
+  subtitle="Manage sessions for your assigned sites" 
+  onMenuClick={onMenuClick}
+/>
 
       <div className="p-3 sm:p-4 md:p-6">
         <div className="mb-6">

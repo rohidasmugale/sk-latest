@@ -93,9 +93,9 @@ const StaffBriefingSchema: Schema = new Schema(
       default: ''
     },
     conductedBy: {
-      type: String,
-      required: true
-    },
+  type: String,
+  default: ''
+},
     site: {
       type: String,
       required: true

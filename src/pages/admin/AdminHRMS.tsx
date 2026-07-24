@@ -177,7 +177,6 @@ const [salarySlips, setSalarySlips] = useState<SalarySlip[]>([]);
         title={<span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">HRMS - Human Resource Management</span>}
         onMenuClick={handleMenuClick}
       />
-      
       {/* Mobile Sidebar */}
       {mobileSidebarOpen && (
         <DashboardSidebar 
@@ -191,15 +190,7 @@ const [salarySlips, setSalarySlips] = useState<SalarySlip[]>([]);
         animate={{ opacity: 1, y: 0 }}
         className="p-3 sm:p-4 md:p-6 space-y-4 md:space-y-6"
       >
-        {/* Stats Cards - Responsive Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <StatCard title="Total Employees" value={totalEmployees} icon={Users} color="primary" subtitle="All staff members" />
-          <StatCard title="Active" value={activeEmployees} icon={UserCheck} color="success" subtitle="Currently working" />
-          <StatCard title="Pending Leaves" value={pendingLeaves} icon={Clock} color="warning" subtitle="Awaiting approval" />
-          <StatCard title="Present Today" value={presentToday} icon={CheckCircle} color="success" subtitle="Today's attendance" />
-          <StatCard title="Payroll Pending" value={payrollPending} icon={DollarSign} color="danger" subtitle="To be processed" />
-          <StatCard title="Avg Rating" value={avgPerformance} icon={TrendingUp} color="purple" subtitle="Performance score" />
-        </div>
+      
 
         {/* Mobile Tab Selector */}
         <MobileTabSelector

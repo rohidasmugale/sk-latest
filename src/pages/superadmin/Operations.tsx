@@ -1,8 +1,9 @@
+// src/pages/SuperAdmin/Operations.tsx
 import { useState, useEffect } from "react";
 import { DashboardHeader } from "@/components/shared/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building, ClipboardList, ChevronDown, ChevronUp, Loader2, RefreshCw, AlertCircle } from "lucide-react";
+import { Building, ClipboardList, ChevronDown, ChevronUp, Calendar, Loader2, RefreshCw, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { useOutletContext } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,8 @@ import {
 import { toast } from 'sonner';
 import AssignTaskPage from "./components/AssignTaskPage";
 import SitesSection from "./components/SitesSection";
+// ✅ CORRECT IMPORT PATH
+import TrainingBriefingSectionManager from "@/pages/manager/components/TrainingBriefingSectionManager";
 import { PullToRefreshWrapper } from '@/components/shared/PullToRefreshWrapper';
 import axios from "axios";
 
@@ -70,24 +73,22 @@ const MobileTabSelector = ({
   );
 };
 
-const Operations = () => {
+const SuperAdminOperations = () => {
   const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
   const [activeTab, setActiveTab] = useState("assign");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [refreshTrigger, setRefreshTrigger] = useState(0); // ✅ ADDED
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
-  // Mobile responsive state
   const [isMobileView, setIsMobileView] = useState(false);
 
-  // Define tabs for mobile selector
   const tabs = [
     { value: "assign", label: "Assign Task", icon: <ClipboardList className="h-4 w-4" /> },
     { value: "sites", label: "Sites", icon: <Building className="h-4 w-4" /> },
+    { value: "training", label: "Training & Briefing", icon: <Calendar className="h-4 w-4" /> },
   ];
 
-  // Fetch all data
   const fetchAllData = async (showToast: boolean = false) => {
     try {
       setError(null);
@@ -98,7 +99,6 @@ const Operations = () => {
         setLoading(true);
       }
 
-      // Fetch tasks and sites in parallel
       const [tasksRes, sitesRes] = await Promise.all([
         axios.get(`${API_URL}/tasks`),
         axios.get(`${API_URL}/sites`)
@@ -111,7 +111,7 @@ const Operations = () => {
         } 
       }));
 
-      setRefreshTrigger(prev => prev + 1); // ✅ ADDED - increment trigger
+      setRefreshTrigger(prev => prev + 1);
 
       if (showToast) {
         toast.dismiss();
@@ -133,20 +133,16 @@ const Operations = () => {
     }
   };
 
-  // Initial data fetch
   useEffect(() => {
     fetchAllData(false);
   }, []);
 
-  // Check for mobile view on mount and resize
   useEffect(() => {
     const checkMobile = () => {
       setIsMobileView(window.innerWidth < 1024);
     };
-    
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
@@ -168,7 +164,6 @@ const Operations = () => {
         animate={{ opacity: 1, y: 0 }}
         className="p-4 md:p-6 space-y-4 md:space-y-6"
       >
-        {/* Error Display */}
         {error && (
           <Card className="border-red-200 bg-red-50">
             <CardContent className="p-4">
@@ -190,7 +185,6 @@ const Operations = () => {
           </Card>
         )}
 
-        {/* Refresh Button */}
         <div className="flex justify-end">
           <Button 
             variant="outline" 
@@ -203,7 +197,6 @@ const Operations = () => {
           </Button>
         </div>
 
-        {/* Loading State */}
         {loading ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
@@ -213,16 +206,14 @@ const Operations = () => {
           </Card>
         ) : (
           <>
-            {/* Mobile Tab Selector */}
             <MobileTabSelector
               activeTab={activeTab}
               onTabChange={setActiveTab}
               tabs={tabs}
             />
 
-            {/* Desktop Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 md:space-y-6">
-              <TabsList className="hidden lg:grid w-full grid-cols-2">
+              <TabsList className="hidden lg:grid w-full grid-cols-3">
                 <TabsTrigger value="assign" className="text-sm">
                   <ClipboardList className="h-4 w-4 mr-2" />
                   Assign Task
@@ -231,16 +222,22 @@ const Operations = () => {
                   <Building className="h-4 w-4 mr-2" />
                   Sites
                 </TabsTrigger>
+                <TabsTrigger value="training" className="text-sm">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Training & Briefing
+                </TabsTrigger>
               </TabsList>
 
-              {/* Assign Task Tab - ✅ WITH refreshTrigger */}
               <TabsContent value="assign">
                 <AssignTaskPage refreshTrigger={refreshTrigger} />
               </TabsContent> 
 
-              {/* Sites Tab - ✅ WITH refreshTrigger */}
               <TabsContent value="sites">
                 <SitesSection refreshTrigger={refreshTrigger} />
+              </TabsContent>
+
+              <TabsContent value="training">
+                <TrainingBriefingSectionManager />
               </TabsContent>
             </Tabs>
           </>
@@ -250,4 +247,4 @@ const Operations = () => {
   );
 };
 
-export default Operations;
+export default SuperAdminOperations;

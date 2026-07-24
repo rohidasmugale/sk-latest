@@ -27,14 +27,10 @@ export const getAllTrainings = async (req: Request, res: Response) => {
     const { role, assignedSites, siteName } = req.user; // from middleware
     let filter: any = {};
 
-    // Apply roleâ€‘based site filtering
-    if (role === 'superadmin') {
-      // no site filter â€“ see all
-    } else if (role === 'manager') {
-      if (!assignedSites || assignedSites.length === 0) {
-        return res.status(403).json({ success: false, message: 'No sites assigned to you' });
-      }
-      filter.site = { $in: assignedSites };
+    // ✅ UPDATED: Managers now see everything (like superadmin)
+    if (role === 'superadmin' || role === 'manager'||role==='admin') {
+      // ✅ No site filter - managers see ALL trainings
+      // no filter applied
     } else if (role === 'supervisor') {
       if (!siteName) {
         return res.status(403).json({ success: false, message: 'No site assigned to you' });
@@ -68,7 +64,6 @@ export const getAllTrainings = async (req: Request, res: Response) => {
       TrainingSession.countDocuments(filter)
     ]);
 
-    
     console.log(`Found ${trainings.length} training sessions`);
     const transformedTrainings = trainings.map(training => ({
       id: training._id.toString(),

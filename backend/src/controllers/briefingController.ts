@@ -25,11 +25,10 @@ export const getAllBriefings = async (req: Request, res: Response) => {
     const { role, assignedSites, siteName } = req.user;
     let filter: any = {};
 
-    if (role === 'superadmin') {
-      // no filter
-    } else if (role === 'manager') {
-      if (!assignedSites?.length) return res.status(403).json({ success: false, message: 'No sites assigned' });
-      filter.site = { $in: assignedSites };
+    // ✅ UPDATED: Managers now see everything (like superadmin)
+    if (role === 'superadmin' || role === 'manager'||role==='admin') {
+      // ✅ No site filter - managers see ALL briefings
+      // no filter applied
     } else if (role === 'supervisor') {
       if (!siteName) return res.status(403).json({ success: false, message: 'No site assigned' });
       filter.site = siteName;
@@ -52,7 +51,6 @@ export const getAllBriefings = async (req: Request, res: Response) => {
       ];
     }
 
-   
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
     const skip = (pageNum - 1) * limitNum;
@@ -96,7 +94,6 @@ export const getAllBriefings = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: "Error fetching staff briefings", error: error.message });
   }
 };
-
 export const getBriefingById = async (req: Request, res: Response) => {
   try {
     console.log(`GET /api/briefings/${req.params.id} called`);
@@ -160,7 +157,7 @@ export const createBriefing = async (req: Request, res: Response) => {
         
         const userType = req.headers['x-user-type'] as string || 'superadmin';
         
-        const requiredFields = ["date", "conductedBy", "site"];
+        const requiredFields = ["date", "site"];
         const missingFields = requiredFields.filter(field => !briefingData[field]);
         
         if (missingFields.length > 0) {
@@ -170,13 +167,8 @@ export const createBriefing = async (req: Request, res: Response) => {
           });
         }
         
-        if (!briefingData.supervisors || briefingData.supervisors.length === 0) {
-          return res.status(400).json({ success: false, message: "At least one supervisor is required" });
-        }
-        
-        if (!briefingData.managers || briefingData.managers.length === 0) {
-          return res.status(400).json({ success: false, message: "At least one manager is required" });
-        }
+        // ✅ REMOVED: Supervisor and Manager validation
+        // No longer require supervisors or managers
         
         const attachments: IAttachment[] = [];
         const files = req.files as Express.Multer.File[];
@@ -215,7 +207,7 @@ export const createBriefing = async (req: Request, res: Response) => {
         const briefingWithCreator = {
           date: briefingData.date,
           time: briefingData.time || '',
-          conductedBy: briefingData.conductedBy,
+          conductedBy: briefingData.conductedBy || '',
           site: briefingData.site,
           department: briefingData.department || '',
           attendeesCount: briefingData.attendeesCount || 0,

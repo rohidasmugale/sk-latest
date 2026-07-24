@@ -16,6 +16,7 @@ export interface IUser extends Document {
   createdBy?: mongoose.Types.ObjectId;
   assignedSites?: string[];
   siteName?: string;
+    site: { type: String, default: '' };
   avatar?: string;
   lastLogin?: Date;
   passwordChangedAt?: Date;

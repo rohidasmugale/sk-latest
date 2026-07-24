@@ -1638,11 +1638,7 @@ useEffect(() => {
           totalEmployees: fetchedEmployees.length
         }));
         
-        if (fetchedEmployees.length > 0) {
-          toast.success(`Loaded ${fetchedEmployees.length} employees for your task-assigned sites`);
-        } else {
-          toast.warning(`No employees found for your task-assigned sites: ${supervisorSiteNameList.join(', ')}`);
-        }
+        
       }
       
       setEmployees(fetchedEmployees);
@@ -2447,21 +2443,21 @@ useEffect(() => {
     toast.success("Dashboard data refreshed!");
   };
 
-  const loadData = async () => {
-    const result = await fetchAssignedTasks();
-    await fetchAllLeaveRequests();
-    
-    setStats(prev => ({
-      ...prev,
-      totalEmployees: summary.totalEmployees,
-      assignedTasks: result.assigned,
-      completedTasks: result.completed,
-      pendingRequests: pendingLeaveCount
-    }));
-    setActivities(prev => [...prev]);
-    setTeam([]);
-  };
-
+ const loadData = async () => {
+  const result = await fetchAssignedTasks();
+  await fetchAllLeaveRequests();
+  
+  setStats(prev => ({
+    ...prev,
+    totalEmployees: summary.totalEmployees,
+    assignedTasks: result.assigned,
+    completedTasks: result.completed,
+    pendingRequests: pendingLeaveCount
+  }));
+  // Remove these two lines:
+  // setActivities(prev => [...prev]);
+  // setTeam([]);
+};
   // Check if it's a new day
   const isNewDay = () => {
     if (!attendance.lastCheckInDate) return true;

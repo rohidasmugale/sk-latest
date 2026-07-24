@@ -4,6 +4,7 @@ import xlsx from 'xlsx';
 import path from 'path';
 import fs from 'fs';
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import Employee, { IEmployee } from '../models/Employee';
 import { 
   uploadImageToCloudinary, 
@@ -842,6 +843,31 @@ router.post('/',
           message: 'Employee with same email or Aadhar already exists' 
         });
       }
+
+       const Site = mongoose.model('Site');
+      const site = await Site.findOne({ name: employeeData.siteName });
+      
+      if (!site) {
+        return res.status(404).json({
+          success: false,
+          message: `Site "${employeeData.siteName}" not found. Please create the site first.`
+        });
+      }
+
+      // ✅ Atomic counter increment
+      const updatedSite = await Site.findByIdAndUpdate(
+        site._id,
+        { $inc: { employeeCounter: 1 } },
+        { new: true }
+      );
+
+      // ✅ Generate simple serial ID (1, 2, 3...)
+      const employeeId = updatedSite.employeeCounter.toString();
+      
+      console.log(`✅ Generated employee ID: ${employeeId} for site: ${site.name}`);
+      
+      // ✅ Set the generated ID
+      employeeData.employeeId = employeeId;
 
       let photoUrl = '';
       let photoPublicId = '';

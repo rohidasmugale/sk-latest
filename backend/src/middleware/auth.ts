@@ -2,6 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
+import { UserSiteService } from '../services/userSiteService';
 
 // Extend Express Request type
 declare global {
@@ -12,32 +13,45 @@ declare global {
     }
   }
 }
+
 export const auth = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.header('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ success: false, error: 'No authentication token provided' });
     }
+
     const token = authHeader.replace('Bearer ', '');
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
 
-    // 👇 CRITICAL: Get full user from DB (includes assignedSites, siteName)
+    // Get full user from DB
     const user = await User.findById(decoded.userId).select('-password').lean();
-    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
-    if (!user.isActive) return res.status(403).json({ success: false, error: 'User account is inactive' });
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    if (!user.isActive) {
+      return res.status(403).json({ success: false, error: 'User account is inactive' });
+    }
 
-    // 👇 Attach these fields to req.user
+    // ✅ Get site info from AssignTask/Employee
+    const siteInfo = await UserSiteService.getUserSites(
+      user._id.toString(),
+      user.role
+    );
+
+    // Attach to req.user with site info
     req.user = {
       _id: user._id.toString(),
       role: user.role,
-      name: user.name,
+      name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
       email: user.email,
-      assignedSites: user.assignedSites || [],
-      siteName: user.siteName || null,
+      department: user.department || '',
+      assignedSites: siteInfo.assignedSites,
+      siteName: siteInfo.siteName,
     };
     req.userId = user._id.toString();
 
-    console.log(`✅ Auth: ${user.name} (${user.role}) accessing ${req.method} ${req.path}`);
+    console.log(`✅ Auth: ${user.email} (${user.role}) site: ${siteInfo.siteName || 'none'}`);
     next();
   } catch (error: any) {
     console.error('❌ Auth middleware error:', error.message);
@@ -77,8 +91,8 @@ export const mockAuth = async (req: Request, res: Response, next: NextFunction) 
           const user = await User.findById(decoded.userId).select('-password');
           if (user) {
             req.user = user;
-            req.userId = user._id.toString(); // Add this line
-            console.log(`✅ Mock Auth: Using real user ${user.name}`);
+            req.userId = user._id.toString();
+            console.log(`✅ Mock Auth: Using real user ${user.name || user.email}`);
             return next();
           }
         }
@@ -93,9 +107,11 @@ export const mockAuth = async (req: Request, res: Response, next: NextFunction) 
       _id: 'system',
       name: 'System User',
       email: 'system@example.com',
-      role: 'admin'
+      role: 'admin',
+      assignedSites: [],
+      siteName: null,
     };
-    req.userId = 'system'; // Add this line
+    req.userId = 'system';
     
     console.log(`⚠️ Mock Auth: Using system user for ${req.method} ${req.path}`);
     next();
@@ -124,5 +140,6 @@ export const authorize = (...roles: string[]) => {
     next();
   };
 };
+
 export const authenticate = auth;
 export const requireRole = authorize;

@@ -153,26 +153,14 @@ const TrainingSessionSchema: Schema = new Schema(
       type: [String],
       default: []
     },
-    supervisors: {
-      type: [SupervisorSchema],
-      default: [],
-      validate: {
-        validator: function(v: any[]) {
-          return v.length > 0;
-        },
-        message: 'At least one supervisor is required'
-      }
-    },
-    managers: {
-      type: [ManagerSchema],
-      default: [],
-      validate: {
-        validator: function(v: any[]) {
-          return v.length > 0;
-        },
-        message: 'At least one manager is required'
-      }
-    },
+   supervisors: {
+  type: [SupervisorSchema],
+  default: []
+},
+managers: {
+  type: [ManagerSchema],
+  default: []
+},
     createdBy: {
       type: String,
       default: 'system'

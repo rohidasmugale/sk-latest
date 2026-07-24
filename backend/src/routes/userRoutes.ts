@@ -115,7 +115,7 @@ router.post('/signup', async (req: Request, res: Response) => {
     const token = jwt.sign(
       { userId: newUser._id, role: newUser.role },
       process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '7d' }
+       { expiresIn: '30d' }
     );
 
     // User response without password
@@ -261,7 +261,7 @@ router.post('/login', async (req: Request, res: Response) => {
         name: user.name
       },
       process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '7d' }
+       { expiresIn: '30d' }
     );
 
     console.log(`🔑 Token generated: ${token.substring(0, 20)}...`);
@@ -481,7 +481,7 @@ router.post('/create-default-admin', async (req: Request, res: Response) => {
     const token = jwt.sign(
       { userId: admin._id, role: admin.role },
       process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '7d' }
+       { expiresIn: '30d' }
     );
 
     res.status(201).json({

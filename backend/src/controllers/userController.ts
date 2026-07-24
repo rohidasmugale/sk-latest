@@ -31,72 +31,60 @@ export const getAllUsers = async (req: Request, res: Response) => {
   }
 };
 
+// controllers/userController.ts - Update createUser
 export const createUser = async (req: Request, res: Response) => {
   try {
-    console.log('👑 [CONTROLLER] Creating user with data:', req.body);
-    
-    // Check if superadmin already exists when trying to create one
-    if (req.body.role === 'superadmin') {
-      const existingSuperadmin = await User.findOne({ role: 'superadmin' });
-      
-      if (existingSuperadmin) {
-        console.log('👑 [CONTROLLER] Superadmin already exists:', existingSuperadmin.email);
-        return res.status(400).json({ 
-          success: false,
-          message: 'Only one superadmin is allowed. A superadmin already exists.'
-        });
-      }
+    const { 
+      username, email, password, role, firstName, lastName, 
+      department, site, siteName, assignedSites, phone, joinDate 
+    } = req.body;
+
+    // Check if user exists
+    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+    if (existingUser) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'User with this email or username already exists' 
+      });
     }
-    
-    // Generate username from email if not provided
-    if (!req.body.username && req.body.email) {
-      req.body.username = req.body.email.split('@')[0];
-    }
-    
-    const userData = req.body;
-    const user = new User(userData);
-    
-    console.log('👑 [CONTROLLER] Attempting to save user...');
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // ✅ Create user with site fields
+    const user = new User({
+      username: username || email.split('@')[0],
+      email,
+      password: hashedPassword,
+      role,
+      firstName: firstName || '',
+      lastName: lastName || '',
+      department: department || '',
+      site: site || siteName || '',
+      siteName: siteName || site || '', // ✅ Store siteName
+      assignedSites: assignedSites || (site ? [site] : []), // ✅ Store assignedSites
+      phone: phone || '',
+      joinDate: joinDate || new Date().toISOString().split('T')[0],
+      isActive: true,
+    });
+
     await user.save();
-    
-    console.log('✅ [CONTROLLER] User created successfully');
+
+    // Return user without password
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
     res.status(201).json({
       success: true,
-      user,
-      message: 'User created successfully'
+      message: 'User created successfully',
+      user: userResponse
     });
   } catch (error: any) {
-    console.error('❌ [CONTROLLER] Error creating user:', error.message);
-    
-    // Handle specific superadmin limit error from Mongoose middleware
-    if (error.name === 'SuperadminLimitError') {
-      return res.status(400).json({ 
-        success: false,
-        message: error.message
-      });
-    }
-    
-    // Handle duplicate key errors
-    if (error.code === 11000) {
-      const field = Object.keys(error.keyPattern)[0];
-      return res.status(400).json({ 
-        success: false,
-        message: `${field} already exists`
-      });
-    }
-    
-    // Handle validation errors
-    if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map((err: any) => err.message);
-      return res.status(400).json({ 
-        success: false,
-        message: messages.join(', ')
-      });
-    }
-    
-    res.status(400).json({ 
-      success: false,
-      message: error.message || 'Error creating user'
+    console.error('Error creating user:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error creating user', 
+      error: error.message 
     });
   }
 };

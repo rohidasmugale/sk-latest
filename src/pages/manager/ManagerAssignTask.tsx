@@ -68,7 +68,7 @@ import { useRole } from '@/context/RoleContext';
 import ManagerAssignTaskPopup from './ManagerAssignTaskPopup';
 import { useOutletContext } from 'react-router-dom'; // Added for outlet context
 import { motion } from 'framer-motion'; // Added for animations
-
+import { DashboardHeader } from "@/components/shared/DashboardHeader";
 interface SiteStaffCounts {
   [siteId: string]: {
     managers: number;
@@ -1108,69 +1108,15 @@ const ManagerAssignTask: React.FC = () => {
       className="min-h-screen bg-gradient-to-b from-background to-background/80"
     >
       {/* Header with Hamburger Menu - Mobile Responsive */}
-      <motion.header
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="bg-card border-b border-border px-4 md:px-6 py-4 sticky top-0 z-40"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* Hamburger Menu for Mobile */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onMenuClick}
-              className="lg:hidden"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-            
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold">Manager Tasks</h1>
-              <p className="text-xs md:text-sm text-muted-foreground mt-1">
-                View and manage tasks assigned to you or created by you
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 md:gap-4">
-            <Button 
-              onClick={() => setShowAssignPopup(true)} 
-              size="sm" 
-              className="bg-primary text-xs sm:text-sm whitespace-nowrap"
-            >
-              <Plus className="mr-1 h-4 w-4" />
-              <span className="hidden xs:inline">Assign Task</span>
-              <span className="xs:hidden">Assign</span>
-            </Button>
-            <Badge variant="outline" className="hidden sm:flex px-3 py-1">
-              <Shield className="h-4 w-4 mr-2" />
-              Manager View
-            </Badge>
-          </div>
-        </div>
-      </motion.header>
+    <DashboardHeader 
+  title="Manager Tasks" 
+  subtitle="View and manage tasks assigned to you or created by you"
+  onMenuClick={onMenuClick}
+/>
 
       <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
         {/* Info Card */}
-        <Card className="bg-primary/5 border-primary/10">
-          <CardContent className="p-3 md:p-4">
-            <div className="flex items-start gap-2 md:gap-3">
-              <AlertCircle className="h-4 w-4 md:h-5 md:w-5 text-primary mt-0.5 flex-shrink-0" />
-              <div>
-                <h3 className="font-medium text-sm md:text-base">Tasks Overview</h3>
-                <p className="text-xs md:text-sm text-muted-foreground">
-                  Showing tasks where you are assigned as a manager and tasks you have created.
-                  {tasks.length > 0 && (
-                    <span className="ml-1 font-medium">
-                      ({createdByMeCount} created, {assignedToMeCount} assigned to you)
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+       
 
         {/* Search and Filters */}
         <Card>

@@ -48,9 +48,9 @@ import {
   Shield,
   ShieldCheck,
   Camera,
-  ExternalLink, Home, Car, Trash2, Droplets, ShoppingCart,Settings,  Images,Cpu,        // missing
-  Shirt,   Factory   // missing
-  
+  ExternalLink, Home, Car, Trash2, Droplets, ShoppingCart, Settings, Images, Cpu,        // missing
+  Shirt, Factory, MessageSquare // missing
+
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -61,7 +61,7 @@ import { useRole } from "@/context/RoleContext";
 import { machineService, type FrontendMachine } from "@/services/machineService";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // API URL
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 const apiClient = axios.create({ baseURL: API_URL });
@@ -258,49 +258,49 @@ const fetchEmployees = async (): Promise<Employee[]> => {
       }
     }
 
-    
 
 
-// Then change the map signature:
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const transformedEmployees: Employee[] = employeesData.map((emp: any) => {
-  const employee: Employee = {
-    id: str(emp._id || emp.id) || `emp_${Math.random()}`,
-    _id: str(emp._id || emp.id) || undefined,
-    employeeId: str(emp.employeeId || emp.employeeID) || `EMP${String(Math.random()).slice(2, 6)}`,
-    name: str(emp.name || emp.employeeName, "Unknown Employee"),
-    email: str(emp.email),
-    phone: str(emp.phone || emp.mobile),
-    department: str(emp.department, "Unknown Department"),
-    position: str(emp.position || emp.designation || emp.role, "Employee"),
-    site: str(emp.site || emp.siteName, "Main Site"),
-    siteName: str(emp.siteName || emp.site, "Main Site"),
-    status: "present",
-    employeeStatus: str(emp.status, "active"),
-    role: str(emp.role, "employee"),
-    gender: str(emp.gender),
-    dateOfJoining: str(emp.dateOfJoining || emp.joinDate),
-    dateOfBirth: str(emp.dateOfBirth),
-    salary: num(emp.salary || emp.basicSalary),
-    assignedSites: arr(emp.assignedSites || emp.sites),
-    shift: str(emp.shift, "General"),
-    workingHours: str(emp.workingHours, "9:00 AM - 6:00 PM"),
-    employeeType: str(emp.employeeType || emp.type, "Full-time"),
-    reportingManager: str(emp.reportingManager || emp.manager),
-    createdAt: str(emp.createdAt || emp.created, new Date().toISOString()),
-    updatedAt: str(emp.updatedAt || emp.updated, new Date().toISOString()),
-    date: new Date().toISOString().split("T")[0],
-    isManager: false,
-    isSupervisor: false,
-  };
 
-  const position = employee.position.toLowerCase();
-  const department = employee.department.toLowerCase();
-  employee.isManager = position.includes("manager") || department.includes("manager");
-  employee.isSupervisor = position.includes("supervisor") || department.includes("supervisor");
+    // Then change the map signature:
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const transformedEmployees: Employee[] = employeesData.map((emp: any) => {
+      const employee: Employee = {
+        id: str(emp._id || emp.id) || `emp_${Math.random()}`,
+        _id: str(emp._id || emp.id) || undefined,
+        employeeId: str(emp.employeeId || emp.employeeID) || `EMP${String(Math.random()).slice(2, 6)}`,
+        name: str(emp.name || emp.employeeName, "Unknown Employee"),
+        email: str(emp.email),
+        phone: str(emp.phone || emp.mobile),
+        department: str(emp.department, "Unknown Department"),
+        position: str(emp.position || emp.designation || emp.role, "Employee"),
+        site: str(emp.site || emp.siteName, "Main Site"),
+        siteName: str(emp.siteName || emp.site, "Main Site"),
+        status: "present",
+        employeeStatus: str(emp.status, "active"),
+        role: str(emp.role, "employee"),
+        gender: str(emp.gender),
+        dateOfJoining: str(emp.dateOfJoining || emp.joinDate),
+        dateOfBirth: str(emp.dateOfBirth),
+        salary: num(emp.salary || emp.basicSalary),
+        assignedSites: arr(emp.assignedSites || emp.sites),
+        shift: str(emp.shift, "General"),
+        workingHours: str(emp.workingHours, "9:00 AM - 6:00 PM"),
+        employeeType: str(emp.employeeType || emp.type, "Full-time"),
+        reportingManager: str(emp.reportingManager || emp.manager),
+        createdAt: str(emp.createdAt || emp.created, new Date().toISOString()),
+        updatedAt: str(emp.updatedAt || emp.updated, new Date().toISOString()),
+        date: new Date().toISOString().split("T")[0],
+        isManager: false,
+        isSupervisor: false,
+      };
 
-  return employee;
-});
+      const position = employee.position.toLowerCase();
+      const department = employee.department.toLowerCase();
+      employee.isManager = position.includes("manager") || department.includes("manager");
+      employee.isSupervisor = position.includes("supervisor") || department.includes("supervisor");
+
+      return employee;
+    });
 
     console.log(`✅ Loaded ${transformedEmployees.length} employees`);
     return transformedEmployees;
@@ -552,7 +552,7 @@ const generateEmployeeData = async (
         let checkInPhoto = '';
         let checkOutPhoto = '';
         let remark = '';
-let totalHours = 0;
+        let totalHours = 0;
         if (attendance) {
           status = attendance.status as any;
           checkInTime = attendance.checkInTime
@@ -581,7 +581,7 @@ let totalHours = 0;
           checkOutTime,
           checkInPhoto,
           checkOutPhoto,
-            totalHours,
+          totalHours,
           site: siteName,
           siteName,
           date: currentDate,
@@ -981,7 +981,7 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
 
   // ----- New tab state -----
   const [mainTab, setMainTab] = useState<
-    "employees" | "machines" | "grooming" | "incidents" | "photos" | "shift"
+    "employees" | "machines" | "grooming" | "incidents" | "photos" | "shift" | "training"
   >("employees");
 
   // Machines
@@ -1004,114 +1004,118 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
 
   // Shift deployment
   const [shiftText, setShiftText] = useState<string>("");
-// Shift deployment state
-const [todayShift, setTodayShift] = useState<string>("");
-const [tomorrowShift, setTomorrowShift] = useState<string>("");
-const [editTodayText, setEditTodayText] = useState<string>("");
-const [editTomorrowText, setEditTomorrowText] = useState<string>("");
-const [editingShift, setEditingShift] = useState(false);
-const [loadingShift, setLoadingShift] = useState(false);
-const [editShiftText, setEditShiftText] = useState("");
+  // Shift deployment state
+  const [todayShift, setTodayShift] = useState<string>("");
+  const [tomorrowShift, setTomorrowShift] = useState<string>("");
+  const [editTodayText, setEditTodayText] = useState<string>("");
+  const [editTomorrowText, setEditTomorrowText] = useState<string>("");
+  const [editingShift, setEditingShift] = useState(false);
+  const [loadingShift, setLoadingShift] = useState(false);
+  const [editShiftText, setEditShiftText] = useState("");
   const siteName = siteData?.siteName || siteData?.name;
   // Grooming count for this site
-const [groomingCount, setGroomingCount] = useState(0);
-const [loadingGroomingCount, setLoadingGroomingCount] = useState(false);
-const [isMobileView, setIsMobileView] = useState(false);
+  const [groomingCount, setGroomingCount] = useState(0);
+  const [loadingGroomingCount, setLoadingGroomingCount] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(false);
 
-const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null);
-// Remark editing for machines (inside SiteEmployeeDetails)
-const [editingRemarkId, setEditingRemarkId] = useState<string | null>(null);
-const [remarkValue, setRemarkValue] = useState<string>("");
-const [savingRemarkId, setSavingRemarkId] = useState<string | null>(null);
+  // Training & Briefing states
+  const [trainingSessions, setTrainingSessions] = useState<any[]>([]);
+  const [staffBriefings, setStaffBriefings] = useState<any[]>([]);
+  const [loadingTraining, setLoadingTraining] = useState(false);
+  const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null);
+  // Remark editing for machines (inside SiteEmployeeDetails)
+  const [editingRemarkId, setEditingRemarkId] = useState<string | null>(null);
+  const [remarkValue, setRemarkValue] = useState<string>("");
+  const [savingRemarkId, setSavingRemarkId] = useState<string | null>(null);
 
-const handleSaveRemark = async (machineId: string) => {
-  setSavingRemarkId(machineId);
-  try {
-    await machineService.updateMachine(machineId, { remark: remarkValue });
-    setMachines(prev =>
-      prev.map(m => (m._id === machineId ? { ...m, remark: remarkValue } : m))
-    );
-    toast.success("Remark saved");
-    setEditingRemarkId(null);
-  } catch (error) {
-    toast.error("Failed to save remark");
-  } finally {
-    setSavingRemarkId(null);
-  }
-};
-
-const startEditingRemark = (machine: FrontendMachine) => {
-  setEditingRemarkId(machine._id);
-  setRemarkValue(machine.remark || "");
-};
-const toggleExpand = (id: string) => setExpandedEmployeeId(prev => prev === id ? null : id);
-const fetchGroomingCount = async () => {
-  if (!siteName || mainTab !== "employees") return;
-  setLoadingGroomingCount(true);
-  try {
-    const res = await apiClient.get('/grooming', {
-      params: { date: selectedDate, site: siteName }
-    });
-    const records = res.data?.data || [];
-    // records is an array of grooming records for employees of this site on selectedDate
-    // We consider "improper" if any required item is missing
-    // For simplicity, count employees that have at least one missing grooming item
-    let improperCount = 0;
-    records.forEach((rec: any) => {
-      // Check required fields based on gender (we don't have gender here, use basic)
-      const missing = !rec.shirt || !rec.pant || !rec.cap || !rec.shoes || !rec.idCard;
-      if (missing) improperCount++;
-    });
-    setGroomingCount(improperCount);
-  } catch (error) {
-    console.error("Error fetching grooming count:", error);
-    setGroomingCount(0);
-  } finally {
-    setLoadingGroomingCount(false);
-  }
-};
-// ---- Place this at the top of SiteEmployeeDetails, after the useState declarations ----
-const getDerivedAttendanceStatus = (employee: any) => {
-  const status = employee.status;
-  const checkInTime = employee.checkInTime;
-  if (status === 'weekly-off' || status === 'leave') {
-    return { status, isLate: false };
-  }
-  let isLate = false;
-  if (checkInTime && checkInTime !== '-') {
-    const timeStr = checkInTime;
-    const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
-    if (match) {
-      let hours = parseInt(match[1]);
-      const minutes = parseInt(match[2]);
-      const period = match[3].toUpperCase();
-      if (period === 'PM' && hours !== 12) hours += 12;
-      if (period === 'AM' && hours === 12) hours = 0;
-      const totalMinutes = hours * 60 + minutes;
-      isLate = totalMinutes > 9 * 60 + 30;
+  const handleSaveRemark = async (machineId: string) => {
+    setSavingRemarkId(machineId);
+    try {
+      await machineService.updateMachine(machineId, { remark: remarkValue });
+      setMachines(prev =>
+        prev.map(m => (m._id === machineId ? { ...m, remark: remarkValue } : m))
+      );
+      toast.success("Remark saved");
+      setEditingRemarkId(null);
+    } catch (error) {
+      toast.error("Failed to save remark");
+    } finally {
+      setSavingRemarkId(null);
     }
-  }
-  let derivedStatus = status;
-  if (employee.checkOutTime && employee.totalHours !== undefined) {
-    const totalHours = employee.totalHours || 0;
-    if (totalHours < 4) derivedStatus = 'absent';
-    else if (totalHours < 9) derivedStatus = 'half-day';
-    else derivedStatus = 'present';
-  }
-  return { status: derivedStatus, isLate };
-};
-useEffect(() => {
-  const checkMobile = () => setIsMobileView(window.innerWidth < 768);
-  checkMobile();
-  window.addEventListener('resize', checkMobile);
-  return () => window.removeEventListener('resize', checkMobile);
-}, []);
-// Call it whenever selectedDate or siteName changes
-useEffect(() => {
-  if (siteName && mainTab === "employees") {
-    fetchGroomingCount();
-  }
-}, [selectedDate, siteName, mainTab]);
+  };
+
+  const startEditingRemark = (machine: FrontendMachine) => {
+    setEditingRemarkId(machine._id);
+    setRemarkValue(machine.remark || "");
+  };
+  const toggleExpand = (id: string) => setExpandedEmployeeId(prev => prev === id ? null : id);
+  const fetchGroomingCount = async () => {
+    if (!siteName || mainTab !== "employees") return;
+    setLoadingGroomingCount(true);
+    try {
+      const res = await apiClient.get('/grooming', {
+        params: { date: selectedDate, site: siteName }
+      });
+      const records = res.data?.data || [];
+      // records is an array of grooming records for employees of this site on selectedDate
+      // We consider "improper" if any required item is missing
+      // For simplicity, count employees that have at least one missing grooming item
+      let improperCount = 0;
+      records.forEach((rec: any) => {
+        // Check required fields based on gender (we don't have gender here, use basic)
+        const missing = !rec.shirt || !rec.pant || !rec.cap || !rec.shoes || !rec.idCard;
+        if (missing) improperCount++;
+      });
+      setGroomingCount(improperCount);
+    } catch (error) {
+      console.error("Error fetching grooming count:", error);
+      setGroomingCount(0);
+    } finally {
+      setLoadingGroomingCount(false);
+    }
+  };
+  // ---- Place this at the top of SiteEmployeeDetails, after the useState declarations ----
+  const getDerivedAttendanceStatus = (employee: any) => {
+    const status = employee.status;
+    const checkInTime = employee.checkInTime;
+    if (status === 'weekly-off' || status === 'leave') {
+      return { status, isLate: false };
+    }
+    let isLate = false;
+    if (checkInTime && checkInTime !== '-') {
+      const timeStr = checkInTime;
+      const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+      if (match) {
+        let hours = parseInt(match[1]);
+        const minutes = parseInt(match[2]);
+        const period = match[3].toUpperCase();
+        if (period === 'PM' && hours !== 12) hours += 12;
+        if (period === 'AM' && hours === 12) hours = 0;
+        const totalMinutes = hours * 60 + minutes;
+        isLate = totalMinutes > 9 * 60 + 30;
+      }
+    }
+    let derivedStatus = status;
+    if (employee.checkOutTime && employee.totalHours !== undefined) {
+      const totalHours = employee.totalHours || 0;
+      if (totalHours < 4) derivedStatus = 'absent';
+      else if (totalHours < 9) derivedStatus = 'half-day';
+      else derivedStatus = 'present';
+    }
+    return { status: derivedStatus, isLate };
+  };
+  useEffect(() => {
+    const checkMobile = () => setIsMobileView(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  // Call it whenever selectedDate or siteName changes
+  useEffect(() => {
+    if (siteName && mainTab === "employees") {
+      fetchGroomingCount();
+    }
+  }, [selectedDate, siteName, mainTab]);
 
   // ----- Data fetching for tabs -----
   const fetchMachines = async () => {
@@ -1128,7 +1132,7 @@ useEffect(() => {
     }
   };
 
-   const fetchGrooming = async () => {
+  const fetchGrooming = async () => {
     setLoadingGrooming(true);
     try {
       // Get employees of this site
@@ -1136,12 +1140,12 @@ useEffect(() => {
       const allEmployees = allEmployeesRes.data?.data || allEmployeesRes.data || [];
       const siteEmployees = allEmployees.filter((emp: any) => emp.siteName === siteName);
       setGroomingEmployees(siteEmployees);
-  
+
       // Fetch grooming records for the selected date AND site
       const groomingRes = await apiClient.get('/grooming', {
         params: { date: selectedDate, site: siteName }   // ← ADD site parameter
       });
-  
+
       const records = groomingRes.data?.data || [];
       const map = new Map();
       records.forEach((r: any) => map.set(r.employeeId, r));
@@ -1153,10 +1157,10 @@ useEffect(() => {
     }
   };
 
- const fetchIncidents = async () => {
+  const fetchIncidents = async () => {
     setLoadingIncidents(true);
     try {
-     const incidentRes = await apiClient.get('/incidents', { params: { site: siteName } });
+      const incidentRes = await apiClient.get('/incidents', { params: { site: siteName } });
       setIncidents(incidentRes.data?.data || []);
     } catch (error) {
       toast.error("Failed to load incidents");
@@ -1165,7 +1169,7 @@ useEffect(() => {
     }
   };
 
- const fetchCleaningPhotos = async () => {
+  const fetchCleaningPhotos = async () => {
     setLoadingPhotos(true);
     try {
       const photosRes = await apiClient.get('/cleaning-photos', { params: { site: siteName } });
@@ -1177,53 +1181,86 @@ useEffect(() => {
     }
   };
 
-const fetchShiftDeployment = async () => {
-  if (!siteName) return;
-  setLoadingShift(true);
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  const fetchShiftDeployment = async () => {
+    if (!siteName) return;
+    setLoadingShift(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
-    const [todayRes, tomorrowRes] = await Promise.all([
-      apiClient.get('/shifts/site-deployment', { params: { site: siteName, date: today } }),
-      apiClient.get('/shifts/site-deployment', { params: { site: siteName, date: tomorrow } })
-    ]);
+      const [todayRes, tomorrowRes] = await Promise.all([
+        apiClient.get('/shifts/site-deployment', { params: { site: siteName, date: today } }),
+        apiClient.get('/shifts/site-deployment', { params: { site: siteName, date: tomorrow } })
+      ]);
 
-    const todayText = todayRes.data?.data?.text || 'No shift deployment available.';
-    const tomorrowText = tomorrowRes.data?.data?.text || 'No shift deployment available.';
+      const todayText = todayRes.data?.data?.text || 'No shift deployment available.';
+      const tomorrowText = tomorrowRes.data?.data?.text || 'No shift deployment available.';
 
-    setTodayShift(todayText);
-    setTomorrowShift(tomorrowText);
-    setEditTodayText(todayText);
-    setEditTomorrowText(tomorrowText);
-  } catch (error) {
-    setTodayShift('No shift deployment available.');
-    setTomorrowShift('No shift deployment available.');
-    setEditTodayText('');
-    setEditTomorrowText('');
-  } finally {
-    setLoadingShift(false);
-  }
-};
+      setTodayShift(todayText);
+      setTomorrowShift(tomorrowText);
+      setEditTodayText(todayText);
+      setEditTomorrowText(tomorrowText);
+    } catch (error) {
+      setTodayShift('No shift deployment available.');
+      setTomorrowShift('No shift deployment available.');
+      setEditTodayText('');
+      setEditTomorrowText('');
+    } finally {
+      setLoadingShift(false);
+    }
+  };
 
-const saveShiftDeployment = async () => {
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  // Fetch Training & Briefing data for this site
+  const fetchTrainingData = async () => {
+    if (!siteName) return;
+    setLoadingTraining(true);
+    try {
+      // Fetch ALL trainings and filter on frontend
+      const trainingsRes = await apiClient.get('/trainings', {
+        params: { limit: 1000 }
+      });
+      const trainings = trainingsRes.data?.trainings || [];
+      const siteTrainings = trainings.filter((t: any) =>
+        t.site && t.site.toLowerCase() === siteName.toLowerCase()
+      );
+      setTrainingSessions(siteTrainings);
+      console.log(`✅ Found ${siteTrainings.length} trainings for site: ${siteName}`);
 
-    // Save today
-    await apiClient.post('/shifts/site-deployment', { site: siteName, date: today, text: editTodayText });
-    // Save tomorrow
-    await apiClient.post('/shifts/site-deployment', { site: siteName, date: tomorrow, text: editTomorrowText });
+      // Fetch ALL briefings and filter on frontend
+      const briefingsRes = await apiClient.get('/briefings', {
+        params: { limit: 1000 }
+      });
+      const briefings = briefingsRes.data?.briefings || [];
+      const siteBriefings = briefings.filter((b: any) =>
+        b.site && b.site.toLowerCase() === siteName.toLowerCase()
+      );
+      setStaffBriefings(siteBriefings);
+      console.log(`✅ Found ${siteBriefings.length} briefings for site: ${siteName}`);
+    } catch (error) {
+      console.error('Error fetching training data:', error);
+      toast.error('Failed to load training & briefing data');
+    } finally {
+      setLoadingTraining(false);
+    }
+  };
+  const saveShiftDeployment = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
-    setTodayShift(editTodayText);
-    setTomorrowShift(editTomorrowText);
-    setEditingShift(false);
-    toast.success('Shift deployment saved');
-  } catch (error) {
-    toast.error('Failed to save shift deployment');
-  }
-};
+      // Save today
+      await apiClient.post('/shifts/site-deployment', { site: siteName, date: today, text: editTodayText });
+      // Save tomorrow
+      await apiClient.post('/shifts/site-deployment', { site: siteName, date: tomorrow, text: editTomorrowText });
+
+      setTodayShift(editTodayText);
+      setTomorrowShift(editTomorrowText);
+      setEditingShift(false);
+      toast.success('Shift deployment saved');
+    } catch (error) {
+      toast.error('Failed to save shift deployment');
+    }
+  };
   // Load data when tab changes
   useEffect(() => {
     if (mainTab === "machines") fetchMachines();
@@ -1231,34 +1268,35 @@ const saveShiftDeployment = async () => {
     if (mainTab === "incidents") fetchIncidents();
     if (mainTab === "photos") fetchCleaningPhotos();
     if (mainTab === "shift") fetchShiftDeployment();
+    if (mainTab === "training") fetchTrainingData(); // ← Add this
   }, [mainTab, selectedDate, siteName]);
 
   // Update machine status (allowed for admin/manager/superadmin)
- const updateMachineStatus = async (machineId: string, newStatus: string) => {
-  const machine = machines.find((m) => m._id === machineId);
-  if (!machine) return;
-  if (!window.confirm(`Change status of "${machine.name}" to ${newStatus}?`)) return;
-  setUpdatingMachine(machineId);
-  try {
-    // Preserve the existing remark
-    await machineService.updateMachine(machineId, {
-      status: newStatus,
-      remark: machine.remark || ""
-    });
-   setMachines((prev) =>
-  prev.map((m) =>
-    m._id === machineId
-      ? { ...m, status: newStatus as FrontendMachine["status"] }
-      : m
-  )
-);
-    toast.success(`Status updated to ${newStatus}`);
-  } catch (error) {
-    toast.error("Update failed");
-  } finally {
-    setUpdatingMachine(null);
-  }
- };
+  const updateMachineStatus = async (machineId: string, newStatus: string) => {
+    const machine = machines.find((m) => m._id === machineId);
+    if (!machine) return;
+    if (!window.confirm(`Change status of "${machine.name}" to ${newStatus}?`)) return;
+    setUpdatingMachine(machineId);
+    try {
+      // Preserve the existing remark
+      await machineService.updateMachine(machineId, {
+        status: newStatus,
+        remark: machine.remark || ""
+      });
+      setMachines((prev) =>
+        prev.map((m) =>
+          m._id === machineId
+            ? { ...m, status: newStatus as FrontendMachine["status"] }
+            : m
+        )
+      );
+      toast.success(`Status updated to ${newStatus}`);
+    } catch (error) {
+      toast.error("Update failed");
+    } finally {
+      setUpdatingMachine(null);
+    }
+  };
 
   // ----- Employee table logic (unchanged from your original) -----
   const availableDates = useMemo(() => {
@@ -1341,44 +1379,44 @@ const saveShiftDeployment = async () => {
   const handleExport = (detailed = false) => {
     const headers = detailed
       ? [
-          "Employee ID",
-          "Name",
-          "Department",
-          "Position",
-          "Status",
-          "Check In",
-          "Check Out",
-          "Check In Photo URL",
-          "Check Out Photo URL",
-          "Email",
-          "Phone",
-          "Employee Type",
-          "Shift",
-          "Working Hours",
-          "Reporting Manager",
-          "Date of Joining",
-          "Action",
-          "Remark",
-          "Site",
-          "Date",
-          "Role Type",
-        ]
+        "Employee ID",
+        "Name",
+        "Department",
+        "Position",
+        "Status",
+        "Check In",
+        "Check Out",
+        "Check In Photo URL",
+        "Check Out Photo URL",
+        "Email",
+        "Phone",
+        "Employee Type",
+        "Shift",
+        "Working Hours",
+        "Reporting Manager",
+        "Date of Joining",
+        "Action",
+        "Remark",
+        "Site",
+        "Date",
+        "Role Type",
+      ]
       : [
-          "Employee ID",
-          "Name",
-          "Department",
-          "Position",
-          "Status",
-          "Check In",
-          "Check Out",
-          "Has Check In Photo",
-          "Has Check Out Photo",
-          "Action",
-          "Remark",
-          "Site",
-          "Date",
-          "Role Type",
-        ];
+        "Employee ID",
+        "Name",
+        "Department",
+        "Position",
+        "Status",
+        "Check In",
+        "Check Out",
+        "Has Check In Photo",
+        "Has Check Out Photo",
+        "Action",
+        "Remark",
+        "Site",
+        "Date",
+        "Role Type",
+      ];
     const rows = filteredEmployees.map((emp) => {
       const base = [
         emp.employeeId,
@@ -1388,8 +1426,8 @@ const saveShiftDeployment = async () => {
         emp.status === "weekly-off"
           ? "Weekly Off"
           : emp.status === "leave"
-          ? "Leave"
-          : emp.status.charAt(0).toUpperCase() + emp.status.slice(1),
+            ? "Leave"
+            : emp.status.charAt(0).toUpperCase() + emp.status.slice(1),
         emp.checkInTime || "-",
         emp.checkOutTime || "-",
         emp.checkInPhoto ? "Yes" : "No",
@@ -1440,573 +1478,573 @@ const saveShiftDeployment = async () => {
   };
 
   // Add this function after handleExport in SiteEmployeeDetails
-const handleExportFullMonth = async () => {
-  if (!siteData || !siteData.employees || siteData.employees.length === 0) {
-    toast.error('No data to export');
-    return;
-  }
-
-  try {
-    toast.loading('Fetching full month data...');
-
-    // Get the month from startDate
-    const month = siteData.startDate?.substring(0, 7) || new Date().toISOString().substring(0, 7);
-    const monthStart = `${month}-01`;
-    const monthEnd = new Date(
-      parseInt(month.split('-')[0]),
-      parseInt(month.split('-')[1]),
-      0
-    ).toISOString().split('T')[0];
-
-    // Fetch full month data
-    const fullMonthEmployees = await generateEmployeeData(
-      siteData.siteName || siteData.name,
-      monthStart,
-      monthEnd
-    );
-
-    if (!fullMonthEmployees || fullMonthEmployees.length === 0) {
-      toast.dismiss();
-      toast.error('No data found for this month');
+  const handleExportFullMonth = async () => {
+    if (!siteData || !siteData.employees || siteData.employees.length === 0) {
+      toast.error('No data to export');
       return;
     }
 
-    toast.dismiss();
+    try {
+      toast.loading('Fetching full month data...');
 
-    // Group employees by employeeId
-    const uniqueEmployees = new Map();
-    fullMonthEmployees.forEach((emp: any) => {
-      if (emp.employeeId && !uniqueEmployees.has(emp.employeeId)) {
-        uniqueEmployees.set(emp.employeeId, {
-          employeeId: emp.employeeId,
-          name: emp.name,
-          department: emp.department,
-          position: emp.position,
-          isManager: emp.isManager || false,
-          isSupervisor: emp.isSupervisor || false,
-          site: emp.site || siteData.siteName || siteData.name,
-        });
+      // Get the month from startDate
+      const month = siteData.startDate?.substring(0, 7) || new Date().toISOString().substring(0, 7);
+      const monthStart = `${month}-01`;
+      const monthEnd = new Date(
+        parseInt(month.split('-')[0]),
+        parseInt(month.split('-')[1]),
+        0
+      ).toISOString().split('T')[0];
+
+      // Fetch full month data
+      const fullMonthEmployees = await generateEmployeeData(
+        siteData.siteName || siteData.name,
+        monthStart,
+        monthEnd
+      );
+
+      if (!fullMonthEmployees || fullMonthEmployees.length === 0) {
+        toast.dismiss();
+        toast.error('No data found for this month');
+        return;
       }
-    });
 
-    // Count attendance per employee
-    const attendanceCounts = new Map();
-    fullMonthEmployees.forEach((emp: any) => {
-      const key = emp.employeeId || emp.id;
-      if (!attendanceCounts.has(key)) {
-        attendanceCounts.set(key, { present: 0, absent: 0, weeklyOff: 0, leave: 0, total: 0 });
-      }
-      const counts = attendanceCounts.get(key);
-      counts.total++;
-      if (emp.status === 'present') counts.present++;
-      else if (emp.status === 'weekly-off') counts.weeklyOff++;
-      else if (emp.status === 'leave') counts.leave++;
-      else counts.absent++;
-    });
+      toast.dismiss();
 
-    const daysInMonth = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0).getDate();
+      // Group employees by employeeId
+      const uniqueEmployees = new Map();
+      fullMonthEmployees.forEach((emp: any) => {
+        if (emp.employeeId && !uniqueEmployees.has(emp.employeeId)) {
+          uniqueEmployees.set(emp.employeeId, {
+            employeeId: emp.employeeId,
+            name: emp.name,
+            department: emp.department,
+            position: emp.position,
+            isManager: emp.isManager || false,
+            isSupervisor: emp.isSupervisor || false,
+            site: emp.site || siteData.siteName || siteData.name,
+          });
+        }
+      });
 
-    let totalPresent = 0, totalAbsent = 0, totalWeeklyOff = 0, totalLeave = 0;
-    let totalManagers = 0, totalSupervisors = 0, totalStaff = 0;
+      // Count attendance per employee
+      const attendanceCounts = new Map();
+      fullMonthEmployees.forEach((emp: any) => {
+        const key = emp.employeeId || emp.id;
+        if (!attendanceCounts.has(key)) {
+          attendanceCounts.set(key, { present: 0, absent: 0, weeklyOff: 0, leave: 0, total: 0 });
+        }
+        const counts = attendanceCounts.get(key);
+        counts.total++;
+        if (emp.status === 'present') counts.present++;
+        else if (emp.status === 'weekly-off') counts.weeklyOff++;
+        else if (emp.status === 'leave') counts.leave++;
+        else counts.absent++;
+      });
 
-    const rows: string[][] = [];
+      const daysInMonth = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0).getDate();
 
-    uniqueEmployees.forEach((emp: any) => {
-      const counts = attendanceCounts.get(emp.employeeId) || { present: 0, absent: 0, weeklyOff: 0, leave: 0, total: 0 };
-      if (emp.isManager) totalManagers++;
-      else if (emp.isSupervisor) totalSupervisors++;
-      else totalStaff++;
+      let totalPresent = 0, totalAbsent = 0, totalWeeklyOff = 0, totalLeave = 0;
+      let totalManagers = 0, totalSupervisors = 0, totalStaff = 0;
 
-      totalPresent += counts.present;
-      totalAbsent += counts.absent;
-      totalWeeklyOff += counts.weeklyOff;
-      totalLeave += counts.leave;
+      const rows: string[][] = [];
 
-      const attendanceRate = daysInMonth > 0 ? ((counts.present / daysInMonth) * 100).toFixed(1) + '%' : '0.0%';
+      uniqueEmployees.forEach((emp: any) => {
+        const counts = attendanceCounts.get(emp.employeeId) || { present: 0, absent: 0, weeklyOff: 0, leave: 0, total: 0 };
+        if (emp.isManager) totalManagers++;
+        else if (emp.isSupervisor) totalSupervisors++;
+        else totalStaff++;
 
-      rows.push([
-        `"${emp.employeeId}"`,
-        `"${emp.name}"`,
-        `"${emp.department}"`,
-        `"${emp.position}"`,
-        `"${emp.isManager ? 'Manager' : emp.isSupervisor ? 'Supervisor' : 'Staff'}"`,
-        counts.present.toString(),
-        counts.absent.toString(),
-        counts.weeklyOff.toString(),
-        counts.leave.toString(),
-        daysInMonth.toString(),
-        attendanceRate
-      ]);
-    });
+        totalPresent += counts.present;
+        totalAbsent += counts.absent;
+        totalWeeklyOff += counts.weeklyOff;
+        totalLeave += counts.leave;
 
-    rows.sort((a, b) => a[1].localeCompare(b[1]));
+        const attendanceRate = daysInMonth > 0 ? ((counts.present / daysInMonth) * 100).toFixed(1) + '%' : '0.0%';
 
-    const headers = [
-      'Employee ID', 'Employee Name', 'Department', 'Position', 'Role',
-      'Present', 'Absent', 'Weekly Off', 'Leave', 'Total Working Days', 'Attendance Rate'
-    ];
+        rows.push([
+          `"${emp.employeeId}"`,
+          `"${emp.name}"`,
+          `"${emp.department}"`,
+          `"${emp.position}"`,
+          `"${emp.isManager ? 'Manager' : emp.isSupervisor ? 'Supervisor' : 'Staff'}"`,
+          counts.present.toString(),
+          counts.absent.toString(),
+          counts.weeklyOff.toString(),
+          counts.leave.toString(),
+          daysInMonth.toString(),
+          attendanceRate
+        ]);
+      });
 
-    const totalEmployees = uniqueEmployees.size;
-    const totalRequired = totalEmployees * daysInMonth;
-    const totalAbsentAll = totalAbsent + totalLeave;
-    const overallRate = totalRequired > 0 ? ((totalPresent / totalRequired) * 100).toFixed(1) + '%' : '0.0%';
+      rows.sort((a, b) => a[1].localeCompare(b[1]));
 
-    const summaryRow = [
-      `"📊 GRAND TOTAL"`,
-      `"${siteData.siteName || siteData.name}"`,
-      `"All Departments"`,
-      `"${totalEmployees} Employees"`,
-      `"M:${totalManagers} S:${totalSupervisors} St:${totalStaff}"`,
-      totalPresent.toString(),
-      totalAbsentAll.toString(),
-      totalWeeklyOff.toString(),
-      totalLeave.toString(),
-      totalRequired.toString(),
-      overallRate
-    ];
+      const headers = [
+        'Employee ID', 'Employee Name', 'Department', 'Position', 'Role',
+        'Present', 'Absent', 'Weekly Off', 'Leave', 'Total Working Days', 'Attendance Rate'
+      ];
 
-    const emptyRow = headers.map(() => '');
+      const totalEmployees = uniqueEmployees.size;
+      const totalRequired = totalEmployees * daysInMonth;
+      const totalAbsentAll = totalAbsent + totalLeave;
+      const overallRate = totalRequired > 0 ? ((totalPresent / totalRequired) * 100).toFixed(1) + '%' : '0.0%';
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(',')),
-      emptyRow.join(','),
-      ['=== SUMMARY ===', '', '', '', '', '', '', '', '', '', ''],
-      summaryRow.join(',')
-    ].join('\n');
+      const summaryRow = [
+        `"📊 GRAND TOTAL"`,
+        `"${siteData.siteName || siteData.name}"`,
+        `"All Departments"`,
+        `"${totalEmployees} Employees"`,
+        `"M:${totalManagers} S:${totalSupervisors} St:${totalStaff}"`,
+        totalPresent.toString(),
+        totalAbsentAll.toString(),
+        totalWeeklyOff.toString(),
+        totalLeave.toString(),
+        totalRequired.toString(),
+        overallRate
+      ];
 
-    const filename = `Attendance_${(siteData.siteName || siteData.name).replace(/\s/g, '_')}_${month}.csv`;
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const emptyRow = headers.map(() => '');
+
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.join(',')),
+        emptyRow.join(','),
+        ['=== SUMMARY ===', '', '', '', '', '', '', '', '', '', ''],
+        summaryRow.join(',')
+      ].join('\n');
+
+      const filename = `Attendance_${(siteData.siteName || siteData.name).replace(/\s/g, '_')}_${month}.csv`;
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success(`Full month data exported to ${filename} with summary`);
+
+    } catch (error) {
+      console.error('Error exporting full month:', error);
+      toast.dismiss();
+      toast.error('Failed to export full month data');
+    }
+  };
+  // Export old incidents (all except selected date)
+  const exportOldIncidents = () => {
+    const oldIncidents = incidents.filter(inc => inc.date !== selectedDate);
+    if (oldIncidents.length === 0) {
+      toast.info("No old incidents to export");
+      return;
+    }
+    const headers = ['Date', 'Site', 'Type', 'Description', 'Employee ID', 'Photo URL'];
+    const rows = oldIncidents.map(inc => [
+      inc.date,
+      inc.site,
+      inc.type,
+      inc.description,
+      inc.employeeId || '',
+      inc.photoUrl || ''
+    ]);
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
     const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
+    link.href = URL.createObjectURL(blob);
+    link.download = `incidents_old_${selectedDate}.csv`;
     link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(link.href);
+    toast.success("Old incidents exported");
+  };
 
-    toast.success(`Full month data exported to ${filename} with summary`);
+  // Export old cleaning photos (all except selected date)
+  const exportOldPhotos = () => {
+    const oldPhotos = cleaningPhotos.filter(photo => !photo.createdAt?.startsWith(selectedDate));
+    if (oldPhotos.length === 0) {
+      toast.info("No old photos to export");
+      return;
+    }
+    const headers = ['Date', 'Site', 'Photo URL', 'Remark'];
 
-  } catch (error) {
-    console.error('Error exporting full month:', error);
-    toast.dismiss();
-    toast.error('Failed to export full month data');
-  }
-};
-// Export old incidents (all except selected date)
-const exportOldIncidents = () => {
-  const oldIncidents = incidents.filter(inc => inc.date !== selectedDate);
-  if (oldIncidents.length === 0) {
-    toast.info("No old incidents to export");
-    return;
-  }
-  const headers = ['Date', 'Site', 'Type', 'Description', 'Employee ID', 'Photo URL'];
-  const rows = oldIncidents.map(inc => [
-    inc.date,
-    inc.site,
-    inc.type,
-    inc.description,
-    inc.employeeId || '',
-    inc.photoUrl || ''
-  ]);
-  const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `incidents_old_${selectedDate}.csv`;
-  link.click();
-  URL.revokeObjectURL(link.href);
-  toast.success("Old incidents exported");
-};
-
-// Export old cleaning photos (all except selected date)
-const exportOldPhotos = () => {
-  const oldPhotos = cleaningPhotos.filter(photo => !photo.createdAt?.startsWith(selectedDate));
-  if (oldPhotos.length === 0) {
-    toast.info("No old photos to export");
-    return;
-  }
-  const headers = ['Date', 'Site', 'Photo URL', 'Remark'];
-  
-   const rows = oldPhotos.map(p => [
-  new Date(p.createdAt).toLocaleString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true
-  }),
-  p.site,
-  p.photoUrl,
-  p.remark || ''
-]);
-  const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `cleaning_photos_old_${selectedDate}.csv`;
-  link.click();
-  URL.revokeObjectURL(link.href);
-  toast.success("Old cleaning photos exported");
-};
+    const rows = oldPhotos.map(p => [
+      new Date(p.createdAt).toLocaleString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      }),
+      p.site,
+      p.photoUrl,
+      p.remark || ''
+    ]);
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `cleaning_photos_old_${selectedDate}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    toast.success("Old cleaning photos exported");
+  };
   const renderEmployeesTab = () => (
-  <div className="space-y-4">
-    {/* Date navigation & search */}
-    <div className="flex flex-wrap justify-between items-center gap-2">
-      <div className="flex items-center gap-2">
-        <Calendar className="h-4 w-4 text-muted-foreground" />
-        <Input
-          type="date"
-          value={selectedDate}
-          onChange={(e) => setSelectedDate(e.target.value)}
-          className="w-36 h-8 text-sm"
-        />
-        <Button variant="outline" size="sm" onClick={() => setDailyView(false)} className="h-8">
-          Cumulative
+    <div className="space-y-4">
+      {/* Date navigation & search */}
+      <div className="flex flex-wrap justify-between items-center gap-2">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <Input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="w-36 h-8 text-sm"
+          />
+          <Button variant="outline" size="sm" onClick={() => setDailyView(false)} className="h-8">
+            Cumulative
+          </Button>
+        </div>
+        <div className="relative w-64">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Search employees..."
+            value={employeeSearch}
+            onChange={(e) => {
+              setEmployeeSearch(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="pl-7 h-8 text-sm"
+          />
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-1 bg-muted p-1 rounded-md">
+        <Button variant={activeTab === "all" ? "default" : "ghost"} size="sm" onClick={() => setActiveTab("all")}>
+          All ({allEmployees.length})
+        </Button>
+        <Button variant={activeTab === "present" ? "default" : "ghost"} size="sm" onClick={() => setActiveTab("present")}>
+          Present ({presentEmployees.length})
+        </Button>
+        <Button variant={activeTab === "weekly-off" ? "default" : "ghost"} size="sm" onClick={() => setActiveTab("weekly-off")}>
+          WO ({weeklyOffEmployees.length})
+        </Button>
+        <Button variant={activeTab === "absent" ? "default" : "ghost"} size="sm" onClick={() => setActiveTab("absent")}>
+          Absent ({absentEmployees.length + leaveEmployees.length})
         </Button>
       </div>
-      <div className="relative w-64">
-        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-        <Input
-          placeholder="Search employees..."
-          value={employeeSearch}
-          onChange={(e) => {
-            setEmployeeSearch(e.target.value);
-            setCurrentPage(1);
-          }}
-          className="pl-7 h-8 text-sm"
-        />
-      </div>
-    </div>
 
-    {/* Tabs */}
-    <div className="flex flex-wrap gap-1 bg-muted p-1 rounded-md">
-      <Button variant={activeTab === "all" ? "default" : "ghost"} size="sm" onClick={() => setActiveTab("all")}>
-        All ({allEmployees.length})
-      </Button>
-      <Button variant={activeTab === "present" ? "default" : "ghost"} size="sm" onClick={() => setActiveTab("present")}>
-        Present ({presentEmployees.length})
-      </Button>
-      <Button variant={activeTab === "weekly-off" ? "default" : "ghost"} size="sm" onClick={() => setActiveTab("weekly-off")}>
-        WO ({weeklyOffEmployees.length})
-      </Button>
-      <Button variant={activeTab === "absent" ? "default" : "ghost"} size="sm" onClick={() => setActiveTab("absent")}>
-        Absent ({absentEmployees.length + leaveEmployees.length})
-      </Button>
-    </div>
-
-    {/* Mobile Card View */}
-    {isMobileView ? (
-      <div className="space-y-3">
-        {paginatedEmployees.length === 0 ? (
-          <p className="text-center text-muted-foreground py-8">No employees found</p>
-        ) : (
-          paginatedEmployees.map((emp: any) => {
-            const isExpanded = expandedEmployeeId === emp.id;
-            const { status: displayStatus, isLate } = getDerivedAttendanceStatus(emp);
-            return (
-              <Card key={emp.id} className="p-3">
-                {/* Header */}
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="font-semibold">{emp.name}</h4>
-                    <p className="text-xs text-muted-foreground">{emp.employeeId}</p>
-                    <p className="text-xs">{emp.department} • {emp.position}</p>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => toggleExpand(emp.id)}>
-                    {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                  </Button>
-                </div>
-
-                {/* Status & Action Buttons */}
-                <div className="mt-2 flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant={
-                        displayStatus === "present" ? "default" :
-                        displayStatus === "half-day" ? "secondary" :
-                        displayStatus === "weekly-off" ? "outline" :
-                        "destructive"
-                      }
-                      className="text-xs"
-                    >
-                      {displayStatus === "weekly-off" ? "WO" :
-                       displayStatus === "half-day" ? "Half Day" :
-                       displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
-                    </Badge>
-                    {isLate && (
-                      <Badge variant="outline" className="bg-orange-100 text-orange-800 text-xs">
-                        Late
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex gap-1">
-                    <Button variant="outline" size="sm" onClick={() => updateEmployeeAction(emp.id, "fine")}>Fine</Button>
-                    <Button variant="outline" size="sm" onClick={() => updateEmployeeRemark(emp.id, "Late")}>Mark</Button>
-                  </div>
-                </div>
-
-                {/* Expanded Details */}
-                {isExpanded && (
-                  <div className="mt-3 pt-3 border-t text-sm space-y-1">
-                    <div className="flex justify-between"><span>Check In:</span><span>{emp.checkInTime || "-"}</span></div>
-                    <div className="flex justify-between"><span>Check Out:</span><span>{emp.checkOutTime || "-"}</span></div>
-                    <div className="flex justify-between"><span>Role:</span><span>{emp.isManager ? "Manager" : emp.isSupervisor ? "Supervisor" : "Staff"}</span></div>
-                    {emp.checkInPhoto && (
-                      <button onClick={() => handleViewPhoto(emp.checkInPhoto, "checkin")} className="text-blue-500 text-xs flex items-center gap-1">
-                        <Camera className="h-3 w-3" /> Check-in Photo
-                      </button>
-                    )}
-                    {emp.checkOutPhoto && (
-                      <button onClick={() => handleViewPhoto(emp.checkOutPhoto, "checkout")} className="text-blue-500 text-xs flex items-center gap-1">
-                        <Camera className="h-3 w-3" /> Check-out Photo
-                      </button>
-                    )}
-                    <div className="mt-2">
-                      <Select value={emp.action || "none"} onValueChange={(v) => updateEmployeeAction(emp.id, v)}>
-                        <SelectTrigger className="h-7 w-24 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          <SelectItem value="fine">Fine</SelectItem>
-                          <SelectItem value="advance">Advance</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
+      {/* Mobile Card View */}
+      {isMobileView ? (
+        <div className="space-y-3">
+          {paginatedEmployees.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">No employees found</p>
+          ) : (
+            paginatedEmployees.map((emp: any) => {
+              const isExpanded = expandedEmployeeId === emp.id;
+              const { status: displayStatus, isLate } = getDerivedAttendanceStatus(emp);
+              return (
+                <Card key={emp.id} className="p-3">
+                  {/* Header */}
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-semibold">{emp.name}</h4>
+                      <p className="text-xs text-muted-foreground">{emp.employeeId}</p>
+                      <p className="text-xs">{emp.department} • {emp.position}</p>
                     </div>
-                    <Input
-                      value={emp.remark || ""}
-                      onChange={(e) => updateEmployeeRemark(emp.id, e.target.value)}
-                      placeholder="Remark"
-                      className="h-7 text-xs"
-                    />
+                    <Button variant="ghost" size="sm" onClick={() => toggleExpand(emp.id)}>
+                      {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
                   </div>
-                )}
-              </Card>
-            );
-          })
-        )}
-      </div>
-    ) : (
-      /* Desktop Table */
-      <div className="rounded-md border overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50">
-            <tr>
-              <th className="p-2 text-left text-xs">ID</th>
-              <th className="p-2 text-left text-xs">Name</th>
-              <th className="p-2 text-left text-xs">Dept</th>
-              <th className="p-2 text-left text-xs">Position</th>
-              <th className="p-2 text-left text-xs">Role</th>
-              <th className="p-2 text-left text-xs">Status</th>
-              <th className="p-2 text-left text-xs">Check In</th>
-              <th className="p-2 text-left text-xs">Check Out</th>
-              <th className="p-2 text-left text-xs">In Photo</th>
-              <th className="p-2 text-left text-xs">Out Photo</th>
-              <th className="p-2 text-left text-xs">Date</th>
-              <th className="p-2 text-left text-xs">Action</th>
-              <th className="p-2 text-left text-xs">Remark</th>
-            </tr>
-          </thead>
-          <tbody>
-            {refreshing ? (
-              <tr><td colSpan={13} className="p-4 text-center"><Loader2 className="animate-spin h-5 w-5 mx-auto" /></td></tr>
-            ) : paginatedEmployees.length === 0 ? (
-              <tr><td colSpan={13} className="p-4 text-center text-muted-foreground">No employees found</td></tr>
-            ) : (
-              paginatedEmployees.map((emp: any) => {
-                const { status: displayStatus, isLate } = getDerivedAttendanceStatus(emp);
-                return (
-                  <tr key={emp.id} className="border-b hover:bg-muted/50">
-                    <td className="p-2 text-xs font-mono">{emp.employeeId}</td>
-                    <td className="p-2 font-medium">{emp.name}</td>
-                    <td className="p-2"><Badge variant="outline" className="text-xs">{emp.department}</Badge></td>
-                    <td className="p-2 text-xs">{emp.position}</td>
-                    <td className="p-2">{emp.isManager ? <Badge className="bg-amber-100 text-amber-800 text-xs">Mgr</Badge> : emp.isSupervisor ? <Badge className="bg-teal-100 text-teal-800 text-xs">Sup</Badge> : <Badge className="bg-cyan-100 text-cyan-800 text-xs">Staff</Badge>}</td>
-                    <td className="p-2">
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant={
-                            displayStatus === "present" ? "default" :
-                            displayStatus === "half-day" ? "secondary" :
-                            displayStatus === "weekly-off" ? "outline" :
-                            "destructive"
-                          }
-                          className="text-xs"
-                        >
-                          {displayStatus === "weekly-off" ? "WO" :
-                           displayStatus === "half-day" ? "Half Day" :
-                           displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
-                        </Badge>
-                        {isLate && (
-                          <Badge variant="outline" className="bg-orange-100 text-orange-800 text-xs">
-                            Late
-                          </Badge>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-2 text-xs">{emp.checkInTime || "-"}</td>
-                    <td className="p-2 text-xs">{emp.checkOutTime || "-"}</td>
-                    <td className="p-2">{emp.checkInPhoto ? <Button variant="ghost" size="sm" onClick={() => handleViewPhoto(emp.checkInPhoto, "checkin")} className="h-6 px-1"><Camera className="h-3 w-3" /></Button> : "-"}</td>
-                    <td className="p-2">{emp.checkOutPhoto ? <Button variant="ghost" size="sm" onClick={() => handleViewPhoto(emp.checkOutPhoto, "checkout")} className="h-6 px-1"><Camera className="h-3 w-3" /></Button> : "-"}</td>
-                    <td className="p-2 text-xs">{emp.date ? formatDateDisplay(emp.date) : "-"}</td>
-                    <td className="p-2">
-                      <Select value={emp.action || "none"} onValueChange={(v) => updateEmployeeAction(emp.id, v)}>
-                        <SelectTrigger className="h-7 w-24 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          <SelectItem value="fine">Fine</SelectItem>
-                          <SelectItem value="advance">Advance</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="p-2"><Input value={emp.remark || ""} onChange={(e) => updateEmployeeRemark(emp.id, e.target.value)} placeholder="Remark" className="h-7 text-xs" /></td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-    )}
 
-    {/* Pagination */}
-    {totalPages > 1 && (
-      <div className="flex justify-center gap-2 mt-4">
-        <Button variant="outline" size="sm" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>First</Button>
-        <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Prev</Button>
-        <span className="py-1 px-2 text-sm">Page {currentPage} of {totalPages}</span>
-        <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
-        <Button variant="outline" size="sm" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}>Last</Button>
-      </div>
-    )}
-  </div>
-);
-  // ----- Render new tabs -----
- const renderMachinesTab = () => {
-  return (
-    <div>
-      {loadingMachines ? (
-        <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>
-      ) : machines.length === 0 ? (
-        <div className="text-center py-8 text-muted-foreground">
-          <Cpu className="h-12 w-12 mx-auto mb-2" />
-          <p>No machines found for this site.</p>
+                  {/* Status & Action Buttons */}
+                  <div className="mt-2 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={
+                          displayStatus === "present" ? "default" :
+                            displayStatus === "half-day" ? "secondary" :
+                              displayStatus === "weekly-off" ? "outline" :
+                                "destructive"
+                        }
+                        className="text-xs"
+                      >
+                        {displayStatus === "weekly-off" ? "WO" :
+                          displayStatus === "half-day" ? "Half Day" :
+                            displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
+                      </Badge>
+                      {isLate && (
+                        <Badge variant="outline" className="bg-orange-100 text-orange-800 text-xs">
+                          Late
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="outline" size="sm" onClick={() => updateEmployeeAction(emp.id, "fine")}>Fine</Button>
+                      <Button variant="outline" size="sm" onClick={() => updateEmployeeRemark(emp.id, "Late")}>Mark</Button>
+                    </div>
+                  </div>
+
+                  {/* Expanded Details */}
+                  {isExpanded && (
+                    <div className="mt-3 pt-3 border-t text-sm space-y-1">
+                      <div className="flex justify-between"><span>Check In:</span><span>{emp.checkInTime || "-"}</span></div>
+                      <div className="flex justify-between"><span>Check Out:</span><span>{emp.checkOutTime || "-"}</span></div>
+                      <div className="flex justify-between"><span>Role:</span><span>{emp.isManager ? "Manager" : emp.isSupervisor ? "Supervisor" : "Staff"}</span></div>
+                      {emp.checkInPhoto && (
+                        <button onClick={() => handleViewPhoto(emp.checkInPhoto, "checkin")} className="text-blue-500 text-xs flex items-center gap-1">
+                          <Camera className="h-3 w-3" /> Check-in Photo
+                        </button>
+                      )}
+                      {emp.checkOutPhoto && (
+                        <button onClick={() => handleViewPhoto(emp.checkOutPhoto, "checkout")} className="text-blue-500 text-xs flex items-center gap-1">
+                          <Camera className="h-3 w-3" /> Check-out Photo
+                        </button>
+                      )}
+                      <div className="mt-2">
+                        <Select value={emp.action || "none"} onValueChange={(v) => updateEmployeeAction(emp.id, v)}>
+                          <SelectTrigger className="h-7 w-24 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            <SelectItem value="fine">Fine</SelectItem>
+                            <SelectItem value="advance">Advance</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Input
+                        value={emp.remark || ""}
+                        onChange={(e) => updateEmployeeRemark(emp.id, e.target.value)}
+                        placeholder="Remark"
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                  )}
+                </Card>
+              );
+            })
+          )}
         </div>
       ) : (
+        /* Desktop Table */
         <div className="rounded-md border overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
               <tr>
-                <th className="p-3 text-left font-medium">Machine Name</th>
-                <th className="p-3 text-left font-medium">Location</th>
-                <th className="p-3 text-left font-medium">Manufacturer</th>
-                <th className="p-3 text-left font-medium">Model No</th>
-                <th className="p-3 text-left font-medium">Serial No</th>
-                <th className="p-3 text-left font-medium">Status</th>
-                <th className="p-3 text-left font-medium">Remark</th>
-                <th className="p-3 text-left font-medium">Actions</th>
+                <th className="p-2 text-left text-xs">ID</th>
+                <th className="p-2 text-left text-xs">Name</th>
+                <th className="p-2 text-left text-xs">Dept</th>
+                <th className="p-2 text-left text-xs">Position</th>
+                <th className="p-2 text-left text-xs">Role</th>
+                <th className="p-2 text-left text-xs">Status</th>
+                <th className="p-2 text-left text-xs">Check In</th>
+                <th className="p-2 text-left text-xs">Check Out</th>
+                <th className="p-2 text-left text-xs">In Photo</th>
+                <th className="p-2 text-left text-xs">Out Photo</th>
+                <th className="p-2 text-left text-xs">Date</th>
+                <th className="p-2 text-left text-xs">Action</th>
+                <th className="p-2 text-left text-xs">Remark</th>
               </tr>
             </thead>
             <tbody>
-              {machines.map((machine) => {
-                const isEditing = editingRemarkId === machine._id;
-
-                return (
-                  <tr key={machine._id} className="border-b hover:bg-muted/50">
-                    <td className="p-3 font-medium">{machine.name}</td>
-                    <td className="p-3">{machine.location || '-'}</td>
-                    <td className="p-3">{machine.manufacturer || '-'}</td>
-                    <td className="p-3">{machine.model || '-'}</td>
-                    <td className="p-3">{machine.serialNumber || '-'}</td>
-                    <td className="p-3">
-                      <Badge variant={machine.status === 'operational' ? 'default' : 'destructive'} className="text-xs">
-                        {machine.status === 'operational' ? 'Operational' : 'Under Maintenance'}
-                      </Badge>
-                    </td>
-
-                    {/* Remark column */}
-                    <td className="p-3">
-                      {role === 'supervisor' ? (
-                        // Supervisor can edit remark
-                        isEditing ? (
-                          <div className="flex items-center gap-2">
-                            <Input
-                              value={remarkValue}
-                              onChange={(e) => setRemarkValue(e.target.value)}
-                              className="h-8 text-sm"
-                              placeholder="Enter remark..."
-                            />
-                            <Button
-                              size="sm"
-                              onClick={() => handleSaveRemark(machine._id)}
-                              disabled={savingRemarkId === machine._id}
-                            >
-                              {savingRemarkId === machine._id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setEditingRemarkId(null)}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm">{machine.remark || "-"}</span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => startEditingRemark(machine)}
-                              title="Edit remark"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )
-                      ) : (
-                        // Admin / Manager / Superadmin – view only
-                        <span className="text-sm">{machine.remark || "-"}</span>
-                      )}
-                    </td>
-
-                    {/* Actions column */}
-                    <td className="p-3">
-                      {/* Status update dropdown – allowed for admin, manager, superadmin, and also supervisor */}
-                      {["superadmin", "admin", "manager", "supervisor"].includes(role) && (
-                        <Select
-                          value={machine.status}
-                          onValueChange={(value) => updateMachineStatus(machine._id, value)}
-                          disabled={updatingMachine === machine._id}
-                        >
-                          <SelectTrigger className="w-36 h-8 text-xs">
-                            <SelectValue placeholder="Change status" />
-                          </SelectTrigger>
+              {refreshing ? (
+                <tr><td colSpan={13} className="p-4 text-center"><Loader2 className="animate-spin h-5 w-5 mx-auto" /></td></tr>
+              ) : paginatedEmployees.length === 0 ? (
+                <tr><td colSpan={13} className="p-4 text-center text-muted-foreground">No employees found</td></tr>
+              ) : (
+                paginatedEmployees.map((emp: any) => {
+                  const { status: displayStatus, isLate } = getDerivedAttendanceStatus(emp);
+                  return (
+                    <tr key={emp.id} className="border-b hover:bg-muted/50">
+                      <td className="p-2 text-xs font-mono">{emp.employeeId}</td>
+                      <td className="p-2 font-medium">{emp.name}</td>
+                      <td className="p-2"><Badge variant="outline" className="text-xs">{emp.department}</Badge></td>
+                      <td className="p-2 text-xs">{emp.position}</td>
+                      <td className="p-2">{emp.isManager ? <Badge className="bg-amber-100 text-amber-800 text-xs">Mgr</Badge> : emp.isSupervisor ? <Badge className="bg-teal-100 text-teal-800 text-xs">Sup</Badge> : <Badge className="bg-cyan-100 text-cyan-800 text-xs">Staff</Badge>}</td>
+                      <td className="p-2">
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant={
+                              displayStatus === "present" ? "default" :
+                                displayStatus === "half-day" ? "secondary" :
+                                  displayStatus === "weekly-off" ? "outline" :
+                                    "destructive"
+                            }
+                            className="text-xs"
+                          >
+                            {displayStatus === "weekly-off" ? "WO" :
+                              displayStatus === "half-day" ? "Half Day" :
+                                displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
+                          </Badge>
+                          {isLate && (
+                            <Badge variant="outline" className="bg-orange-100 text-orange-800 text-xs">
+                              Late
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-2 text-xs">{emp.checkInTime || "-"}</td>
+                      <td className="p-2 text-xs">{emp.checkOutTime || "-"}</td>
+                      <td className="p-2">{emp.checkInPhoto ? <Button variant="ghost" size="sm" onClick={() => handleViewPhoto(emp.checkInPhoto, "checkin")} className="h-6 px-1"><Camera className="h-3 w-3" /></Button> : "-"}</td>
+                      <td className="p-2">{emp.checkOutPhoto ? <Button variant="ghost" size="sm" onClick={() => handleViewPhoto(emp.checkOutPhoto, "checkout")} className="h-6 px-1"><Camera className="h-3 w-3" /></Button> : "-"}</td>
+                      <td className="p-2 text-xs">{emp.date ? formatDateDisplay(emp.date) : "-"}</td>
+                      <td className="p-2">
+                        <Select value={emp.action || "none"} onValueChange={(v) => updateEmployeeAction(emp.id, v)}>
+                          <SelectTrigger className="h-7 w-24 text-xs"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="operational">Operational</SelectItem>
-                            <SelectItem value="maintenance">Under Maintenance</SelectItem>
-                            <SelectItem value="out-of-service">Out of Service</SelectItem>
+                            <SelectItem value="none">None</SelectItem>
+                            <SelectItem value="fine">Fine</SelectItem>
+                            <SelectItem value="advance">Advance</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
                           </SelectContent>
                         </Select>
-                      )}
-                      {!["superadmin", "admin", "manager", "supervisor"].includes(role) && (
-                        <span className="text-xs text-muted-foreground">Read only</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                      <td className="p-2"><Input value={emp.remark || ""} onChange={(e) => updateEmployeeRemark(emp.id, e.target.value)} placeholder="Remark" className="h-7 text-xs" /></td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
       )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-center gap-2 mt-4">
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>First</Button>
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Prev</Button>
+          <span className="py-1 px-2 text-sm">Page {currentPage} of {totalPages}</span>
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}>Last</Button>
+        </div>
+      )}
     </div>
   );
-};
+  // ----- Render new tabs -----
+  const renderMachinesTab = () => {
+    return (
+      <div>
+        {loadingMachines ? (
+          <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>
+        ) : machines.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Cpu className="h-12 w-12 mx-auto mb-2" />
+            <p>No machines found for this site.</p>
+          </div>
+        ) : (
+          <div className="rounded-md border overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="p-3 text-left font-medium">Machine Name</th>
+                  <th className="p-3 text-left font-medium">Location</th>
+                  <th className="p-3 text-left font-medium">Manufacturer</th>
+                  <th className="p-3 text-left font-medium">Model No</th>
+                  <th className="p-3 text-left font-medium">Serial No</th>
+                  <th className="p-3 text-left font-medium">Status</th>
+                  <th className="p-3 text-left font-medium">Remark</th>
+                  <th className="p-3 text-left font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {machines.map((machine) => {
+                  const isEditing = editingRemarkId === machine._id;
+
+                  return (
+                    <tr key={machine._id} className="border-b hover:bg-muted/50">
+                      <td className="p-3 font-medium">{machine.name}</td>
+                      <td className="p-3">{machine.location || '-'}</td>
+                      <td className="p-3">{machine.manufacturer || '-'}</td>
+                      <td className="p-3">{machine.model || '-'}</td>
+                      <td className="p-3">{machine.serialNumber || '-'}</td>
+                      <td className="p-3">
+                        <Badge variant={machine.status === 'operational' ? 'default' : 'destructive'} className="text-xs">
+                          {machine.status === 'operational' ? 'Operational' : 'Under Maintenance'}
+                        </Badge>
+                      </td>
+
+                      {/* Remark column */}
+                      <td className="p-3">
+                        {role === 'supervisor' ? (
+                          // Supervisor can edit remark
+                          isEditing ? (
+                            <div className="flex items-center gap-2">
+                              <Input
+                                value={remarkValue}
+                                onChange={(e) => setRemarkValue(e.target.value)}
+                                className="h-8 text-sm"
+                                placeholder="Enter remark..."
+                              />
+                              <Button
+                                size="sm"
+                                onClick={() => handleSaveRemark(machine._id)}
+                                disabled={savingRemarkId === machine._id}
+                              >
+                                {savingRemarkId === machine._id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setEditingRemarkId(null)}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm">{machine.remark || "-"}</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => startEditingRemark(machine)}
+                                title="Edit remark"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )
+                        ) : (
+                          // Admin / Manager / Superadmin – view only
+                          <span className="text-sm">{machine.remark || "-"}</span>
+                        )}
+                      </td>
+
+                      {/* Actions column */}
+                      <td className="p-3">
+                        {/* Status update dropdown – allowed for admin, manager, superadmin, and also supervisor */}
+                        {["superadmin", "admin", "manager", "supervisor"].includes(role) && (
+                          <Select
+                            value={machine.status}
+                            onValueChange={(value) => updateMachineStatus(machine._id, value)}
+                            disabled={updatingMachine === machine._id}
+                          >
+                            <SelectTrigger className="w-36 h-8 text-xs">
+                              <SelectValue placeholder="Change status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="operational">Operational</SelectItem>
+                              <SelectItem value="maintenance">Under Maintenance</SelectItem>
+                              <SelectItem value="out-of-service">Out of Service</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                        {!["superadmin", "admin", "manager", "supervisor"].includes(role) && (
+                          <span className="text-xs text-muted-foreground">Read only</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    );
+  };
   const renderGroomingTab = () => (
     <div>
       {loadingGrooming ? (
@@ -2068,173 +2106,303 @@ const exportOldPhotos = () => {
   );
 
   const renderIncidentsTab = () => {
-  if (loadingIncidents) {
-    return <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>;
-  }
+    if (loadingIncidents) {
+      return <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>;
+    }
 
-  const incidentsForDate = incidents.filter(inc => inc.date === selectedDate);
-  const oldIncidentsCount = incidents.filter(inc => inc.date !== selectedDate).length;
+    const incidentsForDate = incidents.filter(inc => inc.date === selectedDate);
+    const oldIncidentsCount = incidents.filter(inc => inc.date !== selectedDate).length;
 
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-sm font-medium">Incidents on {formatDateDisplay(selectedDate)}</h3>
-        {oldIncidentsCount > 0 && (
-          <Button variant="outline" size="sm" onClick={exportOldIncidents}>
-            <FileSpreadsheet className="h-4 w-4 mr-1" />
-            Export Old ({oldIncidentsCount})
-          </Button>
-        )}
-      </div>
-      {incidentsForDate.length === 0 ? (
-        <div className="text-center py-8 text-muted-foreground">
-          <AlertCircle className="h-12 w-12 mx-auto mb-2" />
-          <p>No incidents reported for this site on {formatDateDisplay(selectedDate)}.</p>
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="text-sm font-medium">Incidents on {formatDateDisplay(selectedDate)}</h3>
+          {oldIncidentsCount > 0 && (
+            <Button variant="outline" size="sm" onClick={exportOldIncidents}>
+              <FileSpreadsheet className="h-4 w-4 mr-1" />
+              Export Old ({oldIncidentsCount})
+            </Button>
+          )}
         </div>
-      ) : (
-        <div className="space-y-3">
-          {incidentsForDate.map((inc) => (
-            <Card key={inc._id} className="p-3">
-              <div className="flex justify-between">
-                <Badge variant={inc.type === "accident" ? "destructive" : "default"}>
-                  {inc.type}
-                </Badge>
-                <span className="text-xs text-muted-foreground">{formatDateDisplay(inc.date)}</span>
-              </div>
-              <p className="text-sm mt-1">{inc.description}</p>
-              {inc.employeeId && <p className="text-xs text-muted-foreground">Employee: {inc.employeeId}</p>}
-              {inc.photoUrl && (
-                <img
-                  src={inc.photoUrl}
-                  alt="Incident"
-                  className="h-20 w-20 object-cover rounded mt-2 cursor-pointer"
-                  onClick={() => {
-                    setSelectedPhoto(inc.photoUrl);
-                    setSelectedPhotoType("checkin");
-                    setPhotoModalOpen(true);
-                  }}
-                />
-              )}
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-  const renderPhotosTab = () => {
-  if (loadingPhotos) {
-    return <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>;
-  }
-
-  const photosForDate = cleaningPhotos.filter(photo => photo.createdAt?.startsWith(selectedDate));
-  const oldPhotosCount = cleaningPhotos.filter(photo => !photo.createdAt?.startsWith(selectedDate)).length;
-
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-sm font-medium">Cleaning Photos on {formatDateDisplay(selectedDate)}</h3>
-        {oldPhotosCount > 0 && (
-          <Button variant="outline" size="sm" onClick={exportOldPhotos}>
-            <FileSpreadsheet className="h-4 w-4 mr-1" />
-            Export Old ({oldPhotosCount})
-          </Button>
-        )}
-      </div>
-      {photosForDate.length === 0 ? (
-        <div className="text-center py-8 text-muted-foreground">
-          <Images className="h-12 w-12 mx-auto mb-2" />
-          <p>No cleaning photos uploaded for this site on {formatDateDisplay(selectedDate)}.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {photosForDate.map((photo) => (
-            <Card
-              key={photo._id}
-              className="p-2 cursor-pointer"
-              onClick={() => {
-                setSelectedPhoto(photo.photoUrl);
-                setSelectedPhotoType("checkin");
-                setPhotoModalOpen(true);
-              }}
-            >
-              <img src={photo.photoUrl} alt="Cleaning" className="w-full h-32 object-cover rounded" />
-              {photo.remark && <p className="text-xs mt-1 truncate">{photo.remark}</p>}
-              <p className="text-[10px] text-muted-foreground">
-  {new Date(photo.createdAt).toLocaleString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true
-  })}
-</p>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
- const renderShiftTab = () => {
-  const today = new Date().toISOString().split('T')[0];
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-
-  return (
-    <Card>
-      <CardContent className="p-4">
-        {editingShift ? (
-          // Edit mode
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-sm font-medium mb-2">Today ({today})</h3>
-              <Textarea
-                value={editTodayText}
-                onChange={(e) => setEditTodayText(e.target.value)}
-                rows={4}
-                className="text-sm"
-              />
-            </div>
-            <div>
-              <h3 className="text-sm font-medium mb-2">Tomorrow ({tomorrow})</h3>
-              <Textarea
-                value={editTomorrowText}
-                onChange={(e) => setEditTomorrowText(e.target.value)}
-                rows={4}
-                className="text-sm"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={saveShiftDeployment} size="sm">Save</Button>
-              <Button variant="outline" onClick={() => setEditingShift(false)} size="sm">Cancel</Button>
-            </div>
+        {incidentsForDate.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <AlertCircle className="h-12 w-12 mx-auto mb-2" />
+            <p>No incidents reported for this site on {formatDateDisplay(selectedDate)}.</p>
           </div>
         ) : (
-          // View mode – two columns
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+          <div className="space-y-3">
+            {incidentsForDate.map((inc) => (
+              <Card key={inc._id} className="p-3">
+                <div className="flex justify-between">
+                  <Badge variant={inc.type === "accident" ? "destructive" : "default"}>
+                    {inc.type}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">{formatDateDisplay(inc.date)}</span>
+                </div>
+                <p className="text-sm mt-1">{inc.description}</p>
+                {inc.employeeId && <p className="text-xs text-muted-foreground">Employee: {inc.employeeId}</p>}
+                {inc.photoUrl && (
+                  <img
+                    src={inc.photoUrl}
+                    alt="Incident"
+                    className="h-20 w-20 object-cover rounded mt-2 cursor-pointer"
+                    onClick={() => {
+                      setSelectedPhoto(inc.photoUrl);
+                      setSelectedPhotoType("checkin");
+                      setPhotoModalOpen(true);
+                    }}
+                  />
+                )}
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+  const renderPhotosTab = () => {
+    if (loadingPhotos) {
+      return <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>;
+    }
+
+    const photosForDate = cleaningPhotos.filter(photo => photo.createdAt?.startsWith(selectedDate));
+    const oldPhotosCount = cleaningPhotos.filter(photo => !photo.createdAt?.startsWith(selectedDate)).length;
+
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="text-sm font-medium">Cleaning Photos on {formatDateDisplay(selectedDate)}</h3>
+          {oldPhotosCount > 0 && (
+            <Button variant="outline" size="sm" onClick={exportOldPhotos}>
+              <FileSpreadsheet className="h-4 w-4 mr-1" />
+              Export Old ({oldPhotosCount})
+            </Button>
+          )}
+        </div>
+        {photosForDate.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Images className="h-12 w-12 mx-auto mb-2" />
+            <p>No cleaning photos uploaded for this site on {formatDateDisplay(selectedDate)}.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {photosForDate.map((photo) => (
+              <Card
+                key={photo._id}
+                className="p-2 cursor-pointer"
+                onClick={() => {
+                  setSelectedPhoto(photo.photoUrl);
+                  setSelectedPhotoType("checkin");
+                  setPhotoModalOpen(true);
+                }}
+              >
+                <img src={photo.photoUrl} alt="Cleaning" className="w-full h-32 object-cover rounded" />
+                {photo.remark && <p className="text-xs mt-1 truncate">{photo.remark}</p>}
+                <p className="text-[10px] text-muted-foreground">
+                  {new Date(photo.createdAt).toLocaleString('en-IN', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                  })}
+                </p>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderShiftTab = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+
+    return (
+      <Card>
+        <CardContent className="p-4">
+          {editingShift ? (
+            // Edit mode
+            <div className="space-y-4">
               <div>
-                <h4 className="text-sm font-medium text-muted-foreground mb-1">Today ({today})</h4>
-                <p className="whitespace-pre-wrap text-sm">{todayShift || 'No deployment set.'}</p>
+                <h3 className="text-sm font-medium mb-2">Today ({today})</h3>
+                <Textarea
+                  value={editTodayText}
+                  onChange={(e) => setEditTodayText(e.target.value)}
+                  rows={4}
+                  className="text-sm"
+                />
               </div>
               <div>
-                <h4 className="text-sm font-medium text-muted-foreground mb-1">Tomorrow ({tomorrow})</h4>
-                <p className="whitespace-pre-wrap text-sm">{tomorrowShift || 'No deployment set.'}</p>
+                <h3 className="text-sm font-medium mb-2">Tomorrow ({tomorrow})</h3>
+                <Textarea
+                  value={editTomorrowText}
+                  onChange={(e) => setEditTomorrowText(e.target.value)}
+                  rows={4}
+                  className="text-sm"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={saveShiftDeployment} size="sm">Save</Button>
+                <Button variant="outline" onClick={() => setEditingShift(false)} size="sm">Cancel</Button>
               </div>
             </div>
-            {(role === 'superadmin' || role === 'admin' || role === 'manager') && (
-              <Button variant="outline" size="sm" onClick={() => setEditingShift(true)}>
-                Edit Shift Deployment
-              </Button>
-            )}
-          </>
+          ) : (
+            // View mode – two columns
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Today ({today})</h4>
+                  <p className="whitespace-pre-wrap text-sm">{todayShift || 'No deployment set.'}</p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Tomorrow ({tomorrow})</h4>
+                  <p className="whitespace-pre-wrap text-sm">{tomorrowShift || 'No deployment set.'}</p>
+                </div>
+              </div>
+              {(role === 'superadmin' || role === 'admin' || role === 'manager') && (
+                <Button variant="outline" size="sm" onClick={() => setEditingShift(true)}>
+                  Edit Shift Deployment
+                </Button>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderTrainingTab = () => {
+    if (loadingTraining) {
+      return (
+        <div className="flex justify-center py-8">
+          <Loader2 className="animate-spin" />
+        </div>
+      );
+    }
+
+    const hasTrainings = trainingSessions.length > 0;
+    const hasBriefings = staffBriefings.length > 0;
+
+    if (!hasTrainings && !hasBriefings) {
+      return (
+        <div className="text-center py-8 text-muted-foreground">
+          <Calendar className="h-12 w-12 mx-auto mb-2" />
+          <p>No training or briefing sessions found for this site.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        {/* Training Sessions */}
+        {hasTrainings && (
+          <div>
+            <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Training Sessions ({trainingSessions.length})
+            </h3>
+            <div className="space-y-3">
+              {trainingSessions.map((training: any) => (
+                <Card key={training._id} className="p-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-semibold text-sm">{training.title}</h4>
+                      <p className="text-xs text-muted-foreground">{training.description}</p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        <Badge variant="outline" className="text-xs">{training.type}</Badge>
+                        <Badge
+                          variant={
+                            training.status === 'completed' ? 'default' :
+                              training.status === 'ongoing' ? 'secondary' : 'outline'
+                          }
+                          className="text-xs"
+                        >
+                          {training.status}
+                        </Badge>
+                      </div>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{training.date}</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-xs">
+                    <div><span className="text-muted-foreground">Trainer:</span> {training.trainer}</div>
+                    <div><span className="text-muted-foreground">Time:</span> {training.time}</div>
+                    <div><span className="text-muted-foreground">Duration:</span> {training.duration}</div>
+                    <div><span className="text-muted-foreground">Attendees:</span> {training.attendees?.length || 0}/{training.maxAttendees}</div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
         )}
-      </CardContent>
-    </Card>
-  );
-};
+
+        {/* Staff Briefings */}
+        {hasBriefings && (
+          <div>
+            <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Staff Briefings ({staffBriefings.length})
+            </h3>
+            <div className="space-y-3">
+              {staffBriefings.map((briefing: any) => (
+                <Card key={briefing._id} className="p-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-semibold text-sm">
+                        {briefing.site} - {briefing.shift} Shift
+                      </h4>
+                      <p className="text-xs text-muted-foreground">
+                        Conducted by: {briefing.conductedBy || 'N/A'}
+                      </p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        <Badge variant="outline" className="text-xs">{briefing.department}</Badge>
+                        <Badge
+                          variant={
+                            briefing.shift === 'morning' ? 'default' :
+                              briefing.shift === 'evening' ? 'secondary' : 'outline'
+                          }
+                          className="text-xs"
+                        >
+                          {briefing.shift}
+                        </Badge>
+                      </div>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{briefing.date}</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2 text-xs">
+                    <div><span className="text-muted-foreground">Time:</span> {briefing.time}</div>
+                    <div><span className="text-muted-foreground">Attendees:</span> {briefing.attendeesCount}</div>
+                  </div>
+                  {briefing.topics?.length > 0 && (
+                    <div className="mt-2">
+                      <span className="text-xs text-muted-foreground">Topics:</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {briefing.topics.map((topic: string, idx: number) => (
+                          <Badge key={idx} variant="outline" className="text-[10px]">{topic}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {briefing.keyPoints?.length > 0 && (
+                    <div className="mt-2">
+                      <span className="text-xs text-muted-foreground">Key Points:</span>
+                      <ul className="list-disc list-inside text-xs mt-1">
+                        {briefing.keyPoints.map((point: string, idx: number) => (
+                          <li key={idx}>{point}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
   // ----- Main render -----
   if (!siteData) {
     return (
@@ -2264,115 +2432,127 @@ const exportOldPhotos = () => {
             <p className="text-xs text-muted-foreground">
               {formatDateDisplay(siteData.startDate)}  •{" "}
               {viewType === "department" ? "Department View" : "Site View"}
-             
+
             </p>
           </div>
         </div>
-      <div className="flex gap-2 items-center flex-wrap">
-  <Button variant="outline" size="sm" onClick={refreshEmployeeData} disabled={refreshing}>
-    <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`} /> Refresh
-  </Button>
-  <Button variant="outline" size="sm" onClick={() => handleExport(false)}>
-    <Download className="h-4 w-4 mr-1" /> Summary
-  </Button>
-  <Button variant="default" size="sm" onClick={() => handleExport(true)}>
-    <FileText className="h-4 w-4 mr-1" /> Details
-  </Button>
-  {/* ✅ ADD THIS BUTTON */}
-  <Button 
-    variant="default" 
-    size="sm" 
-    onClick={handleExportFullMonth}
-    disabled={employees.length === 0}
-    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
-  >
-    <FileSpreadsheet className="h-4 w-4" />
-    Export Full Month
-  </Button>
-  <Badge variant="outline" className="bg-yellow-50 ml-auto">
-    Grooming issues: {groomingCount}
-  </Badge>
-</div>
+        <div className="flex gap-2 items-center flex-wrap">
+          <Button variant="outline" size="sm" onClick={refreshEmployeeData} disabled={refreshing}>
+            <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => handleExport(false)}>
+            <Download className="h-4 w-4 mr-1" /> Summary
+          </Button>
+          <Button variant="default" size="sm" onClick={() => handleExport(true)}>
+            <FileText className="h-4 w-4 mr-1" /> Details
+          </Button>
+          {/* ✅ ADD THIS BUTTON */}
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleExportFullMonth}
+            disabled={employees.length === 0}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Export Full Month
+          </Button>
+          <Badge variant="outline" className="bg-yellow-50 ml-auto">
+            Grooming issues: {groomingCount}
+          </Badge>
+        </div>
       </div>
-{/* Feature Blocks (like supervisor dashboard) */}
-<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mb-4">
-  <Card
-    className="cursor-pointer hover:shadow-md transition-all"
-    onClick={() => setMainTab("employees")}
-  >
-    <CardContent className="p-2 flex flex-col items-center text-center">
-      <div className="p-2 rounded-full bg-blue-500 text-white mb-1">
-        <Users className="h-4 w-4" />
+      {/* Feature Blocks (like supervisor dashboard) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mb-4">
+        <Card
+          className="cursor-pointer hover:shadow-md transition-all"
+          onClick={() => setMainTab("employees")}
+        >
+          <CardContent className="p-2 flex flex-col items-center text-center">
+            <div className="p-2 rounded-full bg-blue-500 text-white mb-1">
+              <Users className="h-4 w-4" />
+            </div>
+            <span className="text-xs font-medium">Employees</span>
+          </CardContent>
+        </Card>
+        <Card
+          className="cursor-pointer hover:shadow-md transition-all"
+          onClick={() => setMainTab("machines")}
+        >
+          <CardContent className="p-2 flex flex-col items-center text-center">
+            <div className="p-2 rounded-full bg-green-500 text-white mb-1">
+              <Cpu className="h-4 w-4" />
+            </div>
+            <span className="text-xs font-medium">Machines</span>
+          </CardContent>
+        </Card>
+        <Card
+          className="cursor-pointer hover:shadow-md transition-all"
+          onClick={() => setMainTab("grooming")}
+        >
+          <CardContent className="p-2 flex flex-col items-center text-center">
+            <div className="p-2 rounded-full bg-purple-500 text-white mb-1">
+              <Shirt className="h-4 w-4" />
+            </div>
+            <span className="text-xs font-medium">Grooming</span>
+          </CardContent>
+        </Card>
+        <Card
+          className="cursor-pointer hover:shadow-md transition-all"
+          onClick={() => setMainTab("incidents")}
+        >
+          <CardContent className="p-2 flex flex-col items-center text-center">
+            <div className="p-2 rounded-full bg-red-500 text-white mb-1">
+              <AlertCircle className="h-4 w-4" />
+            </div>
+            <span className="text-xs font-medium">Incidents</span>
+          </CardContent>
+        </Card>
+        <Card
+          className="cursor-pointer hover:shadow-md transition-all"
+          onClick={() => setMainTab("photos")}
+        >
+          <CardContent className="p-2 flex flex-col items-center text-center">
+            <div className="p-2 rounded-full bg-yellow-500 text-white mb-1">
+              <Images className="h-4 w-4" />
+            </div>
+            <span className="text-xs font-medium">Cleaning Photos</span>
+          </CardContent>
+        </Card>
+        <Card
+          className="cursor-pointer hover:shadow-md transition-all"
+          onClick={() => setMainTab("shift")}
+        >
+          <CardContent className="p-2 flex flex-col items-center text-center">
+            <div className="p-2 rounded-full bg-indigo-500 text-white mb-1">
+              <Factory className="h-4 w-4" />
+            </div>
+            <span className="text-xs font-medium">Shift</span>
+          </CardContent>
+        </Card>
+        <Card
+          className="cursor-pointer hover:shadow-md transition-all"
+          onClick={() => setMainTab("training")}
+        >
+          <CardContent className="p-2 flex flex-col items-center text-center">
+            <div className="p-2 rounded-full bg-orange-500 text-white mb-1">
+              <Calendar className="h-4 w-4" />
+            </div>
+            <span className="text-xs font-medium">Training</span>
+          </CardContent>
+        </Card>
       </div>
-      <span className="text-xs font-medium">Employees</span>
-    </CardContent>
-  </Card>
-  <Card
-    className="cursor-pointer hover:shadow-md transition-all"
-    onClick={() => setMainTab("machines")}
-  >
-    <CardContent className="p-2 flex flex-col items-center text-center">
-      <div className="p-2 rounded-full bg-green-500 text-white mb-1">
-        <Cpu className="h-4 w-4" />
-      </div>
-      <span className="text-xs font-medium">Machines</span>
-    </CardContent>
-  </Card>
-  <Card
-    className="cursor-pointer hover:shadow-md transition-all"
-    onClick={() => setMainTab("grooming")}
-  >
-    <CardContent className="p-2 flex flex-col items-center text-center">
-      <div className="p-2 rounded-full bg-purple-500 text-white mb-1">
-        <Shirt className="h-4 w-4" />
-      </div>
-      <span className="text-xs font-medium">Grooming</span>
-    </CardContent>
-  </Card>
-  <Card
-    className="cursor-pointer hover:shadow-md transition-all"
-    onClick={() => setMainTab("incidents")}
-  >
-    <CardContent className="p-2 flex flex-col items-center text-center">
-      <div className="p-2 rounded-full bg-red-500 text-white mb-1">
-        <AlertCircle className="h-4 w-4" />
-      </div>
-      <span className="text-xs font-medium">Incidents</span>
-    </CardContent>
-  </Card>
-  <Card
-    className="cursor-pointer hover:shadow-md transition-all"
-    onClick={() => setMainTab("photos")}
-  >
-    <CardContent className="p-2 flex flex-col items-center text-center">
-      <div className="p-2 rounded-full bg-yellow-500 text-white mb-1">
-        <Images className="h-4 w-4" />
-      </div>
-      <span className="text-xs font-medium">Cleaning Photos</span>
-    </CardContent>
-  </Card>
-  <Card
-    className="cursor-pointer hover:shadow-md transition-all"
-    onClick={() => setMainTab("shift")}
-  >
-    <CardContent className="p-2 flex flex-col items-center text-center">
-      <div className="p-2 rounded-full bg-indigo-500 text-white mb-1">
-        <Factory className="h-4 w-4" />
-      </div>
-      <span className="text-xs font-medium">Shift</span>
-    </CardContent>
-  </Card>
-</div>
       {/* Main Tabs */}
-      
+
       <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as any)} className="space-y-4">
-       
+
         <TabsContent value="employees">{renderEmployeesTab()}</TabsContent>
         <TabsContent value="machines">{renderMachinesTab()}</TabsContent>
         <TabsContent value="grooming">{renderGroomingTab()}</TabsContent>
         <TabsContent value="incidents">{renderIncidentsTab()}</TabsContent>
         <TabsContent value="photos">{renderPhotosTab()}</TabsContent>
         <TabsContent value="shift">{renderShiftTab()}</TabsContent>
+        <TabsContent value="training">{renderTrainingTab()}</TabsContent> {/* ← Add this */}
       </Tabs>
 
       {/* Photo Modal (for attendance photos) */}
@@ -2432,14 +2612,31 @@ const AdminAttendanceView = () => {
   const [error, setError] = useState<string | null>(null);
   const [sites, setSites] = useState<Site[]>([]);
   const [displayData, setDisplayData] = useState<any[]>([]);
-const [isMobileSiteView, setIsMobileSiteView] = useState(false);
+  const [isMobileSiteView, setIsMobileSiteView] = useState(false);
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const dateParam = params.get('date');
+    const startDateParam = params.get('startDate');
+    const endDateParam = params.get('endDate');
 
-useEffect(() => {
-  const checkMobile = () => setIsMobileSiteView(window.innerWidth < 768);
-  checkMobile();
-  window.addEventListener('resize', checkMobile);
-  return () => window.removeEventListener('resize', checkMobile);
-}, []);
+    if (dateParam) {
+      // Single date (from clicking historical day on dashboard)
+      setStartDate(dateParam);
+      setEndDate(dateParam);
+    } else if (startDateParam && endDateParam) {
+      // Date range (from manual selection)
+      setStartDate(startDateParam);
+      setEndDate(endDateParam);
+    }
+  }, [location.search]);
+
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobileSiteView(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   // ========== NEW: Department attendance stats (present / total) ==========
   const [departmentStats, setDepartmentStats] = useState<
     { department: string; total: number; present: number }[]
@@ -2526,7 +2723,7 @@ useEffect(() => {
       if (sitesData && Array.isArray(sitesData)) {
         console.log(`✅ Successfully fetched ${sitesData.length} sites`);
         setSites(sitesData);
-        await calculateDisplayData(sitesData);
+
       } else {
         console.warn('⚠️ No sites data received or invalid format');
         setSites([]);
@@ -2543,27 +2740,154 @@ useEffect(() => {
       setLoading(false);
     }
   };
-
-  // Calculate display data – unchanged
+// ✅ ADD THIS - Helper function for in-memory calculation
+const calculateSiteAttendanceFromMemory = (
+  site: Site,
+  employees: Employee[],
+  attendanceMap: Map<string, any>,
+  startDate: string,
+  endDate: string
+) => {
+  const daysInPeriod = calculateDaysBetween(startDate, endDate);
+  
+  // Build employee data with attendance status
+  const employeeData: Employee[] = [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
+    const currentDate = formatDate(date);
+    for (const employee of employees) {
+      const mongoId = employee._id || employee.id || '';
+      const attendance = attendanceMap.get(`${mongoId}_${currentDate}`);
+      
+      let status: 'present' | 'absent' | 'leave' | 'weekly-off' = 'absent';
+      let checkInTime = '';
+      let checkOutTime = '';
+      let checkInPhoto = '';
+      let checkOutPhoto = '';
+      let remark = '';
+      let totalHours = 0;
+      
+      if (attendance) {
+        status = attendance.status as any;
+        checkInTime = attendance.checkInTime ? formatTimeForDisplay(attendance.checkInTime) : '';
+        checkOutTime = attendance.checkOutTime ? formatTimeForDisplay(attendance.checkOutTime) : '';
+        checkInPhoto = attendance.checkInPhoto || '';
+        checkOutPhoto = attendance.checkOutPhoto || '';
+        remark = attendance.remarks || '';
+        totalHours = attendance.totalHours || 0;
+      }
+      
+      employeeData.push({
+        ...employee,
+        status,
+        checkInTime,
+        checkOutTime,
+        checkInPhoto,
+        checkOutPhoto,
+        totalHours,
+        site: site.name,
+        siteName: site.name,
+        date: currentDate,
+        remark,
+        action: 'none'
+      });
+    }
+  }
+  
+  // Calculate deployment stats
+  const deploymentStats = calculateSiteDeploymentStats(site, employeeData);
+  const dailyRequirement = deploymentStats.dailyStaffRequirement;
+  const totalRequiredForPeriod = dailyRequirement * daysInPeriod;
+  
+  // Count attendance
+  let totalPresentCount = 0;
+  let totalAbsentCount = 0;
+  let totalWeeklyOffCount = 0;
+  let totalLeaveCount = 0;
+  
+  employeeData.forEach(emp => {
+    if (emp.isManager || emp.isSupervisor) return;
+    if (emp.status === 'present') totalPresentCount++;
+    else if (emp.status === 'absent') totalAbsentCount++;
+    else if (emp.status === 'weekly-off') totalWeeklyOffCount++;
+    else if (emp.status === 'leave') totalLeaveCount++;
+    else totalAbsentCount++;
+  });
+  
+  return {
+    id: `${site._id}-${startDate}-${endDate}`,
+    siteId: `${site._id}-${startDate}-${endDate}`,
+    name: site.name,
+    siteName: site.name,
+    dailyRequirement,
+    totalEmployees: dailyRequirement,
+    deploymentStats,
+    totalRequiredForPeriod,
+    totalPresent: totalPresentCount,
+    totalWeeklyOff: totalWeeklyOffCount,
+    totalLeave: totalLeaveCount,
+    totalAbsent: totalAbsentCount,
+    present: totalPresentCount,
+    weeklyOff: totalWeeklyOffCount,
+    leave: totalLeaveCount,
+    absent: totalAbsentCount,
+    daysInPeriod,
+    startDate,
+    endDate,
+    employees: employeeData,
+    originalSite: site,
+    isRealData: employeeData.length > 0 && employeeData[0]?.employeeId?.startsWith?.('DEMO') === false
+  };
+};
+  // ✅ NEW CODE - Fetch once, filter in memory
   const calculateDisplayData = async (sitesData: Site[]) => {
     try {
       setRefreshing(true);
+
+      // STEP 1: Fetch ALL employees ONCE
+      const allEmployees = await fetchEmployees();
+      console.log(`📊 Fetched ${allEmployees.length} employees once`);
+
+      // STEP 2: Fetch ALL attendance ONCE for the date range
+      const attendanceRecords = await fetchAttendanceRecords(startDate, endDate);
+      console.log(`📊 Fetched ${attendanceRecords.length} attendance records once`);
+
+      // STEP 3: Build lookup map for O(1) access
+      const attendanceMap = new Map<string, any>();
+      attendanceRecords.forEach(record => {
+        attendanceMap.set(`${record.employeeId}_${record.date}`, record);
+      });
+
+      // STEP 4: Process each site using already-fetched data
       const calculatedData = [];
       for (const site of sitesData) {
-        let siteData;
-        if (viewType === 'department' && selectedDepartment) {
-          siteData = await calculateDepartmentSiteData(site, startDate, endDate, selectedDepartment);
-        } else {
-          siteData = await calculateSiteAttendanceData(site, startDate, endDate);
-        }
+        // Filter employees for this site
+        const siteEmployees = allEmployees.filter(
+          emp => emp.site === site.name || emp.siteName === site.name
+        );
+
+        // Calculate stats using in-memory data
+        const siteData = calculateSiteAttendanceFromMemory(
+          site,
+          siteEmployees,
+          attendanceMap,
+          startDate,
+          endDate
+        );
+
         if (!siteData.employees) siteData.employees = [];
         calculatedData.push(siteData);
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // ✅ REMOVED the setTimeout delay!
       }
+
       setDisplayData(calculatedData);
-      console.log(`✅ Calculated display data for ${calculatedData.length} sites`);
+      console.log(`✅ Calculated ${calculatedData.length} sites in memory (0 API calls)`);
+
     } catch (error) {
       console.error('Error calculating display data:', error);
+      // Fallback to demo data
       setDisplayData(
         sitesData.map(site => ({
           ...site,
@@ -2791,157 +3115,157 @@ useEffect(() => {
 
 
   const handleExportFullMonth = () => {
-  // Get the month from startDate
-  const month = startDate.substring(0, 7); // YYYY-MM
-  const monthStart = `${month}-01`;
-  const monthEnd = new Date(
-    parseInt(month.split('-')[0]),
-    parseInt(month.split('-')[1]),
-    0
-  ).toISOString().split('T')[0];
-  
-  // Re-fetch data for full month
-  const fetchFullMonthData = async () => {
-    try {
-      setRefreshing(true);
-      toast.loading('Fetching full month data...');
-      
-      const fullMonthData = [];
-      for (const site of sites) {
-        let siteData;
-        if (viewType === 'department' && selectedDepartment) {
-          siteData = await calculateDepartmentSiteData(site, monthStart, monthEnd, selectedDepartment);
-        } else {
-          siteData = await calculateSiteAttendanceData(site, monthStart, monthEnd);
+    // Get the month from startDate
+    const month = startDate.substring(0, 7); // YYYY-MM
+    const monthStart = `${month}-01`;
+    const monthEnd = new Date(
+      parseInt(month.split('-')[0]),
+      parseInt(month.split('-')[1]),
+      0
+    ).toISOString().split('T')[0];
+
+    // Re-fetch data for full month
+    const fetchFullMonthData = async () => {
+      try {
+        setRefreshing(true);
+        toast.loading('Fetching full month data...');
+
+        const fullMonthData = [];
+        for (const site of sites) {
+          let siteData;
+          if (viewType === 'department' && selectedDepartment) {
+            siteData = await calculateDepartmentSiteData(site, monthStart, monthEnd, selectedDepartment);
+          } else {
+            siteData = await calculateSiteAttendanceData(site, monthStart, monthEnd);
+          }
+          fullMonthData.push(siteData);
         }
-        fullMonthData.push(siteData);
-      }
-      
-      toast.dismiss();
-      
-      const dataToExport = fullMonthData;
-      if (dataToExport.length === 0) {
-        toast.error('No data to export');
-        return;
-      }
 
-      const filename = viewType === 'department'
-        ? `Attendance_${selectedDepartment}_${month}.csv`
-        : `Sitewise_Attendance_${month}.csv`;
+        toast.dismiss();
 
-      const headers = [
-        'Site Name', 'Department', 'Period', 'Days',
-        'Daily Staff Requirement', 'Total Required', 'Weekly Off (Staff)',
-        'On Site Requirement', 'Total Present (Staff)', 'Leave (Staff)',
-        'Absent (Staff)', 'Managers', 'Supervisors', 'Total Staff',
-        'Attendance Rate', 'Data Source'
-      ];
+        const dataToExport = fullMonthData;
+        if (dataToExport.length === 0) {
+          toast.error('No data to export');
+          return;
+        }
 
-      const rows = dataToExport.map(item => {
-        const dailyRequirement = item.dailyRequirement || 0;
-        const totalRequired = item.totalRequiredForPeriod || item.durationTotalRequired || dailyRequirement * 30;
-        const weeklyOff = item.totalWeeklyOff || item.weeklyOffCount || 0;
-        const onSiteRequirement = totalRequired - weeklyOff;
-        const present = item.totalPresent || item.presentCount || 0;
-        const leave = item.totalLeave || item.leaveCount || 0;
-        const absent = item.totalAbsent || item.absentCount || 0;
-        const managers = item.deploymentStats?.managerCount || 0;
-        const supervisors = item.deploymentStats?.supervisorCount || 0;
-        const staff = item.deploymentStats?.staffCount || 0;
-        const rate = totalRequired > 0 ? ((present / totalRequired) * 100).toFixed(1) + '%' : '0.0%';
-        const dataSource = item.isRealData ? 'Real Data' : 'Demo Data';
-        return [
-          `"${item.siteName || item.name}"`,
-          `"${viewType === 'department' ? selectedDepartment : 'General'}"`,
-          `"${monthStart} to ${monthEnd}"`,
-          item.daysInPeriod || 30,
-          dailyRequirement,
-          totalRequired,
-          weeklyOff,
-          onSiteRequirement,
-          present,
-          leave,
-          absent,
-          managers,
-          supervisors,
-          staff,
-          rate,
-          dataSource
+        const filename = viewType === 'department'
+          ? `Attendance_${selectedDepartment}_${month}.csv`
+          : `Sitewise_Attendance_${month}.csv`;
+
+        const headers = [
+          'Site Name', 'Department', 'Period', 'Days',
+          'Daily Staff Requirement', 'Total Required', 'Weekly Off (Staff)',
+          'On Site Requirement', 'Total Present (Staff)', 'Leave (Staff)',
+          'Absent (Staff)', 'Managers', 'Supervisors', 'Total Staff',
+          'Attendance Rate', 'Data Source'
         ];
-      });
 
-      // Summary Row
-      const totalRequiredAll = dataToExport.reduce((sum, item) => 
-        sum + (item.totalRequiredForPeriod || item.durationTotalRequired || 0), 0
-      );
-      const totalPresentAll = dataToExport.reduce((sum, item) => 
-        sum + (item.totalPresent || item.presentCount || 0), 0
-      );
-      const totalLeaveAll = dataToExport.reduce((sum, item) => 
-        sum + (item.totalLeave || item.leaveCount || 0), 0
-      );
-      const totalAbsentAll = dataToExport.reduce((sum, item) => 
-        sum + (item.totalAbsent || item.absentCount || 0), 0
-      );
-      const totalWeeklyOffAll = dataToExport.reduce((sum, item) => 
-        sum + (item.totalWeeklyOff || item.weeklyOffCount || 0), 0
-      );
-      const overallRate = totalRequiredAll > 0 
-        ? ((totalPresentAll / totalRequiredAll) * 100).toFixed(1) + '%' 
-        : '0.0%';
+        const rows = dataToExport.map(item => {
+          const dailyRequirement = item.dailyRequirement || 0;
+          const totalRequired = item.totalRequiredForPeriod || item.durationTotalRequired || dailyRequirement * 30;
+          const weeklyOff = item.totalWeeklyOff || item.weeklyOffCount || 0;
+          const onSiteRequirement = totalRequired - weeklyOff;
+          const present = item.totalPresent || item.presentCount || 0;
+          const leave = item.totalLeave || item.leaveCount || 0;
+          const absent = item.totalAbsent || item.absentCount || 0;
+          const managers = item.deploymentStats?.managerCount || 0;
+          const supervisors = item.deploymentStats?.supervisorCount || 0;
+          const staff = item.deploymentStats?.staffCount || 0;
+          const rate = totalRequired > 0 ? ((present / totalRequired) * 100).toFixed(1) + '%' : '0.0%';
+          const dataSource = item.isRealData ? 'Real Data' : 'Demo Data';
+          return [
+            `"${item.siteName || item.name}"`,
+            `"${viewType === 'department' ? selectedDepartment : 'General'}"`,
+            `"${monthStart} to ${monthEnd}"`,
+            item.daysInPeriod || 30,
+            dailyRequirement,
+            totalRequired,
+            weeklyOff,
+            onSiteRequirement,
+            present,
+            leave,
+            absent,
+            managers,
+            supervisors,
+            staff,
+            rate,
+            dataSource
+          ];
+        });
 
-      const summaryRow = [
-        `"📊 GRAND TOTAL"`,
-        `"${viewType === 'department' ? selectedDepartment : 'All'}"`,
-        `"${monthStart} to ${monthEnd}"`,
-        dataToExport.reduce((sum, item) => sum + (item.daysInPeriod || 30), 0),
-        dataToExport.reduce((sum, item) => sum + (item.dailyRequirement || 0), 0),
-        totalRequiredAll,
-        totalWeeklyOffAll,
-        totalRequiredAll - totalWeeklyOffAll,
-        totalPresentAll,
-        totalLeaveAll,
-        totalAbsentAll,
-        dataToExport.reduce((sum, item) => sum + (item.deploymentStats?.managerCount || 0), 0),
-        dataToExport.reduce((sum, item) => sum + (item.deploymentStats?.supervisorCount || 0), 0),
-        dataToExport.reduce((sum, item) => sum + (item.deploymentStats?.staffCount || 0), 0),
-        overallRate,
-        'SUMMARY'
-      ];
+        // Summary Row
+        const totalRequiredAll = dataToExport.reduce((sum, item) =>
+          sum + (item.totalRequiredForPeriod || item.durationTotalRequired || 0), 0
+        );
+        const totalPresentAll = dataToExport.reduce((sum, item) =>
+          sum + (item.totalPresent || item.presentCount || 0), 0
+        );
+        const totalLeaveAll = dataToExport.reduce((sum, item) =>
+          sum + (item.totalLeave || item.leaveCount || 0), 0
+        );
+        const totalAbsentAll = dataToExport.reduce((sum, item) =>
+          sum + (item.totalAbsent || item.absentCount || 0), 0
+        );
+        const totalWeeklyOffAll = dataToExport.reduce((sum, item) =>
+          sum + (item.totalWeeklyOff || item.weeklyOffCount || 0), 0
+        );
+        const overallRate = totalRequiredAll > 0
+          ? ((totalPresentAll / totalRequiredAll) * 100).toFixed(1) + '%'
+          : '0.0%';
 
-      const emptyRow = headers.map(() => '');
-      
-      const csvContent = [
-        headers.join(','),
-        ...rows.map(row => row.join(',')),
-        emptyRow.join(','),
-        ['=== SUMMARY ===', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-        summaryRow.join(',')
-      ].join('\n');
+        const summaryRow = [
+          `"📊 GRAND TOTAL"`,
+          `"${viewType === 'department' ? selectedDepartment : 'All'}"`,
+          `"${monthStart} to ${monthEnd}"`,
+          dataToExport.reduce((sum, item) => sum + (item.daysInPeriod || 30), 0),
+          dataToExport.reduce((sum, item) => sum + (item.dailyRequirement || 0), 0),
+          totalRequiredAll,
+          totalWeeklyOffAll,
+          totalRequiredAll - totalWeeklyOffAll,
+          totalPresentAll,
+          totalLeaveAll,
+          totalAbsentAll,
+          dataToExport.reduce((sum, item) => sum + (item.deploymentStats?.managerCount || 0), 0),
+          dataToExport.reduce((sum, item) => sum + (item.deploymentStats?.supervisorCount || 0), 0),
+          dataToExport.reduce((sum, item) => sum + (item.deploymentStats?.staffCount || 0), 0),
+          overallRate,
+          'SUMMARY'
+        ];
 
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', filename);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+        const emptyRow = headers.map(() => '');
 
-      toast.success(`Full month data exported to ${filename} with summary`);
-    } catch (error) {
-      toast.dismiss();
-      toast.error('Failed to fetch full month data');
-      console.error(error);
-    } finally {
-      setRefreshing(false);
-    }
+        const csvContent = [
+          headers.join(','),
+          ...rows.map(row => row.join(',')),
+          emptyRow.join(','),
+          ['=== SUMMARY ===', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+          summaryRow.join(',')
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        toast.success(`Full month data exported to ${filename} with summary`);
+      } catch (error) {
+        toast.dismiss();
+        toast.error('Failed to fetch full month data');
+        console.error(error);
+      } finally {
+        setRefreshing(false);
+      }
+    };
+
+    fetchFullMonthData();
   };
-  
-  fetchFullMonthData();
-};
   const handleBack = () => {
     navigate('/superadmin/dashboard');
   };
@@ -3196,7 +3520,7 @@ useEffect(() => {
         </div>
       )}
 
-      
+
 
 
 
@@ -3239,139 +3563,139 @@ useEffect(() => {
                 >
                   <Download className="h-4 w-4 mr-2" /> Export to Excel
                 </Button>
-                <Button 
-    variant="default" 
-    size="sm" 
-    onClick={handleExportFullMonth}
-    disabled={filteredData.length === 0}
-    className="flex items-center gap-2"
-  >
-    <FileSpreadsheet className="h-4 w-4" />
-    Export Full Month
-  </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleExportFullMonth}
+                  disabled={filteredData.length === 0}
+                  className="flex items-center gap-2"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Export Full Month
+                </Button>
               </div>
             </div>
           </CardHeader>
-         <CardContent>
-  {filteredData.length === 0 ? (
-    <div className="text-center py-12">
-      <Building className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-      <h3 className="text-lg font-medium text-gray-900 mb-2">No Sites Found</h3>
-      <p className="text-gray-500 mb-6">
-        {searchTerm
-          ? 'No sites match your search criteria. Try a different search term.'
-          : 'No sites available or all sites are filtered out.'}
-      </p>
-      {searchTerm && (
-        <Button variant="outline" onClick={() => setSearchTerm('')}>
-          Clear Search
-        </Button>
-      )}
-    </div>
-  ) : isMobileSiteView ? (
-    // ✅ Mobile Card View (like supervisor dashboard)
-    <div className="space-y-3">
-      {paginatedData.map((item, index) => {
-        const dailyRequirement = item.dailyRequirement || 0;
-        const totalRequired = item.totalRequiredForPeriod || item.durationTotalRequired || dailyRequirement * daysInPeriod;
-        const present = item.totalPresent || item.presentCount || 0;
-        const absent = (item.totalAbsent || 0) + (item.totalLeave || 0);
-        const rate = totalRequired > 0 ? ((present / totalRequired) * 100).toFixed(1) : '0.0';
-        const status = parseFloat(rate) >= 90 ? 'Excellent' : parseFloat(rate) >= 80 ? 'Good' : parseFloat(rate) >= 70 ? 'Average' : 'Poor';
-
-        return (
-          <Card key={item.siteId || item.id || index} className="p-3">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-semibold">{item.siteName || item.name}</h3>
-                <p className="text-xs text-muted-foreground">{item.daysInPeriod} {item.daysInPeriod === 1 ? 'day' : 'days'}</p>
+          <CardContent>
+            {filteredData.length === 0 ? (
+              <div className="text-center py-12">
+                <Building className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Sites Found</h3>
+                <p className="text-gray-500 mb-6">
+                  {searchTerm
+                    ? 'No sites match your search criteria. Try a different search term.'
+                    : 'No sites available or all sites are filtered out.'}
+                </p>
+                {searchTerm && (
+                  <Button variant="outline" onClick={() => setSearchTerm('')}>
+                    Clear Search
+                  </Button>
+                )}
               </div>
-              <Badge variant={status === 'Excellent' ? 'default' : status === 'Good' ? 'secondary' : 'outline'}>{status}</Badge>
-            </div>
-            <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
-              <div><span className="text-muted-foreground">Daily Req:</span> <strong>{dailyRequirement}</strong></div>
-              <div><span className="text-muted-foreground">Total Required:</span> <strong>{totalRequired}</strong></div>
-              <div className="text-green-600"><span className="text-muted-foreground">Present:</span> <strong>{present}</strong></div>
-              <div className="text-red-600"><span className="text-muted-foreground">Absent:</span> <strong>{absent}</strong></div>
-              <div><span className="text-muted-foreground">Rate:</span> <strong>{rate}%</strong></div>
-            </div>
-            <div className="flex gap-2 mt-3">
-              <Button variant="outline" size="sm" onClick={() => handleViewDetails(item)}>
-                <Eye className="h-4 w-4 mr-1" /> Details
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => navigate(`/superadmin/machines/${encodeURIComponent(item.siteName || item.name)}`)}>
-                <Settings className="h-4 w-4 mr-1" /> Machines
-              </Button>
-            </div>
-          </Card>
-        );
-      })}
-    </div>
-  ) : (
-    // ✅ Desktop Table (unchanged)
-    <div className="rounded-md border">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Site Name</th>
-              <th className="h-12 px-4 text-left align-middle font-medium text-indigo-700 bg-indigo-50">Daily Req</th>
-              <th className="h-12 px-4 text-left align-middle font-medium text-blue-700 bg-blue-50">Total Required</th>
-              <th className="h-12 px-4 text-left align-middle font-medium text-green-700 bg-green-50">Present</th>
-               <th className="h-12 px-4 text-left align-middle font-medium text-purple-700 bg-purple-50">Weekly Off</th>
-              <th className="h-12 px-4 text-left align-middle font-medium text-red-700 bg-red-50">Absent</th>
-              <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Rate</th>
-              <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Status</th>
-              <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Attendance</th>
-             
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedData.map((item, index) => {
-              const dailyRequirement = item.dailyRequirement || 0;
-              const totalRequired = item.totalRequiredForPeriod || item.durationTotalRequired || dailyRequirement * daysInPeriod;
-              const present = item.totalPresent || item.presentCount || 0;
-              const absent = (item.totalAbsent || 0) + (item.totalLeave || 0);
-              const rate = totalRequired > 0 ? ((present / totalRequired) * 100).toFixed(1) : '0.0';
-              const status = parseFloat(rate) >= 90 ? 'Excellent' : parseFloat(rate) >= 80 ? 'Good' : parseFloat(rate) >= 70 ? 'Average' : 'Poor';
+            ) : isMobileSiteView ? (
+              // ✅ Mobile Card View (like supervisor dashboard)
+              <div className="space-y-3">
+                {paginatedData.map((item, index) => {
+                  const dailyRequirement = item.dailyRequirement || 0;
+                  const totalRequired = item.totalRequiredForPeriod || item.durationTotalRequired || dailyRequirement * daysInPeriod;
+                  const present = item.totalPresent || item.presentCount || 0;
+                  const absent = (item.totalAbsent || 0) + (item.totalLeave || 0);
+                  const rate = totalRequired > 0 ? ((present / totalRequired) * 100).toFixed(1) : '0.0';
+                  const status = parseFloat(rate) >= 90 ? 'Excellent' : parseFloat(rate) >= 80 ? 'Good' : parseFloat(rate) >= 70 ? 'Average' : 'Poor';
 
-              return (
-                <tr key={item.siteId || item.id || index} className="border-b hover:bg-muted/50">
-                  <td className="p-4 align-middle font-medium">
-                    <div className="font-medium text-sm">{item.siteName || item.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {item.daysInPeriod} {item.daysInPeriod === 1 ? 'day' : 'days'}
-                    </div>
-                  </td>
-                  <td className="p-4 align-middle font-bold text-indigo-700 bg-indigo-50">{dailyRequirement}</td>
-                  <td className="p-4 align-middle font-bold text-blue-700 bg-blue-50">{totalRequired}</td>
-                  <td className="p-4 align-middle font-bold text-green-700 bg-green-50">{present}</td>
-                  <td className="p-4 align-middle font-bold text-purple-700 bg-purple-50">
-  {item.totalWeeklyOff || item.weeklyOffCount || 0}
-</td>
-                  <td className="p-4 align-middle font-bold text-red-700 bg-red-50">{absent}</td>
-                  <td className="p-4 align-middle font-bold">{rate}%</td>
-                  <td className="p-4 align-middle">
-                    <Badge variant={status === 'Excellent' ? 'default' : status === 'Good' ? 'secondary' : status === 'Average' ? 'outline' : 'destructive'}>
-                      {status}
-                    </Badge>
-                  </td>
-                  <td className="p-4 align-middle">
-                    <Button variant="outline" size="sm" onClick={() => handleViewDetails(item)}>
-                      <Eye className="h-4 w-4 mr-1" /> Details
-                    </Button>
-                  </td>
-                 
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      {filteredData.length > 0 && <Pagination />}
-    </div>
-  )}
-</CardContent>
+                  return (
+                    <Card key={item.siteId || item.id || index} className="p-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-semibold">{item.siteName || item.name}</h3>
+                          <p className="text-xs text-muted-foreground">{item.daysInPeriod} {item.daysInPeriod === 1 ? 'day' : 'days'}</p>
+                        </div>
+                        <Badge variant={status === 'Excellent' ? 'default' : status === 'Good' ? 'secondary' : 'outline'}>{status}</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
+                        <div><span className="text-muted-foreground">Daily Req:</span> <strong>{dailyRequirement}</strong></div>
+                        <div><span className="text-muted-foreground">Total Required:</span> <strong>{totalRequired}</strong></div>
+                        <div className="text-green-600"><span className="text-muted-foreground">Present:</span> <strong>{present}</strong></div>
+                        <div className="text-red-600"><span className="text-muted-foreground">Absent:</span> <strong>{absent}</strong></div>
+                        <div><span className="text-muted-foreground">Rate:</span> <strong>{rate}%</strong></div>
+                      </div>
+                      <div className="flex gap-2 mt-3">
+                        <Button variant="outline" size="sm" onClick={() => handleViewDetails(item)}>
+                          <Eye className="h-4 w-4 mr-1" /> Details
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/superadmin/machines/${encodeURIComponent(item.siteName || item.name)}`)}>
+                          <Settings className="h-4 w-4 mr-1" /> Machines
+                        </Button>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              // ✅ Desktop Table (unchanged)
+              <div className="rounded-md border">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Site Name</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-indigo-700 bg-indigo-50">Daily Req</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-blue-700 bg-blue-50">Total Required</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-green-700 bg-green-50">Present</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-purple-700 bg-purple-50">Weekly Off</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-red-700 bg-red-50">Absent</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Rate</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Status</th>
+                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Attendance</th>
+
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedData.map((item, index) => {
+                        const dailyRequirement = item.dailyRequirement || 0;
+                        const totalRequired = item.totalRequiredForPeriod || item.durationTotalRequired || dailyRequirement * daysInPeriod;
+                        const present = item.totalPresent || item.presentCount || 0;
+                        const absent = (item.totalAbsent || 0) + (item.totalLeave || 0);
+                        const rate = totalRequired > 0 ? ((present / totalRequired) * 100).toFixed(1) : '0.0';
+                        const status = parseFloat(rate) >= 90 ? 'Excellent' : parseFloat(rate) >= 80 ? 'Good' : parseFloat(rate) >= 70 ? 'Average' : 'Poor';
+
+                        return (
+                          <tr key={item.siteId || item.id || index} className="border-b hover:bg-muted/50">
+                            <td className="p-4 align-middle font-medium">
+                              <div className="font-medium text-sm">{item.siteName || item.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {item.daysInPeriod} {item.daysInPeriod === 1 ? 'day' : 'days'}
+                              </div>
+                            </td>
+                            <td className="p-4 align-middle font-bold text-indigo-700 bg-indigo-50">{dailyRequirement}</td>
+                            <td className="p-4 align-middle font-bold text-blue-700 bg-blue-50">{totalRequired}</td>
+                            <td className="p-4 align-middle font-bold text-green-700 bg-green-50">{present}</td>
+                            <td className="p-4 align-middle font-bold text-purple-700 bg-purple-50">
+                              {item.totalWeeklyOff || item.weeklyOffCount || 0}
+                            </td>
+                            <td className="p-4 align-middle font-bold text-red-700 bg-red-50">{absent}</td>
+                            <td className="p-4 align-middle font-bold">{rate}%</td>
+                            <td className="p-4 align-middle">
+                              <Badge variant={status === 'Excellent' ? 'default' : status === 'Good' ? 'secondary' : status === 'Average' ? 'outline' : 'destructive'}>
+                                {status}
+                              </Badge>
+                            </td>
+                            <td className="p-4 align-middle">
+                              <Button variant="outline" size="sm" onClick={() => handleViewDetails(item)}>
+                                <Eye className="h-4 w-4 mr-1" /> Details
+                              </Button>
+                            </td>
+
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {filteredData.length > 0 && <Pagination />}
+              </div>
+            )}
+          </CardContent>
         </Card>
       </motion.div>
 

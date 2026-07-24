@@ -19,7 +19,8 @@ import { useRole } from "@/context/RoleContext";
 import taskService from "@/services/TaskService";
 import siteVisitService, { Site, SiteVisitReport, WorkQuery } from "@/services/SiteVisitService";
 import { motion } from "framer-motion";
-
+const API_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 // Camera Component
 interface CameraComponentProps {
   onCapture: (imageData: string) => void;
@@ -242,66 +243,77 @@ const ManagerSites = () => {
   const managerName = authUser?.name || "Manager";
   
   // Fetch assigned sites
-  const fetchAssignedSites = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      
-      // Get all tasks to find sites where this manager is assigned
-      const allTasks = await taskService.getAllTasks();
-      
-      // Filter tasks where manager is assigned
-      const managerTasks = allTasks.filter(task => 
-        task.assignedUsers?.some(user => 
-          user.userId === managerId && user.role === 'manager'
-        )
-      );
-      
-      // Get unique sites from tasks
-      const uniqueSites = new Map();
-      managerTasks.forEach(task => {
-        if (!uniqueSites.has(task.siteId)) {
-          uniqueSites.set(task.siteId, {
-            _id: task.siteId,
-            name: task.siteName,
-            clientName: task.clientName,
-            location: task.location || "",
-            status: task.status || "active",
-            lastVisited: null,
-            visitCount: 0,
-            taskId: task._id,
-            taskTitle: task.title,
-            managerCount: 0,
-            supervisorCount: 0
-          });
-        }
-      });
-      
-      // Get visit history for each site
-      for (const [siteId, site] of uniqueSites) {
-        try {
-          const reportsData = await siteVisitService.getManagerReports(managerId, { siteId });
-          const approvedReports = reportsData.filter(r => r.status === 'approved');
-          
-          if (approvedReports.length > 0) {
-            const lastVisit = approvedReports.sort((a, b) => 
-              new Date(b.visitDate).getTime() - new Date(a.visitDate).getTime()
-            )[0];
-            site.lastVisited = lastVisit.visitDate;
-            site.visitCount = approvedReports.length;
-          }
-        } catch (error) {
-          console.error(`Error fetching visits for site ${siteId}:`, error);
-        }
+  // Fetch assigned sites - SHOW ALL SITES
+// src/components/Manager/ManagerSites.tsx - Replace fetchAssignedSites
+
+const fetchAssignedSites = useCallback(async () => {
+  try {
+    setIsLoading(true);
+    console.log('🔍 Fetching sites for manager...');
+    
+    // Get ALL sites directly from API
+    const token = localStorage.getItem('sk_token');
+    const response = await fetch(`${API_URL}/sites`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
       }
-      
-      setSites(Array.from(uniqueSites.values()));
-    } catch (error: any) {
-      console.error("Error fetching assigned sites:", error);
-      toast.error(error.message || "Failed to load assigned sites");
-    } finally {
+    });
+    
+    console.log('📡 Sites API response status:', response.status);
+    
+    if (!response.ok) {
+      console.error('❌ Failed to fetch sites:', response.status);
+      setSites([]);
       setIsLoading(false);
+      return;
     }
-  }, [managerId]);
+    
+    const data = await response.json();
+    console.log('📡 Sites data:', data);
+    
+    // Extract sites from response
+    let allSites = [];
+    if (data.success && Array.isArray(data.data)) {
+      allSites = data.data;
+    } else if (Array.isArray(data)) {
+      allSites = data;
+    } else if (Array.isArray(data.sites)) {
+      allSites = data.sites;
+    } else {
+      console.warn('⚠️ No sites found in response');
+      setSites([]);
+      setIsLoading(false);
+      return;
+    }
+    
+    console.log(`📡 Found ${allSites.length} sites`);
+    
+    // Transform sites to match the Site interface
+    const transformedSites = allSites.map((site: any) => ({
+      _id: site._id || site.id,
+      name: site.name || 'Unnamed Site',
+      clientName: site.clientName || site.client || 'N/A',
+      location: site.location || '',
+      status: site.status || 'active',
+      lastVisited: null,
+      visitCount: 0,
+      managerCount: site.managerCount || 0,
+      supervisorCount: site.supervisorCount || 0
+    }));
+    
+    setSites(transformedSites);
+    console.log(`✅ Loaded ${transformedSites.length} sites for manager`);
+    
+  } catch (error: any) {
+    console.error('❌ Error fetching sites:', error);
+    toast.error(error.message || 'Failed to load sites');
+    setSites([]);
+  } finally {
+    setIsLoading(false);
+  }
+}, []);
   
   // Fetch manager's reports
   const fetchReports = useCallback(async () => {

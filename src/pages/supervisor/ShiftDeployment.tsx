@@ -7,7 +7,7 @@ import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
 import { useRole } from "@/context/RoleContext";
-
+import { DashboardHeader } from "@/components/shared/DashboardHeader";
 const API_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
@@ -105,9 +105,11 @@ export default function ShiftDeployment() {
 
   return (
     <div className="p-4 space-y-4">
-      <BackButton />
-      <h1 className="text-xl font-bold">Shift-wise Deployment</h1>
-      {siteName && <p className="text-sm text-muted-foreground">Site: {siteName}</p>}
+     <DashboardHeader 
+  title="Shift-wise Deployment" 
+  subtitle={siteName ? `Site: ${siteName}` : "Loading..."}
+  onMenuClick={() => {}}
+/>
       <Card>
         <CardContent className="pt-4 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
