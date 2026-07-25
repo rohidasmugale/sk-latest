@@ -10,49 +10,148 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
+  
   plugins: [
     react(), 
     mode === "development" && componentTagger(),
     VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
+      registerType: "autoUpdate",
+      includeAssets: ["favicon.ico", "apple-touch-icon.png"],
       manifest: {
-        name: 'SK Project',
-        short_name: 'SK',
-        description: 'Facility Management System',
-        theme_color: '#1e293b',
-        background_color: '#0f172a',
-        display: 'standalone',
-        start_url: '/',
-        icons: [
-          // Add your icons here
-        ]
+        name: "SK Project",
+        short_name: "SK",
+        description: "Facility Management System",
+        theme_color: "#1e293b",
+        background_color: "#0f172a",
+        display: "standalone",
+        start_url: "/",
+        icons: [],
       },
       workbox: {
-        navigateFallback: 'index.html',
-        // ✅ Don't cache API routes
+        // ✅ Increased limit to 20MB to handle large bundles
+        maximumFileSizeToCacheInBytes: 20 * 1024 * 1024,
+        
+        // ✅ Glob patterns for caching
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        
+        // ✅ Exclude large index files from precaching
+        globIgnores: ["**/index-*.js"],
+        
+        // ✅ Navigate fallback for SPA
+        navigateFallback: "index.html",
         navigateFallbackDenylist: [/^\/api\//],
-        // ✅ Don't cache auth pages
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        
+        // ✅ Runtime caching strategy for better performance
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/sk-backend-btbj\.onrender\.com\/api\/.*/i,
-            handler: 'NetworkFirst',
+            handler: "NetworkFirst",
             options: {
-              cacheName: 'api-cache',
+              cacheName: "api-cache",
               expiration: {
                 maxEntries: 50,
-                maxAgeSeconds: 60 * 60
-              }
-            }
-          }
-        ]
-      }
+                maxAgeSeconds: 60 * 60,
+              },
+            },
+          },
+          {
+            urlPattern: /\.(js|css)$/,
+            handler: "StaleWhileRevalidate",
+            options: {
+              cacheName: "static-resources",
+              expiration: {
+                maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
+              },
+            },
+          },
+          {
+            urlPattern: /\.(png|jpg|jpeg|svg|gif|ico|webp)$/,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "image-cache",
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
+              },
+            },
+          },
+        ],
+      },
     })
   ].filter(Boolean),
+  
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+  },
+  
+  // ✅ Build optimization configuration
+  build: {
+    // ✅ Increase chunk size warning limit
+    chunkSizeWarningLimit: 20000, // 20MB in KB
+    
+    // ✅ Minify for production
+    minify: "terser",
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
+    
+    // ✅ Rollup optimization
+    rollupOptions: {
+      output: {
+        // ✅ Manual chunk splitting for better caching
+        manualChunks: {
+          // React core
+          react: ['react', 'react-dom', 'react-router-dom'],
+          
+          // UI libraries
+          ui: [
+            '@radix-ui/react-dialog', 
+            '@radix-ui/react-select', 
+            '@radix-ui/react-toast',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-tabs'
+          ],
+          
+          // Charts
+          charts: ['recharts'],
+          
+          // Utilities
+          utils: ['axios', 'date-fns', 'sonner', 'framer-motion'],
+          
+          // Form handling
+          forms: ['react-hook-form', '@hookform/resolvers'],
+        },
+        
+        // ✅ Asset file naming for cache busting
+        assetFileNames: 'assets/[name].[hash][extname]',
+        chunkFileNames: 'chunks/[name].[hash].js',
+        entryFileNames: 'entries/[name].[hash].js',
+      },
+    },
+    
+    // ✅ Source map for debugging (optional)
+    sourcemap: mode === "development",
+    
+    // ✅ Target modern browsers
+    target: "es2020",
+  },
+  
+  // ✅ Optimize dependencies
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      'axios',
+      'date-fns',
+      'sonner',
+      'framer-motion',
+    ],
+    exclude: ['@vercel/analytics'],
   },
 }));
