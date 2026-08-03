@@ -193,7 +193,9 @@ const Attendance = () => {
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [selectedPhotoType, setSelectedPhotoType] = useState<'checkin' | 'checkout'>('checkin');
-
+ const [activeShiftId, setActiveShiftId] = useState<string>("");
+const [siteShifts, setSiteShifts] = useState<any[]>([]);
+const [loadingShifts, setLoadingShifts] = useState(false);
   // Data fetching
   const fetchSupervisorSites = useCallback(async () => {
     if (!currentUser) return [];
@@ -221,7 +223,30 @@ const Attendance = () => {
       return [];
     }
   }, [currentUser]);
-
+const fetchSiteShifts = async (siteName: string) => {
+  if (!siteName) return;
+  setLoadingShifts(true);
+  try {
+    const res = await axios.get(`${API_URL}/sites`);
+    const sites = res.data?.data || res.data || [];
+    const site = sites.find((s: any) => s.name === siteName);
+    if (site?.shifts && site.shifts.length > 0) {
+      setSiteShifts(site.shifts);
+      // Set default active shift to first one
+      if (!activeShiftId) {
+        setActiveShiftId(site.shifts[0].id);
+      }
+    } else {
+      setSiteShifts([]);
+      setActiveShiftId("");
+    }
+  } catch (error) {
+    console.error("Error fetching shifts:", error);
+    setSiteShifts([]);
+  } finally {
+    setLoadingShifts(false);
+  }
+};
   const fetchEmployees = useCallback(async () => {
     if (!currentUser) return;
     try {

@@ -28,6 +28,35 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useOutletContext } from "react-router-dom";
 import { taskService, type Assignee, type Site as TaskServiceSite } from "@/services/TaskService";
+import { siteService, Site } from "@/services/SiteService";
+
+// Site Filter Component
+const SiteFilter: React.FC<{
+  selectedSite: string;
+  onSiteChange: (value: string) => void;
+  sites: Site[];
+  isLoading?: boolean;
+}> = ({ selectedSite, onSiteChange, sites, isLoading = false }) => {
+  return (
+    <div className="flex items-center gap-2">
+      <Building className="h-4 w-4 text-gray-500" />
+      <select
+        value={selectedSite}
+        onChange={(e) => onSiteChange(e.target.value)}
+        disabled={isLoading}
+        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white text-sm min-w-[180px]"
+      >
+        <option value="all">🏢 All Sites</option>
+        {sites.map((site) => (
+          <option key={site._id} value={site._id}>
+            {site.name}
+          </option>
+        ))}
+      </select>
+      {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
+    </div>
+  );
+};
 
 // Mobile responsive task card
 const MobileTaskCard = ({
@@ -275,6 +304,11 @@ const ManagerTasks = () => {
   const [sites, setSites] = useState<Site[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   
+  // Site filter state
+  const [allSites, setAllSites] = useState<Site[]>([]);
+  const [selectedSite, setSelectedSite] = useState<string>("all");
+  const [isLoadingSites, setIsLoadingSites] = useState<boolean>(false);
+  
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
@@ -289,6 +323,13 @@ const ManagerTasks = () => {
     taskType: "routine"
   });
 
+  // Get site name for display
+  const getSiteDisplayName = () => {
+    if (selectedSite === 'all') return 'All Sites';
+    const site = allSites.find(s => s._id === selectedSite);
+    return site ? site.name : 'Unknown Site';
+  };
+
   // Check for mobile view on mount and resize
   useEffect(() => {
     const checkMobile = () => {
@@ -300,6 +341,32 @@ const ManagerTasks = () => {
     
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Fetch all sites for filter dropdown
+  const fetchAllSites = async () => {
+    if (!currentUser) return;
+    
+    try {
+      setIsLoadingSites(true);
+      const sitesData = await siteService.getAllSites();
+      
+      // Filter sites based on manager's access if needed
+      let filteredSites = sitesData || [];
+      if (currentUser.site) {
+        filteredSites = sitesData.filter(site => 
+          site.name === currentUser.site || site._id === currentUser.site
+        );
+      }
+      
+      setAllSites(filteredSites);
+      console.log("✅ Loaded sites for filter:", filteredSites.length);
+    } catch (error) {
+      console.error('Error fetching sites for filter:', error);
+      setAllSites([]);
+    } finally {
+      setIsLoadingSites(false);
+    }
+  };
 
   // Fetch all sites
   const fetchSites = async () => {
@@ -414,6 +481,7 @@ const ManagerTasks = () => {
       setLoading(prev => ({ ...prev, tasks: true }));
       console.log("Fetching tasks... Current user:", currentUser);
       console.log("View mode:", viewMode);
+      console.log("Selected site:", selectedSite);
       
       let fetchedTasks: Task[] = [];
       
@@ -477,11 +545,12 @@ const ManagerTasks = () => {
             break;
             
           case "site":
-            // All tasks on current user's site
-            if (currentUser.site) {
-              console.log("Fetching tasks for site:", currentUser.site);
+            // All tasks on selected site or current user's site
+            const siteFilter = selectedSite !== 'all' ? selectedSite : currentUser.site;
+            if (siteFilter) {
+              console.log("Fetching tasks for site:", siteFilter);
               try {
-                const siteTasks = await taskService.getTasksBySite(currentUser.site);
+                const siteTasks = await taskService.getTasksBySite(siteFilter);
                 console.log("Site tasks:", siteTasks);
                 
                 fetchedTasks = siteTasks.map((task: any) => {
@@ -498,7 +567,7 @@ const ManagerTasks = () => {
                 console.error("Error fetching site tasks, falling back to all tasks:", siteError);
                 const allTasks = await taskService.getAllTasks();
                 fetchedTasks = allTasks
-                  .filter((task: any) => task.siteName === currentUser.site)
+                  .filter((task: any) => task.siteName === siteFilter || task.siteId === siteFilter)
                   .map((task: any) => {
                     const isCreatedByCurrentUser = task.createdBy === currentUser._id || task.createdById === currentUser._id;
                     const isAssignedToCurrentUser = task.assignedTo === currentUser._id;
@@ -562,6 +631,7 @@ const ManagerTasks = () => {
       setDebugInfo({
         totalTasks: fetchedTasks.length,
         viewMode: viewMode,
+        selectedSite: selectedSite,
         currentUserSite: currentUser.site,
         currentUserId: currentUser._id,
         currentUserRole: currentUser.role,
@@ -716,15 +786,16 @@ const ManagerTasks = () => {
       fetchSites();
       fetchSupervisors();
       fetchTasks();
+      fetchAllSites();
     }
   }, [currentUser]);
 
-  // Refresh tasks when view mode changes
+  // Refresh tasks when view mode or selected site changes
   useEffect(() => {
     if (currentUser) {
       fetchTasks();
     }
-  }, [viewMode]);
+  }, [viewMode, selectedSite]);
 
   // Handle form input changes
   const handleInputChange = (field: string, value: string) => {
@@ -1094,6 +1165,8 @@ const ManagerTasks = () => {
     console.log("Active Tab:", activeTab);
     console.log("Search Query:", searchQuery);
     console.log("New Task Form:", newTask);
+    console.log("Selected Site:", selectedSite);
+    console.log("All Sites:", allSites);
     console.log("===================");
     
     toast.info("Debug info logged to console", {
@@ -1170,6 +1243,19 @@ const ManagerTasks = () => {
         animate={{ opacity: 1, y: 0 }}
         className="p-4 md:p-6 space-y-4 md:space-y-6"
       >
+        {/* Site Filter Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SiteFilter
+            selectedSite={selectedSite}
+            onSiteChange={setSelectedSite}
+            sites={allSites}
+            isLoading={isLoadingSites}
+          />
+          <span className="text-xs text-muted-foreground">
+            {selectedSite !== 'all' && `Showing: ${getSiteDisplayName()}`}
+          </span>
+        </div>
+
         {/* Manager Info Card */}
         <Card>
           <CardContent className="p-4 md:p-6">
@@ -1322,7 +1408,7 @@ const ManagerTasks = () => {
                   : viewMode === "created"
                   ? "Tasks created by you"
                   : viewMode === "site"
-                  ? `All tasks for ${currentUser.site || "your site"}`
+                  ? `All tasks for ${selectedSite !== 'all' ? getSiteDisplayName() : currentUser.site || "your site"}`
                   : "All tasks from all sources"
                 }
               </p>

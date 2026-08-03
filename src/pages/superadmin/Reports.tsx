@@ -98,6 +98,8 @@ interface AttendanceRecord {
   notes?: string;
   site?: string;
   shift?: string;
+  shiftId?: string; 
+
   lateByMinutes?: number;
   earlyDeparture?: boolean;
   createdBy?: string;

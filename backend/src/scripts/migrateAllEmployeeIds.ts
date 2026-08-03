@@ -1,28 +1,28 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-import Site from '../models/Site';
 import Employee from '../models/Employee';
+import Site from '../models/Site';
 
 dotenv.config();
 
-async function migrateAllEmployeeIds() {
+async function migrateEmployeeIds() {
   try {
     await mongoose.connect(process.env.MONGODB_URI!);
     console.log('📊 Connected to MongoDB');
-    
-    // ✅ STEP 1: Get all sites
+
+    // Get all sites
     const sites = await Site.find();
     console.log(`📍 Found ${sites.length} sites`);
-    
+
     let totalUpdated = 0;
-    
+
     for (const site of sites) {
       console.log(`\n📋 Processing site: ${site.name}`);
       
-      // ✅ STEP 2: Get all employees at this site (active and inactive)
+      // Get all employees at this site, sorted by creation date
       const employees = await Employee.find({ 
         siteName: site.name 
-      }).sort({ createdAt: 1 }); // Sort by creation date (oldest first)
+      }).sort({ createdAt: 1 });
       
       if (employees.length === 0) {
         console.log(`   No employees found for this site`);
@@ -31,12 +31,11 @@ async function migrateAllEmployeeIds() {
       
       console.log(`   Found ${employees.length} employees`);
       
-      // ✅ STEP 3: Update each employee with serial number
+      // Update each employee with sequential ID
       let counter = 1;
       for (const employee of employees) {
         const newId = counter.toString();
         
-        // Update employee with new simple ID
         await Employee.findByIdAndUpdate(
           employee._id,
           { $set: { employeeId: newId } }
@@ -47,7 +46,7 @@ async function migrateAllEmployeeIds() {
         totalUpdated++;
       }
       
-      // ✅ STEP 4: Update site counter to the last assigned number
+      // Update site counter
       await Site.findByIdAndUpdate(
         site._id,
         { $set: { employeeCounter: employees.length } }
@@ -60,11 +59,10 @@ async function migrateAllEmployeeIds() {
     console.log(`📊 Total employees updated: ${totalUpdated}`);
     
     process.exit(0);
-    
   } catch (error) {
     console.error('❌ Migration failed:', error);
     process.exit(1);
   }
 }
 
-migrateAllEmployeeIds();
+migrateEmployeeIds();

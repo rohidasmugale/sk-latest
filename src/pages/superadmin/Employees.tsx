@@ -9,9 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ClipboardList, MoreHorizontal, Edit, Trash2, CheckCircle, PlayCircle } from "lucide-react";
+import { Search, ClipboardList, MoreHorizontal, Edit, Trash2, CheckCircle, PlayCircle, Building, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-
 import { motion } from "framer-motion";
 import {
   DropdownMenu,
@@ -19,8 +18,37 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { siteService, Site } from "@/services/SiteService";
 
-// Task interface
+// Site Filter Component
+const SiteFilter: React.FC<{
+  selectedSite: string;
+  onSiteChange: (value: string) => void;
+  sites: Site[];
+  isLoading?: boolean;
+}> = ({ selectedSite, onSiteChange, sites, isLoading = false }) => {
+  return (
+    <div className="flex items-center gap-2">
+      <Building className="h-4 w-4 text-gray-500" />
+      <select
+        value={selectedSite}
+        onChange={(e) => onSiteChange(e.target.value)}
+        disabled={isLoading}
+        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white text-sm min-w-[180px]"
+      >
+        <option value="all">🏢 All Sites</option>
+        {sites.map((site) => (
+          <option key={site._id} value={site._id}>
+            {site.name}
+          </option>
+        ))}
+      </select>
+      {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
+    </div>
+  );
+};
+
+// Task interface with site
 interface Task {
   id: string;
   title: string;
@@ -30,13 +58,43 @@ interface Task {
   status: "pending" | "in-progress" | "completed";
   dueDate: string;
   createdAt: string;
+  siteId?: string;
+  siteName?: string;
 }
+
+// Employee interface with site
+interface Employee {
+  id: number;
+  name: string;
+  role: string;
+  supervisor: string;
+  site: string;
+  phone: string;
+  status: "active" | "inactive";
+  siteId?: string;
+}
+
+// Sample employee data with site associations
+const sampleEmployees: Employee[] = [
+  { id: 1, name: "Alice Johnson", role: "Security Guard", supervisor: "Bob Smith", site: "Mumbai Office", phone: "+91 98765 43210", status: "active" },
+  { id: 2, name: "Bob Smith", role: "Security Supervisor", supervisor: "Carol White", site: "Mumbai Office", phone: "+91 98765 43211", status: "active" },
+  { id: 3, name: "Carol White", role: "Security Manager", supervisor: "Dave Brown", site: "Mumbai Office", phone: "+91 98765 43212", status: "active" },
+  { id: 4, name: "Dave Brown", role: "Housekeeping Staff", supervisor: "Eve Davis", site: "Delhi Branch", phone: "+91 98765 43213", status: "active" },
+  { id: 5, name: "Eve Davis", role: "Housekeeping Supervisor", supervisor: "Frank Wilson", site: "Delhi Branch", phone: "+91 98765 43214", status: "active" },
+  { id: 6, name: "Frank Wilson", role: "Parking Attendant", supervisor: "Grace Lee", site: "Bangalore Tech Park", phone: "+91 98765 43215", status: "inactive" },
+];
 
 const Employees = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [employees, setEmployees] = useState<Employee[]>(sampleEmployees);
+  
+  // Site state
+  const [allSites, setAllSites] = useState<Site[]>([]);
+  const [selectedSite, setSelectedSite] = useState<string>("all");
+  const [isLoadingSites, setIsLoadingSites] = useState<boolean>(false);
   
   // Task form state
   const [taskForm, setTaskForm] = useState({
@@ -44,8 +102,16 @@ const Employees = () => {
     description: "",
     assignedTo: "",
     priority: "medium" as "low" | "medium" | "high",
-    dueDate: ""
+    dueDate: "",
+    siteId: ""
   });
+
+  // Get site name for display
+  const getSiteDisplayName = () => {
+    if (selectedSite === 'all') return 'All Sites';
+    const site = allSites.find(s => s._id === selectedSite);
+    return site ? site.name : 'Unknown Site';
+  };
 
   // Load tasks from localStorage on component mount
   useEffect(() => {
@@ -53,6 +119,7 @@ const Employees = () => {
     if (savedTasks) {
       setTasks(JSON.parse(savedTasks));
     }
+    fetchSites();
   }, []);
 
   // Save tasks to localStorage whenever tasks change
@@ -60,8 +127,53 @@ const Employees = () => {
     localStorage.setItem('employeeTasks', JSON.stringify(tasks));
   }, [tasks]);
 
+  // Fetch sites
+  const fetchSites = async () => {
+    try {
+      setIsLoadingSites(true);
+      const sitesData = await siteService.getAllSites();
+      setAllSites(sitesData || []);
+      console.log("✅ Loaded sites:", sitesData.length);
+    } catch (error) {
+      console.error("Error fetching sites:", error);
+      setAllSites([]);
+    } finally {
+      setIsLoadingSites(false);
+    }
+  };
+
+  // Filter employees by selected site
+  const filteredEmployees = employees.filter(employee => {
+    const matchesSearch = 
+      employee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      employee.site.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      employee.role.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesSite = selectedSite === "all" || 
+      employee.siteId === selectedSite || 
+      employee.site === selectedSite ||
+      employee.site === allSites.find(s => s._id === selectedSite)?.name;
+    
+    return matchesSearch && matchesSite;
+  });
+
+  // Get employee by ID
+  const getEmployeeById = (id: string) => {
+    return employees.find(e => e.id === parseInt(id));
+  };
+
+  // Get site name for task
+  const getSiteNameForTask = (task: Task) => {
+    if (task.siteName) return task.siteName;
+    const site = allSites.find(s => s._id === task.siteId);
+    return site ? site.name : "Unknown Site";
+  };
+
   const handleAddTask = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    
+    const selectedSite = allSites.find(s => s._id === taskForm.siteId);
+    const assignedEmployee = getEmployeeById(taskForm.assignedTo);
     
     const newTask: Task = {
       id: Date.now().toString(),
@@ -71,7 +183,9 @@ const Employees = () => {
       priority: taskForm.priority,
       status: "pending",
       dueDate: taskForm.dueDate,
-      createdAt: new Date().toISOString().split('T')[0]
+      createdAt: new Date().toISOString().split('T')[0],
+      siteId: taskForm.siteId || undefined,
+      siteName: selectedSite?.name || assignedEmployee?.site || "Unknown Site"
     };
 
     setTasks(prev => [newTask, ...prev]);
@@ -84,7 +198,8 @@ const Employees = () => {
       description: "",
       assignedTo: "",
       priority: "medium",
-      dueDate: ""
+      dueDate: "",
+      siteId: ""
     });
   };
 
@@ -92,13 +207,18 @@ const Employees = () => {
     e.preventDefault();
     if (!editingTask) return;
 
+    const selectedSite = allSites.find(s => s._id === taskForm.siteId);
+    const assignedEmployee = getEmployeeById(taskForm.assignedTo);
+
     const updatedTask: Task = {
       ...editingTask,
       title: taskForm.title,
       description: taskForm.description,
       assignedTo: taskForm.assignedTo,
       priority: taskForm.priority,
-      dueDate: taskForm.dueDate
+      dueDate: taskForm.dueDate,
+      siteId: taskForm.siteId || editingTask.siteId,
+      siteName: selectedSite?.name || assignedEmployee?.site || editingTask.siteName || "Unknown Site"
     };
 
     setTasks(prev => prev.map(task => task.id === editingTask.id ? updatedTask : task));
@@ -112,7 +232,8 @@ const Employees = () => {
       description: "",
       assignedTo: "",
       priority: "medium",
-      dueDate: ""
+      dueDate: "",
+      siteId: ""
     });
   };
 
@@ -135,7 +256,8 @@ const Employees = () => {
       description: task.description,
       assignedTo: task.assignedTo,
       priority: task.priority,
-      dueDate: task.dueDate
+      dueDate: task.dueDate,
+      siteId: task.siteId || ""
     });
     setTaskDialogOpen(true);
   };
@@ -165,10 +287,18 @@ const Employees = () => {
     }
   };
 
-  const filteredEmployees = employees.filter(employee => 
-    employee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    employee.site.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Calculate stats based on filtered employees
+  const totalEmployees = filteredEmployees.length;
+  const activeEmployees = filteredEmployees.filter(e => e.status === "active").length;
+  
+  // Filter tasks by selected site
+  const filteredTasks = tasks.filter(task => {
+    if (selectedSite === "all") return true;
+    return task.siteId === selectedSite || task.siteName === selectedSite;
+  });
+  
+  const totalTasks = filteredTasks.length;
+  const pendingTasks = filteredTasks.filter(t => t.status === "pending").length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -179,13 +309,27 @@ const Employees = () => {
         animate={{ opacity: 1, y: 0 }}
         className="p-6 space-y-6"
       >
+        {/* Site Filter Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SiteFilter
+            selectedSite={selectedSite}
+            onSiteChange={setSelectedSite}
+            sites={allSites}
+            isLoading={isLoadingSites}
+          />
+          <span className="text-xs text-muted-foreground">
+            {selectedSite !== 'all' && `Showing: ${getSiteDisplayName()}`}
+          </span>
+        </div>
+
+        {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{employees.length}</div>
+              <div className="text-2xl font-bold">{totalEmployees}</div>
             </CardContent>
           </Card>
           <Card>
@@ -194,7 +338,7 @@ const Employees = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">
-                {employees.filter(e => e.status === "active").length}
+                {activeEmployees}
               </div>
             </CardContent>
           </Card>
@@ -203,7 +347,7 @@ const Employees = () => {
               <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{tasks.length}</div>
+              <div className="text-2xl font-bold">{totalTasks}</div>
             </CardContent>
           </Card>
           <Card>
@@ -212,19 +356,19 @@ const Employees = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {tasks.filter(t => t.status === "pending").length}
+                {pendingTasks}
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Tasks Section */}
-        {tasks.length > 0 && (
+        {filteredTasks.length > 0 && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle>Assigned Tasks</CardTitle>
               <Badge variant="outline" className="ml-2">
-                {tasks.length} tasks
+                {filteredTasks.length} tasks
               </Badge>
             </CardHeader>
             <CardContent>
@@ -233,6 +377,7 @@ const Employees = () => {
                   <TableRow>
                     <TableHead>Task Title</TableHead>
                     <TableHead>Assigned To</TableHead>
+                    <TableHead>Site</TableHead>
                     <TableHead>Priority</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Due Date</TableHead>
@@ -241,8 +386,9 @@ const Employees = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {tasks.map((task) => {
-                    const employee = employees.find(e => e.id === parseInt(task.assignedTo));                    return (
+                  {filteredTasks.map((task) => {
+                    const employee = getEmployeeById(task.assignedTo);
+                    return (
                       <TableRow key={task.id}>
                         <TableCell className="font-medium">
                           <div>
@@ -253,6 +399,12 @@ const Employees = () => {
                           </div>
                         </TableCell>
                         <TableCell>{employee?.name || "Unknown"}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs">
+                            <Building className="h-3 w-3 mr-1" />
+                            {getSiteNameForTask(task)}
+                          </Badge>
+                        </TableCell>
                         <TableCell>
                           <Badge variant={getPriorityColor(task.priority)}>
                             {task.priority}
@@ -267,7 +419,6 @@ const Employees = () => {
                         <TableCell>{task.createdAt}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            {/* Status Update Buttons */}
                             {task.status !== "completed" && (
                               <Button
                                 variant="outline"
@@ -317,95 +468,120 @@ const Employees = () => {
           </Card>
         )}
 
+        {/* Employees Table */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle>All Employees</CardTitle>
-            <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <ClipboardList className="mr-2 h-4 w-4" />
-                  Assign Task
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>
-                    {editingTask ? "Edit Task" : "Assign New Task"}
-                  </DialogTitle>
-                </DialogHeader>
-                <form onSubmit={editingTask ? handleEditTask : handleAddTask} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="title">Task Title</Label>
-                    <Input 
-                      id="title" 
-                      placeholder="Enter task title" 
-                      value={taskForm.title}
-                      onChange={(e) => handleTaskInputChange("title", e.target.value)}
-                      required 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea 
-                      id="description" 
-                      placeholder="Enter task description" 
-                      value={taskForm.description}
-                      onChange={(e) => handleTaskInputChange("description", e.target.value)}
-                      required 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="assignedTo">Assign To</Label>
-                    <Select 
-                      value={taskForm.assignedTo} 
-                      onValueChange={(value) => handleTaskInputChange("assignedTo", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select employee" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {employees.map((employee) => (
-                          <SelectItem key={employee.id} value={employee.id.toString()}>
-                            {employee.name} - {employee.role} ({employee.site})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
+            <div className="flex gap-2">
+              <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <ClipboardList className="mr-2 h-4 w-4" />
+                    Assign Task
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>
+                      {editingTask ? "Edit Task" : "Assign New Task"}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={editingTask ? handleEditTask : handleAddTask} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="priority">Priority</Label>
-                      <Select 
-                        value={taskForm.priority} 
-                        onValueChange={(value: "low" | "medium" | "high") => handleTaskInputChange("priority", value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="dueDate">Due Date</Label>
+                      <Label htmlFor="title">Task Title</Label>
                       <Input 
-                        id="dueDate" 
-                        type="date" 
-                        value={taskForm.dueDate}
-                        onChange={(e) => handleTaskInputChange("dueDate", e.target.value)}
+                        id="title" 
+                        placeholder="Enter task title" 
+                        value={taskForm.title}
+                        onChange={(e) => handleTaskInputChange("title", e.target.value)}
                         required 
                       />
                     </div>
-                  </div>
-                  <Button type="submit" className="w-full">
-                    {editingTask ? "Update Task" : "Assign Task"}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea 
+                        id="description" 
+                        placeholder="Enter task description" 
+                        value={taskForm.description}
+                        onChange={(e) => handleTaskInputChange("description", e.target.value)}
+                        required 
+                      />
+                    </div>
+                    
+                    {/* Site Selection */}
+                    <div className="space-y-2">
+                      <Label htmlFor="site">Site</Label>
+                      <Select 
+                        value={taskForm.siteId} 
+                        onValueChange={(value) => handleTaskInputChange("siteId", value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select site" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {allSites.map((site) => (
+                            <SelectItem key={site._id} value={site._id}>
+                              {site.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="assignedTo">Assign To</Label>
+                      <Select 
+                        value={taskForm.assignedTo} 
+                        onValueChange={(value) => handleTaskInputChange("assignedTo", value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select employee" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filteredEmployees.map((employee) => (
+                            <SelectItem key={employee.id} value={employee.id.toString()}>
+                              {employee.name} - {employee.role} ({employee.site})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="priority">Priority</Label>
+                        <Select 
+                          value={taskForm.priority} 
+                          onValueChange={(value: "low" | "medium" | "high") => handleTaskInputChange("priority", value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="low">Low</SelectItem>
+                            <SelectItem value="medium">Medium</SelectItem>
+                            <SelectItem value="high">High</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="dueDate">Due Date</Label>
+                        <Input 
+                          id="dueDate" 
+                          type="date" 
+                          value={taskForm.dueDate}
+                          onChange={(e) => handleTaskInputChange("dueDate", e.target.value)}
+                          required 
+                        />
+                      </div>
+                    </div>
+                    <Button type="submit" className="w-full">
+                      {editingTask ? "Update Task" : "Assign Task"}
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="mb-4">
@@ -453,7 +629,11 @@ const Employees = () => {
                         size="sm"
                         onClick={() => {
                           setEditingTask(null);
-                          setTaskForm(prev => ({ ...prev, assignedTo: employee.id.toString() }));
+                          setTaskForm(prev => ({ 
+                            ...prev, 
+                            assignedTo: employee.id.toString(),
+                            siteId: allSites.find(s => s.name === employee.site)?.id || ""
+                          }));
                           setTaskDialogOpen(true);
                         }}
                       >

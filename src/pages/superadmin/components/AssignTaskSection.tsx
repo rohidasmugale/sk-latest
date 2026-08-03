@@ -57,6 +57,7 @@ import assignTaskService, {
   type Attachment
 } from "@/services/assignTaskService";
 import taskService, { type Site, type Assignee, type ExtendedSite, type Task, type AssignedUser } from "@/services/TaskService";
+import { siteService, Site as ServiceSite } from "@/services/SiteService";
 import {
   Dialog,
   DialogContent,
@@ -89,7 +90,33 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
+// Site Filter Component
+const SiteFilter: React.FC<{
+  selectedSite: string;
+  onSiteChange: (value: string) => void;
+  sites: ServiceSite[];
+  isLoading?: boolean;
+}> = ({ selectedSite, onSiteChange, sites, isLoading = false }) => {
+  return (
+    <div className="flex items-center gap-2">
+      <Building className="h-4 w-4 text-gray-500" />
+      <select
+        value={selectedSite}
+        onChange={(e) => onSiteChange(e.target.value)}
+        disabled={isLoading}
+        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white text-sm min-w-[180px]"
+      >
+        <option value="all">🏢 All Sites</option>
+        {sites.map((site) => (
+          <option key={site._id} value={site._id}>
+            {site.name}
+          </option>
+        ))}
+      </select>
+      {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
+    </div>
+  );
+};
 // ==================== Types ====================
 interface SiteStaffInfo {
   userId: string;
@@ -2002,6 +2029,11 @@ const AssignTaskSection = () => {
   // State for sites
   const [sites, setSites] = useState<ExtendedSite[]>([]);
   const [isLoadingSites, setIsLoadingSites] = useState(false);
+ 
+// Site filter state
+const [allSites, setAllSites] = useState<ServiceSite[]>([]);
+const [selectedSite, setSelectedSite] = useState<string>("all");
+const [isLoadingAllSites, setIsLoadingAllSites] = useState<boolean>(false);
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
@@ -2067,13 +2099,20 @@ const AssignTaskSection = () => {
     currentManagers: number;
     currentSupervisors: number;
   } | null>(null);
-
+// Get site name for display
+const getSiteDisplayName = () => {
+  if (selectedSite === 'all') return 'All Sites';
+  const site = allSites.find(s => s._id === selectedSite);
+  return site ? site.name : 'Unknown Site';
+};
   // Load data on mount
-  useEffect(() => {
-    fetchSites();
-    fetchAllTasks();
-    fetchAssignTasks();
-  }, []);
+ // Load data on mount
+useEffect(() => {
+  fetchSites();
+  fetchAllTasks();
+  fetchAssignTasks();
+  fetchAllSites(); // ← ADD THIS
+}, []);
 
   // Build site staff map from allTasks
   useEffect(() => {
@@ -2194,15 +2233,19 @@ const AssignTaskSection = () => {
   };
 
   // Fetch assign tasks with filters
- const fetchAssignTasks = async () => {
+const fetchAssignTasks = async () => {
   try {
     setIsLoadingTasks(true);
     console.log('📋 Fetching assign tasks with filters:', filters);
+    console.log('📋 Selected site filter:', selectedSite);
+    
+    // Determine site filter - use selectedSite from global filter if set, otherwise use filter from panel
+    const siteFilter = selectedSite !== 'all' ? selectedSite : (filters.siteId || undefined);
     
     const response = await assignTaskService.getAllAssignTasks({
       status: filters.status || undefined,
       priority: filters.priority || undefined,
-      siteId: filters.siteId || undefined,
+      siteId: siteFilter,
       taskType: filters.taskType || undefined,
       page: pagination.page,
       limit: pagination.limit,
@@ -2240,11 +2283,25 @@ const AssignTaskSection = () => {
     setIsLoadingTasks(false);
   }
 };
-
+// Fetch ALL sites for filter dropdown
+const fetchAllSites = async () => {
+  try {
+    setIsLoadingAllSites(true);
+    const sitesData = await siteService.getAllSites();
+    setAllSites(sitesData || []);
+    console.log("✅ Loaded sites for filter:", sitesData.length);
+  } catch (error) {
+    console.error('Error fetching sites for filter:', error);
+    setAllSites([]);
+  } finally {
+    setIsLoadingAllSites(false);
+  }
+};
   // Apply filters when they change
-  useEffect(() => {
-    fetchAssignTasks();
-  }, [filters.status, filters.priority, filters.siteId, filters.taskType, pagination.page]);
+  // Apply filters when they change
+useEffect(() => {
+  fetchAssignTasks();
+}, [filters.status, filters.priority, filters.siteId, filters.taskType, pagination.page, selectedSite]);
 
   // Search with debounce
   useEffect(() => {
@@ -2727,19 +2784,32 @@ if (result.status === 'completed' && taskToEdit.status !== 'completed') {
     };
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Header with Assign Button */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold">Task Assignment</h2>
-          <p className="text-muted-foreground">Create and manage tasks assigned to sites</p>
-        </div>
-        <Button onClick={() => setShowAssignForm(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Assign New Task
-        </Button>
+ return (
+  <div className="space-y-6">
+    {/* Header with Assign Button */}
+    <div className="flex justify-between items-center">
+      <div>
+        <h2 className="text-2xl font-bold">Task Assignment</h2>
+        <p className="text-muted-foreground">Create and manage tasks assigned to sites</p>
       </div>
+      <Button onClick={() => setShowAssignForm(true)}>
+        <Plus className="mr-2 h-4 w-4" />
+        Assign New Task
+      </Button>
+    </div>
+
+    {/* Site Filter Header */}
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <SiteFilter
+        selectedSite={selectedSite}
+        onSiteChange={setSelectedSite}
+        sites={allSites}
+        isLoading={isLoadingAllSites}
+      />
+      <span className="text-xs text-muted-foreground">
+        {selectedSite !== 'all' && `Showing: ${getSiteDisplayName()}`}
+      </span>
+    </div>
 
       {/* Assign Task Form Dialog */}
       <AssignTaskFormDialog

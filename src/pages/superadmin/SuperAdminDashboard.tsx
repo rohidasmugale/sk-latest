@@ -236,6 +236,8 @@ interface AttendanceRecord {
   siteName?: string;
   department?: string;
   shift?: string;
+  shiftId?: string; 
+
   overtimeHours?: number;
   lateMinutes?: number;
   earlyLeaveMinutes?: number;
@@ -518,168 +520,11 @@ const fetchAttendanceData = async (days: number = 30): Promise<DailyAttendanceSu
   } catch (error: any) {
     console.error('Error fetching attendance data:', error);
     toast.error('Failed to fetch attendance data');
-    return generateDemoAttendanceData(days);
+    return [];
   }
 };
 
-// Update the generateDemoAttendanceData function to match the expected pattern from your attendance view
-const generateDemoAttendanceData = (days: number): DailyAttendanceSummary[] => {
-  console.log('Generating demo attendance data (only site-assigned employees)...');
-  const data = [];
-  const today = new Date();
 
-  // Demo site counts (only sites that exist)
-  const demoSites = [
-    'ALYSSUM DEVELOPERS PVT. LTD.',
-    'ARYA ASSOCIATES',
-    'ASTITVA ASSET MANAGEMENT LLP',
-    'A.T.C COMMERCIAL PREMISES CO. OPERATIVE SOCIETY LTD',
-    'BAHIRAT ESTATE LLP',
-    'CHITRALI PROPERTIES PVT LTD',
-    'Concretely Infra Llp',
-    'COORTUS ADVISORS LLP',
-    'CUSHMAN & WAKEFIELD PROPERTY MANAGEMENT SERVICES INDIA PVT. LTD.'
-  ];
-
-  // Demo employee counts per site - MATCHING YOUR ATTENDANCE VIEW EXAMPLE
-  // Total 4 employees: 1 present, 2 absent, 1 weekly off
-  const siteEmployeeCounts: { [key: string]: number } = {
-    'ALYSSUM DEVELOPERS PVT. LTD.': 4
-  };
-
-  const totalEmployees = Object.values(siteEmployeeCounts).reduce((a, b) => a + b, 0);
-
-  for (let i = 0; i < days; i++) {
-    const date = new Date();
-    date.setDate(today.getDate() - i);
-    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-
-    const dayName = i === 0 ? 'Today' :
-      i === 1 ? 'Yesterday' :
-        date.toLocaleDateString('en-US', { weekday: 'long' });
-
-    let totalPresent = 0;
-    let totalWeeklyOff = 0;
-    let totalLeave = 0;
-    let totalAbsent = 0;
-
-    const siteBreakdown: { [siteName: string]: { total: number; present: number; absent: number; weeklyOff: number; leave: number } } = {};
-
-    // Calculate per site - MATCHING YOUR ATTENDANCE VIEW EXAMPLE
-    Object.entries(siteEmployeeCounts).forEach(([siteName, siteTotal]) => {
-      if (siteTotal === 4) {
-        // Match your example: 1 present, 2 absent, 1 weekly off
-        totalPresent = 1;
-        totalWeeklyOff = 1;
-        totalAbsent = 2;
-        totalLeave = 0;
-
-        siteBreakdown[siteName] = {
-          total: siteTotal,
-          present: 1,
-          absent: 2,
-          weeklyOff: 1,
-          leave: 0
-        };
-      } else {
-        // For other sites, use realistic distribution
-        let present, weeklyOff, leave, absent;
-
-        if (isWeekend) {
-          // Weekend pattern
-          weeklyOff = Math.floor(siteTotal * 0.7);
-          present = Math.floor(siteTotal * 0.2);
-          leave = Math.floor(siteTotal * 0.05);
-          absent = siteTotal - present - weeklyOff - leave;
-        } else {
-          // Weekday pattern
-          present = Math.floor(siteTotal * 0.75);
-          weeklyOff = Math.floor(siteTotal * 0.05);
-          leave = Math.floor(siteTotal * 0.05);
-          absent = siteTotal - present - weeklyOff - leave;
-        }
-
-        siteBreakdown[siteName] = {
-          total: siteTotal,
-          present,
-          absent,
-          weeklyOff,
-          leave
-        };
-
-        totalPresent += present;
-        totalWeeklyOff += weeklyOff;
-        totalLeave += leave;
-        totalAbsent += absent;
-      }
-    });
-
-    const totalPresentWithWO = totalPresent + totalWeeklyOff;
-    const rate = totalEmployees > 0 ? ((totalPresentWithWO / totalEmployees) * 100).toFixed(1) + '%' : '0.0%';
-
-    data.push({
-      date: date.toISOString().split('T')[0],
-      day: dayName,
-      present: totalPresent,
-      absent: totalAbsent,
-      weeklyOff: totalWeeklyOff,
-      leave: totalLeave,
-      total: totalEmployees,
-      rate,
-      index: i,
-      totalEmployees,
-      sitesWithData: demoSites.length,
-      siteBreakdown
-    });
-  }
-
-  return data;
-};
-
-
-// Generate payroll data
-const generatePayrollData = () => {
-  const payrollData = [];
-  const siteNames = [
-    'ALYSSUM DEVELOPERS PVT. LTD.',
-    'ARYA ASSOCIATES',
-    'ASTITVA ASSET MANAGEMENT LLP',
-    'A.T.C COMMERCIAL PREMISES CO. OPERATIVE SOCIETY LTD',
-    'BAHIRAT ESTATE LLP',
-    'CHITRALI PROPERTIES PVT LTD',
-    'Concretely Infra Llp',
-    'COORTUS ADVISORS LLP',
-    'CUSHMAN & WAKEFIELD PROPERTY MANAGEMENT SERVICES INDIA PVT. LTD.',
-  ];
-
-  siteNames.forEach((siteName, index) => {
-    const billingAmount = Math.floor(Math.random() * 500000) + 200000;
-    const totalPaid = Math.floor(Math.random() * billingAmount * 0.8) + (billingAmount * 0.2);
-    const holdSalary = billingAmount - totalPaid;
-
-    const remarks = [
-      'Payment processed',
-      'Pending approval',
-      'Under review',
-      'Payment scheduled',
-      'Awaiting documents',
-      'Completed',
-      'On hold'
-    ];
-
-    payrollData.push({
-      id: index + 1,
-      siteName,
-      billingAmount,
-      totalPaid,
-      holdSalary: holdSalary > 0 ? holdSalary : 0,
-      remark: remarks[Math.floor(Math.random() * remarks.length)],
-      status: holdSalary > 0 ? 'Pending' : 'Paid'
-    });
-  });
-
-  return payrollData;
-};
 
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 4 }, (_, i) => String(currentYear - i));
@@ -930,59 +775,53 @@ const SuperAdminDashboard = () => {
   ];
 
   // Dynamic department data – always show all allowed departments, count only staff (exclude managers/supervisors)
+  // ✅ REPLACE this entire useMemo
   const departmentData = useMemo(() => {
-    // Create mapping from raw department to allowed name (case-insensitive, partial match)
-    const allowedMap = new Map<string, string>(); // raw -> allowed
-    allowedDepartments.forEach(dept => {
-      allowedMap.set(dept.name.toLowerCase(), dept.name);
-    });
-    // Additional mapping for variations
-    const mapping: Record<string, string> = {
-      'parking management': 'Parking',
-      'housekeeping': 'Housekeeping',
-      'security': 'Security',
-      'waste management': 'Waste Management',
-      'consumables': 'Consumables',
-      'other': 'Other'
-    };
+    // Count SITES per department, not employees
+    const departmentSites = new Map<string, Set<string>>();
 
-    // Count employees per allowed department (only staff, not managers/supervisors)
-    const countMap = new Map<string, number>();
     employees.forEach(emp => {
-      // Exclude managers and supervisors
-      if (emp.isManager || emp.isSupervisor) return;
       const deptRaw = emp.department?.trim().toLowerCase() || '';
       if (!deptRaw) return;
-      // Try to map to allowed department
-      let allowedDept = mapping[deptRaw];
-      if (!allowedDept) {
-        for (const [key, value] of Object.entries(mapping)) {
-          if (deptRaw.includes(key) || key.includes(deptRaw)) {
-            allowedDept = value;
-            break;
-          }
-        }
+
+      // Map to allowed department
+      let allowedDept = '';
+      const mapping: Record<string, string> = {
+        'housekeeping': 'Housekeeping',
+        'security': 'Security',
+        'waste management': 'Waste Management',
+        'parking management': 'Parking Management',
+        'consumables': 'Consumables',
+        'other': 'Other'
+      };
+
+      allowedDept = mapping[deptRaw] || deptRaw;
+
+      // Get site name
+      const siteName = emp.siteName || emp.site || 'Unknown';
+
+      if (!departmentSites.has(allowedDept)) {
+        departmentSites.set(allowedDept, new Set());
       }
-      if (allowedDept) {
-        countMap.set(allowedDept, (countMap.get(allowedDept) || 0) + 1);
-      }
+      departmentSites.get(allowedDept)!.add(siteName);
     });
 
-    // Build final array in allowed order, always include all departments (even with 0)
-    return allowedDepartments.map(dept => ({
-      department: dept.name,
-      total: countMap.get(dept.name) || 0,
-      present: countMap.get(dept.name) || 0, // just show total count
-      icon: dept.icon,
-      color: dept.color
-    }));
+    // Build final array in allowed order
+    return allowedDepartments.map(dept => {
+      const sites = departmentSites.get(dept.name) || new Set();
+      return {
+        department: dept.name,
+        total: sites.size,  // ✅ Now counts SITES, not employees
+        present: sites.size,
+        icon: dept.icon,
+        color: dept.color,
+        siteNames: Array.from(sites) // Optional: for tooltip
+      };
+    });
   }, [employees]);
   const navigate = useNavigate();
 
 
-
-  // ... rest of your state declarations
-  // State for attendance data
   const [attendanceData, setAttendanceData] = useState<DailyAttendanceSummary[]>([]);
   const [loadingAttendance, setLoadingAttendance] = useState(true);
   const [refreshingAttendance, setRefreshingAttendance] = useState(false);
@@ -1272,14 +1111,19 @@ const SuperAdminDashboard = () => {
     navigate(`/superadmin/attendaceview?view=site&date=${dayData.date}`);
   };
 
-  const handleDepartmentCardClick = (department: string) => {
-    navigate(`/superadmin/attendaceview?view=department&department=${department}&date=Today`);
-  };
-
+ const handleDepartmentCardClick = (department: string) => {
+  const todayStr = new Date().toISOString().split('T')[0]; // "2026-07-28"
+  navigate(`/superadmin/attendaceview?view=department&department=${department}&date=${todayStr}`);
+};
   // Custom tooltips
+  // ✅ Replace the CustomPieTooltip
   const CustomPieTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0];
+      const total = currentDayData.totalEmployees || 1;
+      const actualCount = data.payload.value;
+      const percentage = ((actualCount / total) * 100).toFixed(1);
+
       return (
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
@@ -1288,7 +1132,8 @@ const SuperAdminDashboard = () => {
         >
           <p className="font-semibold text-sm">{data.name}</p>
           <p className="text-sm" style={{ color: data.payload.fill }}>
-            {data.value} employees ({((data.value / currentDayData.totalEmployees) * 100).toFixed(1)}%)
+            <span className="font-bold">{actualCount}</span> employees
+            ({percentage}%)
           </p>
         </motion.div>
       );
@@ -1502,6 +1347,7 @@ const SuperAdminDashboard = () => {
                         <div className="h-28">
                           <ResponsiveContainer width="100%" height="100%">
                             <RechartsPieChart>
+                              // ✅ Update the Pie component
                               <Pie
                                 data={currentDayPieData}
                                 cx="50%"
@@ -1511,6 +1357,10 @@ const SuperAdminDashboard = () => {
                                 labelLine={false}
                                 onClick={() => handlePieChartClick(currentDayData.date)}
                                 className="cursor-pointer"
+                                label={({ name, value, percent }) => {
+                                  // ✅ Show actual count on the chart
+                                  return `${name}: ${value}`;
+                                }}
                               >
                                 {currentDayPieData.map((entry, i) => (
                                   <Cell key={i} fill={entry.color} />
@@ -1590,8 +1440,8 @@ const SuperAdminDashboard = () => {
                             <p className="text-[10px] font-medium truncate">{dept.department}</p>
                             <p className="text-sm font-bold mt-1">{dept.total}</p>
                             <p className="text-[9px] text-muted-foreground">
-                              employee{dept.total !== 1 ? 's' : ''}
-                            </p>
+  site{dept.total !== 1 ? 's' : ''}
+</p>
                           </CardContent>
                         </Card>
                       </motion.div>

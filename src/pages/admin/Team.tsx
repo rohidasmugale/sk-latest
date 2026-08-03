@@ -9,13 +9,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Search, Plus, Edit, Trash2, Shield, Briefcase, Users, Mail, Phone, MapPin, Calendar, UserCheck, UserX } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Shield, Briefcase, Users, Mail, Phone, MapPin, Calendar, UserCheck, UserX, Building, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import userService from "@/services/userService"; 
 import type { User, UserRole, CreateUserData } from "@/types/user";
-import { siteService } from "@/services/SiteService";
+import { siteService, Site } from "@/services/SiteService";
 
 // Utility functions for date handling
 const formatDateForDisplay = (dateValue: any): string => {
@@ -69,21 +69,51 @@ interface FormUserData {
   firstName?: string;
   lastName?: string;
 }
+
 const departments = ['Housekeeping', 'Security', 'Parking', 'Waste Management', 'Others'];
-// const sites = ['Mumbai Office', 'Delhi Branch', 'Bangalore Tech Park', 'Chennai Center', 'Hyderabad Campus'];
 const roles: UserRole[] = ['manager', 'supervisor', 'employee'];
+
+// Site Filter Component
+const SiteFilter: React.FC<{
+  selectedSite: string;
+  onSiteChange: (value: string) => void;
+  sites: Site[];
+  isLoading?: boolean;
+}> = ({ selectedSite, onSiteChange, sites, isLoading = false }) => {
+  return (
+    <div className="flex items-center gap-2">
+      <Building className="h-4 w-4 text-gray-500" />
+      <select
+        value={selectedSite}
+        onChange={(e) => onSiteChange(e.target.value)}
+        disabled={isLoading}
+        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white text-sm min-w-[180px]"
+      >
+        <option value="all">🏢 All Sites</option>
+        {sites.map((site) => (
+          <option key={site._id} value={site._id}>
+            {site.name}
+          </option>
+        ))}
+      </select>
+      {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
+    </div>
+  );
+};
 
 // User Form Component
 const UserForm = ({ 
   onSubmit, 
   isEditing = false, 
   user = null,
-  defaultRole = 'manager'
+  defaultRole = 'manager',
+  sites = []
 }: { 
   onSubmit: (data: FormUserData) => void;
   isEditing?: boolean;
   user?: User | null;
   defaultRole?: UserRole;
+  sites?: Site[];
 }) => {
   const [formData, setFormData] = useState<FormUserData>({
     name: user?.name || '',
@@ -91,7 +121,7 @@ const UserForm = ({
     password: '',
     role: (user?.role as UserRole) || defaultRole,
     department: user?.department || 'Operations',
-    site: user?.site || 'string',
+    site: user?.site || '',
     phone: user?.phone || '',
     status: user?.isActive ? 'active' : 'inactive',
     joinDate: user?.joinDate ? 
@@ -204,9 +234,15 @@ const UserForm = ({
               <SelectValue placeholder="Select site" />
             </SelectTrigger>
             <SelectContent>
-              {sites.map(site => (
-                <SelectItem key={site} value={site}>{site}</SelectItem>
-              ))}
+              {sites.length > 0 ? (
+                sites.map(site => (
+                  <SelectItem key={site._id} value={site._id}>
+                    {site.name}
+                  </SelectItem>
+                ))
+              ) : (
+                <SelectItem value="default">Default Site</SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>
@@ -260,12 +296,16 @@ const TeamList = ({
   title, 
   icon: Icon, 
   roleFilter,
-  description 
+  description,
+  sites = [],
+  selectedSite = 'all'
 }: { 
   title: string;
   icon: React.ElementType;
   roleFilter: UserRole[];
   description: string;
+  sites?: Site[];
+  selectedSite?: string;
 }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -278,16 +318,24 @@ const TeamList = ({
     try {
       setLoading(true);
       const data = await userService.getAllUsers();
-      const filteredUsers = data.allUsers.filter(user => 
+      let filteredUsers = data.allUsers.filter(user => 
         roleFilter.includes(user.role)
       );
+      
+      // Apply site filter
+      if (selectedSite !== 'all') {
+        filteredUsers = filteredUsers.filter(user => 
+          user.site === selectedSite || user.siteName === selectedSite
+        );
+      }
+      
       setUsers(filteredUsers);
     } catch (error) {
       toast.error('Failed to fetch team members');
     } finally {
       setLoading(false);
     }
-  }, [roleFilter]);
+  }, [roleFilter, selectedSite]);
 
   useEffect(() => {
     fetchUsers();
@@ -418,6 +466,7 @@ const TeamList = ({
                 <UserForm 
                   onSubmit={handleAddUser} 
                   defaultRole={roleFilter[0] as UserRole}
+                  sites={sites}
                 />
               </DialogContent>
             </Dialog>
@@ -485,7 +534,7 @@ const TeamList = ({
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <MapPin className="h-3 w-3 text-muted-foreground" />
-                        {user.site}
+                        {user.siteName || user.site || 'N/A'}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -521,6 +570,7 @@ const TeamList = ({
                               user={user} 
                               onSubmit={(data) => handleEditUser(data, user._id)}
                               isEditing={true}
+                              sites={sites}
                             />
                           </DialogContent>
                         </Dialog>
@@ -568,7 +618,7 @@ const TeamList = ({
 };
 
 // Stats Cards Component
-const StatsCards = () => {
+const StatsCards = ({ selectedSite = 'all', sites = [] }) => {
   const [stats, setStats] = useState([
     { title: "Total Team", value: 0, icon: Users, description: "All team members", color: "text-blue-600" },
     { title: "Managers", value: 0, icon: Briefcase, description: "Department managers", color: "text-green-600" },
@@ -580,25 +630,32 @@ const StatsCards = () => {
 
   useEffect(() => {
     fetchStats();
-  }, []);
+  }, [selectedSite]);
 
   const fetchStats = async () => {
     try {
       const data = await userService.getAllUsers();
-      const users = data.allUsers;
+      let users = data.allUsers;
       
       // Filter only team members (no admin/superadmin)
-      const teamUsers = users.filter(user => 
+      users = users.filter(user => 
         ['manager', 'supervisor', 'employee'].includes(user.role)
       );
       
+      // Apply site filter
+      if (selectedSite !== 'all') {
+        users = users.filter(user => 
+          user.site === selectedSite || user.siteName === selectedSite
+        );
+      }
+      
       const newStats = [
-        { ...stats[0], value: teamUsers.length },
-        { ...stats[1], value: teamUsers.filter(u => u.role === 'manager').length },
-        { ...stats[2], value: teamUsers.filter(u => u.role === 'supervisor').length },
-        { ...stats[3], value: teamUsers.filter(u => u.role === 'employee').length },
-        { ...stats[4], value: teamUsers.filter(u => u.isActive).length },
-        { ...stats[5], value: teamUsers.filter(u => !u.isActive).length }
+        { ...stats[0], value: users.length },
+        { ...stats[1], value: users.filter(u => u.role === 'manager').length },
+        { ...stats[2], value: users.filter(u => u.role === 'supervisor').length },
+        { ...stats[3], value: users.filter(u => u.role === 'employee').length },
+        { ...stats[4], value: users.filter(u => u.isActive).length },
+        { ...stats[5], value: users.filter(u => !u.isActive).length }
       ];
       
       setStats(newStats);
@@ -627,6 +684,33 @@ const StatsCards = () => {
 
 // Main Component
 const Team = () => {
+  const [sites, setSites] = useState<Site[]>([]);
+  const [selectedSite, setSelectedSite] = useState<string>("all");
+  const [isLoadingSites, setIsLoadingSites] = useState<boolean>(false);
+
+  useEffect(() => {
+    fetchSites();
+  }, []);
+
+  const fetchSites = async () => {
+    setIsLoadingSites(true);
+    try {
+      const sitesData = await siteService.getAllSites();
+      setSites(sitesData || []);
+    } catch (error) {
+      console.error('Error fetching sites:', error);
+    } finally {
+      setIsLoadingSites(false);
+    }
+  };
+
+  // Get site name for display
+  const getSiteName = () => {
+    if (selectedSite === 'all') return 'All Sites';
+    const site = sites.find(s => s._id === selectedSite);
+    return site ? site.name : 'Unknown Site';
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <DashboardHeader 
@@ -639,7 +723,20 @@ const Team = () => {
         animate={{ opacity: 1, y: 0 }}
         className="p-6"
       >
-        <StatsCards />
+        {/* Site Filter Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <SiteFilter
+            selectedSite={selectedSite}
+            onSiteChange={setSelectedSite}
+            sites={sites}
+            isLoading={isLoadingSites}
+          />
+          <span className="text-xs text-muted-foreground">
+            {selectedSite !== 'all' && `Showing: ${getSiteName()}`}
+          </span>
+        </div>
+
+        <StatsCards selectedSite={selectedSite} sites={sites} />
         
         <Tabs defaultValue="managers" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
@@ -663,6 +760,8 @@ const Team = () => {
               icon={Briefcase}
               roleFilter={['manager']}
               description="Department managers with management privileges"
+              sites={sites}
+              selectedSite={selectedSite}
             />
           </TabsContent>
           
@@ -672,6 +771,8 @@ const Team = () => {
               icon={Shield}
               roleFilter={['supervisor']}
               description="Team supervisors with oversight responsibilities"
+              sites={sites}
+              selectedSite={selectedSite}
             />
           </TabsContent>
           
@@ -681,6 +782,8 @@ const Team = () => {
               icon={Users}
               roleFilter={['employee']}
               description="Regular employees with standard access"
+              sites={sites}
+              selectedSite={selectedSite}
             />
           </TabsContent>
         </Tabs>

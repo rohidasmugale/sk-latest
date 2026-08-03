@@ -67,15 +67,19 @@ self.addEventListener("fetch", (event) => {
 
           return networkResponse;
         })
-        .catch(() => {
+       .catch(() => {
+  // If it's a navigation request, serve the cached index.html as an offline fallback
+  if (event.request.mode === 'navigate') {
+    return caches.match('/index.html');
+  }
+  // Otherwise return a generic 503
+  return new Response("Offline", {
+    status: 503,
+    statusText: "Offline"
+  });
+});
 
-          // Never return undefined
-          return new Response("Offline", {
-            status: 503,
-            statusText: "Offline"
-          });
-
-        });
+        
     })
   );
 });

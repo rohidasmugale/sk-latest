@@ -24,7 +24,9 @@ import {
   DollarSign,
   Square,
   ChevronRight,
-  Layers
+  Layers,
+  Sun,
+  Moon
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -76,43 +78,31 @@ const ManagerSitesPage = () => {
     try {
       setLoading(true);
       
-      // Get current manager ID
       const managerId = authUser?._id || authUser?.id;
       if (!managerId) {
         throw new Error("Manager ID not found");
       }
 
-      // Fetch all sites and tasks
       const [allSites, allTasks] = await Promise.all([
         siteService.getAllSites(),
         taskService.getAllTasks()
       ]);
 
-      // Filter sites where this manager is assigned
       const managerSites = allSites.filter(site => {
-        // Check if manager is assigned to this site through tasks
         const siteTasks = allTasks.filter(task => task.siteId === site._id);
-        
-        // Check if manager is assigned to any task at this site
         const isManagerAssigned = siteTasks.some(task => 
           task.assignedUsers?.some(user => 
             user.userId === managerId && user.role === 'manager'
           )
         );
-
-        // Also check old format
         const isManagerAssignedOld = siteTasks.some(task => 
           task.assignedTo === managerId
         );
-
         return isManagerAssigned || isManagerAssignedOld;
       });
 
-      // Transform sites with their tasks and stats
       const transformedSites: ManagerSite[] = managerSites.map(site => {
         const siteTasks = allTasks.filter(task => task.siteId === site._id);
-        
-        // Calculate task statistics
         const taskStats = {
           total: siteTasks.length,
           pending: siteTasks.filter(t => t.status === 'pending').length,
@@ -120,8 +110,6 @@ const ManagerSitesPage = () => {
           completed: siteTasks.filter(t => t.status === 'completed').length,
           cancelled: siteTasks.filter(t => t.status === 'cancelled').length
         };
-
-        // Calculate staff statistics from site deployment
         const staffStats = {
           total: site.staffDeployment?.reduce((sum, item) => sum + (item.count || 0), 0) || 0,
           managers: site.staffDeployment?.find(d => d.role === 'Manager')?.count || 0,
@@ -130,7 +118,6 @@ const ManagerSitesPage = () => {
             !['Manager', 'Supervisor'].includes(d.role)
           ).reduce((sum, item) => sum + (item.count || 0), 0) || 0
         };
-
         return {
           ...site,
           tasks: siteTasks,
@@ -142,8 +129,6 @@ const ManagerSitesPage = () => {
       });
 
       setSites(transformedSites);
-
-      // Auto-select first site if available
       if (transformedSites.length > 0) {
         setSelectedSite(transformedSites[0]);
       }
@@ -166,7 +151,7 @@ const ManagerSitesPage = () => {
     try {
       await taskService.updateTaskStatus(taskId, { status });
       toast.success("Task status updated!");
-      await fetchManagerData(); // Refresh data
+      await fetchManagerData();
     } catch (error: any) {
       console.error("Error updating task:", error);
       toast.error(error.message || "Failed to update task");
@@ -276,7 +261,6 @@ const ManagerSitesPage = () => {
       />
 
       <div className="p-6 max-w-7xl mx-auto space-y-6">
-        {/* Site Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardContent className="p-6">
@@ -333,9 +317,7 @@ const ManagerSitesPage = () => {
           </Card>
         </div>
 
-        {/* Main Content - Site List and Details */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Site List with Scrolling */}
           <Card className="lg:col-span-1">
             <CardHeader>
               <CardTitle>Your Sites</CardTitle>
@@ -396,7 +378,6 @@ const ManagerSitesPage = () => {
             </CardContent>
           </Card>
 
-          {/* Site Details */}
           <Card className="lg:col-span-2">
             {selectedSite ? (
               <>
@@ -419,9 +400,7 @@ const ManagerSitesPage = () => {
                       <TabsTrigger value="staff">Staff</TabsTrigger>
                     </TabsList>
 
-                    {/* Overview Tab */}
                     <TabsContent value="overview" className="space-y-4">
-                      {/* Site Stats */}
                       <div className="grid grid-cols-2 gap-4">
                         <Card>
                           <CardContent className="p-4">
@@ -447,7 +426,36 @@ const ManagerSitesPage = () => {
                         </Card>
                       </div>
 
-                      {/* Services */}
+                      {/* ✅ NEW: Shift Timings Card */}
+                      {selectedSite.shifts && selectedSite.shifts.length > 0 && (
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium flex items-center gap-2">
+                              <Clock className="h-4 w-4" />
+                              Shift Timings
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-2">
+                            {selectedSite.shifts.map((shift, idx) => (
+                              <div key={idx} className="flex items-center justify-between border-b last:border-0 pb-2 last:pb-0">
+                                <div>
+                                  <div className="font-medium">{shift.name}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {shift.startTime} – {shift.endTime}
+                                    {shift.graceMinutes && ` (Grace: ${shift.graceMinutes} min)`}
+                                  </div>
+                                </div>
+                                {shift.isOvernight && (
+                                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                                    <Moon className="h-3 w-3 mr-1" /> Overnight
+                                  </Badge>
+                                )}
+                              </div>
+                            ))}
+                          </CardContent>
+                        </Card>
+                      )}
+
                       <div>
                         <h3 className="font-semibold mb-2">Services</h3>
                         <div className="flex flex-wrap gap-2">
@@ -462,7 +470,6 @@ const ManagerSitesPage = () => {
                         </div>
                       </div>
 
-                      {/* Quick Stats */}
                       <div className="grid grid-cols-2 gap-4">
                         <Card>
                           <CardContent className="p-4">
@@ -520,7 +527,6 @@ const ManagerSitesPage = () => {
                       </div>
                     </TabsContent>
 
-                    {/* Tasks Tab */}
                     <TabsContent value="tasks" className="space-y-4">
                       {selectedSite.tasks.length === 0 ? (
                         <div className="text-center py-8">
@@ -589,7 +595,6 @@ const ManagerSitesPage = () => {
                       )}
                     </TabsContent>
 
-                    {/* Staff Tab */}
                     <TabsContent value="staff" className="space-y-4">
                       {!selectedSite.staffDeployment || selectedSite.staffDeployment.length === 0 ? (
                         <div className="text-center py-8">
@@ -619,7 +624,6 @@ const ManagerSitesPage = () => {
                             </Card>
                           ))}
 
-                          {/* Staff Summary */}
                           <Card className="bg-primary/5">
                             <CardContent className="p-4">
                               <div className="flex items-center justify-between">
@@ -654,7 +658,6 @@ const ManagerSitesPage = () => {
         </div>
       </div>
 
-      {/* Task Details Dialog */}
       {selectedTask && (
         <Dialog open={showTaskDetails} onOpenChange={setShowTaskDetails}>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -666,7 +669,6 @@ const ManagerSitesPage = () => {
             </DialogHeader>
             
             <div className="space-y-6">
-              {/* Task Info */}
               <div>
                 <h3 className="font-semibold mb-2">{selectedTask.title}</h3>
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap">
@@ -674,7 +676,6 @@ const ManagerSitesPage = () => {
                 </p>
               </div>
 
-              {/* Metadata */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="text-sm text-muted-foreground">Site</div>
@@ -717,7 +718,6 @@ const ManagerSitesPage = () => {
                 </div>
               </div>
 
-              {/* Assignees */}
               <div>
                 <div className="text-sm text-muted-foreground mb-2">Assignees</div>
                 <div className="space-y-2">
@@ -738,7 +738,6 @@ const ManagerSitesPage = () => {
                 </div>
               </div>
 
-              {/* Attachments */}
               {selectedTask.attachments && selectedTask.attachments.length > 0 && (
                 <div>
                   <div className="text-sm text-muted-foreground mb-2">Attachments</div>
@@ -767,7 +766,6 @@ const ManagerSitesPage = () => {
                 </div>
               )}
 
-              {/* Action Buttons */}
               <div className="flex gap-2 pt-4 border-t">
                 {selectedTask.status !== 'completed' && selectedTask.status !== 'cancelled' && (
                   <Button

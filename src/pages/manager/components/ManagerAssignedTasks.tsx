@@ -84,6 +84,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { siteService, Site } from "@/services/SiteService";
 
 // ==================== Types ====================
 interface ManagerTaskStats {
@@ -94,6 +95,34 @@ interface ManagerTaskStats {
   overdue: number;
   highPriority: number;
 }
+
+// ==================== Site Filter Component ====================
+const SiteFilter: React.FC<{
+  selectedSite: string;
+  onSiteChange: (value: string) => void;
+  sites: Site[];
+  isLoading?: boolean;
+}> = ({ selectedSite, onSiteChange, sites, isLoading = false }) => {
+  return (
+    <div className="flex items-center gap-2">
+      <Building className="h-4 w-4 text-gray-500" />
+      <select
+        value={selectedSite}
+        onChange={(e) => onSiteChange(e.target.value)}
+        disabled={isLoading}
+        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white text-sm min-w-[180px]"
+      >
+        <option value="all">🏢 All Sites</option>
+        {sites.map((site) => (
+          <option key={site._id} value={site._id}>
+            {site.name}
+          </option>
+        ))}
+      </select>
+      {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
+    </div>
+  );
+};
 
 // ==================== Task Details Dialog Component ====================
 const ManagerTaskDetailsDialog = ({ 
@@ -750,6 +779,11 @@ const ManagerAssignedTasks = () => {
     highPriority: 0
   });
 
+  // Site state
+  const [sites, setSites] = useState<Site[]>([]);
+  const [selectedSite, setSelectedSite] = useState<string>("all");
+  const [isLoadingSites, setIsLoadingSites] = useState<boolean>(false);
+
   // Mock current user - in real app, this would come from auth context
   const currentUser = {
     id: "current-user-id",
@@ -757,20 +791,40 @@ const ManagerAssignedTasks = () => {
     role: "manager"
   };
 
-  // Load tasks on mount
+  // Load tasks and sites on mount
   useEffect(() => {
     fetchManagerTasks();
+    fetchSites();
   }, []);
 
-  // Apply filters when tasks or filters change
+  // Apply filters when tasks, filters, or selectedSite change
   useEffect(() => {
     applyFilters();
-  }, [tasks, filters]);
+  }, [tasks, filters, selectedSite]);
 
   // Calculate stats when tasks change
   useEffect(() => {
     calculateStats();
   }, [tasks]);
+
+  // Get site name for display
+  const getSiteName = () => {
+    if (selectedSite === 'all') return 'All Sites';
+    const site = sites.find(s => s._id === selectedSite);
+    return site ? site.name : 'Unknown Site';
+  };
+
+  const fetchSites = async () => {
+    setIsLoadingSites(true);
+    try {
+      const sitesData = await siteService.getAllSites();
+      setSites(sitesData || []);
+    } catch (error) {
+      console.error('Error fetching sites:', error);
+    } finally {
+      setIsLoadingSites(false);
+    }
+  };
 
   const fetchManagerTasks = async () => {
     try {
@@ -781,7 +835,8 @@ const ManagerAssignedTasks = () => {
         managerId: currentUser.id,
         limit: 100,
         sortBy: 'dueDateTime',
-        sortOrder: 'asc'
+        sortOrder: 'asc',
+        siteId: selectedSite !== 'all' ? selectedSite : undefined
       });
       
       console.log('✅ Manager tasks fetched:', response);
@@ -828,6 +883,13 @@ const ManagerAssignedTasks = () => {
   const applyFilters = () => {
     let filtered = [...tasks];
 
+    // Apply site filter
+    if (selectedSite !== 'all') {
+      filtered = filtered.filter(task => 
+        task.siteId === selectedSite || task.siteName === selectedSite
+      );
+    }
+
     // Apply status filter
     if (filters.status) {
       filtered = filtered.filter(task => {
@@ -862,38 +924,38 @@ const ManagerAssignedTasks = () => {
   };
 
   const handleStatusUpdate = async (taskId: string, status: string) => {
-     try {
-    const statusData: UpdateStatusRequest = { 
-      status: status as any,
-      userId: currentUser.id,
-      userRole: 'manager'
-    };
-    await assignTaskService.updateTaskStatus(taskId, statusData);
-    
-    // ✅ NEW: Dispatch events
-    const task = tasks.find(t => t._id === taskId);
-    if (task) {
-      window.dispatchEvent(new CustomEvent('task-updated', {
-        detail: {
-          taskId: task._id,
-          taskTitle: task.taskTitle,
-          siteName: task.siteName,
-          newStatus: status,
-          updatedBy: currentUser.name
-        }
-      }));
+    try {
+      const statusData: UpdateStatusRequest = { 
+        status: status as any,
+        userId: currentUser.id,
+        userRole: 'manager'
+      };
+      await assignTaskService.updateTaskStatus(taskId, statusData);
       
-      if (status === 'completed') {
-        window.dispatchEvent(new CustomEvent('task-completed', {
+      // Dispatch events for real-time notifications
+      const task = tasks.find(t => t._id === taskId);
+      if (task) {
+        window.dispatchEvent(new CustomEvent('task-updated', {
           detail: {
             taskId: task._id,
             taskTitle: task.taskTitle,
             siteName: task.siteName,
-            completedBy: currentUser.name
+            newStatus: status,
+            updatedBy: currentUser.name
           }
         }));
+        
+        if (status === 'completed') {
+          window.dispatchEvent(new CustomEvent('task-completed', {
+            detail: {
+              taskId: task._id,
+              taskTitle: task.taskTitle,
+              siteName: task.siteName,
+              completedBy: currentUser.name
+            }
+          }));
+        }
       }
-    }
       
       toast.success(`Task status updated to ${status}`);
       
@@ -1028,6 +1090,19 @@ const ManagerAssignedTasks = () => {
 
   return (
     <div className="space-y-6">
+      {/* Site Filter Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SiteFilter
+          selectedSite={selectedSite}
+          onSiteChange={setSelectedSite}
+          sites={sites}
+          isLoading={isLoadingSites}
+        />
+        <span className="text-xs text-muted-foreground">
+          {selectedSite !== 'all' && `Showing: ${getSiteName()}`}
+        </span>
+      </div>
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card>

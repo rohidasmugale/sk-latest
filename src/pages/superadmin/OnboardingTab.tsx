@@ -252,8 +252,8 @@ interface OnboardingTabProps {
 
 // Departments array
 const departments = [
-  "Housekeeping ", 
-  "Security ", 
+  "Housekeeping", 
+  "Security", 
   "Parking Management", 
   "Waste Management", 
   "STP Tank Cleaning", 
@@ -263,7 +263,8 @@ const departments = [
   "Finance",
   "IT",
   "Operations",
-  "Maintenance"
+  "Maintenance",
+  "Other"
 ];
 
 // FormField Component
@@ -1669,14 +1670,14 @@ useEffect(() => {
   // Handle add employee
   const handleAddEmployee = async () => {
     // Validate required fields (email is optional but we'll generate if empty for backend)
-    const requiredFields = [
-      { field: newEmployee.name, name: 'Name' },
-      { field: newEmployee.aadharNumber, name: 'Aadhar Number' },
-      { field: newEmployee.position, name: 'Position' },
-      { field: newEmployee.department, name: 'Department' },
-      { field: newEmployee.siteName, name: 'Site Name' },
-      
-    ];
+   const requiredFields = [
+  { field: newEmployee.name, name: 'Name' },
+  { field: newEmployee.aadharNumber, name: 'Aadhar Number' },
+  { field: newEmployee.dateOfBirth, name: 'Date of Birth' },  // ✅ Added
+  { field: newEmployee.department, name: 'Department' },
+  { field: newEmployee.siteName, name: 'Site Name' },
+  
+];
 
     const missingFields = requiredFields
       .filter(item => !item.field || item.field.trim() === '')
@@ -1687,6 +1688,19 @@ useEffect(() => {
       return;
     }
 
+    if (newEmployee.dateOfBirth) {
+  const birthDate = new Date(newEmployee.dateOfBirth);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  if (age < 18) {
+    toast.error("Employee must be at least 18 years old");
+    return;
+  }
+}
     // Generate email if not provided (to satisfy backend requirement)
     let finalEmail = newEmployee.email?.trim() || '';
     if (!finalEmail && newEmployee.name) {
@@ -2889,9 +2903,15 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
           <FormField label="Name" required>
             <Input value={newEmployee.name} onChange={(e) => setNewEmployee({...newEmployee, name: e.target.value})} />
           </FormField>
-          <FormField label="Date of Birth">
-            <Input type="date" value={newEmployee.dateOfBirth} onChange={(e) => setNewEmployee({...newEmployee, dateOfBirth: e.target.value})} />
-          </FormField>
+         <FormField label="Date of Birth" required>
+  <Input 
+    type="date" 
+    value={newEmployee.dateOfBirth} 
+    onChange={(e) => setNewEmployee({...newEmployee, dateOfBirth: e.target.value})} 
+    max={new Date(Date.now() - 18 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+  />
+  <p className="text-xs text-muted-foreground mt-1">Must be at least 18 years old</p>
+</FormField>
           <FormField label="Gender" required>
             <Select value={newEmployee.gender} onValueChange={(v) => setNewEmployee({...newEmployee, gender: v})}>
               <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
@@ -2963,9 +2983,9 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
               </SelectContent>
             </Select>
           </FormField>
-          <FormField label="Position" required>
-            <Input value={newEmployee.position} onChange={(e) => setNewEmployee({...newEmployee, position: e.target.value})} />
-          </FormField>
+          <FormField label="Position">
+  <Input value={newEmployee.position} onChange={(e) => setNewEmployee({...newEmployee, position: e.target.value})} placeholder="Optional - Enter position" />
+</FormField>
           <FormField label="Monthly Salary (₹)">
             <Input type="number" min="0" step="0.01" value={newEmployee.salary} onChange={(e) => setNewEmployee({...newEmployee, salary: e.target.value})} />
           </FormField>

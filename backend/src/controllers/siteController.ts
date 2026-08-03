@@ -132,6 +132,7 @@ export const createSite = async (req: Request, res: Response) => {
       contractValue: Number(cleanedData.contractValue) || 0,
       contractEndDate: new Date(cleanedData.contractEndDate),
       services: Array.isArray(cleanedData.services) ? cleanedData.services : [],
+      
       staffDeployment: Array.isArray(cleanedData.staffDeployment) 
         ? cleanedData.staffDeployment.filter((item: any) => item && item.role && typeof item.count === 'number')
         : [],
@@ -139,7 +140,9 @@ export const createSite = async (req: Request, res: Response) => {
       addedBy: userId,
       addedByRole: userRole
     };
-    
+    siteData.shifts = Array.isArray(cleanedData.shifts)
+  ? cleanedData.shifts.filter((s: any) => s && s.name && s.startTime && s.endTime)
+  : [];
     // Only include clientId if it exists and is not empty
     if (cleanedData.clientId && cleanedData.clientId.trim() !== '') {
       siteData.clientId = String(cleanedData.clientId).trim();
@@ -248,54 +251,40 @@ export const updateSite = async (req: Request, res: Response) => {
     const { id } = req.params;
     console.log(`🔄 Updating site with ID: ${id}`);
     
-    // Get user info
     const { userId, userRole } = getUserInfo(req);
     
-    // Find site
     const site = await Site.findById(id);
     if (!site) {
-      console.log(`❌ Site not found for update: ${id}`);
-      return res.status(404).json({ 
-        success: false,
-        message: 'Site not found' 
-      });
+      return res.status(404).json({ success: false, message: 'Site not found' });
     }
     
-    // Check permissions
     if (userRole === 'manager' && site.addedBy !== userId) {
-      console.log(`⛔ Manager ${userId} trying to update site not added by them`);
-      return res.status(403).json({ 
-        success: false,
-        message: 'Access denied. You can only update sites you added.' 
-      });
+      return res.status(403).json({ success: false, message: 'Access denied.' });
     }
     
-    // Remove any id fields from update data
     const { _id, id: reqId, addedBy, addedByRole, ...updateData } = req.body;
     
-    // Prevent changing addedBy and addedByRole
-    if (addedBy || addedByRole) {
-      console.warn('⚠️ Attempt to change addedBy or addedByRole fields was blocked');
-    }
-    
-    // Update site fields
+    // Update all fields
     Object.keys(updateData).forEach(key => {
       if (updateData[key] !== undefined) {
         (site as any)[key] = updateData[key];
       }
     });
+
+    // ✅ CRITICAL: handle `shifts` explicitly
+    if (updateData.shifts !== undefined) {
+      site.shifts = updateData.shifts;
+      site.markModified('shifts');   // force Mongoose to detect the change
+    }
     
     await site.save();
-    
-    console.log(`✅ Site updated successfully: ${site.name}`);
-    console.log(`👤 Updated by: ${userId} (${userRole})`);
     
     res.status(200).json({
       success: true,
       message: 'Site updated successfully',
       site
     });
-  } catch (error: any) {
+  }  catch (error: any) {
     console.error('Error updating site:', error);
     
     if (error.code === 11000) {

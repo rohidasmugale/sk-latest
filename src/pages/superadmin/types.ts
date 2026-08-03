@@ -20,7 +20,11 @@ export interface Employee {
   department: string;
   position: string;
   siteName: string; // Added
+   site: string;
+  
+  siteId?: string; // ADD THIS
   joinDate: string;
+
   dateOfBirth?: string; // Added
   exitDate?: string; // Added
   status: "active" | "inactive" | "left"; // Added "left"
@@ -86,6 +90,9 @@ export interface LeaveRequest {
   to: string;
   reason: string;
   status: "pending" | "approved" | "rejected";
+    site?: string; // ADD THIS
+  siteName?: string; // ADD THIS
+  siteId?: string; // ADD THIS
 }
 
 export interface Attendance {

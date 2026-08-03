@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -13,9 +13,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Eye, Plus, Edit, Trash2, Calendar, User, Filter, Download, Clock, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Search, Eye, Plus, Edit, Trash2, Calendar, User, Filter, Download, Clock, AlertCircle, CheckCircle2, Building } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { siteService, Site } from "@/services/SiteService";
 
 const taskSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters").max(100),
@@ -25,6 +26,7 @@ const taskSchema = z.object({
   status: z.enum(["pending", "in-progress", "completed"]),
   dueDate: z.string().min(1, "Due date is required"),
   description: z.string().max(500).optional(),
+  siteId: z.string().optional(),
 });
 
 type Task = {
@@ -38,6 +40,8 @@ type Task = {
   description?: string;
   createdAt: string;
   updatedAt: string;
+  siteId?: string;
+  siteName?: string;
 };
 
 const teamMembers = [
@@ -49,11 +53,45 @@ const teamMembers = [
   { name: "Emma Employee", position: "Employee" },
 ];
 
+// Site Filter Component
+const SiteFilter: React.FC<{
+  selectedSite: string;
+  onSiteChange: (value: string) => void;
+  sites: Site[];
+  isLoading?: boolean;
+}> = ({ selectedSite, onSiteChange, sites, isLoading = false }) => {
+  return (
+    <div className="flex items-center gap-2">
+      <Building className="h-4 w-4 text-gray-500" />
+      <select
+        value={selectedSite}
+        onChange={(e) => onSiteChange(e.target.value)}
+        disabled={isLoading}
+        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white text-sm min-w-[180px]"
+      >
+        <option value="all">🏢 All Sites</option>
+        {sites.map((site) => (
+          <option key={site._id} value={site._id}>
+            {site.name}
+          </option>
+        ))}
+      </select>
+      {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
+    </div>
+  );
+};
+
 const Tasks = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [positionFilter, setPositionFilter] = useState<string>("all");
+  
+  // Site state
+  const [sites, setSites] = useState<Site[]>([]);
+  const [selectedSite, setSelectedSite] = useState<string>("all");
+  const [isLoadingSites, setIsLoadingSites] = useState<boolean>(false);
+  
   const [tasks, setTasks] = useState<Task[]>([
     { 
       id: 1, 
@@ -65,7 +103,9 @@ const Tasks = () => {
       dueDate: "2025-01-15", 
       description: "Update the HRMS module with new features and improvements",
       createdAt: "2024-12-01",
-      updatedAt: "2024-12-19"
+      updatedAt: "2024-12-19",
+      siteId: "site1",
+      siteName: "Mumbai Office"
     },
     { 
       id: 2, 
@@ -76,7 +116,9 @@ const Tasks = () => {
       status: "pending", 
       dueDate: "2025-01-20",
       createdAt: "2024-12-10",
-      updatedAt: "2024-12-10"
+      updatedAt: "2024-12-10",
+      siteId: "site2",
+      siteName: "Delhi Branch"
     },
     { 
       id: 3, 
@@ -87,7 +129,9 @@ const Tasks = () => {
       status: "in-progress", 
       dueDate: "2025-01-12",
       createdAt: "2024-12-05",
-      updatedAt: "2024-12-18"
+      updatedAt: "2024-12-18",
+      siteId: "site1",
+      siteName: "Mumbai Office"
     },
     { 
       id: 4, 
@@ -98,7 +142,9 @@ const Tasks = () => {
       status: "completed", 
       dueDate: "2025-01-10",
       createdAt: "2024-11-28",
-      updatedAt: "2024-12-10"
+      updatedAt: "2024-12-10",
+      siteId: "site3",
+      siteName: "Bangalore Tech Park"
     },
   ]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -107,6 +153,23 @@ const Tasks = () => {
   const [taskToDelete, setTaskToDelete] = useState<number | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  // Fetch sites
+  useEffect(() => {
+    fetchSites();
+  }, []);
+
+  const fetchSites = async () => {
+    setIsLoadingSites(true);
+    try {
+      const sitesData = await siteService.getAllSites();
+      setSites(sitesData || []);
+    } catch (error) {
+      console.error('Error fetching sites:', error);
+    } finally {
+      setIsLoadingSites(false);
+    }
+  };
 
   const form = useForm<z.infer<typeof taskSchema>>({
     resolver: zodResolver(taskSchema),
@@ -118,6 +181,7 @@ const Tasks = () => {
       status: "pending",
       dueDate: "",
       description: "",
+      siteId: "",
     },
   });
 
@@ -141,8 +205,9 @@ const Tasks = () => {
     const matchesStatus = statusFilter === "all" || task.status === statusFilter;
     const matchesPriority = priorityFilter === "all" || task.priority === priorityFilter;
     const matchesPosition = positionFilter === "all" || task.position === positionFilter;
+    const matchesSite = selectedSite === "all" || task.siteId === selectedSite || task.siteName === selectedSite;
     
-    return matchesSearch && matchesStatus && matchesPriority && matchesPosition;
+    return matchesSearch && matchesStatus && matchesPriority && matchesPosition && matchesSite;
   });
 
   const handleOpenDialog = (task?: Task) => {
@@ -156,6 +221,7 @@ const Tasks = () => {
         status: task.status as "pending" | "in-progress" | "completed",
         dueDate: task.dueDate,
         description: task.description || "",
+        siteId: task.siteId || "",
       });
     } else {
       setEditingTask(null);
@@ -167,17 +233,21 @@ const Tasks = () => {
         status: "pending",
         dueDate: "",
         description: "",
+        siteId: "",
       });
     }
     setDialogOpen(true);
   };
 
   const onSubmit = (values: z.infer<typeof taskSchema>) => {
+    const selectedSite = sites.find(s => s._id === values.siteId);
+    
     if (editingTask) {
       setTasks(tasks.map(t => 
         t.id === editingTask.id ? { 
           ...t, 
           ...values,
+          siteName: selectedSite?.name || t.siteName,
           updatedAt: new Date().toISOString().split('T')[0]
         } : t
       ));
@@ -194,6 +264,8 @@ const Tasks = () => {
         description: values.description,
         createdAt: new Date().toISOString().split('T')[0],
         updatedAt: new Date().toISOString().split('T')[0],
+        siteId: values.siteId,
+        siteName: selectedSite?.name || "Unspecified Site",
       };
       setTasks([...tasks, newTask]);
       toast.success("Task created successfully!");
@@ -264,6 +336,13 @@ const Tasks = () => {
 
   const stats = getTaskStats();
 
+  // Get site name for display
+  const getSiteName = () => {
+    if (selectedSite === 'all') return 'All Sites';
+    const site = sites.find(s => s._id === selectedSite);
+    return site ? site.name : 'Unknown Site';
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <DashboardHeader title="Task Management" subtitle="View and manage all assigned tasks" />
@@ -273,6 +352,19 @@ const Tasks = () => {
         animate={{ opacity: 1, y: 0 }}
         className="p-6 space-y-6"
       >
+        {/* Site Filter Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SiteFilter
+            selectedSite={selectedSite}
+            onSiteChange={setSelectedSite}
+            sites={sites}
+            isLoading={isLoadingSites}
+          />
+          <span className="text-xs text-muted-foreground">
+            {selectedSite !== 'all' && `Showing: ${getSiteName()}`}
+          </span>
+        </div>
+
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <Card className="bg-card border-border">
@@ -367,9 +459,9 @@ const Tasks = () => {
                   className="pl-10 bg-background border-border"
                 />
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[140px] bg-background border-border">
+                  <SelectTrigger className="w-[130px] bg-background border-border">
                     <Filter className="h-4 w-4 mr-2" />
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
@@ -381,7 +473,7 @@ const Tasks = () => {
                   </SelectContent>
                 </Select>
                 <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                  <SelectTrigger className="w-[140px] bg-background border-border">
+                  <SelectTrigger className="w-[130px] bg-background border-border">
                     <Filter className="h-4 w-4 mr-2" />
                     <SelectValue placeholder="Priority" />
                   </SelectTrigger>
@@ -393,7 +485,7 @@ const Tasks = () => {
                   </SelectContent>
                 </Select>
                 <Select value={positionFilter} onValueChange={setPositionFilter}>
-                  <SelectTrigger className="w-[140px] bg-background border-border">
+                  <SelectTrigger className="w-[130px] bg-background border-border">
                     <Filter className="h-4 w-4 mr-2" />
                     <SelectValue placeholder="Position" />
                   </SelectTrigger>
@@ -417,13 +509,14 @@ const Tasks = () => {
                     <TableHead className="text-foreground">Priority</TableHead>
                     <TableHead className="text-foreground">Status</TableHead>
                     <TableHead className="text-foreground">Due Date</TableHead>
+                    <TableHead className="text-foreground">Site</TableHead>
                     <TableHead className="text-right text-foreground">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredTasks.length === 0 ? (
                     <TableRow className="hover:bg-transparent border-border">
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         No tasks found matching your criteria
                       </TableCell>
                     </TableRow>
@@ -494,6 +587,16 @@ const Tasks = () => {
                               {isOverdue(task.dueDate) && " (Overdue)"}
                             </span>
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          {task.siteName ? (
+                            <Badge variant="outline" className="text-xs">
+                              <Building className="h-3 w-3 mr-1" />
+                              {task.siteName}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">—</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex justify-end gap-1">
@@ -685,6 +788,32 @@ const Tasks = () => {
 
               <FormField
                 control={form.control}
+                name="siteId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-foreground">Site</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="bg-background border-border text-foreground">
+                          <SelectValue placeholder="Select site" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="bg-background border-border">
+                        <SelectItem value="" className="focus:bg-accent text-foreground">No Site</SelectItem>
+                        {sites.map((site) => (
+                          <SelectItem key={site._id} value={site._id} className="focus:bg-accent text-foreground">
+                            {site.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="description"
                 render={({ field }) => (
                   <FormItem>
@@ -772,6 +901,12 @@ const Tasks = () => {
                   <label className="text-sm font-medium text-muted-foreground">Created</label>
                   <p className="font-medium text-foreground">{new Date(selectedTask.createdAt).toLocaleDateString()}</p>
                 </div>
+                {selectedTask.siteName && (
+                  <div className="col-span-2">
+                    <label className="text-sm font-medium text-muted-foreground">Site</label>
+                    <p className="font-medium text-foreground">{selectedTask.siteName}</p>
+                  </div>
+                )}
               </div>
             </div>
           )}

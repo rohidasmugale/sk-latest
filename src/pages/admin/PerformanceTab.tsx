@@ -31,6 +31,7 @@ import {
   IndianRupee,
   Loader2,
   RefreshCw,
+  Building,
 } from "lucide-react";
 import Pagination from "./Pagination";
 
@@ -65,14 +66,46 @@ import deductionService, {
   type PaginatedResponse,
 } from "../../services/DeductionService";
 
+// Site Service
+import { siteService, Site } from "@/services/SiteService";
+
 const API_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 interface DeductionListTabProps {
-  // Optional props if you need to manage deductions from parent component
+  selectedSite?: string;
+  sites?: Site[];
 }
 
-const DeductionListTab = ({}: DeductionListTabProps) => {
+// Site Filter Component
+const SiteFilter: React.FC<{
+  selectedSite: string;
+  onSiteChange: (value: string) => void;
+  sites: Site[];
+  isLoading?: boolean;
+}> = ({ selectedSite, onSiteChange, sites, isLoading = false }) => {
+  return (
+    <div className="flex items-center gap-2">
+      <Building className="h-4 w-4 text-gray-500" />
+      <select
+        value={selectedSite}
+        onChange={(e) => onSiteChange(e.target.value)}
+        disabled={isLoading}
+        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white text-sm min-w-[180px]"
+      >
+        <option value="all">🏢 All Sites</option>
+        {sites.map((site) => (
+          <option key={site._id} value={site._id}>
+            {site.name}
+          </option>
+        ))}
+      </select>
+      {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
+    </div>
+  );
+};
+
+const DeductionListTab = ({ selectedSite: propSelectedSite = 'all', sites: propSites = [] }: DeductionListTabProps) => {
   // State
   const [deductions, setDeductions] = useState<Deduction[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -105,6 +138,11 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
     completedCount: 0,
   });
 
+  // Site state
+  const [sites, setSites] = useState<Site[]>(propSites);
+  const [selectedSite, setSelectedSite] = useState<string>(propSelectedSite);
+  const [isLoadingSites, setIsLoadingSites] = useState<boolean>(false);
+
   // Deduction form state
   const [deductionForm, setDeductionForm] = useState({
     employeeId: "",
@@ -129,11 +167,37 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
     };
   }, []);
 
+  // Fetch sites if not provided as props
+  useEffect(() => {
+    if (propSites.length === 0) {
+      fetchSites();
+    } else {
+      setSites(propSites);
+    }
+  }, [propSites]);
+
+  // Sync with props
+  useEffect(() => {
+    setSelectedSite(propSelectedSite);
+  }, [propSelectedSite]);
+
+  const fetchSites = async () => {
+    setIsLoadingSites(true);
+    try {
+      const sitesData = await siteService.getAllSites();
+      setSites(sitesData || []);
+    } catch (error) {
+      console.error('Error fetching sites:', error);
+    } finally {
+      setIsLoadingSites(false);
+    }
+  };
+
   // Debug useEffect to track employees
   useEffect(() => {
     console.log("Employees state changed:", {
       count: employees.length,
-      employees: employees.slice(0, 3) // First 3 for preview
+      employees: employees.slice(0, 3)
     });
   }, [employees]);
 
@@ -152,10 +216,11 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
       searchTerm,
       statusFilter,
       typeFilter,
+      selectedSite,
       page: deductionPage,
       itemsPerPage: deductionItemsPerPage
     });
-  }, [searchTerm, statusFilter, typeFilter, deductionPage, deductionItemsPerPage]);
+  }, [searchTerm, statusFilter, typeFilter, selectedSite, deductionPage, deductionItemsPerPage]);
 
   const fetchDeductions = useCallback(
     async (forceRefresh = false) => {
@@ -165,6 +230,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
         statusFilter,
         typeFilter,
         searchTerm,
+        selectedSite,
       });
 
       setIsLoading(true);
@@ -177,10 +243,10 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
         if (statusFilter !== "all") params.status = statusFilter;
         if (typeFilter !== "all") params.type = typeFilter;
         if (searchTerm) params.search = searchTerm;
+        if (selectedSite !== "all") params.site = selectedSite;
 
         console.log("API params:", params);
 
-        // Direct API call with correct endpoint
         const response = await fetch(
           `${API_URL}/deductions/deductions?${new URLSearchParams(
             params
@@ -199,7 +265,6 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
         if (!isMounted.current) return;
 
         if (data.success) {
-          // Transform the data
           const transformedDeductions = data.data.map((deduction: any) => {
             const employeeDetails = deduction.employeeDetails || {};
             return {
@@ -223,6 +288,8 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
               appliedMonth: deduction.appliedMonth,
               createdAt: deduction.createdAt,
               updatedAt: deduction.updatedAt,
+              site: deduction.site || deduction.siteName || 'unspecified',
+              siteName: deduction.siteName || deduction.site || 'Unspecified Site'
             };
           });
 
@@ -230,7 +297,6 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
 
           setDeductions(transformedDeductions);
           
-          // Use the pagination total from API
           const totalFromApi = data.pagination?.totalItems || 0;
           console.log("Total deductions from API:", totalFromApi);
           setTotalDeductionsCount(totalFromApi);
@@ -250,7 +316,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
         }
       }
     },
-    [deductionPage, deductionItemsPerPage, statusFilter, typeFilter, searchTerm]
+    [deductionPage, deductionItemsPerPage, statusFilter, typeFilter, searchTerm, selectedSite]
   );
 
   const fetchEmployees = useCallback(async (forceRefresh = false) => {
@@ -258,7 +324,6 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
     try {
       console.log("Fetching employees from API...");
       
-      // Try just one reliable endpoint first
       const endpoint = `${API_URL}/employees`;
       console.log(`Using endpoint: ${endpoint}`);
       
@@ -276,7 +341,6 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
       if (!isMounted.current) return;
 
       if (data.success) {
-        // Check various possible structures
         const employeesArray = data.data || data.employees || data.result || [];
         
         console.log("Employees array length:", employeesArray.length);
@@ -290,9 +354,8 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
           return;
         }
 
-        // Transform employee data
         const transformedEmployees = employeesArray
-          .filter((employee: any) => employee && (employee._id || employee.id)) // Filter out invalid entries
+          .filter((employee: any) => employee && (employee._id || employee.id))
           .map((employee: any) => ({
             id: employee._id || employee.id || '',
             employeeId: employee.employeeId || employee.code || employee.empId || "",
@@ -307,12 +370,13 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
             joinDate: employee.dateOfJoining || employee.joiningDate || employee.startDate
               ? new Date(employee.dateOfJoining || employee.joiningDate || employee.startDate).toISOString().split("T")[0]
               : new Date().toISOString().split("T")[0],
+            site: employee.site || employee.siteName || 'unspecified',
+            siteName: employee.siteName || employee.site || 'Unspecified Site'
           }));
 
         console.log(`Transformed ${transformedEmployees.length} employees`);
         setEmployees(transformedEmployees);
         
-        // Show success message if employees found
         if (transformedEmployees.length > 0) {
           console.log("Employees loaded successfully");
         } else {
@@ -328,7 +392,6 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
     } catch (error: any) {
       console.error("Error fetching employees:", error);
       
-      // More specific error messages
       if (error.message.includes('Failed to fetch')) {
         toast.error("Connection Error", {
           description: "Unable to connect to the server. Please ensure:\n1. Backend is running on port 5001\n2. CORS is properly configured\n3. Network connection is stable",
@@ -353,8 +416,10 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
   // Fetch deduction statistics
   const fetchDeductionStats = useCallback(async () => {
     try {
-      // Try to get stats from a dedicated API endpoint
-      const response = await fetch(`${API_URL}/deductions/stats`);
+      const params = new URLSearchParams();
+      if (selectedSite !== "all") params.append("site", selectedSite);
+      
+      const response = await fetch(`${API_URL}/deductions/stats?${params.toString()}`);
       
       if (response.ok) {
         const data = await response.json();
@@ -365,10 +430,9 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
         }
       }
       
-      // Fallback: If no dedicated stats endpoint, fetch ALL deductions for stats
       console.log("Fetching all deductions for stats calculation...");
       const allDeductionsResponse = await fetch(
-        `${API_URL}/deductions/deductions?limit=1000`
+        `${API_URL}/deductions/deductions?limit=1000${selectedSite !== 'all' ? `&site=${selectedSite}` : ''}`
       );
       
       if (allDeductionsResponse.ok) {
@@ -379,7 +443,6 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
             (acc: any, deduction: any) => {
               if (!deduction) return acc;
               
-              // Use the same calculation logic as in fetchDeductions
               acc.totalDeductions += deduction.amount || 0;
               
               if (deduction.type === "advance") {
@@ -390,7 +453,6 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
                 acc.totalFines += deduction.fineAmount || deduction.amount || 0;
               }
               
-              // Count by status
               switch (deduction.status) {
                 case "pending":
                   acc.pendingCount += 1;
@@ -423,8 +485,6 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
           setDeductionStats(stats);
         }
       } else {
-        // Final fallback: Calculate from current deductions (limited)
-        console.log("Using current deductions for stats (may be incomplete)");
         const localStats = deductions.reduce(
           (acc, deduction) => {
             if (!deduction) return acc;
@@ -436,7 +496,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
             if (deduction.status === "pending") acc.pendingCount += 1;
             if (deduction.status === "approved") acc.approvedCount += 1;
             if (deduction.status === "rejected") acc.rejectedCount += 1;
-            if (duplicate.status === "completed") acc.completedCount += 1;
+            if (deduction.status === "completed") acc.completedCount += 1;
             return acc;
           },
           {
@@ -453,9 +513,8 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
       }
     } catch (error) {
       console.error("Error fetching stats:", error);
-      // Don't show toast for stats errors, they're less critical
     }
-  }, [deductions]);
+  }, [deductions, selectedSite]);
 
   // Load employees and deductions on component mount
   useEffect(() => {
@@ -471,6 +530,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
     deductionItemsPerPage,
     statusFilter,
     typeFilter,
+    selectedSite,
     fetchDeductions,
   ]);
 
@@ -541,7 +601,6 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
         return;
       }
 
-      // Prepare deduction data
       const deductionData = {
         employeeId: deductionForm.employeeId,
         employeeName: employee.name,
@@ -558,11 +617,12 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
           ? parseFloat(deductionForm.fineAmount)
           : 0,
         appliedMonth: deductionForm.appliedMonth,
+        site: selectedSite !== 'all' ? selectedSite : employee.site || 'unspecified',
+        siteName: selectedSite !== 'all' ? sites.find(s => s._id === selectedSite)?.name : employee.siteName || 'Unspecified Site'
       };
 
       console.log("Sending deduction data:", deductionData);
 
-      // Direct API call to create deduction
       const response = await fetch(
         `${API_URL}/deductions/deductions`,
         {
@@ -585,7 +645,6 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
       console.log("Create deduction response:", data);
 
       if (data.success) {
-        // Transform the response to match frontend format
         const employeeDetails = data.data.employeeDetails || {};
         const newDeduction = {
           id: data.data._id,
@@ -606,9 +665,10 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
           appliedMonth: data.data.appliedMonth,
           createdAt: data.data.createdAt,
           updatedAt: data.data.updatedAt,
+          site: data.data.site || deductionData.site,
+          siteName: data.data.siteName || deductionData.siteName
         };
 
-        // Add to the beginning of the list
         setDeductions((prev) => [newDeduction, ...(prev || [])]);
         setIsAddingDeduction(false);
         resetDeductionForm();
@@ -617,9 +677,8 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
           description: data.message || "Deduction added successfully!",
         });
 
-        // Refresh the list to get updated data
         fetchDeductions(true);
-        fetchDeductionStats(); // Refresh stats after adding
+        fetchDeductionStats();
       } else {
         toast.error("Failed to add deduction", {
           description: data.message || "Please try again",
@@ -670,12 +729,12 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
           ? parseFloat(deductionForm.fineAmount)
           : 0,
         appliedMonth: deductionForm.appliedMonth,
+        site: selectedSite !== 'all' ? selectedSite : employee.site || 'unspecified',
+        siteName: selectedSite !== 'all' ? sites.find(s => s._id === selectedSite)?.name : employee.siteName || 'Unspecified Site'
       };
 
       console.log(`Updating deduction ${editingDeduction.id}:`, updateData);
 
-      // Check what endpoint your backend uses for updating
-      // Try both possibilities
       const response = await fetch(
         `${API_URL}/deductions/deductions/${editingDeduction.id}`,
         {
@@ -688,7 +747,6 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
       );
 
       if (!response.ok) {
-        // Try alternative endpoint
         const altResponse = await fetch(
           `${API_URL}/deductions/${editingDeduction.id}`,
           {
@@ -727,6 +785,8 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
             appliedMonth: data.data.appliedMonth,
             createdAt: data.data.createdAt,
             updatedAt: data.data.updatedAt,
+            site: data.data.site || updateData.site,
+            siteName: data.data.siteName || updateData.siteName
           };
 
           setDeductions((prev) =>
@@ -742,7 +802,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
           });
 
           fetchDeductions(true);
-          fetchDeductionStats(); // Refresh stats after updating
+          fetchDeductionStats();
         }
       } else {
         const data = await response.json();
@@ -766,6 +826,8 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
             appliedMonth: data.data.appliedMonth,
             createdAt: data.data.createdAt,
             updatedAt: data.data.updatedAt,
+            site: data.data.site || updateData.site,
+            siteName: data.data.siteName || updateData.siteName
           };
 
           setDeductions((prev) =>
@@ -781,7 +843,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
           });
 
           fetchDeductions(true);
-          fetchDeductionStats(); // Refresh stats after updating
+          fetchDeductionStats();
         }
       }
     } catch (error: any) {
@@ -801,8 +863,6 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
     try {
       console.log(`Deleting deduction ${id}`);
 
-      // Check what endpoint your backend uses for deleting
-      // Try both possibilities
       const response = await fetch(
         `${API_URL}/deductions/deductions/${id}`,
         {
@@ -811,7 +871,6 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
       );
 
       if (!response.ok) {
-        // Try alternative endpoint
         const altResponse = await fetch(
           `${API_URL}/deductions/${id}`,
           {
@@ -836,7 +895,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
           });
 
           fetchDeductions(true);
-          fetchDeductionStats(); // Refresh stats after deleting
+          fetchDeductionStats();
         } else {
           toast.error("Failed to delete deduction", {
             description: data.message || "Please try again",
@@ -854,7 +913,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
           });
 
           fetchDeductions(true);
-          fetchDeductionStats(); // Refresh stats after deleting
+          fetchDeductionStats();
         } else {
           toast.error("Failed to delete deduction", {
             description: data.message || "Please try again",
@@ -942,6 +1001,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
         format: "csv",
         status: statusFilter !== "all" ? statusFilter : undefined,
         type: typeFilter !== "all" ? typeFilter : undefined,
+        site: selectedSite !== "all" ? selectedSite : undefined,
       });
 
       const url = URL.createObjectURL(blob);
@@ -995,7 +1055,6 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
 
   // Manual refresh function
   const handleManualRefresh = () => {
-    // Force refresh
     fetchEmployees(true);
     fetchDeductions(true);
     fetchDeductionStats();
@@ -1003,9 +1062,29 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
     toast.info("Refreshing data...");
   };
 
+  // Get site name for display
+  const getSiteName = () => {
+    if (selectedSite === 'all') return 'All Sites';
+    const site = sites.find(s => s._id === selectedSite);
+    return site ? site.name : 'Unknown Site';
+  };
+
   return (
     <div className="space-y-6">
-      {/* Add/Edit Deduction Dialog - IMPROVED UI */}
+      {/* Site Filter Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SiteFilter
+          selectedSite={selectedSite}
+          onSiteChange={setSelectedSite}
+          sites={sites}
+          isLoading={isLoadingSites}
+        />
+        <span className="text-xs text-muted-foreground">
+          {selectedSite !== 'all' && `Showing: ${getSiteName()}`}
+        </span>
+      </div>
+
+      {/* Add/Edit Deduction Dialog */}
       <Dialog
         open={isAddingDeduction || !!editingDeduction}
         onOpenChange={(open) => {
@@ -1295,7 +1374,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog - IMPROVED UI */}
+      {/* Delete Confirmation Dialog */}
       <AlertDialog
         open={deleteDialog.open}
         onOpenChange={(open) => setDeleteDialog({ open, deduction: null })}
@@ -1343,7 +1422,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Header Section - IMPROVED UI */}
+      {/* Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Deduction Management</h2>
@@ -1368,7 +1447,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
         </div>
       </div>
 
-      {/* Stats Cards - IMPROVED UI */}
+      {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="border-l-4 border-l-primary">
           <CardHeader className="pb-2">
@@ -1451,7 +1530,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
         </Card>
       </div>
 
-      {/* Filters and Search - IMPROVED UI */}
+      {/* Filters and Search */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1583,7 +1662,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
             </div>
           </div>
 
-          {/* Deductions Table - IMPROVED UI */}
+          {/* Deductions Table */}
           <div className="rounded-lg border overflow-hidden">
             {isLoading ? (
               <div className="flex flex-col justify-center items-center py-16">
@@ -1772,7 +1851,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
                       onPageChange={setDeductionPage}
                       onItemsPerPageChange={(value) => {
                         setDeductionItemsPerPage(value);
-                        setDeductionPage(1); // Reset to first page when changing items per page
+                        setDeductionPage(1);
                       }}
                     />
                   </div>

@@ -52,6 +52,9 @@ export interface LeaveRequest {
   to: string;
   reason: string;
   status: "pending" | "approved" | "rejected";
+    site?: string; // ADD THIS
+  siteName?: string; // ADD THIS
+  siteId?: string; // ADD THIS
 }
 
 export interface Attendance {

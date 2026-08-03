@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,9 +19,11 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const { login } = useRole();
+  const { login, isAuthenticated, user, loading } = useRole();
   const navigate = useNavigate();
-
+  if (!loading && isAuthenticated && user?.role) {
+    return <Navigate to={`/${user.role}/dashboard`} replace />;
+  }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 

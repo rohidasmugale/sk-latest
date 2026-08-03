@@ -58,6 +58,36 @@ import { assignTaskService, type AssignTask } from '@/services/assignTaskService
 import { taskService } from '@/services/TaskService';
 import { format } from 'date-fns';
 import { createNotificationForSuperadmin } from '@/lib/notificationHelper';
+import { siteService, Site } from '@/services/SiteService';
+
+// Site Filter Component
+const SiteFilter: React.FC<{
+  selectedSite: string;
+  onSiteChange: (value: string) => void;
+  sites: Site[];
+  isLoading?: boolean;
+}> = ({ selectedSite, onSiteChange, sites, isLoading = false }) => {
+  return (
+    <div className="flex items-center gap-2">
+      <Building className="h-4 w-4 text-gray-500" />
+      <select
+        value={selectedSite}
+        onChange={(e) => onSiteChange(e.target.value)}
+        disabled={isLoading}
+        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white text-sm min-w-[180px]"
+      >
+        <option value="all">🏢 All Sites</option>
+        {sites.map((site) => (
+          <option key={site._id} value={site._id}>
+            {site.name}
+          </option>
+        ))}
+      </select>
+      {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
+    </div>
+  );
+};
+
 // Add interface for site staff counts
 interface SiteStaffCounts {
   [siteId: string]: {
@@ -72,13 +102,21 @@ interface SiteStaffCounts {
 interface AssignTaskWithDerivedStatus extends AssignTask {
   derivedStatus?: 'pending' | 'in-progress' | 'completed' | 'cancelled';
 }
+
 interface AssignTaskPageProps {
   refreshTrigger?: number;
+  selectedSite?: string;   // ← ADD
+  sites?: Site[];          // ← ADD
 }
+
 const API_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
-const AssignTaskPage: React.FC<AssignTaskPageProps> = ({ refreshTrigger = 0 }) => {
+const AssignTaskPage: React.FC<AssignTaskPageProps> = ({ 
+  refreshTrigger = 0, 
+  selectedSite: propSelectedSite = 'all',  // ← rename to avoid conflict
+  sites: propSites = []                    // ← rename
+}) => {
   const [showPopup, setShowPopup] = useState(false);
   const [tasks, setTasks] = useState<AssignTaskWithDerivedStatus[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -92,6 +130,9 @@ const AssignTaskPage: React.FC<AssignTaskPageProps> = ({ refreshTrigger = 0 }) =
   const [showFilters, setShowFilters] = useState(false);
   const [sites, setSites] = useState<any[]>([]);
   
+  // Site filter state
+ 
+  
   // State for site staff counts
   const [siteStaffCounts, setSiteStaffCounts] = useState<SiteStaffCounts>({});
   const [isLoadingStaffCounts, setIsLoadingStaffCounts] = useState(false);
@@ -103,12 +144,18 @@ const AssignTaskPage: React.FC<AssignTaskPageProps> = ({ refreshTrigger = 0 }) =
   }>({ managers: [], supervisors: [] });
   
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
-useEffect(() => {
+
+  
+
+  // Fetch all sites for filter dropdown
+ 
+  useEffect(() => {
     if (refreshTrigger > 0) {
       fetchTasks();
     }
   }, [refreshTrigger]);
-   useEffect(() => {
+
+  useEffect(() => {
     const handleRefresh = (event: CustomEvent) => {
       if (event.detail?.tasks) {
         const fetchedTasks = event.detail.tasks;
@@ -127,14 +174,12 @@ useEffect(() => {
         fetchTasks();
       }
     };
-     window.addEventListener('refreshOperations', handleRefresh as EventListener);
+
+    window.addEventListener('refreshOperations', handleRefresh as EventListener);
     return () => window.removeEventListener('refreshOperations', handleRefresh as EventListener);
   }, []);
-  // Fetch tasks on mount
-  useEffect(() => {
-    fetchTasks();
-    fetchSites();
-  }, []);
+
+  
 
   // Fetch staff counts whenever tasks change
   useEffect(() => {
@@ -166,7 +211,15 @@ useEffect(() => {
         };
       });
       
-      setTasks(tasksWithDerivedStatus);
+      // Filter tasks by selected site if not 'all'
+      let filteredTasks = tasksWithDerivedStatus;
+      if (propSelectedSite !== 'all') {
+  filteredTasks = tasksWithDerivedStatus.filter(task => 
+    task.siteId === propSelectedSite || task.siteName === propSelectedSite
+  );
+}
+      
+      setTasks(filteredTasks);
     } catch (error) {
       console.error('Error fetching tasks:', error);
       toast.error('Failed to load tasks');
@@ -525,8 +578,9 @@ useEffect(() => {
         </Button>
       </div>
 
+      
+
       {/* Summary Cards */}
-        {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
           <CardContent className="p-4 flex items-center justify-between">

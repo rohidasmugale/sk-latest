@@ -2492,7 +2492,12 @@ const TasksSection = () => {
   const getAttachmentsCount = useCallback((task: Task) => {
     return (task.attachments || []).length;
   }, []);
-
+// Get site name for display
+const getSiteDisplayName = () => {
+  if (selectedSite === 'all') return 'All Sites';
+  const site = sites.find(s => s._id === selectedSite);
+  return site ? site.name : 'Unknown Site';
+};
   const getAllAssigneeNames = useCallback((task: Task | GroupedTask): string[] => {
     if (!task) return [];
     

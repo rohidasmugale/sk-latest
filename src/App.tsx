@@ -19,7 +19,7 @@ import EmployeeLayout from "./layouts/EmployeeLayout";
 
 // Dashboards
 import SuperAdminDashboard from "./pages/superadmin/SuperAdminDashboard";
-import AdminDashboard from "./pages/admin/AdminDashboard";
+
 import ManagerDashboard from "./pages/manager/ManagerDashboard";
 import SupervisorDashboard from "./pages/supervisor/SupervisorDashboard";
 import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
@@ -75,7 +75,7 @@ import SupervisorLeave from "./pages/supervisor/Leave";
 import Tasks from "./pages/supervisor/Tasks";
 import Attendance from "./pages/supervisor/Attendance";
 import SupervisorSettings from "./pages/supervisor/SupervisorSettings";
-import InventoryPage from "./pages/supervisor/InventoryPage"; // ADD THIS IMPORT
+import InventoryPage from "./pages/supervisor/SupervisorInventory"; // ADD THIS IMPORT
 import MachineStatus from "./pages/supervisor/MachineStatus";
 import GroomingStatus from "./pages/supervisor/GroomingStatus";
 import IncidentReports from "./pages/supervisor/IncidentReports";
@@ -92,7 +92,7 @@ import EmployeeAttendance from "./pages/employee/EmployeeAttendance";
 import NotFound from "./pages/NotFound";
 import ManagerAttendance from "./pages/manager/ManagerAttendance";
 import SuperAdminWorkIssues from "./pages/superadmin/SuperAdminWorkIssues";
-import AdminAttendanceView from "./pages/admin/AdminAttendanceView";
+
 import AdminHRMS from "./pages/admin/AdminHRMS";
 import SupervisorAssignTask from "./pages/supervisor/SupervisorAssignTask";
 import ManagerAssignTask from "./pages/manager/ManagerAssignTask";
@@ -101,8 +101,7 @@ import ManagerSites from "./pages/manager/ManagerSites";
 
 import SupervisorTrainingBriefing from "./pages/supervisor/SupervisorTrainingBriefing";
 import SiteMachinesView from "./pages/superadmin/SiteMachinesView";
-//import { AuthProvider } from "./contexts/AuthContext";
-// import AdminCRM from "./pages/admin/AdminCRM";
+
 
 
 import ManagerMachineStatus from '@/pages/manager/ManagerMachineStatus';
@@ -217,10 +216,11 @@ const App = () => (
                   </ProtectedRoute>
                 }
               >
-                <Route path="dashboard" element={<AdminDashboard />} />
+              <Route path="dashboard" element={<SuperAdminDashboard />} />
+  <Route path="attendance" element={<AttendanceTab />} />
                 <Route path="profile" element={<AdminProfile />} />
                 <Route path="team" element={<AdminTeam />} />
-                <Route path="attendance" element={<AdminAttendanceView />} />
+             
                 <Route path="tasks" element={<AdminTasks />} />
                 <Route path="reports" element={<AdminReports />} />
                 <Route path="leave" element={<AdminLeave />} />

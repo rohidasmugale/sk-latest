@@ -75,6 +75,8 @@ export interface BriefingData {
 export interface GetBriefingsParams {
   department?: string;
   shift?: string;
+  shiftId?: string; 
+
   site?: string;
   search?: string;
   startDate?: string;

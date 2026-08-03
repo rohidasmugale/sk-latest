@@ -239,6 +239,8 @@ interface AttendanceRecord {
   siteName?: string;
   department?: string;
   shift?: string;
+  shiftId?: string; 
+
   overtimeHours?: number;
   lateMinutes?: number;
   earlyLeaveMinutes?: number;
@@ -546,168 +548,11 @@ siteAssignedEmployees.forEach(emp => {
   } catch (error: any) {
     console.error('Error fetching attendance data:', error);
     toast.error('Failed to fetch attendance data');
-    return generateDemoAttendanceData(days);
+    return [];
   }
 };
 
-// Update the generateDemoAttendanceData function to match the expected pattern from your attendance view
-const generateDemoAttendanceData = (days: number): DailyAttendanceSummary[] => {
-  console.log('Generating demo attendance data (only site-assigned employees)...');
-  const data = [];
-  const today = new Date();
 
-  // Demo site counts (only sites that exist)
-  const demoSites = [
-    'ALYSSUM DEVELOPERS PVT. LTD.',
-    'ARYA ASSOCIATES',
-    'ASTITVA ASSET MANAGEMENT LLP',
-    'A.T.C COMMERCIAL PREMISES CO. OPERATIVE SOCIETY LTD',
-    'BAHIRAT ESTATE LLP',
-    'CHITRALI PROPERTIES PVT LTD',
-    'Concretely Infra Llp',
-    'COORTUS ADVISORS LLP',
-    'CUSHMAN & WAKEFIELD PROPERTY MANAGEMENT SERVICES INDIA PVT. LTD.'
-  ];
-
-  // Demo employee counts per site - MATCHING YOUR ATTENDANCE VIEW EXAMPLE
-  // Total 4 employees: 1 present, 2 absent, 1 weekly off
-  const siteEmployeeCounts: { [key: string]: number } = {
-    'ALYSSUM DEVELOPERS PVT. LTD.': 4
-  };
-
-  const totalEmployees = Object.values(siteEmployeeCounts).reduce((a, b) => a + b, 0);
-
-  for (let i = 0; i < days; i++) {
-    const date = new Date();
-    date.setDate(today.getDate() - i);
-    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-
-    const dayName = i === 0 ? 'Today' :
-      i === 1 ? 'Yesterday' :
-        date.toLocaleDateString('en-US', { weekday: 'long' });
-
-    let totalPresent = 0;
-    let totalWeeklyOff = 0;
-    let totalLeave = 0;
-    let totalAbsent = 0;
-
-    const siteBreakdown: { [siteName: string]: { total: number; present: number; absent: number; weeklyOff: number; leave: number } } = {};
-
-    // Calculate per site - MATCHING YOUR ATTENDANCE VIEW EXAMPLE
-    Object.entries(siteEmployeeCounts).forEach(([siteName, siteTotal]) => {
-      if (siteTotal === 4) {
-        // Match your example: 1 present, 2 absent, 1 weekly off
-        totalPresent = 1;
-        totalWeeklyOff = 1;
-        totalAbsent = 2;
-        totalLeave = 0;
-
-        siteBreakdown[siteName] = {
-          total: siteTotal,
-          present: 1,
-          absent: 2,
-          weeklyOff: 1,
-          leave: 0
-        };
-      } else {
-        // For other sites, use realistic distribution
-        let present, weeklyOff, leave, absent;
-
-        if (isWeekend) {
-          // Weekend pattern
-          weeklyOff = Math.floor(siteTotal * 0.7);
-          present = Math.floor(siteTotal * 0.2);
-          leave = Math.floor(siteTotal * 0.05);
-          absent = siteTotal - present - weeklyOff - leave;
-        } else {
-          // Weekday pattern
-          present = Math.floor(siteTotal * 0.75);
-          weeklyOff = Math.floor(siteTotal * 0.05);
-          leave = Math.floor(siteTotal * 0.05);
-          absent = siteTotal - present - weeklyOff - leave;
-        }
-
-        siteBreakdown[siteName] = {
-          total: siteTotal,
-          present,
-          absent,
-          weeklyOff,
-          leave
-        };
-
-        totalPresent += present;
-        totalWeeklyOff += weeklyOff;
-        totalLeave += leave;
-        totalAbsent += absent;
-      }
-    });
-
-    const totalPresentWithWO = totalPresent + totalWeeklyOff;
-    const rate = totalEmployees > 0 ? ((totalPresentWithWO / totalEmployees) * 100).toFixed(1) + '%' : '0.0%';
-
-    data.push({
-      date: date.toISOString().split('T')[0],
-      day: dayName,
-      present: totalPresent,
-      absent: totalAbsent,
-      weeklyOff: totalWeeklyOff,
-      leave: totalLeave,
-      total: totalEmployees,
-      rate,
-      index: i,
-      totalEmployees,
-      sitesWithData: demoSites.length,
-      siteBreakdown
-    });
-  }
-
-  return data;
-};
-
-
-// Generate payroll data
-const generatePayrollData = () => {
-  const payrollData = [];
-  const siteNames = [
-    'ALYSSUM DEVELOPERS PVT. LTD.',
-    'ARYA ASSOCIATES',
-    'ASTITVA ASSET MANAGEMENT LLP',
-    'A.T.C COMMERCIAL PREMISES CO. OPERATIVE SOCIETY LTD',
-    'BAHIRAT ESTATE LLP',
-    'CHITRALI PROPERTIES PVT LTD',
-    'Concretely Infra Llp',
-    'COORTUS ADVISORS LLP',
-    'CUSHMAN & WAKEFIELD PROPERTY MANAGEMENT SERVICES INDIA PVT. LTD.',
-  ];
-
-  siteNames.forEach((siteName, index) => {
-    const billingAmount = Math.floor(Math.random() * 500000) + 200000;
-    const totalPaid = Math.floor(Math.random() * billingAmount * 0.8) + (billingAmount * 0.2);
-    const holdSalary = billingAmount - totalPaid;
-
-    const remarks = [
-      'Payment processed',
-      'Pending approval',
-      'Under review',
-      'Payment scheduled',
-      'Awaiting documents',
-      'Completed',
-      'On hold'
-    ];
-
-    payrollData.push({
-      id: index + 1,
-      siteName,
-      billingAmount,
-      totalPaid,
-      holdSalary: holdSalary > 0 ? holdSalary : 0,
-      remark: remarks[Math.floor(Math.random() * remarks.length)],
-      status: holdSalary > 0 ? 'Pending' : 'Paid'
-    });
-  });
-
-  return payrollData;
-};
 
 const years = ['2024', '2023', '2022', '2021'];
 const months = [
@@ -956,53 +801,45 @@ const ManagerDashboard = () => {
   ];
 
   // Dynamic department data – always show all allowed departments, count only staff (exclude managers/supervisors)
-  const departmentData = useMemo(() => {
-    // Create mapping from raw department to allowed name (case-insensitive, partial match)
-    const allowedMap = new Map<string, string>(); // raw -> allowed
-    allowedDepartments.forEach(dept => {
-      allowedMap.set(dept.name.toLowerCase(), dept.name);
-    });
-    // Additional mapping for variations
+ const departmentData = useMemo(() => {
+  // Count SITES per department, not employees
+  const departmentSites = new Map<string, Set<string>>();
+
+  employees.forEach(emp => {
+    const deptRaw = emp.department?.trim().toLowerCase() || '';
+    if (!deptRaw) return;
+
     const mapping: Record<string, string> = {
-      'parking management': 'Parking',
       'housekeeping': 'Housekeeping',
       'security': 'Security',
       'waste management': 'Waste Management',
+      'parking management': 'Parking Management',
       'consumables': 'Consumables',
       'other': 'Other'
     };
 
-    // Count employees per allowed department (only staff, not managers/supervisors)
-    const countMap = new Map<string, number>();
-    employees.forEach(emp => {
-      // Exclude managers and supervisors
-      if (emp.isManager || emp.isSupervisor) return;
-      const deptRaw = emp.department?.trim().toLowerCase() || '';
-      if (!deptRaw) return;
-      // Try to map to allowed department
-      let allowedDept = mapping[deptRaw];
-      if (!allowedDept) {
-        for (const [key, value] of Object.entries(mapping)) {
-          if (deptRaw.includes(key) || key.includes(deptRaw)) {
-            allowedDept = value;
-            break;
-          }
-        }
-      }
-      if (allowedDept) {
-        countMap.set(allowedDept, (countMap.get(allowedDept) || 0) + 1);
-      }
-    });
+    const allowedDept = mapping[deptRaw] || deptRaw;
+    const siteName = emp.siteName || emp.site || 'Unknown';
 
-    // Build final array in allowed order, always include all departments (even with 0)
-    return allowedDepartments.map(dept => ({
+    if (!departmentSites.has(allowedDept)) {
+      departmentSites.set(allowedDept, new Set());
+    }
+    departmentSites.get(allowedDept)!.add(siteName);
+  });
+
+  return allowedDepartments.map(dept => {
+    const sites = departmentSites.get(dept.name) || new Set();
+    return {
       department: dept.name,
-      total: countMap.get(dept.name) || 0,
-      present: countMap.get(dept.name) || 0, // just show total count
+      total: sites.size,  // ✅ Now counts SITES
+      present: sites.size,
       icon: dept.icon,
-      color: dept.color
-    }));
-  }, [employees]);
+      color: dept.color,
+      siteNames: Array.from(sites)
+    };
+  });
+}, [employees]);
+
   const navigate = useNavigate();
 
   const [attendanceData, setAttendanceData] = useState<DailyAttendanceSummary[]>([]);
@@ -1421,23 +1258,13 @@ const calculateBreakTime = (start: string | null, end: string | null): number =>
     return `${formatDate(firstDate)} - ${formatDate(lastDate)}`;
   };
 
-  const handlePayrollFilterChange = () => {
-    setPayrollData(generatePayrollData());
-    setCurrentPage(1);
-    toast.success(`Payroll data updated for ${months.find(m => m.value === selectedMonth)?.label} ${selectedYear}`);
-  };
+ 
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
 
-  const handleExportToExcel = () => {
-    const monthName = months.find(m => m.value === selectedMonth)?.label;
-    const filename = `Payroll_Data_${monthName}_${selectedYear}.csv`;
 
-    exportToExcel(filteredPayrollData, filename);
-    toast.success(`Payroll data exported to ${filename}`);
-  };
 
  const handlePieChartClick = (date?: string) => {
   const selectedDate = date || currentDayData.date;
@@ -1777,8 +1604,8 @@ const CustomPayrollTooltip = ({ active, payload }: any) => {
                             <p className="text-[10px] font-medium truncate">{dept.department}</p>
                             <p className="text-sm font-bold mt-1">{dept.total}</p>
                             <p className="text-[9px] text-muted-foreground">
-                              employee{dept.total !== 1 ? 's' : ''}
-                            </p>
+  site{dept.total !== 1 ? 's' : ''}
+</p>
                           </CardContent>
                         </Card>
                       </motion.div>

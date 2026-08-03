@@ -8,13 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import { 
-  Users, UserPlus, Calendar, Clock, FileText, TrendingUp, 
-  BarChart3, ChevronDown, ChevronUp, Menu, Building, 
-  Briefcase, DollarSign, AlertCircle, CheckCircle, UserCheck, UserX,
-  PieChart, Download, Upload, Filter, Search, Eye, Edit, Trash2,
-  Plus, X, ChevronLeft, ChevronRight, MoreVertical, Home, Shield,
-  Car, Droplets, ShoppingCart, Settings, LogOut, Bell, Sun, Moon,
-  Loader2, RefreshCw, Database
+  Users, Clock, DollarSign, ChevronDown, ChevronUp, Building,
+  Filter, Loader2, RefreshCw
 } from "lucide-react";
 import { 
   DropdownMenu,
@@ -22,13 +17,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import EmployeesTab from "../../components/shared/EmployeesTab";
 import OnboardingTab from "./OnboardingTab";
 import AttendanceTab from "./AttendanceTab";
 import LeaveManagementTab from "./LeaveManagementTab";
-
-import PayrollTab from "../superadmin/PayrollTab";  // ✅ Use this
+import PayrollTab from "../superadmin/PayrollTab";
 import PerformanceTab from "./PerformanceTab";
 import ReportsTab from "./ReportsTab";
 import { 
@@ -37,11 +32,12 @@ import {
   Attendance, 
   Payroll, 
   Performance, 
-  Shift, 
   SalaryStructure, 
   SalarySlip 
 } from "./types";
-import { Deduction } from "@/services/DeductionService";
+
+// Site Service
+import { siteService, Site as ServiceSite } from "@/services/SiteService";
 
 // Mobile Tab Selector Component
 const MobileTabSelector = ({
@@ -119,22 +115,60 @@ const StatCard = ({ title, value, icon: Icon, color = "primary", subtitle }: any
   );
 };
 
+// Site Filter Component
+const SiteFilter = ({ 
+  selectedSite, 
+  onSiteChange, 
+  sites, 
+  isLoading = false 
+}: { 
+  selectedSite: string; 
+  onSiteChange: (value: string) => void; 
+  sites: ServiceSite[];
+  isLoading?: boolean;
+}) => {
+  return (
+    <div className="flex items-center gap-2">
+      <Building className="h-4 w-4 text-muted-foreground" />
+      <Select value={selectedSite} onValueChange={onSiteChange} disabled={isLoading}>
+        <SelectTrigger className="w-[180px] sm:w-[220px] h-9 text-sm">
+          <SelectValue placeholder="All Sites" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">🏢 All Sites</SelectItem>
+          {sites.map((site) => (
+            <SelectItem key={site._id} value={site._id}>
+              {site.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+    </div>
+  );
+};
+
 const HRMS = () => {
+  // Data state
   const [employees, setEmployees] = useState<Employee[]>([]);
-const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
-const [attendance, setAttendance] = useState<Attendance[]>([]);
-const [payroll, setPayroll] = useState<Payroll[]>([]);
-const [performance, setPerformance] = useState<Performance[]>([]);
-const [shifts, setShifts] = useState<Shift[]>([]);
-const [salaryStructures, setSalaryStructures] = useState<SalaryStructure[]>([]);
-const [salarySlips, setSalarySlips] = useState<SalarySlip[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [attendance, setAttendance] = useState<Attendance[]>([]);
+  const [payroll, setPayroll] = useState<Payroll[]>([]);
+  const [performance, setPerformance] = useState<Performance[]>([]);
+  const [salaryStructures, setSalaryStructures] = useState<SalaryStructure[]>([]);
+  const [salarySlips, setSalarySlips] = useState<SalarySlip[]>([]);
+  
+  // UI state
   const [activeTab, setActiveTab] = useState("employees");
-  const [deductions, setDeductions] = useState<Deduction[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [isMobileView, setIsMobileView] = useState(false);
-  
-  // Mobile sidebar state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  
+  // Site state
+  const [sites, setSites] = useState<ServiceSite[]>([]);
+  const [selectedSite, setSelectedSite] = useState<string>("all");
+  const [isLoadingSites, setIsLoadingSites] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Check for mobile view
   useEffect(() => {
@@ -146,6 +180,24 @@ const [salarySlips, setSalarySlips] = useState<SalarySlip[]>([]);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Fetch sites on mount
+  useEffect(() => {
+    fetchSites();
+  }, []);
+
+  const fetchSites = async () => {
+    setIsLoadingSites(true);
+    try {
+      const sitesData = await siteService.getAllSites();
+      setSites(sitesData || []);
+    } catch (error) {
+      console.error("Failed to fetch sites:", error);
+      toast.error("Failed to load sites");
+    } finally {
+      setIsLoadingSites(false);
+    }
+  };
+
   const handleMenuClick = () => {
     setMobileSidebarOpen(!mobileSidebarOpen);
   };
@@ -154,22 +206,55 @@ const [salarySlips, setSalarySlips] = useState<SalarySlip[]>([]);
     setMobileSidebarOpen(false);
   };
 
-  // Calculate stats
-  const totalEmployees = employees.length;
-  const activeEmployees = employees.filter(e => e.status === "active").length;
-  const pendingLeaves = leaveRequests.filter(l => l.status === "pending").length;
-  const presentToday = attendance.filter(a => a.status === "present").length;
-  const payrollPending = payroll.filter(p => p.status === "pending").length;
-  const avgPerformance = (performance.reduce((sum, p) => sum + p.rating, 0) / performance.length).toFixed(1);
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchSites();
+    // Refresh other data here if needed
+    setIsRefreshing(false);
+  };
+
+  // Filter data by selected site
+  const filterBySite = <T extends { site?: string; siteName?: string }>(data: T[]): T[] => {
+    if (selectedSite === "all") return data;
+    return data.filter(item => 
+      item.site === selectedSite || 
+      item.siteName === selectedSite
+    );
+  };
+
+  // Filtered data
+  const filteredEmployees = filterBySite(employees);
+  const filteredLeaveRequests = filterBySite(leaveRequests);
+  const filteredAttendance = filterBySite(attendance);
+  const filteredPayroll = filterBySite(payroll);
+  const filteredPerformance = filterBySite(performance);
+
+  // Calculate stats based on filtered data
+  const totalEmployees = filteredEmployees.length;
+  const activeEmployees = filteredEmployees.filter(e => e.status === "active").length;
+  const pendingLeaves = filteredLeaveRequests.filter(l => l.status === "pending").length;
+  const presentToday = filteredAttendance.filter(a => a.status === "present").length;
+  const payrollPending = filteredPayroll.filter(p => p.status === "pending").length;
+  const avgPerformance = filteredPerformance.length > 0 
+    ? (filteredPerformance.reduce((sum, p) => sum + p.rating, 0) / filteredPerformance.length).toFixed(1)
+    : "0.0";
+
+  // Get site name for display
+  const getSiteName = () => {
+    if (selectedSite === "all") return "All Sites";
+    const site = sites.find(s => s._id === selectedSite);
+    return site ? site.name : "Unknown Site";
+  };
 
   // Define tabs for mobile selector
   const tabs = [
     { value: "employees", label: "Employees", icon: <Users className="h-4 w-4" /> },
     { value: "leave", label: "Leave", icon: <Clock className="h-4 w-4" /> },
-    
     { value: "payroll", label: "Payroll", icon: <DollarSign className="h-4 w-4" /> },
-   
   ];
+
+  // Get site ID for props (convert 'all' to undefined or handle in child components)
+  const siteIdForProps = selectedSite === "all" ? undefined : selectedSite;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -177,7 +262,7 @@ const [salarySlips, setSalarySlips] = useState<SalarySlip[]>([]);
         title={<span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">HRMS - Human Resource Management</span>}
         onMenuClick={handleMenuClick}
       />
-      {/* Mobile Sidebar */}
+      
       {mobileSidebarOpen && (
         <DashboardSidebar 
           mobileOpen={mobileSidebarOpen}
@@ -190,7 +275,72 @@ const [salarySlips, setSalarySlips] = useState<SalarySlip[]>([]);
         animate={{ opacity: 1, y: 0 }}
         className="p-3 sm:p-4 md:p-6 space-y-4 md:space-y-6"
       >
-      
+        {/* Site Filter & Stats Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <SiteFilter 
+              selectedSite={selectedSite}
+              onSiteChange={setSelectedSite}
+              sites={sites}
+              isLoading={isLoadingSites}
+            />
+            <span className="text-xs text-muted-foreground">
+              {selectedSite !== "all" && `Showing: ${getSiteName()}`}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`h-4 w-4 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats Cards - Site-wise */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+          <StatCard 
+            title="Total Employees" 
+            value={totalEmployees} 
+            icon={Users} 
+            color="primary"
+            subtitle={`Active: ${activeEmployees}`}
+          />
+          <StatCard 
+            title="Present Today" 
+            value={presentToday} 
+            icon={Clock} 
+            color="success"
+          />
+          <StatCard 
+            title="Pending Leaves" 
+            value={pendingLeaves} 
+            icon={Clock} 
+            color="warning"
+          />
+          <StatCard 
+            title="Payroll Pending" 
+            value={payrollPending} 
+            icon={DollarSign} 
+            color="danger"
+          />
+          <StatCard 
+            title="Avg Performance" 
+            value={`${avgPerformance}%`} 
+            icon={TrendingUp} 
+            color="purple"
+          />
+          <StatCard 
+            title="Site" 
+            value={selectedSite === "all" ? "All" : sites.find(s => s._id === selectedSite)?.name || "N/A"} 
+            icon={Building} 
+            color="primary"
+          />
+        </div>
 
         {/* Mobile Tab Selector */}
         <MobileTabSelector
@@ -205,78 +355,94 @@ const [salarySlips, setSalarySlips] = useState<SalarySlip[]>([]);
             <TabsTrigger value="employees" className="flex-1 min-w-[100px] text-sm py-2">
               <Users className="h-4 w-4 mr-2" /> Employees
             </TabsTrigger>
-           
             <TabsTrigger value="leave" className="flex-1 min-w-[100px] text-sm py-2">
               <Clock className="h-4 w-4 mr-2" /> Leave
             </TabsTrigger>
-            
             <TabsTrigger value="payroll" className="flex-1 min-w-[100px] text-sm py-2">
               <DollarSign className="h-4 w-4 mr-2" /> Payroll
             </TabsTrigger>
-            
           </TabsList>
 
+          {/* Employees Tab - Pass site filter */}
           <TabsContent value="employees">
             <EmployeesTab
-              employees={employees}
+              employees={filteredEmployees}
               setEmployees={setEmployees}
               setActiveTab={setActiveTab}
+              selectedSite={selectedSite}
+              sites={sites}
             />
           </TabsContent>
 
+          {/* Onboarding Tab */}
           <TabsContent value="onboarding">
             <OnboardingTab
-              employees={employees}
+              employees={filteredEmployees}
               setEmployees={setEmployees}
               salaryStructures={salaryStructures}
               setSalaryStructures={setSalaryStructures}
+              selectedSite={selectedSite}
+              sites={sites}
             />
           </TabsContent>
 
+          {/* Attendance Tab */}
           <TabsContent value="attendance">
             <AttendanceTab
-              attendance={attendance}
+              attendance={filteredAttendance}
               setAttendance={setAttendance}
+              selectedSite={selectedSite}
+              sites={sites}
             />
           </TabsContent>
 
+          {/* Leave Tab */}
           <TabsContent value="leave">
             <LeaveManagementTab
-              leaveRequests={leaveRequests}
+              leaveRequests={filteredLeaveRequests}
               setLeaveRequests={setLeaveRequests}
+              selectedSite={selectedSite}
+              sites={sites}
             />
           </TabsContent>
 
-         
-
+          {/* Payroll Tab */}
           <TabsContent value="payroll">
             <PayrollTab
-              employees={employees}
-              payroll={payroll}
+              employees={filteredEmployees}
+              payroll={filteredPayroll}
               setPayroll={setPayroll}
               salaryStructures={salaryStructures}
               setSalaryStructures={setSalaryStructures}
               salarySlips={salarySlips}
               setSalarySlips={setSalarySlips}
-              attendance={attendance}
+              attendance={filteredAttendance}
               selectedMonth={selectedMonth}
               setSelectedMonth={setSelectedMonth}
+              selectedSite={selectedSite}
+              sites={sites}
             />
           </TabsContent>
 
+          {/* Performance Tab */}
           <TabsContent value="performance">
             <PerformanceTab
-              performance={performance}
-              setDeductions={setDeductions} 
+              performance={filteredPerformance}
+              setDeductions={() => {}} 
               setPerformance={setPerformance}
+              selectedSite={selectedSite}
+              sites={sites}
             />
           </TabsContent>
 
+          {/* Reports Tab */}
           <TabsContent value="reports">
             <ReportsTab
-              employees={employees}
-              attendance={attendance}
-              payroll={payroll}
+              employees={filteredEmployees}
+              attendance={filteredAttendance}
+              payroll={filteredPayroll}
+              selectedSite={selectedSite}
+              sites={sites}
             />
           </TabsContent>
         </Tabs>

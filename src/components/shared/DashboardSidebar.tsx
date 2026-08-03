@@ -148,7 +148,7 @@ const getSidebarItems = (role: UserRole) => {
         ...baseItems,
 
         { name: "My Tasks", icon: ClipboardList, path: "tasks" },
-
+        { name: "Inventory", icon: Package, path: "inventory" },
         { name: "Assigned task", icon: ClipboardList, path: "assigntask" },
 
         { name: "Leave", icon: Calendar, path: "leave" },

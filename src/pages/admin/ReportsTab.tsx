@@ -26,7 +26,8 @@ import {
   FileSpreadsheet,
   Database,
   ShieldAlert,
-  Activity
+  Activity,
+  Building
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -34,6 +35,7 @@ import axios from "axios";
 
 // API Services
 import { payrollApi } from "@/services/payrollApi";
+import { siteService, Site } from "@/services/SiteService";
 
 // Types
 interface Employee {
@@ -61,6 +63,8 @@ interface Employee {
   professionalTax?: number;
   permanentAddress?: string;
   localAddress?: string;
+  site?: string;
+  siteName?: string;
   documents?: Array<{
     type: string;
     expiryDate: string;
@@ -75,6 +79,8 @@ interface Attendance {
   checkIn?: string;
   checkOut?: string;
   overtimeHours?: number;
+  site?: string;
+  siteName?: string;
 }
 
 interface Payroll {
@@ -114,12 +120,16 @@ interface Payroll {
   createdAt?: string;
   updatedAt?: string;
   employee?: Employee;
+  site?: string;
+  siteName?: string;
 }
 
 interface ReportsTabProps {
   employees: Employee[];
   attendance: Attendance[];
   selectedMonth?: string;
+  selectedSite?: string;
+  sites?: Site[];
 }
 
 interface PayrollSummary {
@@ -154,11 +164,48 @@ interface APIAttendance {
   department?: string;
   hoursWorked?: number;
   remarks?: string;
+  site?: string;
+  siteName?: string;
 }
+
 const API_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
-const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOString().slice(0, 7) }: ReportsTabProps) => {
+// Site Filter Component
+const SiteFilter: React.FC<{
+  selectedSite: string;
+  onSiteChange: (value: string) => void;
+  sites: Site[];
+  isLoading?: boolean;
+}> = ({ selectedSite, onSiteChange, sites, isLoading = false }) => {
+  return (
+    <div className="flex items-center gap-2">
+      <Building className="h-4 w-4 text-gray-500" />
+      <select
+        value={selectedSite}
+        onChange={(e) => onSiteChange(e.target.value)}
+        disabled={isLoading}
+        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white text-sm min-w-[180px]"
+      >
+        <option value="all">🏢 All Sites</option>
+        {sites.map((site) => (
+          <option key={site._id} value={site._id}>
+            {site.name}
+          </option>
+        ))}
+      </select>
+      {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
+    </div>
+  );
+};
+
+const ReportsTab = ({ 
+  employees, 
+  attendance, 
+  selectedMonth = new Date().toISOString().slice(0, 7),
+  selectedSite: propSelectedSite = 'all',
+  sites: propSites = []
+}: ReportsTabProps) => {
   // State for payroll data
   const [payroll, setPayroll] = useState<Payroll[]>([]);
   const [loading, setLoading] = useState(false);
@@ -186,23 +233,57 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
   const [employeesLoading, setEmployeesLoading] = useState(false);
   const [employeesError, setEmployeesError] = useState<string | null>(null);
 
+  // Site state
+  const [sites, setSites] = useState<Site[]>(propSites);
+  const [selectedSite, setSelectedSite] = useState<string>(propSelectedSite);
+  const [isLoadingSites, setIsLoadingSites] = useState<boolean>(false);
+
   // Active tab state
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Fetch sites if not provided as props
+  useEffect(() => {
+    if (propSites.length === 0) {
+      fetchSites();
+    } else {
+      setSites(propSites);
+    }
+  }, [propSites]);
+
+  // Sync with props
+  useEffect(() => {
+    setSelectedSite(propSelectedSite);
+  }, [propSelectedSite]);
+
+  const fetchSites = async () => {
+    setIsLoadingSites(true);
+    try {
+      const sitesData = await siteService.getAllSites();
+      setSites(sitesData || []);
+    } catch (error) {
+      console.error('Error fetching sites:', error);
+    } finally {
+      setIsLoadingSites(false);
+    }
+  };
 
   // Fetch all data
   useEffect(() => {
     fetchPayrollData();
     fetchAttendanceData();
     fetchEmployeeCounts();
-  }, [selectedMonth]);
+  }, [selectedMonth, selectedSite]);
 
-  // Fetch attendance data from API
+  // Fetch attendance data from API with site filter
   const fetchAttendanceData = async () => {
     try {
       setAttendanceLoading(true);
       setAttendanceError(null);
       
-      const response = await axios.get(`${API_URL}/attendance`);
+      const params = new URLSearchParams();
+      if (selectedSite !== 'all') params.append('site', selectedSite);
+      
+      const response = await axios.get(`${API_URL}/attendance?${params.toString()}`);
       
       if (response.data && response.data.success) {
         const apiData = response.data.data || response.data.attendance || [];
@@ -214,7 +295,6 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
           return;
         }
         
-        // Transform API data
         const transformedAttendance = apiData.map((att: any) => ({
           id: att._id || att.id || `att_${Date.now()}_${Math.random()}`,
           employeeId: att.employeeId || att.employeeID || "",
@@ -226,7 +306,9 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
           department: att.department || "",
           hoursWorked: att.hoursWorked || 0,
           overtimeHours: att.overtimeHours || 0,
-          remarks: att.remarks || ""
+          remarks: att.remarks || "",
+          site: att.site || att.siteName || 'unspecified',
+          siteName: att.siteName || att.site || 'Unspecified Site'
         }));
         
         setAttendanceData(transformedAttendance);
@@ -244,16 +326,18 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
     }
   };
 
-  // Fetch payroll data for the selected month
+  // Fetch payroll data for the selected month with site filter
   const fetchPayrollData = async () => {
     try {
       setLoading(true);
       
-      // Fetch payroll records for the selected month
-      const response = await payrollApi.getAll({
+      const params: any = {
         month: selectedMonth,
-        limit: 1000 // Fetch all records for the month
-      });
+        limit: 1000
+      };
+      if (selectedSite !== 'all') params.site = selectedSite;
+      
+      const response = await payrollApi.getAll(params);
 
       console.log("Payroll API Response:", response);
 
@@ -261,7 +345,6 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
         const payrollData = Array.isArray(response.data) ? response.data : [];
         setPayroll(payrollData);
         
-        // Calculate counts and total amount
         const counts = {
           total: payrollData.length,
           processed: payrollData.filter(p => p.status === "processed").length,
@@ -306,14 +389,16 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
     }
   };
 
-  // Fetch employee counts from API
+  // Fetch employee counts with site filter
   const fetchEmployeeCounts = async () => {
     try {
       setEmployeesLoading(true);
       setEmployeesError(null);
       
-      // Fetch all employees to calculate counts
-      const response = await axios.get(`${API_URL}/employees`);
+      const params = new URLSearchParams();
+      if (selectedSite !== 'all') params.append('site', selectedSite);
+      
+      const response = await axios.get(`${API_URL}/employees?${params.toString()}`);
       
       console.log("Employees API Response for counts:", response.data);
       
@@ -326,12 +411,10 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
           return;
         }
         
-        // Calculate counts
         const total = employeesData.length;
         const active = employeesData.filter((emp: any) => emp.status === "active").length;
         const left = employeesData.filter((emp: any) => emp.status === "left").length;
         
-        // Calculate department-wise counts
         const departments: { [key: string]: number } = {};
         employeesData.forEach((emp: any) => {
           const dept = emp.department || "Unknown";
@@ -358,12 +441,16 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
         
         // Fallback: calculate from props if available
         if (employees && Array.isArray(employees)) {
-          const total = employees.length;
-          const active = employees.filter(emp => emp.status === "active").length;
-          const left = employees.filter(emp => emp.status === "left").length;
+          const siteFiltered = selectedSite !== 'all' 
+            ? employees.filter(emp => emp.site === selectedSite || emp.siteName === selectedSite)
+            : employees;
+          
+          const total = siteFiltered.length;
+          const active = siteFiltered.filter(emp => emp.status === "active").length;
+          const left = siteFiltered.filter(emp => emp.status === "left").length;
           const departments: { [key: string]: number } = {};
           
-          employees.forEach(emp => {
+          siteFiltered.forEach(emp => {
             const dept = emp.department || "Unknown";
             departments[dept] = (departments[dept] || 0) + 1;
           });
@@ -383,12 +470,16 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
       
       // Fallback: calculate from props
       if (employees && Array.isArray(employees)) {
-        const total = employees.length;
-        const active = employees.filter(emp => emp.status === "active").length;
-        const left = employees.filter(emp => emp.status === "left").length;
+        const siteFiltered = selectedSite !== 'all' 
+          ? employees.filter(emp => emp.site === selectedSite || emp.siteName === selectedSite)
+          : employees;
+        
+        const total = siteFiltered.length;
+        const active = siteFiltered.filter(emp => emp.status === "active").length;
+        const left = siteFiltered.filter(emp => emp.status === "left").length;
         const departments: { [key: string]: number } = {};
         
-        employees.forEach(emp => {
+        siteFiltered.forEach(emp => {
           const dept = emp.department || "Unknown";
           departments[dept] = (departments[dept] || 0) + 1;
         });
@@ -434,15 +525,17 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
 
   const attendanceSummary = calculateAttendanceSummary(attendanceData);
 
-  // Document expiry report
-  const documentExpiryReport = employees.flatMap(emp =>
-    emp.documents?.map(doc => ({
-      employee: emp.name,
-      document: doc.type,
-      expiryDate: doc.expiryDate,
-      status: doc.status
-    })) || []
-  );
+  // Document expiry report (filtered by site)
+  const documentExpiryReport = (employees || [])
+    .filter(emp => selectedSite === 'all' || emp.site === selectedSite || emp.siteName === selectedSite)
+    .flatMap(emp =>
+      emp.documents?.map(doc => ({
+        employee: emp.name,
+        document: doc.type,
+        expiryDate: doc.expiryDate,
+        status: doc.status
+      })) || []
+    );
 
   // Helper function to export data as CSV
   const exportToCSV = (data: any[], headers: string[], fileName: string) => {
@@ -452,19 +545,15 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
         return;
       }
 
-      // Prepare CSV content
       const csvRows = [
         headers.join(","),
         ...data.map(row => {
           const values = headers.map(header => {
-            // Handle nested properties
             const value = header.includes('.') 
               ? header.split('.').reduce((obj, key) => obj?.[key], row)
               : row[header] || "";
             
-            // Format the value for CSV
             const stringValue = String(value);
-            // Escape quotes and wrap in quotes if contains comma, newline, or quotes
             if (stringValue.includes(",") || stringValue.includes('"') || stringValue.includes("\n")) {
               return `"${stringValue.replace(/"/g, '""')}"`;
             }
@@ -476,7 +565,6 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
 
       const csvContent = csvRows.join("\n");
       
-      // Create and download file
       const blob = new Blob([csvContent], { 
         type: "text/csv;charset=utf-8;" 
       });
@@ -510,23 +598,27 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
       "Date of Joining",
       "Gender",
       "Aadhar Number",
-      "PAN Number"
+      "PAN Number",
+      "Site"
     ];
 
-    const data = employees.map(emp => ({
-      "Employee ID": emp.employeeId,
-      "Name": emp.name,
-      "Email": emp.email || "",
-      "Phone": emp.phone || "",
-      "Department": emp.department,
-      "Position": emp.position,
-      "Salary": emp.salary,
-      "Status": emp.status,
-      "Date of Joining": emp.dateOfJoining || "",
-      "Gender": emp.gender || "",
-      "Aadhar Number": emp.aadharNumber || "",
-      "PAN Number": emp.panNumber || ""
-    }));
+    const data = (employees || [])
+      .filter(emp => selectedSite === 'all' || emp.site === selectedSite || emp.siteName === selectedSite)
+      .map(emp => ({
+        "Employee ID": emp.employeeId,
+        "Name": emp.name,
+        "Email": emp.email || "",
+        "Phone": emp.phone || "",
+        "Department": emp.department,
+        "Position": emp.position,
+        "Salary": emp.salary,
+        "Status": emp.status,
+        "Date of Joining": emp.dateOfJoining || "",
+        "Gender": emp.gender || "",
+        "Aadhar Number": emp.aadharNumber || "",
+        "PAN Number": emp.panNumber || "",
+        "Site": emp.siteName || emp.site || "N/A"
+      }));
 
     exportToCSV(data, headers, "employees");
   };
@@ -548,7 +640,8 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
       "Check Out",
       "Hours Worked",
       "Overtime Hours",
-      "Remarks"
+      "Remarks",
+      "Site"
     ];
 
     exportToCSV(attendanceData, headers, "attendance");
@@ -573,7 +666,8 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
       "Absent Days",
       "Leaves",
       "Overtime Hours",
-      "Payment Date"
+      "Payment Date",
+      "Site"
     ];
 
     const data = payroll.map(p => ({
@@ -588,7 +682,8 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
       "Absent Days": p.absentDays,
       "Leaves": p.leaves,
       "Overtime Hours": p.overtimeHours || 0,
-      "Payment Date": p.paymentDate || ""
+      "Payment Date": p.paymentDate || "",
+      "Site": p.siteName || p.site || "N/A"
     }));
 
     exportToCSV(data, headers, "payroll");
@@ -597,11 +692,10 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
   // Export all reports
   const handleExportAllReports = () => {
     try {
-      // Create a zip file with all reports
       const reports = [
-        { name: "employees", data: employees, headers: ["Employee ID", "Name", "Department", "Position", "Status"] },
-        { name: "attendance", data: attendanceData, headers: ["Date", "Employee ID", "Employee Name", "Status", "Hours Worked"] },
-        { name: "payroll", data: payroll, headers: ["Employee ID", "Month", "Net Salary", "Status", "Payment Date"] }
+        { name: "employees", data: employees?.filter(emp => selectedSite === 'all' || emp.site === selectedSite || emp.siteName === selectedSite) || [], headers: ["Employee ID", "Name", "Department", "Position", "Status", "Site"] },
+        { name: "attendance", data: attendanceData, headers: ["Date", "Employee ID", "Employee Name", "Status", "Hours Worked", "Site"] },
+        { name: "payroll", data: payroll, headers: ["Employee ID", "Month", "Net Salary", "Status", "Payment Date", "Site"] }
       ];
 
       let allExportsCompleted = 0;
@@ -621,7 +715,7 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
             if (allExportsCompleted === totalExports) {
               toast.success("All reports exported successfully!");
             }
-          }, allExportsCompleted * 100); // Stagger exports slightly
+          }, allExportsCompleted * 100);
         }
       });
 
@@ -649,7 +743,7 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
     fetchEmployeeCounts();
   };
 
-  // New: Calculate department distribution for visualization
+  // Get department distribution
   const getDepartmentDistribution = () => {
     return Object.entries(employeeCounts.departments)
       .map(([name, count]) => ({
@@ -660,26 +754,26 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
       .sort((a, b) => b.count - a.count);
   };
 
-  // New: Calculate attendance percentage
+  // Get attendance percentage
   const getAttendancePercentage = () => {
     if (attendanceSummary.total === 0) return 0;
     return (attendanceSummary.present / attendanceSummary.total) * 100;
   };
 
-  // New: Calculate payroll completion percentage
+  // Get payroll completion percentage
   const getPayrollCompletionPercentage = () => {
     if (payrollSummary.total === 0) return 0;
     return ((payrollSummary.paid + payrollSummary.partPaid) / payrollSummary.total) * 100;
   };
 
-  // New: Get recent payroll activities
+  // Get recent payroll activities
   const getRecentPayrollActivities = () => {
     return payroll
       .sort((a, b) => new Date(b.updatedAt || "").getTime() - new Date(a.updatedAt || "").getTime())
       .slice(0, 5);
   };
 
-  // New: Get status icon
+  // Get status icon
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "paid":
@@ -711,7 +805,6 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
     return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
 
-  // Format currency
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -721,14 +814,35 @@ const ReportsTab = ({ employees, attendance, selectedMonth = new Date().toISOStr
     }).format(amount);
   };
 
+  // Get site name for display
+  const getSiteName = () => {
+    if (selectedSite === 'all') return 'All Sites';
+    const site = sites.find(s => s._id === selectedSite);
+    return site ? site.name : 'Unknown Site';
+  };
+
   return (
     <div className="space-y-6">
+      {/* Site Filter Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SiteFilter
+          selectedSite={selectedSite}
+          onSiteChange={setSelectedSite}
+          sites={sites}
+          isLoading={isLoadingSites}
+        />
+        <span className="text-xs text-muted-foreground">
+          {selectedSite !== 'all' && `Showing: ${getSiteName()}`}
+        </span>
+      </div>
+
       {/* Header Section */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Reports Dashboard</h1>
           <p className="text-muted-foreground">
             Comprehensive overview of your HR analytics for {formatMonth(selectedMonth)}
+            {selectedSite !== 'all' && ` at ${getSiteName()}`}
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">

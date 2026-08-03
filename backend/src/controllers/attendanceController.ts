@@ -6,8 +6,6 @@ import Employee, { IEmployee } from '../models/Employee';
 import { uploadAttendancePhoto, deleteFromCloudinary } from '../utils/CloudinaryUtils';
 import axios from 'axios';
 import FormData from 'form-data';
-import * as faceapi from 'face-api.js';
-import canvas from 'canvas';
 import path from 'path';
 import Notification from '../models/Notification';
 const FACE_SERVICE_URL = process.env.FACE_SERVICE_URL || 
@@ -16,19 +14,9 @@ const FACE_SERVICE_URL = process.env.FACE_SERVICE_URL ||
     : 'http://localhost:8000');
 console.log("FACE_SERVICE_URL =", FACE_SERVICE_URL);
 // ------------------ Types and helpers ------------------
-let modelsLoaded = false;
 
-async function loadFaceModels() {
-  if (modelsLoaded) return;
-  const { Canvas, Image, ImageData } = canvas;
-  faceapi.env.monkeyPatch({ Canvas, Image, ImageData });
-  const modelsPath = path.join(process.cwd(), 'models');
-  await faceapi.nets.ssdMobilenetv1.loadFromDisk(modelsPath);
-  await faceapi.nets.faceLandmark68Net.loadFromDisk(modelsPath);
-  await faceapi.nets.faceRecognitionNet.loadFromDisk(modelsPath);
-  modelsLoaded = true;
-  console.log('✅ Face models loaded');
-}
+
+
 
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
   if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
@@ -71,7 +59,7 @@ export const autoAttendance = async (req: Request, res: Response) => {
   console.log('🔵 req.file:', req.file ? 'FILE PRESENT' : 'NO FILE');
 
   try {
-    const { supervisorId, siteName } = req.body;
+    const { supervisorId, siteName, shiftId } = req.body;
     const photoFile = req.file;
 
     if (!photoFile) {
@@ -174,6 +162,7 @@ export const autoAttendance = async (req: Request, res: Response) => {
         totalHours: totalHours,
         hasCheckedOutToday: true,
         updatedAt: new Date(),
+        shiftId: shiftId || null,
       };
 
       const updated = await Attendance.findByIdAndUpdate(attendance._id, updateData, { new: true });
@@ -233,6 +222,7 @@ export const autoAttendance = async (req: Request, res: Response) => {
         totalHours: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
+        shiftId: shiftId || attendance.shiftId,
       });
 
       const saved = await newAttendance.save();
@@ -406,7 +396,7 @@ export const checkInWithPhoto = async (req: Request, res: Response) => {
   console.log('req.file:', req.file ? 'present' : 'missing');
   
   try {
-    const { employeeId, employeeName, supervisorId, latitude, longitude } = req.body;
+     const { employeeId, employeeName, supervisorId, latitude, longitude, shiftId } = req.body;
     const photoFile = req.file;
 
     if (!employeeId || !employeeName) {
@@ -462,7 +452,9 @@ export const checkInWithPhoto = async (req: Request, res: Response) => {
           currentLongitude: parsedLongitude,
           lastLocationUpdate: new Date(),
           isLocationTracking: parsedLatitude !== null && parsedLongitude !== null,
+          
           isOutOfGeofence: false,
+           shiftId: shiftId || null,
           updatedAt: new Date(),
         },
         { new: true }
@@ -496,6 +488,7 @@ export const checkInWithPhoto = async (req: Request, res: Response) => {
         currentLongitude: parsedLongitude,
         lastLocationUpdate: new Date(),
         isLocationTracking: parsedLatitude !== null && parsedLongitude !== null,
+         shiftId: shiftId || null,
         isOutOfGeofence: false,
       });
     }
@@ -517,7 +510,7 @@ export const checkInWithPhoto = async (req: Request, res: Response) => {
 
 export const checkOutWithPhoto = async (req: Request, res: Response) => {
   try {
-    const { employeeId, latitude, longitude } = req.body;
+    const { employeeId, latitude, longitude, shiftId } = req.body;
     const photoFile = req.file;
 
     if (!employeeId) return res.status(400).json({ success: false, message: 'Employee ID is required' });
@@ -551,7 +544,8 @@ export const checkOutWithPhoto = async (req: Request, res: Response) => {
         latitude: latitude || null,
         longitude: longitude || null,
           isLocationTracking: false,      // <-- add
-    isOutOfGeofence: false,         // <-- add
+    isOutOfGeofence: false, 
+     shiftId: shiftId || attendance.shiftId,        // <-- add
         updatedAt: new Date(),
       },
       { new: true }
@@ -577,7 +571,7 @@ export const checkOutWithPhoto = async (req: Request, res: Response) => {
 
 export const checkIn = async (req: Request, res: Response) => {
   try {
-   const { employeeId, employeeName, supervisorId, latitude, longitude } = req.body;
+    const { employeeId, employeeName, supervisorId, latitude, longitude, shiftId } = req.body;
 
     
     if (!employeeId || !employeeName) {
@@ -652,6 +646,7 @@ export const checkIn = async (req: Request, res: Response) => {
   currentLongitude: longitude ? Number(longitude) : null,
   lastLocationUpdate: new Date(),
   isLocationTracking: !!(latitude && longitude),
+   shiftId: shiftId || null,
   isOutOfGeofence: false,
       });
     }
@@ -1140,7 +1135,8 @@ export const manualAttendance = async (req: Request, res: Response) => {
       remarks,
       totalHours = 0,
       isCheckedIn = false,
-      supervisorId
+      supervisorId,
+      shiftId,
     } = req.body;
 
     if (!employeeId || !employeeName || !date) {
@@ -1193,6 +1189,7 @@ export const manualAttendance = async (req: Request, res: Response) => {
           department: employee?.department || existingRecord.department,
           siteName: employee?.siteName || existingRecord.siteName,
           updatedAt: new Date(),
+          shiftId: shiftId || existingRecord.shiftId,
         },
         { new: true }
       );
@@ -1216,6 +1213,7 @@ export const manualAttendance = async (req: Request, res: Response) => {
         supervisorId: supervisorId || null,
         department: employee?.department || 'General',
         siteName: employee?.siteName || null,
+        shiftId: shiftId || existingRecord.shiftId,
         
       });
     }
@@ -1477,50 +1475,6 @@ export const getWeeklySummary = async (req: Request, res: Response) => {
   }
 };
 
-async function recognizeFace(imageBuffer: Buffer): Promise<string | null> {
-  try {
-    await loadFaceModels();
-
-    const img = await canvas.loadImage(imageBuffer);
-    const detection = await faceapi.detectSingleFace(img)
-      .withFaceLandmarks()
-      .withFaceDescriptor();
-
-    if (!detection) return null;
-
-    const queryDescriptor = detection.descriptor;
-    const employees = await Employee.find({ faceDescriptor: { $ne: null } });
-
-    let bestMatch: string | null = null;
-    let bestDistance = 0.6; // threshold
-
-    for (const emp of employees) {
-      // Skip if face descriptor is invalid
-      if (!emp.faceDescriptor || !Array.isArray(emp.faceDescriptor) || emp.faceDescriptor.length === 0) {
-        continue;
-      }
-      if (!emp.faceDescriptor.every(v => typeof v === 'number' && isFinite(v))) {
-        continue;
-      }
-
-      const storedDescriptor = new Float32Array(emp.faceDescriptor);
-      const distance = faceapi.euclideanDistance(queryDescriptor, storedDescriptor);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestMatch = emp._id.toString();
-      }
-    }
-
-    console.log(`Face recognition result: ${bestMatch}, distance: ${bestDistance}`);
-    return bestMatch;
-  } catch (error) {
-    console.error('Face recognition error:', error);
-    return null;
-  }
-}
-
-// ==================== Geofencing ====================
-// ==================== Geofencing ====================
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
@@ -1535,7 +1489,7 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 }
 export const updateEmployeeLocation = async (req: Request, res: Response) => {
   try {
-    const { employeeId, latitude, longitude } = req.body;
+    const { employeeId, latitude, longitude, shiftId } = req.body;
 
     if (!employeeId || latitude == null || longitude == null) {
       return res.status(400).json({

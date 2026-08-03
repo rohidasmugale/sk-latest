@@ -78,7 +78,7 @@ import deductionService, {
 import { siteService, type Site } from "@/services/SiteService";
 
 // API URL
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 interface DeductionListTabProps {
@@ -181,13 +181,15 @@ interface ViewDetailsDialogData {
   data: any;
 }
 
-const DeductionListTab = ({}: DeductionListTabProps) => {
+const DeductionListTab = ({ }: DeductionListTabProps) => {
   // State
   const [deductions, setDeductions] = useState<Deduction[]>([]);
   const [advances, setAdvances] = useState<AdvanceRecord[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>("");
+  // Add state for site filter
+  const [filterSiteId, setFilterSiteId] = useState<string>("");
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [showAdvances, setShowAdvances] = useState<boolean>(false);
   const [viewDetailsDialog, setViewDetailsDialog] = useState<ViewDetailsDialogData>({
@@ -201,9 +203,9 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
     employeeId: '',
     employeeName: '',
     amount: 0,
-    onConfirm: () => {},
+    onConfirm: () => { },
   });
-  
+
   // Attendance and salary calculation states
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [salaryCalculations, setSalaryCalculations] = useState<Map<string, SalaryCalculationResult>>(new Map());
@@ -286,27 +288,27 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
   // Fetch attendance records for selected month
   const fetchAttendanceRecords = useCallback(async (month: string) => {
     if (!month) return [];
-    
+
     setIsLoadingAttendance(true);
     try {
       const [year, monthNum] = month.split('-');
       const startDate = `${year}-${monthNum}-01`;
       const endDate = new Date(parseInt(year), parseInt(monthNum), 0).toISOString().split('T')[0];
-      
+
       console.log(`Fetching attendance records from ${startDate} to ${endDate}`);
-      
+
       const response = await fetch(
         `${API_URL}/attendance?startDate=${startDate}&endDate=${endDate}&limit=10000`
       );
-      
+
       if (!response.ok) {
         throw new Error(`API Error: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
+
       let records: AttendanceRecord[] = [];
-      
+
       if (data.success && Array.isArray(data.data)) {
         records = data.data;
       } else if (Array.isArray(data)) {
@@ -314,7 +316,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
       } else if (data.attendance && Array.isArray(data.attendance)) {
         records = data.attendance;
       }
-      
+
       const transformedRecords: AttendanceRecord[] = records.map((record: any) => ({
         _id: record._id || record.id,
         employeeId: record.employeeId || record.employee?._id || '',
@@ -326,7 +328,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
         totalHours: Number(record.totalHours) || 0,
         siteName: record.siteName || record.site || ''
       }));
-      
+
       console.log(`Loaded ${transformedRecords.length} attendance records for ${month}`);
       setAttendanceRecords(transformedRecords);
       return transformedRecords;
@@ -347,26 +349,26 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
     attendanceRecords: AttendanceRecord[],
     month: string
   ): SalaryCalculationResult => {
-    const monthlySalary = typeof employee.salary === 'number' 
-      ? employee.salary 
+    const monthlySalary = typeof employee.salary === 'number'
+      ? employee.salary
       : parseFloat(employee.salary as string) || 0;
-    
+
     const employeeAttendance = attendanceRecords.filter(
       record => record.employeeId === employee.employeeId || record.employeeId === employee._id
     );
-    
+
     const [year, monthNum] = month.split('-');
     const totalDaysInMonth = new Date(parseInt(year), parseInt(monthNum), 0).getDate();
-    
+
     const presentDays = employeeAttendance.filter(
       record => record.status === 'present'
     ).length;
-    
+
     const absentDays = totalDaysInMonth - presentDays;
     const perDaySalary = monthlySalary / totalDaysInMonth;
     const deductionAmount = absentDays * perDaySalary;
     const finalSalary = monthlySalary - deductionAmount;
-    
+
     return {
       employeeId: employee.employeeId || employee._id || '',
       employeeName: employee.name,
@@ -384,18 +386,18 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
   // Calculate all employee salaries
   const calculateAllSalaries = useCallback(async () => {
     if (!selectedMonth || employees.length === 0) return;
-    
+
     setIsLoadingAttendance(true);
     try {
       const attendance = await fetchAttendanceRecords(selectedMonth);
-      
+
       const calculations = new Map<string, SalaryCalculationResult>();
-      
+
       employees.forEach(employee => {
         const calculation = calculateEmployeeSalary(employee, attendance, selectedMonth);
         calculations.set(employee.employeeId || employee._id || '', calculation);
       });
-      
+
       setSalaryCalculations(calculations);
       console.log(`Calculated salaries for ${calculations.size} employees`);
     } catch (error) {
@@ -416,10 +418,10 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
       setFilteredEmployees(employees);
       return;
     }
-    
+
     const selectedSite = sites.find(site => site._id === siteId);
     if (selectedSite && selectedSite.name) {
-      const filtered = employees.filter(emp => 
+      const filtered = employees.filter(emp =>
         emp.siteName && emp.siteName.toLowerCase() === selectedSite.name.toLowerCase()
       );
       console.log(`Filtered employees for site "${selectedSite.name}": ${filtered.length} employees`);
@@ -440,7 +442,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
     if (advanceForm.siteId && advanceForm.siteId !== "") {
       const selectedSite = sites.find(site => site._id === advanceForm.siteId);
       if (selectedSite && selectedSite.name) {
-        const filtered = employees.filter(emp => 
+        const filtered = employees.filter(emp =>
           emp.siteName && emp.siteName.toLowerCase() === selectedSite.name.toLowerCase()
         );
         console.log(`Advance form - Filtered employees for site "${selectedSite.name}": ${filtered.length} employees`);
@@ -473,7 +475,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
         if (statusFilter !== "all") params.status = statusFilter;
         if (typeFilter !== "all") params.type = typeFilter;
         if (searchTerm) params.search = searchTerm;
-
+        if (filterSiteId) params.siteId = filterSiteId;   // ✅ ADD THIS
         console.log("API params:", params);
 
         const response = await fetch(
@@ -520,7 +522,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
           console.log("Transformed deductions:", transformedDeductions);
 
           setDeductions(transformedDeductions);
-          
+
           const totalFromApi = data.pagination?.totalItems || 0;
           console.log("Total deductions from API:", totalFromApi);
           setTotalDeductionsCount(totalFromApi);
@@ -546,19 +548,20 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
   // Fetch advances from API
   const fetchAdvances = useCallback(async () => {
     console.log("Fetching advances...");
-    
+
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/deductions/advances?limit=1000`);
-      
+      let url = `${API_URL}/deductions/advances?limit=1000`;
+      if (filterSiteId) url += `&siteId=${filterSiteId}`;
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`API Error: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
+
       if (!isMounted.current) return;
-      
+
       if (data.success && Array.isArray(data.data)) {
         const transformedAdvances: AdvanceRecord[] = data.data.map((advance: any) => ({
           _id: advance._id,
@@ -581,7 +584,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
           createdAt: advance.createdAt,
           updatedAt: advance.updatedAt,
         }));
-        
+
         setAdvances(transformedAdvances);
         setTotalAdvancesCount(transformedAdvances.length);
         console.log(`Loaded ${transformedAdvances.length} advances`);
@@ -600,7 +603,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
         setIsLoading(false);
       }
     }
-  }, []);
+  }, [filterSiteId]);
 
   // Fetch sites from API
   const fetchSites = useCallback(async () => {
@@ -609,11 +612,11 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
       console.log("Fetching sites from API...");
       const sitesData = await siteService.getAllSites();
       console.log("Sites fetched:", sitesData);
-      
+
       if (!isMounted.current) return;
-      
+
       setSites(sitesData || []);
-      
+
       if (sitesData && sitesData.length > 0 && !selectedSiteId) {
         setSelectedSiteId(sitesData[0]._id);
       }
@@ -635,11 +638,11 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
     setIsLoadingEmployees(true);
     try {
       console.log("Fetching employees from API...");
-      
+
       const response = await fetch(`${API_URL}/employees?limit=1000`);
-      
+
       console.log(`Response status: ${response.status}`);
-      
+
       if (!response.ok) {
         throw new Error(`http Error: ${response.status}`);
       }
@@ -651,9 +654,9 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
 
       if (data.success) {
         const employeesArray = data.data || data.employees || data.result || [];
-        
+
         console.log("Employees array length:", employeesArray.length);
-        
+
         if (!Array.isArray(employeesArray)) {
           console.error("Employees data is not an array:", employeesArray);
           toast.error("Data Format Error", {
@@ -686,7 +689,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
         console.log(`Transformed ${transformedEmployees.length} employees`);
         console.log("Employees with site names:", transformedEmployees.map(e => ({ name: e.name, siteName: e.siteName })));
         setEmployees(transformedEmployees);
-        
+
         if (transformedEmployees.length > 0) {
           console.log("Employees loaded successfully");
         } else {
@@ -701,7 +704,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
       }
     } catch (error: any) {
       console.error("Error fetching employees:", error);
-      
+
       if (error.message.includes('Failed to fetch')) {
         toast.error("Connection Error", {
           description: "Unable to connect to the server. Please ensure:\n1. Backend is running on port 5001\n2. CORS is properly configured\n3. Network connection is stable",
@@ -722,8 +725,8 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
   // Fetch deduction statistics
   const fetchDeductionStats = useCallback(async () => {
     try {
-     const response = await fetch(`${API_URL}/deductions/deductions/stats`);
-        
+      const response = await fetch(`${API_URL}/deductions/deductions/stats`);
+
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.data) {
@@ -732,13 +735,13 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
           return;
         }
       }
-      
+
       // Calculate stats from deductions and advances
       let totalAdvancesAmount = advances.reduce((sum, adv) => sum + adv.advanceAmount, 0);
       let totalFinesAmount = deductions.reduce((sum, ded) => sum + (ded.type === 'fine' ? ded.amount : 0), 0);
-      let totalDeductionsAmount = totalAdvancesAmount + totalFinesAmount + 
+      let totalDeductionsAmount = totalAdvancesAmount + totalFinesAmount +
         deductions.reduce((sum, ded) => sum + (ded.type === 'other' ? ded.amount : 0), 0);
-      
+
       setDeductionStats({
         totalDeductions: totalDeductionsAmount,
         totalAdvances: totalAdvancesAmount,
@@ -759,7 +762,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
     fetchEmployees();
     fetchDeductions();
     fetchAdvances();
-  }, [fetchSites, fetchEmployees, fetchDeductions, fetchAdvances]);
+  }, [fetchSites, filterSiteId, fetchEmployees, fetchDeductions, fetchAdvances]);
 
   // Load deductions when filters or pagination changes
   useEffect(() => {
@@ -768,6 +771,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
     deductionPage,
     deductionItemsPerPage,
     statusFilter,
+    filterSiteId,   // ✅ ADD THIS
     typeFilter,
     fetchDeductions,
   ]);
@@ -778,6 +782,8 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
   }, [deductions, advances, fetchDeductionStats]);
 
   // Filtered data based on view type
+  const selectedSiteName = sites.find(s => s._id === filterSiteId)?.name;
+
   const filteredDataList = useMemo(() => {
     if (showAdvances) {
       return advances.filter((advance) => {
@@ -787,34 +793,24 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
           advance.employeeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           advance.employeeCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           advance.description?.toLowerCase().includes(searchTerm.toLowerCase());
-
-        const matchesStatus =
-          statusFilter === "all" || advance.status === statusFilter;
-
-        return matchesSearch && matchesStatus;
+        const matchesStatus = statusFilter === "all" || advance.status === statusFilter;
+        const matchesSite = !filterSiteId || (employee && employee.siteName === selectedSiteName);
+        return matchesSearch && matchesStatus && matchesSite;
       });
     } else {
       return deductions.filter((deduction) => {
-        if (!deduction) return false;
-
-        const employee = employees.find(
-          (emp) => emp && emp.employeeId === deduction.employeeId
-        );
+        const employee = employees.find(emp => emp.employeeId === deduction.employeeId);
         const matchesSearch =
           employee?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          employee?.employeeId
-            ?.toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
+          employee?.employeeId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           deduction.description?.toLowerCase().includes(searchTerm.toLowerCase());
-
-        const matchesStatus =
-          statusFilter === "all" || deduction.status === statusFilter;
+        const matchesStatus = statusFilter === "all" || deduction.status === statusFilter;
         const matchesType = typeFilter === "all" || deduction.type === typeFilter;
-
-        return matchesSearch && matchesStatus && matchesType;
+        const matchesSite = !filterSiteId || (employee && employee.siteName === selectedSiteName);
+        return matchesSearch && matchesStatus && matchesType && matchesSite;
       });
     }
-  }, [showAdvances, deductions, advances, employees, searchTerm, statusFilter, typeFilter]);
+  }, [showAdvances, deductions, advances, employees, searchTerm, statusFilter, typeFilter, filterSiteId, selectedSiteName]);
 
   const paginatedData = filteredDataList.slice(
     ((showAdvances ? advancePage : deductionPage) - 1) * deductionItemsPerPage,
@@ -829,7 +825,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
   const getMonthlyDeductionAmount = (employeeId: string, month: string): number => {
     const employeeAdvances = advances.filter(adv => adv.employeeId === employeeId && adv.status !== 'rejected');
     let totalMonthlyDeduction = 0;
-    
+
     employeeAdvances.forEach(advance => {
       if (advance.deductionType === 'monthly' && advance.monthlyEMI) {
         totalMonthlyDeduction += advance.monthlyEMI;
@@ -837,13 +833,13 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
         const currentDate = new Date(month + '-01');
         const startDate = new Date(advance.customStartDate || '');
         const endDate = new Date(advance.customEndDate || '');
-        
+
         if (currentDate >= startDate && currentDate <= endDate) {
           totalMonthlyDeduction += advance.customAmount;
         }
       }
     });
-    
+
     return totalMonthlyDeduction;
   };
 
@@ -852,7 +848,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
     const monthlyDeduction = getMonthlyDeductionAmount(deductionData.employeeId, deductionData.appliedMonth);
     const finalAfterAdvance = salaryCalc ? salaryCalc.finalSalary - monthlyDeduction : 0;
     const amount = parseFloat(deductionData.amount);
-    
+
     setConfirmationDialog({
       open: true,
       type: 'deduction',
@@ -952,7 +948,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
     const employee = filteredEmployees.find(
       (emp) => emp.employeeId === deductionForm.employeeId
     );
-    
+
     if (!employee) {
       toast.error("Employee Not Found", {
         description: "Selected employee not found",
@@ -964,7 +960,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
     const deductionAmount = parseFloat(deductionForm.amount);
     const monthlyDeduction = getMonthlyDeductionAmount(deductionForm.employeeId, deductionForm.appliedMonth);
     const finalAfterAdvance = salaryCalc ? salaryCalc.finalSalary - monthlyDeduction : 0;
-    
+
     if (salaryCalc && deductionAmount > finalAfterAdvance) {
       toast.error("Deduction amount exceeds employee's final salary", {
         description: `Employee's final salary after attendance and advance deduction is ₹${deductionService.formatCurrency(finalAfterAdvance)}. Please reduce the deduction amount.`,
@@ -1007,7 +1003,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
   // Show confirmation before adding advance
   const showConfirmationBeforeAdvance = (advanceData: any, employee: Employee) => {
     const monthlyDeductionAmount = advanceData.deductionType === 'monthly' ? advanceData.monthlyEMI : advanceData.customAmount;
-    
+
     setConfirmationDialog({
       open: true,
       type: 'advance',
@@ -1112,7 +1108,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
     const employee = filteredEmployees.find(
       (emp) => emp.employeeId === advanceForm.employeeId
     );
-    
+
     if (!employee) {
       toast.error("Employee Not Found", {
         description: "Selected employee not found",
@@ -1121,10 +1117,10 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
     }
 
     const advanceAmountValue = parseFloat(advanceForm.advanceAmount);
-    
+
     let monthlyEMI = 0;
     let customAmount = 0;
-    
+
     if (advanceForm.deductionType === 'monthly' && advanceForm.monthlyEMI) {
       monthlyEMI = parseFloat(advanceForm.monthlyEMI);
     } else if (advanceForm.deductionType === 'custom' && advanceForm.customAmount) {
@@ -1398,11 +1394,11 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
   // Edit deduction
   const handleEditDeduction = (deduction: Deduction) => {
     setEditingDeduction(deduction);
-    
+
     let fineReason = '';
     let otherReason = '';
     let cleanDescription = deduction.description || '';
-    
+
     // Extract amount and reason from description
     const reasonMatch = deduction.description?.match(/Reason: (.+)$/);
     if (reasonMatch) {
@@ -1413,7 +1409,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
       }
       cleanDescription = deduction.description?.replace(/Amount: ₹[\d,]+( \| Reason: .+)?$/, '').trim() || '';
     }
-    
+
     setDeductionForm({
       employeeId: deduction.employeeId.toString(),
       siteId: "",
@@ -1554,13 +1550,13 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
       rows = filteredDataList.map((deduction: any) => {
         let reason = '';
         let cleanDescription = deduction.description || '';
-        
+
         const reasonMatch = deduction.description?.match(/Reason: (.+)$/);
         if (reasonMatch) {
           reason = reasonMatch[1];
           cleanDescription = deduction.description?.replace(/ - Reason: .+$/, '').replace(/Amount: ₹[\d,]+( \| )?/, '').trim() || '';
         }
-        
+
         return [
           deduction.employeeCode,
           `"${deduction.employeeName}"`,
@@ -1662,7 +1658,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
               Detailed information about this record
             </DialogDescription>
           </DialogHeader>
-          
+
           {viewDetailsDialog.data && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -1675,7 +1671,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
                   <p className="font-medium text-sm">{viewDetailsDialog.data.employeeName || '-'}</p>
                 </div>
               </div>
-              
+
               {viewDetailsDialog.type === 'advance' ? (
                 <>
                   <div className="grid grid-cols-2 gap-4">
@@ -1743,7 +1739,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
                       <div>{getStatusBadge(viewDetailsDialog.data.status)}</div>
                     </div>
                   </div>
-                  
+
                   {viewDetailsDialog.data.type === 'fine' && (
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Fine Reason</Label>
@@ -1758,14 +1754,14 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
                   )}
                 </>
               )}
-              
+
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Description</Label>
                 <p className="text-sm bg-gray-50 p-2 rounded border max-h-32 overflow-y-auto">
                   {viewDetailsDialog.data.description || 'No description provided'}
                 </p>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Created At</Label>
@@ -1778,7 +1774,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
               </div>
             </div>
           )}
-          
+
           <DialogFooter>
             <Button onClick={() => setViewDetailsDialog({ ...viewDetailsDialog, open: false })}>
               Close
@@ -1841,7 +1837,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5" />
                   <p className="text-sm text-yellow-800">
-                    {confirmationDialog.type === 'advance' 
+                    {confirmationDialog.type === 'advance'
                       ? 'This advance will be deducted from the employee\'s future salary according to the selected deduction type.'
                       : 'This deduction will be applied to the employee\'s salary for the selected month. Please verify the amount before confirming.'}
                   </p>
@@ -1855,11 +1851,10 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmationDialog.onConfirm}
-              className={`flex-1 sm:flex-none ${
-                confirmationDialog.type === 'advance' 
-                  ? 'bg-green-600 hover:bg-green-700' 
+              className={`flex-1 sm:flex-none ${confirmationDialog.type === 'advance'
+                  ? 'bg-green-600 hover:bg-green-700'
                   : 'bg-blue-600 hover:bg-blue-700'
-              }`}
+                }`}
             >
               <CheckCircle2 className="h-4 w-4 mr-2" />
               Confirm & {confirmationDialog.type === 'advance' ? 'Grant Advance' : 'Apply Deduction'}
@@ -1951,7 +1946,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
                     const salaryCalc = salaryCalculations.get(employee.employeeId || employee._id || '');
                     const existingAdvances = advances.filter(a => a.employeeId === employee.employeeId && a.status !== 'rejected');
                     const totalPendingAdvance = existingAdvances.reduce((sum, a) => sum + a.remainingAmount, 0);
-                    
+
                     return (
                       <SelectItem key={employee.employeeId} value={employee.employeeId}>
                         <div className="flex flex-col">
@@ -2075,7 +2070,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
                     <div className="flex items-center gap-2">
                       <Calculator className="h-4 w-4 text-blue-600" />
                       <span className="text-sm text-blue-700">
-                        {calculateEMI() > 0 
+                        {calculateEMI() > 0
                           ? `Will be repaid in ${calculateEMI()} month(s) with ₹${advanceForm.monthlyEMI} monthly EMI`
                           : "Enter amount and EMI to calculate duration"}
                       </span>
@@ -2353,7 +2348,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
                     const salaryCalc = salaryCalculations.get(employee.employeeId || employee._id || '');
                     const monthlyDeduction = getMonthlyDeductionAmount(employee.employeeId || '', deductionForm.appliedMonth);
                     const finalAfterAdvance = salaryCalc ? salaryCalc.finalSalary - monthlyDeduction : 0;
-                    
+
                     return (
                       <SelectItem
                         key={employee.employeeId}
@@ -2375,7 +2370,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
                           </span>
                           {salaryCalc && (
                             <span className="text-xs text-green-600">
-                              Salary: ₹{deductionService.formatCurrency(salaryCalc.monthlySalary)} | 
+                              Salary: ₹{deductionService.formatCurrency(salaryCalc.monthlySalary)} |
                               Final: ₹{deductionService.formatCurrency(finalAfterAdvance)}
                             </span>
                           )}
@@ -2396,7 +2391,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
                     const employee = filteredEmployees.find(e => e.employeeId === deductionForm.employeeId);
                     const salaryCalc = employee ? salaryCalculations.get(employee.employeeId || employee._id || '') : null;
                     const monthlyDeduction = getMonthlyDeductionAmount(deductionForm.employeeId, deductionForm.appliedMonth);
-                    
+
                     if (salaryCalc) {
                       const finalAfterAdvance = salaryCalc.finalSalary - monthlyDeduction;
                       return (
@@ -2479,7 +2474,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
                 const salaryCalc = employee ? salaryCalculations.get(employee.employeeId || employee._id || '') : null;
                 const monthlyDeduction = getMonthlyDeductionAmount(deductionForm.employeeId, deductionForm.appliedMonth);
                 const finalAfterAdvance = salaryCalc ? salaryCalc.finalSalary - monthlyDeduction : 0;
-                
+
                 if (salaryCalc && parseFloat(deductionForm.amount) > finalAfterAdvance) {
                   return (
                     <p className="text-xs text-red-600 flex items-center gap-1 mt-1">
@@ -2688,8 +2683,8 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
             <Download className="h-4 w-4" />
             Export {showAdvances ? 'Advances' : 'Deductions'}
           </Button>
-          <Button 
-            onClick={() => setIsAddingAdvance(true)} 
+          <Button
+            onClick={() => setIsAddingAdvance(true)}
             className="gap-2 bg-green-600 hover:bg-green-700"
           >
             <HandCoins className="h-4 w-4" />
@@ -2734,7 +2729,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
             <div className="text-sm text-muted-foreground">
               {salaryCalculations.size > 0 && (
                 <span>
-                  {salaryCalculations.size} employees • 
+                  {salaryCalculations.size} employees •
                   Total Present: {Array.from(salaryCalculations.values()).reduce((sum, calc) => sum + calc.presentDays, 0)} days
                 </span>
               )}
@@ -2774,11 +2769,11 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
             </div>
             <div className="flex items-center mt-1">
               <div className="w-full bg-purple-100 rounded-full h-1.5">
-                <div 
-                  className="bg-purple-500 h-1.5 rounded-full" 
-                  style={{ 
-                    width: `${deductionStats.totalAdvances > 0 && deductionStats.totalDeductions > 0 ? 
-                      (deductionStats.totalAdvances / deductionStats.totalDeductions) * 100 : 0}%` 
+                <div
+                  className="bg-purple-500 h-1.5 rounded-full"
+                  style={{
+                    width: `${deductionStats.totalAdvances > 0 && deductionStats.totalDeductions > 0 ?
+                      (deductionStats.totalAdvances / deductionStats.totalDeductions) * 100 : 0}%`
                   }}
                 ></div>
               </div>
@@ -2798,11 +2793,11 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
             </div>
             <div className="flex items-center mt-1">
               <div className="w-full bg-orange-100 rounded-full h-1.5">
-                <div 
-                  className="bg-orange-500 h-1.5 rounded-full" 
-                  style={{ 
-                    width: `${deductionStats.totalFines > 0 && deductionStats.totalDeductions > 0 ? 
-                      (deductionStats.totalFines / deductionStats.totalDeductions) * 100 : 0}%` 
+                <div
+                  className="bg-orange-500 h-1.5 rounded-full"
+                  style={{
+                    width: `${deductionStats.totalFines > 0 && deductionStats.totalDeductions > 0 ?
+                      (deductionStats.totalFines / deductionStats.totalDeductions) * 100 : 0}%`
                   }}
                 ></div>
               </div>
@@ -2896,7 +2891,22 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
                   }}
                 />
               </div>
+
             </div>
+            <Select value={filterSiteId} onValueChange={setFilterSiteId}>
+              <SelectTrigger className="w-[140px]">
+                <Building2 className="h-4 w-4 mr-2" />
+                <span>Site</span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Sites</SelectItem>
+                {sites.map((site) => (
+                  <SelectItem key={site._id} value={site._id}>
+                    {site.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <div className="flex flex-wrap gap-2">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[140px]">
@@ -3048,15 +3058,15 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
                               </p>
                               {(showAdvances ? totalAdvancesCount === 0 : deductions.length === 0) && (
                                 <div className="flex gap-2 mt-4">
-                                  <Button 
-                                    onClick={() => setIsAddingAdvance(true)} 
+                                  <Button
+                                    onClick={() => setIsAddingAdvance(true)}
                                     className="gap-2 bg-green-600 hover:bg-green-700"
                                   >
                                     <HandCoins className="h-4 w-4" />
                                     Add Advance
                                   </Button>
-                                  <Button 
-                                    onClick={() => setIsAddingDeduction(true)} 
+                                  <Button
+                                    onClick={() => setIsAddingDeduction(true)}
                                     className="gap-2"
                                   >
                                     <Plus className="h-4 w-4" />
@@ -3079,7 +3089,7 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
                           if (showAdvances) {
                             const advance = item as AdvanceRecord;
                             const monthlyEMIAmount = advance.deductionType === 'monthly' ? (advance.monthlyEMI || 0) : (advance.customAmount || 0);
-                            
+
                             return (
                               <TableRow key={advance._id} className="hover:bg-muted/50 transition-colors">
                                 <TableCell>
@@ -3185,13 +3195,13 @@ const DeductionListTab = ({}: DeductionListTabProps) => {
                             const deduction = item as Deduction;
                             let reason = '';
                             let cleanDescription = deduction.description || '';
-                            
+
                             const reasonMatch = deduction.description?.match(/Reason: (.+)$/);
                             if (reasonMatch) {
                               reason = reasonMatch[1];
                               cleanDescription = deduction.description?.replace(/ - Reason: .+$/, '').replace(/Amount: ₹[\d,]+( \| )?/, '').trim() || '';
                             }
-                            
+
                             return (
                               <TableRow key={deduction.id} className="hover:bg-muted/50 transition-colors">
                                 <TableCell>

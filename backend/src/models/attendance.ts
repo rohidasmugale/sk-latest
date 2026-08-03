@@ -30,6 +30,7 @@ export interface IAttendance extends Document {
 checkInLongitude?: number | null;
 
 isOutOfGeofence: boolean;
+shiftId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -136,7 +137,12 @@ currentLongitude: { type: Number, default: null },
 lastLocationUpdate: { type: Date, default: null },
 isLocationTracking: { type: Boolean, default: false },
 isOutOfGeofence:  { type: Boolean, default: false },
+ shiftId: {
+     type: String,
+    default: null,
+   },
   },
+ 
   {
     timestamps: true,
     toJSON: {

@@ -1,6 +1,3 @@
-// TasksSection.tsx - Complete unified version with combined add/assign flow
-
-// [Previous imports remain exactly the same until line 500 - the imports section]
 import { useState, useCallback, useMemo, memo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,15 +7,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Plus, 
-  Search, 
-  Clock, 
-  AlertCircle, 
-  Edit, 
-  Trash2, 
-  CheckCircle, 
-  Paperclip, 
+import {
+  Plus,
+  Search,
+  Clock,
+  AlertCircle,
+  Edit,
+  Trash2,
+  CheckCircle,
+  Paperclip,
   Download,
   Eye,
   Upload,
@@ -50,11 +47,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { FormField, SearchBar } from "./sharedA";
-import taskService, { 
-  type Task, 
-  type Site, 
+import taskService, {
+  type Task,
+  type Site,
   type ExtendedSite,
-  type Assignee, 
+  type Assignee,
   type CreateMultipleTasksRequest,
   type UpdateTaskStatusRequest,
   type AddHourlyUpdateRequest,
@@ -63,7 +60,13 @@ import taskService, {
   type AssignedUser,
   type UpdateTaskRequest
 } from "@/services/TaskService";
-
+// Add these imports at the top with other imports
+import { PullToRefreshWrapper } from '@/components/shared/PullToRefreshWrapper';
+import { motion } from 'framer-motion';
+import { DashboardHeader } from '@/components/shared/DashboardHeader';
+import { DashboardSidebar } from '@/components/shared/DashboardSidebar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ClipboardList } from 'lucide-react';
 // Components
 import {
   Command,
@@ -78,7 +81,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-
+// Add these imports at the top
+import { ArrowLeft, ChevronRight } from "lucide-react";
+import { siteService, Site as ServiceSite } from "@/services/SiteService";
 // Extended Task type for grouped tasks
 interface GroupedTask extends Task {
   _isGrouped: true;
@@ -148,17 +153,17 @@ interface TaskStaffingStatus {
 }
 
 // Memoized components
-const SiteCheckboxItem = memo(({ 
-  site, 
-  isSelected, 
-  onToggle 
-}: { 
+const SiteCheckboxItem = memo(({
+  site,
+  isSelected,
+  onToggle
+}: {
   site: Site;
   isSelected: boolean;
   onToggle: (siteId: string) => void;
 }) => (
   <div key={site._id} className="flex items-center space-x-3">
-    <input 
+    <input
       type="checkbox"
       id={`site-${site._id}`}
       checked={isSelected}
@@ -185,26 +190,26 @@ const SiteCheckboxItem = memo(({
 SiteCheckboxItem.displayName = "SiteCheckboxItem";
 
 // Staffing Requirements Indicator Component
-const StaffingRequirementsIndicator = ({ 
-  requirements 
-}: { 
-  requirements: SiteStaffingRequirements | TaskStaffingStatus 
+const StaffingRequirementsIndicator = ({
+  requirements
+}: {
+  requirements: SiteStaffingRequirements | TaskStaffingStatus
 }) => {
   if (!requirements) return null;
-  
+
   const requiredManagers = 'requiredManagers' in requirements ? requirements.requiredManagers : 0;
   const requiredSupervisors = 'requiredSupervisors' in requirements ? requirements.requiredSupervisors : 0;
   const assignedManagers = 'assignedManagers' in requirements ? requirements.assignedManagers : requirements.currentManagers || 0;
   const assignedSupervisors = 'assignedSupervisors' in requirements ? requirements.assignedSupervisors : requirements.currentSupervisors || 0;
   const isManagerRequirementMet = 'isManagerRequirementMet' in requirements ? requirements.isManagerRequirementMet : (assignedManagers >= requiredManagers);
   const isSupervisorRequirementMet = 'isSupervisorRequirementMet' in requirements ? requirements.isSupervisorRequirementMet : (assignedSupervisors >= requiredSupervisors);
-  
+
   // If no requirements, don't show anything
   if (requiredManagers === 0 && requiredSupervisors === 0) return null;
-  
+
   // Check if all requirements are met
   const allRequirementsMet = isManagerRequirementMet && isSupervisorRequirementMet;
-  
+
   if (allRequirementsMet) {
     return (
       <div className="flex items-center gap-2 mt-2 p-2 bg-green-50 border border-green-200 rounded-lg">
@@ -215,7 +220,7 @@ const StaffingRequirementsIndicator = ({
       </div>
     );
   }
-  
+
   return (
     <div className="flex items-center gap-2 mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
       <AlertTriangle className="h-4 w-4 text-amber-600" />
@@ -239,9 +244,9 @@ const StaffingRequirementsIndicator = ({
 };
 
 // Multi-select Combobox for Assignees with site-based limits and supervisor restriction
-const AssigneeMultiSelect = ({ 
-  assignees, 
-  selectedAssignees, 
+const AssigneeMultiSelect = ({
+  assignees,
+  selectedAssignees,
   onSelectAssignees,
   assigneeType,
   onAssigneeTypeChange,
@@ -250,7 +255,7 @@ const AssigneeMultiSelect = ({
   sites,
   assignedSupervisorsMap = new Map(),
   siteStaffingRequirements
-}: { 
+}: {
   assignees: Assignee[];
   selectedAssignees: string[];
   onSelectAssignees: (assigneeIds: string[]) => void;
@@ -267,12 +272,12 @@ const AssigneeMultiSelect = ({
 
   // Calculate available slots per site based on staffing requirements
   const siteSlots = useMemo(() => {
-    const slots: {[siteId: string]: {manager: number, supervisor: number}} = {};
-    
+    const slots: { [siteId: string]: { manager: number, supervisor: number } } = {};
+
     selectedSites.forEach(siteId => {
       const site = sites.find(s => s._id === siteId);
       const requirements = siteStaffingRequirements?.get(siteId);
-      
+
       if (site) {
         slots[siteId] = {
           manager: site.managerCount || 0,
@@ -280,30 +285,30 @@ const AssigneeMultiSelect = ({
         };
       }
     });
-    
+
     return slots;
   }, [selectedSites, sites, siteStaffingRequirements]);
 
   // Calculate current usage per site based on existing assignments
   const currentUsage = useMemo(() => {
-    const usage: {[siteId: string]: {manager: number, supervisor: number}} = {};
-    
+    const usage: { [siteId: string]: { manager: number, supervisor: number } } = {};
+
     // Initialize usage for all selected sites
     selectedSites.forEach(siteId => {
       const requirements = siteStaffingRequirements?.get(siteId);
-      usage[siteId] = { 
-        manager: requirements?.assignedManagers || 0, 
-        supervisor: requirements?.assignedSupervisors || 0 
+      usage[siteId] = {
+        manager: requirements?.assignedManagers || 0,
+        supervisor: requirements?.assignedSupervisors || 0
       };
     });
-    
+
     return usage;
   }, [selectedSites, siteStaffingRequirements]);
 
   // Check if assignee can be selected based on site limits AND supervisor assignment restrictions
-  const canSelectAssignee = (assignee: Assignee): {canSelect: boolean, reason?: string} => {
-    if (!assignee) return {canSelect: false, reason: "Assignee not found"};
-    
+  const canSelectAssignee = (assignee: Assignee): { canSelect: boolean, reason?: string } => {
+    if (!assignee) return { canSelect: false, reason: "Assignee not found" };
+
     // If no sites selected, can't assign
     if (selectedSites.length === 0) {
       return {
@@ -311,13 +316,13 @@ const AssigneeMultiSelect = ({
         reason: "Please select sites first"
       };
     }
-    
+
     // For supervisors, check if they're already assigned to ANY site
     if (assignee.role === 'supervisor') {
       // Check if this supervisor is already assigned to ANY site (across all tasks)
       let isSupervisorAssignedElsewhere = false;
       const assignedSiteNames: string[] = [];
-      
+
       // Check all sites in the assignedSupervisorsMap
       assignedSupervisorsMap.forEach((supervisorIds, siteId) => {
         if (supervisorIds.has(assignee._id)) {
@@ -328,7 +333,7 @@ const AssigneeMultiSelect = ({
           }
         }
       });
-      
+
       if (isSupervisorAssignedElsewhere) {
         return {
           canSelect: false,
@@ -336,26 +341,26 @@ const AssigneeMultiSelect = ({
         };
       }
     }
-    
+
     // Check site capacity limits
     let canAssign = false;
     let reason = "No site can accommodate this assignee";
-    
+
     // Check each selected site to see if it has capacity
     for (const siteId of selectedSites) {
       const siteSlot = siteSlots[siteId];
       const siteUsage = currentUsage[siteId];
       const requirements = siteStaffingRequirements?.get(siteId);
-      
+
       if (!siteSlot || !siteUsage) continue;
-      
+
       if (assignee.role === 'manager') {
         // Check if we've already selected this manager for this site in current session
         const isCurrentlySelected = selectedAssignees.includes(assignee._id);
-        
+
         // Total managers after adding this one
         const totalAfterAdd = siteUsage.manager + (isCurrentlySelected ? 0 : 1);
-        
+
         if (totalAfterAdd <= siteSlot.manager) {
           canAssign = true;
           reason = `Can be assigned to ${sites.find(s => s._id === siteId)?.name || 'site'}`;
@@ -364,10 +369,10 @@ const AssigneeMultiSelect = ({
       } else if (assignee.role === 'supervisor') {
         // Check if we've already selected this supervisor for this site in current session
         const isCurrentlySelected = selectedAssignees.includes(assignee._id);
-        
+
         // Total supervisors after adding this one
         const totalAfterAdd = siteUsage.supervisor + (isCurrentlySelected ? 0 : 1);
-        
+
         if (totalAfterAdd <= siteSlot.supervisor) {
           canAssign = true;
           reason = `Can be assigned to ${sites.find(s => s._id === siteId)?.name || 'site'}`;
@@ -375,7 +380,7 @@ const AssigneeMultiSelect = ({
         }
       }
     }
-    
+
     if (!canAssign) {
       const roleText = assignee.role === 'manager' ? 'Manager' : 'Supervisor';
       return {
@@ -383,8 +388,8 @@ const AssigneeMultiSelect = ({
         reason: `${roleText} limit reached for all selected sites`
       };
     }
-    
-    return {canSelect: true, reason};
+
+    return { canSelect: true, reason };
   };
 
   const filteredAssignees = useMemo(() => {
@@ -398,23 +403,23 @@ const AssigneeMultiSelect = ({
 
     if (searchValue) {
       const searchLower = searchValue.toLowerCase().trim();
-      
+
       result = result.filter(assignee => {
         if (!assignee) return false;
-        
+
         // Create searchable strings
         const name = safeString(assignee.name).toLowerCase();
         const email = safeString(assignee.email).toLowerCase();
         const role = safeString(assignee.role).toLowerCase();
         const department = assignee.department ? safeString(assignee.department).toLowerCase() : '';
         const phone = safeString(assignee.phone).toLowerCase();
-        
+
         // Check if ANY field contains the search term (OR logic)
         return name.includes(searchLower) ||
-               email.includes(searchLower) ||
-               role.includes(searchLower) ||
-               department.includes(searchLower) ||
-               phone.includes(searchLower);
+          email.includes(searchLower) ||
+          role.includes(searchLower) ||
+          department.includes(searchLower) ||
+          phone.includes(searchLower);
       });
     }
 
@@ -424,14 +429,14 @@ const AssigneeMultiSelect = ({
   const handleAssigneeToggle = (assigneeId: string) => {
     const assignee = assignees.find(a => a._id === assigneeId);
     if (!assignee) return;
-    
+
     const { canSelect, reason } = canSelectAssignee(assignee);
-    
+
     if (!canSelect && !selectedAssignees.includes(assigneeId)) {
       toast.error(reason || "Cannot select this assignee");
       return;
     }
-    
+
     if (selectedAssignees.includes(assigneeId)) {
       onSelectAssignees(selectedAssignees.filter(id => id !== assigneeId));
     } else {
@@ -496,23 +501,23 @@ const AssigneeMultiSelect = ({
               const site = sites.find(s => s._id === siteId);
               const requirements = siteStaffingRequirements?.get(siteId);
               if (!site) return null;
-              
+
               const siteName = site.name || "Unknown Site";
               const managerLimit = site.managerCount || 0;
               const supervisorLimit = site.supervisorCount || 0;
               const currentManager = requirements?.assignedManagers || 0;
               const currentSupervisor = requirements?.assignedSupervisors || 0;
-              
+
               // Get already assigned supervisors for this site
               const alreadyAssignedSupervisors = assignedSupervisorsMap.get(siteId) || new Set();
               const alreadyAssignedCount = alreadyAssignedSupervisors.size;
-              
+
               const managerRemaining = Math.max(0, managerLimit - currentManager);
               const supervisorRemaining = Math.max(0, supervisorLimit - currentSupervisor);
-              
+
               const isManagerMet = requirements?.isManagerRequirementMet || false;
               const isSupervisorMet = requirements?.isSupervisorRequirementMet || false;
-              
+
               return (
                 <div key={siteId} className="space-y-2 p-2 border rounded">
                   <div className="flex justify-between items-center">
@@ -590,8 +595,8 @@ const AssigneeMultiSelect = ({
         </PopoverTrigger>
         <PopoverContent className="w-full p-0" style={{ minWidth: '400px' }}>
           <Command>
-            <CommandInput 
-              placeholder="Search assignees by name, role, department..." 
+            <CommandInput
+              placeholder="Search assignees by name, role, department..."
               value={searchValue}
               onValueChange={setSearchValue}
               className="h-9"
@@ -604,11 +609,11 @@ const AssigneeMultiSelect = ({
                 {filteredAssignees.map((assignee) => {
                   const { canSelect, reason } = canSelectAssignee(assignee);
                   const isSelected = selectedAssignees.includes(assignee._id);
-                  
+
                   // Check if this supervisor is already assigned elsewhere
                   let isSupervisorAssignedElsewhere = false;
                   const assignedSiteNames: string[] = [];
-                  
+
                   if (assignee.role === 'supervisor') {
                     assignedSupervisorsMap.forEach((supervisorIds, siteId) => {
                       if (supervisorIds.has(assignee._id)) {
@@ -620,7 +625,7 @@ const AssigneeMultiSelect = ({
                       }
                     });
                   }
-                  
+
                   return (
                     <CommandItem
                       key={assignee._id}
@@ -636,11 +641,10 @@ const AssigneeMultiSelect = ({
                       className={`flex items-center space-x-3 ${!canSelect && !isSelected ? 'opacity-50 cursor-not-allowed' : ''}`}
                       disabled={!canSelect && !isSelected}
                     >
-                      <div className={`flex items-center justify-center h-4 w-4 rounded border ${
-                        isSelected 
-                          ? "bg-primary border-primary" 
+                      <div className={`flex items-center justify-center h-4 w-4 rounded border ${isSelected
+                          ? "bg-primary border-primary"
                           : "border-gray-300"
-                      }`}>
+                        }`}>
                         {isSelected && (
                           <Check className="h-3 w-3 text-primary-foreground" />
                         )}
@@ -692,9 +696,9 @@ const AssigneeMultiSelect = ({
           </div>
           <div className="flex flex-wrap gap-2">
             {selectedAssigneeObjects.map(assignee => (
-              <Badge 
-                key={assignee._id} 
-                variant="secondary" 
+              <Badge
+                key={assignee._id}
+                variant="secondary"
                 className="flex items-center gap-1"
               >
                 <User className="h-3 w-3" />
@@ -721,15 +725,15 @@ const AssigneeMultiSelect = ({
 };
 
 // Multi-select Combobox for Sites - MODIFIED to filter out sites that already have any assignees
-const SiteMultiSelect = ({ 
-  sites, 
-  selectedSites, 
+const SiteMultiSelect = ({
+  sites,
+  selectedSites,
   onSelectSites,
   isLoading,
   alreadyAssignedSiteIds = [],
   siteStaffingRequirements,
   assigneeType // Added to filter sites based on which role we're assigning
-}: { 
+}: {
   sites: ExtendedSite[];
   selectedSites: string[];
   onSelectSites: (siteIds: string[]) => void;
@@ -746,17 +750,17 @@ const SiteMultiSelect = ({
     return sites.filter(site => {
       // Skip if already assigned in context
       if (alreadyAssignedSiteIds.includes(site._id)) return false;
-      
+
       const requirements = siteStaffingRequirements?.get(site._id);
-      
+
       // If site has any assignees (managers or supervisors), don't show it
       if (requirements && requirements.hasAnyAssignee) {
         return false;
       }
-      
+
       // If no requirements, site is available
       if (!requirements) return true;
-      
+
       // Filter based on assignee type
       if (assigneeType === "manager") {
         // For managers: only show sites that still need managers AND have no assignees
@@ -765,7 +769,7 @@ const SiteMultiSelect = ({
         // For supervisors: only show sites that still need supervisors AND have no assignees
         return !requirements.isSupervisorRequirementMet && !requirements.hasAnyAssignee;
       }
-      
+
       // For "all": show sites that need either managers OR supervisors AND have no assignees
       return (!requirements.isManagerRequirementMet || !requirements.isSupervisorRequirementMet) && !requirements.hasAnyAssignee;
     });
@@ -773,34 +777,34 @@ const SiteMultiSelect = ({
 
   // Calculate total available sites count for display
   const totalAvailableCount = availableSites.length;
-  
+
   // Calculate counts for sites with assignees and fully staffed
   const sitesWithAssignees = sites.filter(site => {
     const requirements = siteStaffingRequirements?.get(site._id);
     return requirements && requirements.hasAnyAssignee;
   }).length;
-  
+
   const fullyStaffedCount = sites.length - availableSites.length - sitesWithAssignees;
 
   const filteredSites = useMemo(() => {
     if (!searchValue) return availableSites;
-    
+
     const searchLower = searchValue.toLowerCase().trim();
-    
+
     return availableSites.filter(site => {
       if (!site) return false;
-      
+
       // Create searchable strings
       const name = safeString(site.name).toLowerCase();
       const client = safeString(site.clientName).toLowerCase();
       const location = safeString(site.location).toLowerCase();
       const status = safeString(site.status).toLowerCase();
-      
+
       // Check if ANY field contains the search term (OR logic)
       return name.includes(searchLower) ||
-             client.includes(searchLower) ||
-             location.includes(searchLower) ||
-             status.includes(searchLower);
+        client.includes(searchLower) ||
+        location.includes(searchLower) ||
+        status.includes(searchLower);
     });
   }, [availableSites, searchValue]);
 
@@ -850,9 +854,9 @@ const SiteMultiSelect = ({
             </Badge>
           )}
         </div>
-        <Button 
+        <Button
           type="button"
-          variant="outline" 
+          variant="outline"
           size="sm"
           onClick={() => {
             if (selectedSites.length === availableSites.length) {
@@ -893,15 +897,15 @@ const SiteMultiSelect = ({
               </>
             ) : availableSites.length === 0 ? (
               assigneeType === "manager" ? "No sites need managers (all have assignees or are staffed)" :
-              assigneeType === "supervisor" ? "No sites need supervisors (all have assignees or are staffed)" :
-              "No sites need staffing (all have assignees or are staffed)"
+                assigneeType === "supervisor" ? "No sites need supervisors (all have assignees or are staffed)" :
+                  "No sites need staffing (all have assignees or are staffed)"
             ) : selectedSites.length > 0 ? (
               <div className="flex items-center gap-2 truncate">
                 <Building className="h-4 w-4" />
                 <span>{selectedSites.length} site(s) selected</span>
               </div>
             ) : (
-              `Select sites that need ${assigneeType === "manager" ? "managers" : 
+              `Select sites that need ${assigneeType === "manager" ? "managers" :
                 assigneeType === "supervisor" ? "supervisors" : "staffing"} (no assignees yet)...`
             )}
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -909,8 +913,8 @@ const SiteMultiSelect = ({
         </PopoverTrigger>
         <PopoverContent className="w-full p-0" style={{ minWidth: '400px' }}>
           <Command>
-            <CommandInput 
-              placeholder="Search sites by name, client, location..." 
+            <CommandInput
+              placeholder="Search sites by name, client, location..."
               value={searchValue}
               onValueChange={setSearchValue}
               className="h-9"
@@ -926,11 +930,11 @@ const SiteMultiSelect = ({
                   const isSupervisorMet = requirements?.isSupervisorRequirementMet || false;
                   const isFullyStaffed = isManagerMet && isSupervisorMet;
                   const hasAssignee = requirements?.hasAnyAssignee || false;
-                  
+
                   // Determine which roles are still needed
                   const needsManagers = !isManagerMet;
                   const needsSupervisors = !isSupervisorMet;
-                  
+
                   return (
                     <CommandItem
                       key={site._id}
@@ -941,11 +945,10 @@ const SiteMultiSelect = ({
                       }}
                       className="flex items-center space-x-3"
                     >
-                      <div className={`flex items-center justify-center h-4 w-4 rounded border ${
-                        selectedSites.includes(site._id) 
-                          ? "bg-primary border-primary" 
+                      <div className={`flex items-center justify-center h-4 w-4 rounded border ${selectedSites.includes(site._id)
+                          ? "bg-primary border-primary"
                           : "border-gray-300"
-                      }`}>
+                        }`}>
                         {selectedSites.includes(site._id) && (
                           <Check className="h-3 w-3 text-primary-foreground" />
                         )}
@@ -1012,14 +1015,13 @@ const SiteMultiSelect = ({
               const requirements = siteStaffingRequirements?.get(site._id);
               const isManagerMet = requirements?.isManagerRequirementMet || false;
               const isSupervisorMet = requirements?.isSupervisorRequirementMet || false;
-              
+
               return (
-                <Badge 
-                  key={site._id} 
+                <Badge
+                  key={site._id}
                   variant={isManagerMet && isSupervisorMet ? "default" : "secondary"}
-                  className={`flex items-center gap-1 ${
-                    isManagerMet && isSupervisorMet ? 'bg-green-100 text-green-800 border-green-200' : ''
-                  }`}
+                  className={`flex items-center gap-1 ${isManagerMet && isSupervisorMet ? 'bg-green-100 text-green-800 border-green-200' : ''
+                    }`}
                 >
                   {safeString(site.name)}
                   {(!isManagerMet || !isSupervisorMet) && (
@@ -1045,18 +1047,18 @@ const SiteMultiSelect = ({
 };
 
 // Edit Task Dialog Component - ENHANCED with all requirements
-const EditTaskDialog = ({ 
-  task, 
-  open, 
+const EditTaskDialog = ({
+  task,
+  open,
   onOpenChange,
   onTaskUpdated,
   sites,
   assignees,
   assignedSupervisorsMap,
   siteStaffingRequirements
-}: { 
-  task: Task; 
-  open: boolean; 
+}: {
+  task: Task;
+  open: boolean;
   onOpenChange: (open: boolean) => void;
   onTaskUpdated: () => Promise<void>;
   sites: ExtendedSite[];
@@ -1066,7 +1068,7 @@ const EditTaskDialog = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"details" | "assignees">("details");
-  
+
   // Task details state - Initialize with current task values
   const [title, setTitle] = useState(task.title || "");
   const [description, setDescription] = useState(task.description || "");
@@ -1112,13 +1114,13 @@ const EditTaskDialog = ({
   // Calculate staffing status for this task
   const staffingStatus = useMemo((): TaskStaffingStatus => {
     const siteReq = siteStaffingRequirements.get(task.siteId);
-    
+
     const currentManagers = task.assignedUsers.filter(u => u.role === 'manager').length;
     const currentSupervisors = task.assignedUsers.filter(u => u.role === 'supervisor').length;
-    
+
     const requiredManagers = siteReq?.requiredManagers || 0;
     const requiredSupervisors = siteReq?.requiredSupervisors || 0;
-    
+
     return {
       currentManagers,
       currentSupervisors,
@@ -1135,32 +1137,32 @@ const EditTaskDialog = ({
   // Filter available assignees based on mode and role
   const availableAssignees = useMemo(() => {
     let filtered = assignees;
-    
+
     // Filter by role
     if (assigneeType === "manager") {
       filtered = filtered.filter(a => a.role === 'manager');
     } else if (assigneeType === "supervisor") {
       filtered = filtered.filter(a => a.role === 'supervisor');
     }
-    
+
     if (assigneeMode === "add") {
       // For add mode, exclude current assignees
       const currentIds = new Set(currentAssignees.map(a => a._id));
       filtered = filtered.filter(a => !currentIds.has(a._id));
-      
+
       // Also filter by missing roles to suggest only needed roles
       if (assigneeType === "manager" && staffingStatus.isManagerRequirementMet) {
         filtered = []; // No managers needed if requirement is met
       } else if (assigneeType === "supervisor" && staffingStatus.isSupervisorRequirementMet) {
         filtered = []; // No supervisors needed if requirement is met
       }
-      
+
     } else if (assigneeMode === "remove") {
       // For remove mode, only include current assignees
       const currentIds = new Set(currentAssignees.map(a => a._id));
       filtered = filtered.filter(a => currentIds.has(a._id));
     }
-    
+
     return filtered;
   }, [assignees, currentAssignees, assigneeType, assigneeMode, staffingStatus]);
 
@@ -1168,10 +1170,10 @@ const EditTaskDialog = ({
   const availableSites = useMemo(() => {
     return sites.filter(s => {
       if (s._id === task.siteId) return true; // Always show current site
-      
+
       const requirements = siteStaffingRequirements.get(s._id);
       if (!requirements) return true;
-      
+
       // Only show sites that don't have any assignees yet AND need staffing
       return !requirements.hasAnyAssignee && (!requirements.isManagerRequirementMet || !requirements.isSupervisorRequirementMet);
     });
@@ -1181,7 +1183,7 @@ const EditTaskDialog = ({
   const handleUpdateDetails = async () => {
     try {
       setIsLoading(true);
-      
+
       const updateData: UpdateTaskRequest = {
         title,
         description,
@@ -1193,12 +1195,12 @@ const EditTaskDialog = ({
         siteName: sites.find(s => s._id === siteId)?.name || siteName,
         clientName: sites.find(s => s._id === siteId)?.clientName || clientName
       };
-      
+
       await taskService.updateTask(task._id, updateData);
       toast.success("Task details updated successfully!");
       await onTaskUpdated(); // Wait for tasks to refresh
       onOpenChange(false); // Close the dialog
-      
+
     } catch (error) {
       console.error("Error updating task:", error);
       toast.error(error.message || "Failed to update task");
@@ -1216,23 +1218,23 @@ const EditTaskDialog = ({
 
     try {
       setIsLoading(true);
-      
+
       // Check if adding would exceed limits
       const managersToAdd = assignees
         .filter(a => selectedAssignees.includes(a._id) && a.role === 'manager').length;
       const supervisorsToAdd = assignees
         .filter(a => selectedAssignees.includes(a._id) && a.role === 'supervisor').length;
-      
+
       if (staffingStatus.currentManagers + managersToAdd > staffingStatus.requiredManagers) {
         toast.error(`Cannot add ${managersToAdd} manager(s). Site only needs ${staffingStatus.requiredManagers} managers total.`);
         return;
       }
-      
+
       if (staffingStatus.currentSupervisors + supervisorsToAdd > staffingStatus.requiredSupervisors) {
         toast.error(`Cannot add ${supervisorsToAdd} supervisor(s). Site only needs ${staffingStatus.requiredSupervisors} supervisors total.`);
         return;
       }
-      
+
       // Get full assignee objects
       const assigneesToAdd = assignees
         .filter(a => selectedAssignees.includes(a._id))
@@ -1243,16 +1245,16 @@ const EditTaskDialog = ({
           assignedAt: new Date().toISOString(),
           status: 'pending' as const
         }));
-      
-     await taskService.addAssigneesToTask(task._id, assigneesToAdd.map(a => ({
-  ...a,
-  role: a.role === 'staff' ? 'employee' : a.role
-})));
-      
+
+      await taskService.addAssigneesToTask(task._id, assigneesToAdd.map(a => ({
+        ...a,
+        role: a.role === 'staff' ? 'employee' : a.role
+      })));
+
       toast.success(`Added ${assigneesToAdd.length} assignee(s) successfully!`);
       await onTaskUpdated(); // Wait for tasks to refresh
       onOpenChange(false); // Close the dialog
-      
+
     } catch (error) {
       console.error("Error adding assignees:", error);
       toast.error(error.message || "Failed to add assignees");
@@ -1279,12 +1281,12 @@ const EditTaskDialog = ({
       .filter(a => selectedAssignees.includes(a._id) && a.role === 'manager').length;
     const supervisorsToRemove = assignees
       .filter(a => selectedAssignees.includes(a._id) && a.role === 'supervisor').length;
-    
+
     if (staffingStatus.currentManagers - managersToRemove < staffingStatus.requiredManagers) {
       toast.warning(`Removing ${managersToRemove} manager(s) will leave site under-staffed. Continue anyway?`);
       // Still proceed but warn
     }
-    
+
     if (staffingStatus.currentSupervisors - supervisorsToRemove < staffingStatus.requiredSupervisors) {
       toast.warning(`Removing ${supervisorsToRemove} supervisor(s) will leave site under-staffed. Continue anyway?`);
       // Still proceed but warn
@@ -1292,13 +1294,13 @@ const EditTaskDialog = ({
 
     try {
       setIsLoading(true);
-      
+
       await taskService.removeAssigneesFromTask(task._id, selectedAssignees);
-      
+
       toast.success(`Removed ${selectedAssignees.length} assignee(s) successfully!`);
       await onTaskUpdated(); // Wait for tasks to refresh
       onOpenChange(false); // Close the dialog
-      
+
     } catch (error) {
       console.error("Error removing assignees:", error);
       toast.error(error.message || "Failed to remove assignees");
@@ -1316,21 +1318,21 @@ const EditTaskDialog = ({
 
     try {
       setIsLoading(true);
-      
+
       const oldAssignee = currentAssignees.find(a => a._id === oldUserId);
       const newAssignee = assignees.find(a => a._id === newUserId);
-      
+
       if (!oldAssignee || !newAssignee) {
         toast.error("Selected assignees not found");
         return;
       }
-      
+
       // Check if roles match
       if (oldAssignee.role !== newAssignee.role) {
         toast.error(`Cannot replace ${oldAssignee.role} with ${newAssignee.role}. Roles must match.`);
         return;
       }
-      
+
       await taskService.replaceAssigneeInTask(task._id, oldUserId, {
         userId: newAssignee._id,
         name: newAssignee.name,
@@ -1338,11 +1340,11 @@ const EditTaskDialog = ({
         assignedAt: new Date().toISOString(),
         status: 'pending' as const
       });
-      
+
       toast.success(`Replaced ${oldAssignee.name} with ${newAssignee.name} successfully!`);
       await onTaskUpdated(); // Wait for tasks to refresh
       onOpenChange(false); // Close the dialog
-      
+
     } catch (error) {
       console.error("Error replacing assignee:", error);
       toast.error(error.message || "Failed to replace assignee");
@@ -1369,13 +1371,13 @@ const EditTaskDialog = ({
   // Get available supervisors for replacement (not assigned to any site and not already in this task)
   const availableSupervisorsForReplacement = useMemo(() => {
     if (assigneeMode !== "replace" || assigneeType !== "supervisor") return [];
-    
+
     return assignees.filter(a => {
       if (a.role !== 'supervisor') return false;
-      
+
       // Check if this supervisor is already assigned to this task
       if (currentAssignees.some(c => c._id === a._id)) return false;
-      
+
       // Check if this supervisor is assigned to any other site
       let isAssignedElsewhere = false;
       assignedSupervisorsMap.forEach((supervisorIds, siteId) => {
@@ -1383,7 +1385,7 @@ const EditTaskDialog = ({
           isAssignedElsewhere = true;
         }
       });
-      
+
       // Only include supervisors that are NOT assigned anywhere else
       return !isAssignedElsewhere;
     });
@@ -1392,13 +1394,13 @@ const EditTaskDialog = ({
   // Get available managers for replacement (not assigned to any site and not already in this task)
   const availableManagersForReplacement = useMemo(() => {
     if (assigneeMode !== "replace" || assigneeType !== "manager") return [];
-    
+
     return assignees.filter(a => {
       if (a.role !== 'manager') return false;
-      
+
       // Check if this manager is already assigned to this task
       if (currentAssignees.some(c => c._id === a._id)) return false;
-      
+
       // Managers don't have site restrictions, so just exclude current ones
       return true;
     });
@@ -1413,7 +1415,7 @@ const EditTaskDialog = ({
             Edit Task: {task.title}
           </DialogTitle>
         </DialogHeader>
-        
+
         {/* Tab Navigation */}
         <div className="flex gap-2 border-b pb-2 mb-4">
           <Button
@@ -1476,23 +1478,23 @@ const EditTaskDialog = ({
         {activeTab === "details" && (
           <div className="space-y-4">
             <FormField label="Task Title" id="edit-title" required>
-              <Input 
-                id="edit-title" 
+              <Input
+                id="edit-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Enter task title" 
-                required 
+                placeholder="Enter task title"
+                required
               />
             </FormField>
 
             <FormField label="Description" id="edit-description" required>
-              <Textarea 
-                id="edit-description" 
+              <Textarea
+                id="edit-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Enter task description" 
+                placeholder="Enter task description"
                 rows={3}
-                required 
+                required
               />
             </FormField>
 
@@ -1531,31 +1533,31 @@ const EditTaskDialog = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField label="Deadline Date" id="edit-deadline" required>
-                <Input 
-                  id="edit-deadline" 
-                  type="date" 
+                <Input
+                  id="edit-deadline"
+                  type="date"
                   value={deadline}
                   onChange={(e) => setDeadline(e.target.value)}
                   min={new Date().toISOString().split('T')[0]}
-                  required 
+                  required
                 />
               </FormField>
 
               <FormField label="Due Date & Time" id="edit-due-datetime" required>
-                <Input 
-                  id="edit-due-datetime" 
-                  type="datetime-local" 
+                <Input
+                  id="edit-due-datetime"
+                  type="datetime-local"
                   value={dueDateTime}
                   onChange={(e) => setDueDateTime(e.target.value)}
                   min={new Date().toISOString().slice(0, 16)}
-                  required 
+                  required
                 />
               </FormField>
             </div>
 
             <FormField label="Site" id="edit-site" required>
-              <Select 
-                value={siteId} 
+              <Select
+                value={siteId}
                 onValueChange={(value) => {
                   setSiteId(value);
                   const selectedSite = sites.find(s => s._id === value);
@@ -1575,13 +1577,13 @@ const EditTaskDialog = ({
                     const needsManagers = requirements ? !requirements.isManagerRequirementMet : true;
                     const needsSupervisors = requirements ? !requirements.isSupervisorRequirementMet : true;
                     const hasAssignee = requirements?.hasAnyAssignee || false;
-                    
+
                     return (
                       <SelectItem key={site._id} value={site._id}>
-                        {site.name} - {site.clientName} 
-                        {hasAssignee ? " (Has Assignees)" : 
-                         !needsManagers && !needsSupervisors ? " (Fully Staffed)" : 
-                         ` (Needs: ${!needsManagers ? '' : 'M'}${!needsManagers && !needsSupervisors ? '' : ''}${!needsSupervisors ? '' : 'S'})`}
+                        {site.name} - {site.clientName}
+                        {hasAssignee ? " (Has Assignees)" :
+                          !needsManagers && !needsSupervisors ? " (Fully Staffed)" :
+                            ` (Needs: ${!needsManagers ? '' : 'M'}${!needsManagers && !needsSupervisors ? '' : ''}${!needsSupervisors ? '' : 'S'})`}
                       </SelectItem>
                     );
                   })}
@@ -1597,8 +1599,8 @@ const EditTaskDialog = ({
               </div>
               <div className="flex flex-wrap gap-2">
                 {currentAssignees.map(assignee => (
-                  <Badge 
-                    key={assignee._id} 
+                  <Badge
+                    key={assignee._id}
                     variant={assignee.role === 'manager' ? 'default' : 'secondary'}
                     className="flex items-center gap-1"
                   >
@@ -1708,8 +1710,8 @@ const EditTaskDialog = ({
               </div>
               <div className="flex flex-wrap gap-2">
                 {currentAssignees.map(assignee => (
-                  <Badge 
-                    key={assignee._id} 
+                  <Badge
+                    key={assignee._id}
                     variant={assignee.role === 'manager' ? 'default' : 'secondary'}
                     className="flex items-center gap-1"
                   >
@@ -1783,7 +1785,7 @@ const EditTaskDialog = ({
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div>
                   <label className="text-sm font-medium mb-2 block">Select New Assignee</label>
                   <Select value={newUserId} onValueChange={setNewUserId}>
@@ -1865,16 +1867,16 @@ const EditTaskDialog = ({
                     {selectedAssignees.length} selected
                   </Badge>
                 </div>
-                
+
                 <div className="max-h-60 overflow-y-auto border rounded-lg p-2">
                   {availableAssignees.length === 0 ? (
                     <div className="text-center py-4 text-muted-foreground">
-                      {assigneeMode === "add" 
+                      {assigneeMode === "add"
                         ? (assigneeType === "manager" && staffingStatus.isManagerRequirementMet
-                            ? "Manager requirement already met"
-                            : assigneeType === "supervisor" && staffingStatus.isSupervisorRequirementMet
-                              ? "Supervisor requirement already met"
-                              : "No assignees available to add")
+                          ? "Manager requirement already met"
+                          : assigneeType === "supervisor" && staffingStatus.isSupervisorRequirementMet
+                            ? "Supervisor requirement already met"
+                            : "No assignees available to add")
                         : "No assignees to remove"}
                     </div>
                   ) : (
@@ -1882,7 +1884,7 @@ const EditTaskDialog = ({
                       // Check if this supervisor is already assigned elsewhere
                       let isSupervisorAssignedElsewhere = false;
                       const assignedSiteNames: string[] = [];
-                      
+
                       if (assignee.role === 'supervisor' && assigneeMode === "add") {
                         assignedSupervisorsMap.forEach((supervisorIds, siteId) => {
                           if (supervisorIds.has(assignee._id) && siteId !== task.siteId) {
@@ -1894,16 +1896,15 @@ const EditTaskDialog = ({
                           }
                         });
                       }
-                      
+
                       const isDisabled = (assigneeMode === "remove" && currentAssignees.length <= 1) ||
-                                        (assigneeMode === "add" && isSupervisorAssignedElsewhere);
-                      
+                        (assigneeMode === "add" && isSupervisorAssignedElsewhere);
+
                       return (
                         <div
                           key={assignee._id}
-                          className={`flex items-center space-x-3 p-2 hover:bg-primary/5 rounded-lg cursor-pointer ${
-                            isDisabled ? 'opacity-50 cursor-not-allowed' : ''
-                          } ${selectedAssignees.includes(assignee._id) ? 'bg-primary/10' : ''}`}
+                          className={`flex items-center space-x-3 p-2 hover:bg-primary/5 rounded-lg cursor-pointer ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''
+                            } ${selectedAssignees.includes(assignee._id) ? 'bg-primary/10' : ''}`}
                           onClick={() => {
                             if (isDisabled) {
                               if (assigneeMode === "remove") {
@@ -1913,7 +1914,7 @@ const EditTaskDialog = ({
                               }
                               return;
                             }
-                            
+
                             if (selectedAssignees.includes(assignee._id)) {
                               setSelectedAssignees(prev => prev.filter(id => id !== assignee._id));
                             } else {
@@ -1921,11 +1922,10 @@ const EditTaskDialog = ({
                             }
                           }}
                         >
-                          <div className={`flex items-center justify-center h-4 w-4 rounded border ${
-                            selectedAssignees.includes(assignee._id) 
-                              ? 'bg-primary border-primary' 
+                          <div className={`flex items-center justify-center h-4 w-4 rounded border ${selectedAssignees.includes(assignee._id)
+                              ? 'bg-primary border-primary'
                               : 'border-gray-300'
-                          }`}>
+                            }`}>
                             {selectedAssignees.includes(assignee._id) && (
                               <Check className="h-3 w-3 text-primary-foreground" />
                             )}
@@ -1960,12 +1960,12 @@ const EditTaskDialog = ({
                         onClick={() => {
                           // Find all unassigned managers
                           const unassignedManagers = assignees
-                            .filter(a => 
-                              a.role === 'manager' && 
+                            .filter(a =>
+                              a.role === 'manager' &&
                               !currentAssignees.some(c => c._id === a._id)
                             )
                             .map(a => a._id);
-                          
+
                           setSelectedAssignees(unassignedManagers);
                         }}
                       >
@@ -1983,7 +1983,7 @@ const EditTaskDialog = ({
                             .filter(a => {
                               if (a.role !== 'supervisor') return false;
                               if (currentAssignees.some(c => c._id === a._id)) return false;
-                              
+
                               // Check if supervisor is assigned elsewhere
                               let isAssignedElsewhere = false;
                               assignedSupervisorsMap.forEach((supervisorIds, siteId) => {
@@ -1991,11 +1991,11 @@ const EditTaskDialog = ({
                                   isAssignedElsewhere = true;
                                 }
                               });
-                              
+
                               return !isAssignedElsewhere;
                             })
                             .map(a => a._id);
-                          
+
                           setSelectedAssignees(unassignedSupervisors);
                         }}
                       >
@@ -2012,7 +2012,7 @@ const EditTaskDialog = ({
               (() => {
                 const oldRole = currentAssignees.find(a => a._id === oldUserId)?.role;
                 const newRole = assignees.find(a => a._id === newUserId)?.role;
-                
+
                 if (oldRole && newRole && oldRole !== newRole) {
                   return (
                     <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -2041,9 +2041,9 @@ const EditTaskDialog = ({
           >
             Cancel
           </Button>
-          <Button 
-            type="button" 
-            className="flex-1" 
+          <Button
+            type="button"
+            className="flex-1"
             onClick={handleSubmit}
             disabled={
               isLoading ||
@@ -2086,9 +2086,9 @@ const EditTaskDialog = ({
 };
 
 // View Task Dialog Component
-const ViewTaskDialog = ({ 
-  task, 
-  open, 
+const ViewTaskDialog = ({
+  task,
+  open,
   onOpenChange,
   getAssigneeType,
   getSiteName,
@@ -2097,9 +2097,9 @@ const ViewTaskDialog = ({
   getAllAssigneeNames,
   getAllAssigneeIds,
   siteStaffingRequirements
-}: { 
-  task: Task | GroupedTask; 
-  open: boolean; 
+}: {
+  task: Task | GroupedTask;
+  open: boolean;
   onOpenChange: (open: boolean) => void;
   getAssigneeType: (assigneeId: string) => string;
   getSiteName: (siteId: string) => string;
@@ -2112,22 +2112,22 @@ const ViewTaskDialog = ({
   if (!task) return null;
 
   const getPriorityColor = (priority: string): "default" | "secondary" | "destructive" | "outline" => {
-  const colors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-    high: "destructive",
-    medium: "default",
-    low: "secondary",
+    const colors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+      high: "destructive",
+      medium: "default",
+      low: "secondary",
+    };
+    return colors[priority] || "outline";
   };
-  return colors[priority] || "outline";
-};
   const getStatusColor = (status: string): "default" | "secondary" | "destructive" | "outline" => {
-  const colors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-    completed: "default",
-    "in-progress": "default",
-    pending: "secondary",
-    cancelled: "destructive",
+    const colors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+      completed: "default",
+      "in-progress": "default",
+      pending: "secondary",
+      cancelled: "destructive",
+    };
+    return colors[status] || "outline";
   };
-  return colors[status] || "outline";
-};
 
   const isGrouped = isGroupedTask(task);
   const assigneeNames = getAllAssigneeNames(task);
@@ -2136,10 +2136,10 @@ const ViewTaskDialog = ({
   // Calculate staffing status for this task
   const staffingStatus = useMemo((): TaskStaffingStatus | undefined => {
     if (!siteStaffingRequirements) return undefined;
-    
+
     const currentManagers = task.assignedUsers?.filter(u => u.role === 'manager').length || 0;
     const currentSupervisors = task.assignedUsers?.filter(u => u.role === 'supervisor').length || 0;
-    
+
     return {
       currentManagers,
       currentSupervisors,
@@ -2149,8 +2149,8 @@ const ViewTaskDialog = ({
       missingSupervisors: Math.max(0, siteStaffingRequirements.requiredSupervisors - currentSupervisors),
       isManagerRequirementMet: currentManagers >= siteStaffingRequirements.requiredManagers,
       isSupervisorRequirementMet: currentSupervisors >= siteStaffingRequirements.requiredSupervisors,
-      isFullyStaffed: currentManagers >= siteStaffingRequirements.requiredManagers && 
-                      currentSupervisors >= siteStaffingRequirements.requiredSupervisors
+      isFullyStaffed: currentManagers >= siteStaffingRequirements.requiredManagers &&
+        currentSupervisors >= siteStaffingRequirements.requiredSupervisors
     };
   }, [task, siteStaffingRequirements]);
 
@@ -2163,7 +2163,7 @@ const ViewTaskDialog = ({
             Task Details: {task.title || "Untitled Task"}
           </DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-6">
           {/* Staffing Status Banner */}
           {staffingStatus && !staffingStatus.isFullyStaffed && (
@@ -2279,7 +2279,7 @@ const ViewTaskDialog = ({
                   <div className="text-sm text-muted-foreground">Client</div>
                   <div className="font-medium">{getClientName(task.siteId)}</div>
                 </div>
-                
+
                 {/* Show staffing requirements for this site */}
                 {siteStaffingRequirements && (
                   <div className="mt-4">
@@ -2425,8 +2425,8 @@ const ViewTaskDialog = ({
 };
 
 // Combined Add/Assign Task Dialog Component - Single unified flow
-const AddAssignTaskDialog = ({ 
-  open, 
+const AddAssignTaskDialog = ({
+  open,
   onOpenChange,
   onSubmit,
   sites,
@@ -2441,8 +2441,8 @@ const AddAssignTaskDialog = ({
   isLoadingSites,
   assignedSupervisorsMap,
   siteStaffingRequirements
-}: { 
-  open: boolean; 
+}: {
+  open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   sites: ExtendedSite[];
@@ -2481,7 +2481,7 @@ const AddAssignTaskDialog = ({
   // Handle form submission
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
+
     // Validate form
     if (!title || !description || !deadline || !dueDateTime) {
       toast.error("Please fill in all required fields");
@@ -2497,7 +2497,7 @@ const AddAssignTaskDialog = ({
     resetForm();
   };
 
-  const selectedAssigneeObjects = assignees.filter(assignee => 
+  const selectedAssigneeObjects = assignees.filter(assignee =>
     selectedAssignees.includes(assignee._id)
   );
   const managerCount = selectedAssigneeObjects.filter(a => a.role === 'manager').length;
@@ -2511,7 +2511,7 @@ const AddAssignTaskDialog = ({
       <DialogTrigger asChild>
         <Button variant="default" className="ml-2">
           <Plus className="mr-2 h-4 w-4" />
-           Assign Site
+          Assign Site
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -2529,27 +2529,27 @@ const AddAssignTaskDialog = ({
               <FileText className="h-5 w-5" />
               Task Details
             </h3>
-            
+
             <FormField label="Task Title" id="task-title" required>
-              <Input 
-                id="task-title" 
-                name="task-title" 
+              <Input
+                id="task-title"
+                name="task-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Enter task title" 
-                required 
+                placeholder="Enter task title"
+                required
               />
             </FormField>
 
             <FormField label="Description" id="description" required>
-              <Textarea 
-                id="description" 
-                name="description" 
+              <Textarea
+                id="description"
+                name="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Enter task description" 
+                placeholder="Enter task description"
                 rows={3}
-                required 
+                required
               />
             </FormField>
 
@@ -2588,36 +2588,36 @@ const AddAssignTaskDialog = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField label="Start Date" id="start-date">
-                <Input 
-                  id="start-date" 
-                  name="start-date" 
-                  type="date" 
+                <Input
+                  id="start-date"
+                  name="start-date"
+                  type="date"
                   defaultValue={new Date().toISOString().split('T')[0]}
                 />
               </FormField>
 
               <FormField label="Deadline Date" id="deadline" required>
-                <Input 
-                  id="deadline" 
-                  name="deadline" 
-                  type="date" 
+                <Input
+                  id="deadline"
+                  name="deadline"
+                  type="date"
                   value={deadline}
                   onChange={(e) => setDeadline(e.target.value)}
                   min={new Date().toISOString().split('T')[0]}
-                  required 
+                  required
                 />
               </FormField>
             </div>
 
             <FormField label="Due Date & Time" id="due-datetime" required>
-              <Input 
-                id="due-datetime" 
-                name="due-datetime" 
-                type="datetime-local" 
+              <Input
+                id="due-datetime"
+                name="due-datetime"
+                type="datetime-local"
                 value={dueDateTime}
                 onChange={(e) => setDueDateTime(e.target.value)}
                 min={new Date().toISOString().slice(0, 16)}
-                required 
+                required
               />
             </FormField>
           </div>
@@ -2630,7 +2630,7 @@ const AddAssignTaskDialog = ({
             </h3>
 
             {/* Assignee Selection Section */}
-            <AssigneeMultiSelect 
+            <AssigneeMultiSelect
               assignees={assignees}
               selectedAssignees={selectedAssignees}
               onSelectAssignees={setSelectedAssignees}
@@ -2644,7 +2644,7 @@ const AddAssignTaskDialog = ({
             />
 
             {/* Site Selection Section - Now filtered to show only sites with no assignees */}
-            <SiteMultiSelect 
+            <SiteMultiSelect
               sites={sites}
               selectedSites={selectedSites}
               onSelectSites={setSelectedSites}
@@ -2745,8 +2745,8 @@ const AddAssignTaskDialog = ({
             >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="flex-1"
               disabled={selectedSites.length === 0}
             >
@@ -2782,53 +2782,101 @@ const TasksSection = () => {
   const [isLoadingSites, setIsLoadingSites] = useState(false);
   const [assignedSupervisorsMap, setAssignedSupervisorsMap] = useState<Map<string, Set<string>>>(new Map());
   const [siteStaffingRequirements, setSiteStaffingRequirements] = useState<Map<string, SiteStaffingRequirements>>(new Map());
+  // Add after existing state declarations
+  const [realSites, setRealSites] = useState<ServiceSite[]>([]);
+  const [showSiteDetails, setShowSiteDetails] = useState(false);
+  const [selectedSiteForDetails, setSelectedSiteForDetails] = useState<ServiceSite | null>(null);
+  const [siteTasksMap, setSiteTasksMap] = useState<Map<string, Task[]>>(new Map());
 
+  const [activeTab, setActiveTab] = useState<string>("sites");
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   // Fetch data on component mount
   useEffect(() => {
     fetchTasks();
     fetchSites();
     fetchAssignees();
   }, []);
+  // Add this useEffect to fetch sites
+
+  // Calculate site tasks whenever tasks change
+  useEffect(() => {
+    const map = new Map<string, Task[]>();
+    tasks.forEach(task => {
+      if (task.siteId) {
+        if (!map.has(task.siteId)) {
+          map.set(task.siteId, []);
+        }
+        map.get(task.siteId)!.push(task);
+      }
+    });
+    setSiteTasksMap(map);
+  }, [tasks]);
+
+
+  // Restore from URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('siteDetails') === 'true' && realSites.length > 0) {
+      const site = realSites.find(s => s._id === params.get('selectedSiteId'));
+      if (site) {
+        setSelectedSiteForDetails(site);
+        setShowSiteDetails(true);
+      }
+    }
+  }, [realSites]);
+
 
   useEffect(() => {
-  const fetchAssignedSupervisors = async () => {
-    try {
-      const map = new Map<string, Set<string>>();
-      // Fetch supervisors for each site
-      for (const site of sites) {
-        const supervisors = await taskService.getSupervisorsBySite(site._id);
-        // Convert the array to a Set of supervisor IDs
-        const supervisorIds = new Set(supervisors.map(s => s._id));
-        map.set(site._id, supervisorIds);
+    const fetchAssignedSupervisors = async () => {
+      try {
+        const map = new Map<string, Set<string>>();
+        // Fetch supervisors for each site
+        for (const site of sites) {
+          const supervisors = await taskService.getSupervisorsBySite(site._id);
+          // Convert the array to a Set of supervisor IDs
+          const supervisorIds = new Set(supervisors.map(s => s._id));
+          map.set(site._id, supervisorIds);
+        }
+        setAssignedSupervisorsMap(map);
+      } catch (error) {
+        console.error("Error fetching assigned supervisors:", error);
       }
-      setAssignedSupervisorsMap(map);
-    } catch (error) {
-      console.error("Error fetching assigned supervisors:", error);
-    }
-  };
-  
-  if (sites.length > 0) {
-    fetchAssignedSupervisors();
-  }
-}, [sites]);
+    };
 
+    if (sites.length > 0) {
+      fetchAssignedSupervisors();
+    }
+  }, [sites]);
+  // ✅ REPLACED useEffect:
+  useEffect(() => {
+    const fetchRealSites = async () => {
+      try {
+        const sitesData = await siteService.getAllSites();
+        setRealSites(sitesData || []);
+      } catch (error) {
+        console.error("Failed to fetch sites:", error);
+        toast.error("Failed to load sites");
+      }
+    };
+    fetchRealSites();
+  }, []);
   // Calculate site staffing requirements - FIXED: Now counts UNIQUE managers and supervisors across ALL tasks
   useEffect(() => {
     const calculateStaffingRequirements = () => {
       const requirementsMap = new Map<string, SiteStaffingRequirements>();
-      
+
       sites.forEach(site => {
         if (!site) return;
-        
+
         // Get all tasks for this site
-        const siteTasks = tasks.filter(task => 
+        const siteTasks = tasks.filter(task =>
           task && task.siteId === site._id
         );
-        
+
         // Count UNIQUE managers and supervisors across ALL tasks at this site
         const assignedManagerIds = new Set<string>();
         const assignedSupervisorIds = new Set<string>();
-        
+
         siteTasks.forEach(task => {
           // Check for new format (assignedUsers array)
           if (task.assignedUsers && task.assignedUsers.length > 0) {
@@ -2839,7 +2887,7 @@ const TasksSection = () => {
                 assignedSupervisorIds.add(user.userId);
               }
             });
-          } 
+          }
           // Check for old format (single assignee)
           else if (task.assignedTo && task.assignedTo !== "unassigned") {
             // We need to determine the role from assignees list
@@ -2853,16 +2901,16 @@ const TasksSection = () => {
             }
           }
         });
-        
+
         const requiredManagers = site.managerCount || 0;
         const requiredSupervisors = site.supervisorCount || 0;
         const assignedManagers = assignedManagerIds.size;
         const assignedSupervisors = assignedSupervisorIds.size;
-        
+
         const missingRoles: ('manager' | 'supervisor')[] = [];
         if (assignedManagers < requiredManagers) missingRoles.push('manager');
         if (assignedSupervisors < requiredSupervisors) missingRoles.push('supervisor');
-        
+
         requirementsMap.set(site._id, {
           siteId: site._id,
           siteName: site.name,
@@ -2880,13 +2928,35 @@ const TasksSection = () => {
           hasAnyAssignee: assignedManagers > 0 || assignedSupervisors > 0 // Added this field
         });
       });
-      
+
       setSiteStaffingRequirements(requirementsMap);
     };
-    
+
     calculateStaffingRequirements();
   }, [tasks, sites, assignees]);
+  // Add these handler functions
+  const handleMenuClick = () => {
+    setMobileSidebarOpen(true);
+  };
 
+  const handleMobileClose = () => {
+    setMobileSidebarOpen(false);
+  };
+
+  const handleViewSiteDetails = (site: ServiceSite) => {
+    setSelectedSiteForDetails(site);
+    setShowSiteDetails(true);
+    const params = new URLSearchParams(window.location.search);
+    params.set('siteDetails', 'true');
+    params.set('selectedSiteId', site._id);
+    window.history.replaceState(null, '', `?${params.toString()}`);
+  };
+
+  const handleBackFromSiteDetails = () => {
+    setShowSiteDetails(false);
+    setSelectedSiteForDetails(null);
+    window.history.replaceState(null, '', window.location.pathname);
+  };
   // Fetch tasks from backend using TaskService
   const fetchTasks = async () => {
     try {
@@ -2907,15 +2977,15 @@ const TasksSection = () => {
     try {
       setIsLoadingSites(true);
       const sitesData = await taskService.getAllSites();
-      
+
       // Calculate manager/supervisor counts for each site
       const sitesWithCounts = (sitesData || []).map(site => {
         // Get staff deployment array safely
         const staffDeployment = site.staffDeployment;
-        
+
         // Ensure staffDeployment is an array, if not, use empty array
         const staffArray = Array.isArray(staffDeployment) ? staffDeployment : [];
-        
+
         // Calculate manager count
         const managerCount = staffArray
           .filter((staff: any) => {
@@ -2924,7 +2994,7 @@ const TasksSection = () => {
             return role.includes('manager') || role === 'manager';
           })
           .reduce((sum: number, staff: any) => sum + (Number(staff.count) || 0), 0);
-        
+
         // Calculate supervisor count
         const supervisorCount = staffArray
           .filter((staff: any) => {
@@ -2933,14 +3003,14 @@ const TasksSection = () => {
             return role.includes('supervisor') || role === 'supervisor';
           })
           .reduce((sum: number, staff: any) => sum + (Number(staff.count) || 0), 0);
-        
+
         return {
           ...site,
           managerCount,
           supervisorCount
         };
       });
-      
+
       setSites(sitesWithCounts || []);
     } catch (error) {
       console.error("Error fetching sites:", error);
@@ -3010,7 +3080,7 @@ const TasksSection = () => {
   // Helper function to get all assignee names for a task (for grouped or single tasks)
   const getAllAssigneeNames = useCallback((task: Task | GroupedTask): string[] => {
     if (!task) return [];
-    
+
     if (isGroupedTask(task)) {
       // For grouped tasks, get all unique assignee names from all assigned users
       return Array.from(new Set(task._allAssignedUsers?.map(u => u.name) || []));
@@ -3028,7 +3098,7 @@ const TasksSection = () => {
   // Helper function to get all assignee IDs for a task
   const getAllAssigneeIds = useCallback((task: Task | GroupedTask): string[] => {
     if (!task) return [];
-    
+
     if (isGroupedTask(task)) {
       // For grouped tasks, get all unique assignee IDs from all assigned users
       return Array.from(new Set(task._allAssignedUsers?.map(u => u.userId) || []));
@@ -3046,7 +3116,7 @@ const TasksSection = () => {
   // Get staffing requirements for a specific task
   const getTaskStaffingRequirements = useCallback((task: Task | GroupedTask): SiteStaffingRequirements | undefined => {
     if (!task) return undefined;
-    
+
     if (isGroupedTask(task)) {
       // For grouped tasks, show requirements for the first site
       const firstSiteId = task.siteId;
@@ -3060,20 +3130,20 @@ const TasksSection = () => {
   const doesTaskMeetRequirements = useCallback((task: Task | GroupedTask): boolean => {
     const requirements = getTaskStaffingRequirements(task);
     if (!requirements) return true;
-    
+
     if (isGroupedTask(task)) {
       return requirements.isManagerRequirementMet && requirements.isSupervisorRequirementMet;
     } else {
       // For single task, check if this task's assignees help meet requirements
       const hasManager = task.assignedUsers?.some(u => u.role === 'manager') || false;
       const hasSupervisor = task.assignedUsers?.some(u => u.role === 'supervisor') || false;
-      
+
       // Task meets requirements if either:
       // 1. Requirements are already met by other tasks at this site, or
       // 2. This task provides the missing roles
       const managerMet = requirements.isManagerRequirementMet || hasManager;
       const supervisorMet = requirements.isSupervisorRequirementMet || hasSupervisor;
-      
+
       return managerMet && supervisorMet;
     }
   }, [getTaskStaffingRequirements]);
@@ -3082,21 +3152,21 @@ const TasksSection = () => {
   const groupTasks = useCallback((taskList: Task[]): (Task | GroupedTask)[] => {
     // Create a map to group tasks
     const groupMap = new Map<string, Task[]>();
-    
+
     (taskList || []).forEach(task => {
       if (!task) return;
-      
+
       // Create a unique key based on task definition AND site
       const groupKey = `${task.title}|${task.description}|${task.deadline}|${task.priority}|${task.taskType}|${task.siteId}`;
-      
+
       if (!groupMap.has(groupKey)) {
         groupMap.set(groupKey, []);
       }
       groupMap.get(groupKey)!.push(task);
     });
-    
+
     const result: (Task | GroupedTask)[] = [];
-    
+
     // Process each group
     groupMap.forEach((group, groupKey) => {
       // If only one task in the group, add it as a regular task
@@ -3104,40 +3174,40 @@ const TasksSection = () => {
         result.push(group[0]);
         return;
       }
-      
+
       // Multiple tasks - create a grouped task
       const mainTask = group[0];
-      
+
       // Get all assigned users across all tasks in the group
       const allAssignedUsers = group.flatMap(t => t.assignedUsers || []);
-      
+
       // Get unique values
       const uniqueUserIds = [...new Set(allAssignedUsers.map(u => u.userId))];
       const uniqueUserNames = [...new Set(allAssignedUsers.map(u => u.name))];
       const uniqueSites = [...new Set(group.map(t => t.siteId))];
       const uniqueSiteNames = [...new Set(group.map(t => t.siteName))];
       const uniqueClientNames = [...new Set(group.map(t => t.clientName))];
-      
+
       // Count managers and supervisors
       const managerCount = allAssignedUsers.filter(u => u.role === 'manager').length;
       const supervisorCount = allAssignedUsers.filter(u => u.role === 'supervisor').length;
-      
+
       // Calculate status
       const statuses = group.map(t => t.status);
       const isAllCompleted = statuses.every(s => s === "completed");
       const isSomeInProgress = statuses.some(s => s === "in-progress");
-      
+
       let overallStatus: Task["status"] = "pending";
       if (isAllCompleted) {
         overallStatus = "completed";
       } else if (isSomeInProgress) {
         overallStatus = "in-progress";
       }
-      
+
       // Aggregate attachments and updates
       const allAttachments = group.flatMap(t => t.attachments || []);
       const allHourlyUpdates = group.flatMap(t => t.hourlyUpdates || []);
-      
+
       const groupedTask: GroupedTask = {
         ...mainTask,
         _id: `group-${mainTask._id}-${Date.now()}`,
@@ -3158,10 +3228,10 @@ const TasksSection = () => {
         _managerCount: managerCount,
         _supervisorCount: supervisorCount
       };
-      
+
       result.push(groupedTask);
     });
-    
+
     return result;
   }, []);
 
@@ -3170,78 +3240,78 @@ const TasksSection = () => {
     // First, filter out unassigned/template tasks - only show assigned tasks
     let filtered = (tasks || []).filter(task => {
       if (!task) return false;
-      
+
       // Check if task has assigned users (new format) or single assignee (old format)
       const hasAssignedUsers = task.assignedUsers && task.assignedUsers.length > 0;
-      const hasSingleAssignee = task.assignedTo && task.assignedTo !== "unassigned" && 
-                                task.assignedToName && task.assignedToName !== "Unassigned";
-      
+      const hasSingleAssignee = task.assignedTo && task.assignedTo !== "unassigned" &&
+        task.assignedToName && task.assignedToName !== "Unassigned";
+
       // Only show tasks that are actually assigned (not templates)
-      const isAssigned = (hasAssignedUsers || hasSingleAssignee) && 
-                         task.siteId !== "unspecified" &&
-                         task.siteName !== "Unspecified Site";
-      
+      const isAssigned = (hasAssignedUsers || hasSingleAssignee) &&
+        task.siteId !== "unspecified" &&
+        task.siteName !== "Unspecified Site";
+
       return isAssigned;
     });
-    
+
     // Filter by site if selected
     if (selectedSite !== "all") {
       filtered = filtered.filter(task => task && task.siteId === selectedSite);
     }
-    
+
     // Filter by search query if exists
     if (searchQuery.trim()) {
       const searchLower = searchQuery.toLowerCase().trim();
-      
+
       filtered = filtered.filter(task => {
         if (!task) return false;
-        
+
         // Search in all relevant fields with OR logic
         const titleMatch = safeString(task.title).toLowerCase().includes(searchLower);
         const descriptionMatch = safeString(task.description).toLowerCase().includes(searchLower);
-        
+
         // Search in assignees (new format)
         let assigneeMatch = false;
         if (task.assignedUsers && task.assignedUsers.length > 0) {
-          assigneeMatch = task.assignedUsers.some(u => 
+          assigneeMatch = task.assignedUsers.some(u =>
             safeString(u.name).toLowerCase().includes(searchLower)
           );
         } else {
           // Fallback to old format
           assigneeMatch = safeString(task.assignedToName).toLowerCase().includes(searchLower);
         }
-        
+
         const siteMatch = safeString(task.siteName).toLowerCase().includes(searchLower);
         const clientMatch = safeString(task.clientName).toLowerCase().includes(searchLower);
         const taskTypeMatch = safeString(task.taskType).toLowerCase().includes(searchLower);
         const priorityMatch = safeString(task.priority).toLowerCase().includes(searchLower);
         const statusMatch = safeString(task.status).toLowerCase().includes(searchLower);
-        
-        return titleMatch || descriptionMatch || assigneeMatch || 
-               siteMatch || clientMatch || taskTypeMatch || 
-               priorityMatch || statusMatch;
+
+        return titleMatch || descriptionMatch || assigneeMatch ||
+          siteMatch || clientMatch || taskTypeMatch ||
+          priorityMatch || statusMatch;
       });
     }
-    
+
     // Remove duplicates based on task ID
     const uniqueTasks: Task[] = [];
     const taskIds = new Set<string>();
-    
+
     filtered.forEach(task => {
       if (task && !taskIds.has(task._id)) {
         taskIds.add(task._id);
         uniqueTasks.push(task);
       }
     });
-    
+
     // Group the tasks
     return groupTasks(uniqueTasks);
   }, [tasks, searchQuery, selectedSite, groupTasks]);
 
   // Create tasks for sites - FIXED: Now handles fully staffed sites without requiring assignees
   const createTasksForSites = async (
-    taskTitle: string, 
-    taskDescription: string, 
+    taskTitle: string,
+    taskDescription: string,
     taskPriority: "high" | "medium" | "low",
     taskType: string,
     taskDeadline: string,
@@ -3255,12 +3325,12 @@ const TasksSection = () => {
     }
 
     // Get selected assignee objects (if any)
-    const selectedAssigneeObjects = assignees.filter(assignee => 
+    const selectedAssigneeObjects = assignees.filter(assignee =>
       assigneeIds.includes(assignee._id)
     );
 
     // Get selected sites
-    const selectedSiteObjects = sites.filter(site => 
+    const selectedSiteObjects = sites.filter(site =>
       siteIds.includes(site._id)
     );
 
@@ -3268,13 +3338,13 @@ const TasksSection = () => {
     if (selectedAssigneeObjects.length > 0) {
       const supervisorConflicts: string[] = [];
       const validAssignees: Assignee[] = [];
-      
+
       selectedAssigneeObjects.forEach(assignee => {
         if (assignee.role === 'supervisor') {
           // Check if this supervisor is already assigned to any site
           let isAssignedElsewhere = false;
           const assignedSiteNames: string[] = [];
-          
+
           assignedSupervisorsMap.forEach((supervisorIds, siteId) => {
             if (supervisorIds.has(assignee._id)) {
               isAssignedElsewhere = true;
@@ -3284,7 +3354,7 @@ const TasksSection = () => {
               }
             }
           });
-          
+
           if (isAssignedElsewhere) {
             supervisorConflicts.push(`${assignee.name} (already assigned to: ${assignedSiteNames.join(', ')})`);
           } else {
@@ -3315,47 +3385,47 @@ const TasksSection = () => {
     // Create tasks for EACH SITE
     const tasksToCreate: any[] = [];
     const skippedSites: string[] = [];
-    
+
     for (const site of selectedSiteObjects) {
       // Check site staffing requirements
       const requirements = siteStaffingRequirements.get(site._id);
-      
+
       if (requirements) {
         // If site is fully staffed, skip it (don't create tasks for fully staffed sites)
         if (requirements.isManagerRequirementMet && requirements.isSupervisorRequirementMet) {
           skippedSites.push(`${site.name} (fully staffed)`);
           continue;
         }
-        
+
         // If site already has assignees, skip it
         if (requirements.hasAnyAssignee) {
           skippedSites.push(`${site.name} (already has assignees)`);
           continue;
         }
-        
+
         // If site needs assignees but none selected, skip this site
         if (selectedAssigneeObjects.length === 0) {
           skippedSites.push(`${site.name} (needs staffing)`);
           continue;
         }
-        
+
         // Calculate if adding these assignees would exceed limits
         const managersToAdd = selectedAssigneeObjects.filter(a => a.role === 'manager').length;
         const supervisorsToAdd = selectedAssigneeObjects.filter(a => a.role === 'supervisor').length;
-        
+
         const totalManagersAfterAdd = requirements.assignedManagers + managersToAdd;
         const totalSupervisorsAfterAdd = requirements.assignedSupervisors + supervisorsToAdd;
-        
+
         if (totalManagersAfterAdd > requirements.requiredManagers) {
           toast.warning(`Site ${site.name} already has ${requirements.assignedManagers} managers. Adding ${managersToAdd} more would exceed the limit of ${requirements.requiredManagers}.`);
           continue;
         }
-        
+
         if (totalSupervisorsAfterAdd > requirements.requiredSupervisors) {
           toast.warning(`Site ${site.name} already has ${requirements.assignedSupervisors} supervisors. Adding ${supervisorsToAdd} more would exceed the limit of ${requirements.requiredSupervisors}.`);
           continue;
         }
-        
+
         // Create task with assignees
         const assignedUsers = selectedAssigneeObjects.map(assignee => ({
           userId: assignee._id,
@@ -3364,7 +3434,7 @@ const TasksSection = () => {
           assignedAt: new Date().toISOString(),
           status: 'pending' as const
         }));
-        
+
         const taskData = {
           title: taskTitle,
           description: taskDescription,
@@ -3381,7 +3451,7 @@ const TasksSection = () => {
           hourlyUpdates: [],
           createdBy: "current-user"
         };
-        
+
         tasksToCreate.push(taskData);
       }
     }
@@ -3397,7 +3467,7 @@ const TasksSection = () => {
 
     try {
       console.log("Creating tasks:", JSON.stringify(tasksToCreate, null, 2));
-      
+
       const createMultipleTasksRequest = {
         tasks: tasksToCreate,
         createdBy: "current-user"
@@ -3405,45 +3475,45 @@ const TasksSection = () => {
 
       const createdTasks = await taskService.createMultipleTasks(createMultipleTasksRequest);
       // Inside createTasksForSites, after the taskService.createMultipleTasks call
-if (createdTasks && createdTasks.length > 0) {
-  createdTasks.forEach((task: Task) => {
-    // Dispatch event for each created task
-    window.dispatchEvent(new CustomEvent('task-assigned', {
-      detail: {
-        taskId: task._id,
-        taskTitle: task.title || 'Task',
-        assignedToName: task.assignedUsers?.map(u => u.name).join(', ') || 'Supervisor',
-        siteName: task.siteName,
-        priority: task.priority,
-        assignedTo: task.assignedUsers?.map(u => u.userId) || [],
+      if (createdTasks && createdTasks.length > 0) {
+        createdTasks.forEach((task: Task) => {
+          // Dispatch event for each created task
+          window.dispatchEvent(new CustomEvent('task-assigned', {
+            detail: {
+              taskId: task._id,
+              taskTitle: task.title || 'Task',
+              assignedToName: task.assignedUsers?.map(u => u.name).join(', ') || 'Supervisor',
+              siteName: task.siteName,
+              priority: task.priority,
+              assignedTo: task.assignedUsers?.map(u => u.userId) || [],
+            }
+          }));
+        });
       }
-    }));
-  });
-}
       const managerCount = selectedAssigneeObjects.filter(a => a.role === 'manager').length;
       const supervisorCount = selectedAssigneeObjects.filter(a => a.role === 'supervisor').length;
-      
+
       let successMessage = `✅ Successfully created ${tasksToCreate.length} task(s)`;
-      
+
       if (selectedAssigneeObjects.length > 0) {
         successMessage += ` with ${selectedAssigneeObjects.length} assignee(s) (${managerCount}M, ${supervisorCount}S)`;
       } else {
         successMessage += ` (no assignees)`;
       }
-      
+
       successMessage += ` across ${siteIds.length} site(s)!`;
-      
+
       if (skippedSites.length > 0) {
         successMessage += ` ${skippedSites.length} site(s) were skipped: ${skippedSites.join(', ')}.`;
       }
-      
+
       toast.success(successMessage);
-      
+
       // Refresh tasks list
       await fetchTasks();
-      
+
       return true;
-      
+
     } catch (error) {
       console.error("Error creating tasks:", error);
       toast.error(error.message || "Failed to create tasks");
@@ -3454,7 +3524,7 @@ if (createdTasks && createdTasks.length > 0) {
   // Handle unified submit
   const handleUnifiedSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
+
     const formData = new FormData(e.currentTarget);
     const title = formData.get("title") as string;
     const description = formData.get("description") as string;
@@ -3464,7 +3534,7 @@ if (createdTasks && createdTasks.length > 0) {
     const dueDateTime = formData.get("dueDateTime") as string;
     const selectedSitesStr = formData.get("selectedSites") as string;
     const selectedAssigneesStr = formData.get("selectedAssignees") as string;
-    
+
     const siteIds = JSON.parse(selectedSitesStr) as string[];
     const assigneeIds = JSON.parse(selectedAssigneesStr) as string[];
 
@@ -3472,13 +3542,13 @@ if (createdTasks && createdTasks.length > 0) {
     const sitesNeedingAssignees: string[] = [];
     const sitesFullyStaffed: string[] = [];
     const sitesWithAssignees: string[] = [];
-    
+
     siteIds.forEach(siteId => {
       const requirements = siteStaffingRequirements.get(siteId);
       if (requirements) {
         const missingManagers = requirements.requiredManagers - requirements.assignedManagers;
         const missingSupervisors = requirements.requiredSupervisors - requirements.assignedSupervisors;
-        
+
         if (requirements.hasAnyAssignee) {
           sitesWithAssignees.push(requirements.siteName);
         } else if (missingManagers > 0 || missingSupervisors > 0) {
@@ -3501,18 +3571,18 @@ if (createdTasks && createdTasks.length > 0) {
           </ul>
         </div>
       );
-      
+
       // Filter out sites that already have assignees
       const filteredSiteIds = siteIds.filter(siteId => {
         const requirements = siteStaffingRequirements.get(siteId);
         return requirements && !requirements.hasAnyAssignee;
       });
-      
+
       if (filteredSiteIds.length === 0) {
         toast.error("No valid sites remaining after filtering out sites with assignees.");
         return;
       }
-      
+
       siteIds.length = 0;
       siteIds.push(...filteredSiteIds);
     }
@@ -3546,16 +3616,16 @@ if (createdTasks && createdTasks.length > 0) {
     });
 
     const success = await createTasksForSites(
-      title, 
-      description, 
-      priority, 
-      taskType, 
-      deadline, 
-      dueDateTime, 
-      assigneeIds, 
+      title,
+      description,
+      priority,
+      taskType,
+      deadline,
+      dueDateTime,
+      assigneeIds,
       sitesToCreateTasks
     );
-    
+
     if (success) {
       setAddAssignTaskDialogOpen(false);
       setSelectedSites([]);
@@ -3591,86 +3661,86 @@ if (createdTasks && createdTasks.length > 0) {
     }
   };
 
- const handleUpdateStatus = async (taskId: string, status: Task["status"], userId?: string) => {
-  try {
-    const updateData: UpdateTaskStatusRequest = userId ? { status, userId } : { status };
-    await taskService.updateTaskStatus(taskId, updateData);
-    
-    // 🎯 Dispatch events for real-time notifications
-    const task = tasks.find(t => t._id === taskId);
-    if (task) {
-      // Always dispatch a general update event
-      window.dispatchEvent(new CustomEvent('task-updated', {
-        detail: {
-          taskId: task._id,
-          taskTitle: task.title,
-          siteName: task.siteName,
-          newStatus: status,
-          updatedBy: userId ? getAssigneeName(userId) : 'Admin',
-          notificationType: 'task_status_update'
-        }
-      }));
+  const handleUpdateStatus = async (taskId: string, status: Task["status"], userId?: string) => {
+    try {
+      const updateData: UpdateTaskStatusRequest = userId ? { status, userId } : { status };
+      await taskService.updateTaskStatus(taskId, updateData);
 
-      // If completed, also dispatch task-completed
-      if (status === 'completed') {
-        window.dispatchEvent(new CustomEvent('task-completed', {
+      // 🎯 Dispatch events for real-time notifications
+      const task = tasks.find(t => t._id === taskId);
+      if (task) {
+        // Always dispatch a general update event
+        window.dispatchEvent(new CustomEvent('task-updated', {
           detail: {
             taskId: task._id,
             taskTitle: task.title,
             siteName: task.siteName,
-            completedBy: userId ? getAssigneeName(userId) : 'Admin'
+            newStatus: status,
+            updatedBy: userId ? getAssigneeName(userId) : 'Admin',
+            notificationType: 'task_status_update'
+          }
+        }));
+
+        // If completed, also dispatch task-completed
+        if (status === 'completed') {
+          window.dispatchEvent(new CustomEvent('task-completed', {
+            detail: {
+              taskId: task._id,
+              taskTitle: task.title,
+              siteName: task.siteName,
+              completedBy: userId ? getAssigneeName(userId) : 'Admin'
+            }
+          }));
+        }
+      }
+
+      toast.success(userId ? "User status updated!" : "Task status updated!");
+      await fetchTasks();
+    } catch (error) {
+      console.error("Error updating task status:", error);
+      toast.error(error.message || "Failed to update task status");
+    }
+  };
+
+  // Handle update status for grouped tasks
+  const handleUpdateGroupStatus = async (groupedTask: GroupedTask, status: Task["status"]) => {
+    try {
+      const updatePromises = groupedTask._groupItems.map((task: Task) =>
+        taskService.updateTaskStatus(task._id, { status })
+      );
+      await Promise.all(updatePromises);
+
+      // 🎯 Dispatch events for the whole group
+      if (status === 'completed') {
+        window.dispatchEvent(new CustomEvent('task-completed', {
+          detail: {
+            taskId: groupedTask._id,
+            taskTitle: groupedTask.title,
+            siteName: groupedTask.siteName,
+            completedBy: 'Admin',
+            groupCount: groupedTask._groupCount
+          }
+        }));
+      } else {
+        window.dispatchEvent(new CustomEvent('task-updated', {
+          detail: {
+            taskId: groupedTask._id,
+            taskTitle: groupedTask.title,
+            siteName: groupedTask.siteName,
+            newStatus: status,
+            updatedBy: 'Admin',
+            notificationType: 'task_status_update'
           }
         }));
       }
+
+      toast.success(`Updated status for ${groupedTask._groupCount} tasks!`);
+      await fetchTasks();
+    } catch (error) {
+      console.error("Error updating group status:", error);
+      toast.error(error.message || "Failed to update tasks");
     }
-
-    toast.success(userId ? "User status updated!" : "Task status updated!");
-    await fetchTasks();
-  } catch (error) {
-    console.error("Error updating task status:", error);
-    toast.error(error.message || "Failed to update task status");
-  }
-};
-
-  // Handle update status for grouped tasks
- const handleUpdateGroupStatus = async (groupedTask: GroupedTask, status: Task["status"]) => {
-  try {
-    const updatePromises = groupedTask._groupItems.map((task: Task) => 
-      taskService.updateTaskStatus(task._id, { status })
-    );
-    await Promise.all(updatePromises);
-    
-    // 🎯 Dispatch events for the whole group
-    if (status === 'completed') {
-      window.dispatchEvent(new CustomEvent('task-completed', {
-        detail: {
-          taskId: groupedTask._id,
-          taskTitle: groupedTask.title,
-          siteName: groupedTask.siteName,
-          completedBy: 'Admin',
-          groupCount: groupedTask._groupCount
-        }
-      }));
-    } else {
-      window.dispatchEvent(new CustomEvent('task-updated', {
-        detail: {
-          taskId: groupedTask._id,
-          taskTitle: groupedTask.title,
-          siteName: groupedTask.siteName,
-          newStatus: status,
-          updatedBy: 'Admin',
-          notificationType: 'task_status_update'
-        }
-      }));
-    }
-
-    toast.success(`Updated status for ${groupedTask._groupCount} tasks!`);
-    await fetchTasks();
-  } catch (error) {
-    console.error("Error updating group status:", error);
-    toast.error(error.message || "Failed to update tasks");
-  }
-};
+  };
 
   // Handle delete for grouped tasks
   const handleDeleteGroup = async (groupedTask: GroupedTask) => {
@@ -3680,10 +3750,10 @@ if (createdTasks && createdTasks.length > 0) {
 
     try {
       // Delete all tasks in the group
-      const deletePromises = groupedTask._groupItems.map((task: Task) => 
+      const deletePromises = groupedTask._groupItems.map((task: Task) =>
         taskService.deleteTask(task._id)
       );
-      
+
       await Promise.all(deletePromises);
       toast.success(`Deleted ${groupedTask._groupCount} tasks successfully!`);
       await fetchTasks();
@@ -3704,7 +3774,7 @@ if (createdTasks && createdTasks.length > 0) {
         content: hourlyUpdateText,
         submittedBy: "current-user"
       };
-      
+
       await taskService.addHourlyUpdate(taskId, updateData);
       setHourlyUpdateText("");
       toast.success("Hourly update added!");
@@ -3726,7 +3796,7 @@ if (createdTasks && createdTasks.length > 0) {
       } else {
         await taskService.uploadMultipleAttachments(taskId, Array.from(files));
       }
-      
+
       toast.success(`${files.length} file(s) uploaded successfully!`);
       await fetchTasks();
     } catch (error) {
@@ -3762,13 +3832,13 @@ if (createdTasks && createdTasks.length > 0) {
 
   // Memoized HourlyUpdatesDialog
   const HourlyUpdatesDialog = useMemo(() => {
-    return ({ task, open, onOpenChange }: { 
-      task: Task; 
-      open: boolean; 
+    return ({ task, open, onOpenChange }: {
+      task: Task;
+      open: boolean;
       onOpenChange: (open: boolean) => void;
     }) => {
       const hourlyUpdates = task.hourlyUpdates || [];
-      
+
       return (
         <Dialog open={open} onOpenChange={onOpenChange}>
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -3778,7 +3848,7 @@ if (createdTasks && createdTasks.length > 0) {
                 Hourly Updates for: {task.title || "Untitled Task"}
               </DialogTitle>
             </DialogHeader>
-            
+
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex items-center gap-2">
@@ -3792,12 +3862,12 @@ if (createdTasks && createdTasks.length > 0) {
                   <span className="text-sm font-medium">Site: {task.siteName}</span>
                 </div>
               </div>
-              
+
               {/* Show staffing requirements if available */}
               {getTaskStaffingRequirements(task) && (
                 <StaffingRequirementsIndicator requirements={getTaskStaffingRequirements(task)!} />
               )}
-              
+
               <div className="space-y-3">
                 {hourlyUpdates.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
@@ -3836,7 +3906,7 @@ if (createdTasks && createdTasks.length > 0) {
                   rows={3}
                   className="mb-3"
                 />
-                <Button 
+                <Button
                   onClick={() => handleAddHourlyUpdate(task._id)}
                   className="w-full"
                 >
@@ -3852,13 +3922,13 @@ if (createdTasks && createdTasks.length > 0) {
 
   // Memoized AttachmentsDialog
   const AttachmentsDialog = useMemo(() => {
-    return ({ task, open, onOpenChange }: { 
-      task: Task; 
-      open: boolean; 
+    return ({ task, open, onOpenChange }: {
+      task: Task;
+      open: boolean;
       onOpenChange: (open: boolean) => void;
     }) => {
       const attachments = task.attachments || [];
-      
+
       return (
         <Dialog open={open} onOpenChange={onOpenChange}>
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -3868,7 +3938,7 @@ if (createdTasks && createdTasks.length > 0) {
                 Attachments for: {task.title || "Untitled Task"}
               </DialogTitle>
             </DialogHeader>
-            
+
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div className="flex items-center gap-2">
@@ -3880,12 +3950,12 @@ if (createdTasks && createdTasks.length > 0) {
                   <span className="text-sm">{task.siteName}</span>
                 </div>
               </div>
-              
+
               {/* Show staffing requirements if available */}
               {getTaskStaffingRequirements(task) && (
                 <StaffingRequirementsIndicator requirements={getTaskStaffingRequirements(task)!} />
               )}
-              
+
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">
                   {attachments.length} file(s) attached
@@ -3905,7 +3975,7 @@ if (createdTasks && createdTasks.length > 0) {
                   </Button>
                 </label>
               </div>
-              
+
               <div className="space-y-3">
                 {attachments.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
@@ -3969,420 +4039,622 @@ if (createdTasks && createdTasks.length > 0) {
       </div>
     );
   }
+  // Add this BEFORE the main return
+  // ✅ REPLACED if block:
+  if (showSiteDetails && selectedSiteForDetails) {
+    const site = selectedSiteForDetails;
+    const siteTasks = tasks.filter(task => task.siteId === site._id || task.siteName === site.name);
+    const pendingTasks = siteTasks.filter(t => t.status === 'pending');
+    const inProgressTasks = siteTasks.filter(t => t.status === 'in-progress');
+    const completedTasks = siteTasks.filter(t => t.status === 'completed');
 
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+    return (
+      <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <Button variant="outline" size="sm" onClick={handleBackFromSiteDetails}>
+            <ArrowLeft className="h-4 w-4 mr-1" /> Back to Sites
+          </Button>
           <div>
-            <CardTitle>All Tasks</CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              {filteredTasks.length} assigned task(s) •
-              {filteredTasks.filter(task => !isGroupedTask(task)).length} individual task(s) •
-              {filteredTasks.filter(task => isGroupedTask(task)).length} grouped task(s)
+            <h1 className="text-xl font-bold">{site.name} — Tasks</h1>
+            <p className="text-xs text-muted-foreground">
+              {siteTasks.length} total tasks • {pendingTasks.length} pending • {completedTasks.length} completed
             </p>
           </div>
-          <div className="flex gap-2">
-            <AddAssignTaskDialog
-              open={addAssignTaskDialogOpen}
-              onOpenChange={setAddAssignTaskDialogOpen}
-              onSubmit={handleUnifiedSubmit}
-              sites={sites}
-              assignees={assignees}
-              selectedSites={selectedSites}
-              setSelectedSites={setSelectedSites}
-              selectedAssignees={selectedAssignees}
-              setSelectedAssignees={setSelectedAssignees}
-              assigneeType={assigneeType}
-              setAssigneeType={setAssigneeType}
-              isLoadingAssignees={isLoadingAssignees}
-              isLoadingSites={isLoadingSites}
-              assignedSupervisorsMap={assignedSupervisorsMap}
-              siteStaffingRequirements={siteStaffingRequirements}
-            />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                <SearchBar 
-                  value={searchQuery} 
-                  onChange={setSearchQuery} 
-                  placeholder="Search assigned tasks by title, description, assignee, site, client, type, priority, status..." 
-                />
-              </div>
-              <div className="w-full sm:w-48">
-                <Select value={selectedSite} onValueChange={setSelectedSite}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Filter by site" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Sites</SelectItem>
-                    {(sites || []).map(site => (
-                      <SelectItem key={site._id} value={site._id}>
-                        {site.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Task Title</TableHead>
-                  <TableHead>Site & Client</TableHead>
-                  <TableHead>Assignee(s) & Role(s)</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Due Date & Time</TableHead>
-                  <TableHead>Updates</TableHead>
-                  <TableHead>Attachments</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredTasks.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                      {searchQuery || selectedSite !== "all" 
-                        ? "No assigned tasks match your search criteria" 
-                        : "No tasks assigned yet. Create and assign a new task!"
-                      }
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredTasks.map((task) => {
-                    const isGrouped = isGroupedTask(task);
-                    const staffingRequirements = getTaskStaffingRequirements(task);
-                    const meetsRequirements = doesTaskMeetRequirements(task);
-                    
-                    return (
-                      <TableRow key={task._id} className={!meetsRequirements ? "bg-amber-50/50" : ""}>
-                        <TableCell className="font-medium">
-                          <div>
-                            <div className="font-semibold flex items-center gap-2">
-                              {task.title || "Untitled Task"}
-                              {!meetsRequirements && (
-                               <AlertTriangle className="h-4 w-4 text-amber-600" aria-label="Missing roles" />
-                              )}
-                            </div>
-                            <div className="text-sm text-muted-foreground line-clamp-2">
-                              {task.description || "No description"}
-                            </div>
-                            {isGrouped && (
-                              <div className="flex items-center gap-1 mt-1">
-                                <Layers className="h-3 w-3 text-primary" />
-                                <Badge variant="outline" className="text-xs">
-                                  {task._groupCount} task(s) at this site
-                                </Badge>
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-1">
-                              <Building className="h-3 w-3" />
-                              <span className="font-medium">{task.siteName}</span>
-                              {isGrouped && task._groupedSites && task._groupedSites.length > 1 && (
-                                <Badge variant="outline" className="text-xs ml-1">
-                                  {task._groupedSites.length} sites
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {task.clientName}
-                            </div>
-                            {/* Show staffing requirements for this site */}
-                            {staffingRequirements && staffingRequirements.missingRoles.length > 0 && (
-                              <div className="mt-2">
-                                <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 text-xs">
-                                  Missing: {staffingRequirements.missingRoles.join(', ')}
-                                </Badge>
-                              </div>
-                            )}
-                            {/* Show if there are multiple clients in the group */}
-                            {isGrouped && task._groupedClientNames && task._groupedClientNames.length > 1 && (
-                              <div className="text-xs text-amber-600 mt-1">
-                                Multiple clients
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-2">
-                            <div className="flex items-start gap-2">
-                              <Users className="h-4 w-4 text-muted-foreground mt-1" />
-                              <div className="flex-1">
-                                {isGrouped ? (
-                                  <>
-                                    {/* Display multiple assignees for grouped tasks */}
-                                    <div className="flex flex-wrap gap-1 mb-1">
-                                      {getAllAssigneeNames(task).slice(0, 3).map((name, index) => {
-                                        const assigneeId = getAllAssigneeIds(task)[index];
-                                        const isManager = getAssigneeType(assigneeId) === 'Manager';
-                                        return (
-                                          <Badge 
-                                            key={index} 
-                                            variant={isManager ? "default" : "secondary"}
-                                            className="text-xs flex items-center gap-1"
-                                          >
-                                            <User className="h-3 w-3" />
-                                            {name}
-                                            <span className="ml-1 text-[10px] opacity-70">
-                                              {isManager ? 'Mgr' : 'Sup'}
-                                            </span>
-                                          </Badge>
-                                        );
-                                      })}
-                                      {getAllAssigneeNames(task).length > 3 && (
-                                        <Badge variant="outline" className="text-xs">
-                                          +{getAllAssigneeNames(task).length - 3} more
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    {/* Show role distribution */}
-                                    <div className="flex gap-2 text-xs text-muted-foreground">
-                                      <div className="flex items-center gap-1">
-                                        <span>👨‍💼</span>
-                                        <span>
-                                          {task._managerCount || 0} Managers
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        <span>👨‍🔧</span>
-                                        <span>
-                                          {task._supervisorCount || 0} Supervisors
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </>
-                                ) : (
-                                  <>
-                                    {/* Display all assignees for single task - with null check */}
-                                    <div className="flex flex-wrap gap-1">
-                                      {task.assignedUsers && task.assignedUsers.length > 0 ? (
-                                        task.assignedUsers.map((user, index) => (
-                                          <Badge 
-                                            key={index}
-                                            variant={user.role === 'manager' ? "default" : "secondary"}
-                                            className="text-xs flex items-center gap-1"
-                                          >
-                                            <User className="h-3 w-3" />
-                                            {user.name || 'Unknown'}
-                                            <span className="ml-1 text-[10px] opacity-70">
-                                              {user.role === 'manager' ? 'Mgr' : user.role === 'supervisor' ? 'Sup' : 'Emp'}
-                                            </span>
-                                          </Badge>
-                                        ))
-                                      ) : (
-                                        // Fallback for old tasks that still use assignedTo
-                                        <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                          <User className="h-3 w-3" />
-                                          {task.assignedToName || 'Unassigned'}
-                                          <span className="ml-1 text-[10px] opacity-70">
-                                            {getAssigneeType(task.assignedTo)}
-                                          </span>
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    
-                                    {/* Show staffing status */}
-                                    {staffingRequirements && (
-                                      <div className="mt-2">
-                                        {staffingRequirements.isManagerRequirementMet ? (
-                                          <Badge variant="default" className="bg-green-100 text-green-800 border-green-200 text-xs">
-                                            ✓ Manager requirement met ({staffingRequirements.assignedManagers}/{staffingRequirements.requiredManagers})
-                                          </Badge>
-                                        ) : (
-                                          <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 text-xs">
-                                            Need {staffingRequirements.requiredManagers - staffingRequirements.assignedManagers} more manager(s)
-                                          </Badge>
-                                        )}
-                                        {staffingRequirements.isSupervisorRequirementMet ? (
-                                          <Badge variant="default" className="bg-green-100 text-green-800 border-green-200 text-xs ml-1">
-                                            ✓ Supervisor requirement met ({staffingRequirements.assignedSupervisors}/{staffingRequirements.requiredSupervisors})
-                                          </Badge>
-                                        ) : (
-                                          <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 text-xs ml-1">
-                                            Need {staffingRequirements.requiredSupervisors - staffingRequirements.assignedSupervisors} more supervisor(s)
-                                          </Badge>
-                                        )}
-                                      </div>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getPriorityColor(task.priority) as "default" | "destructive" | "outline" | "secondary"}>
-                            {task.priority === "high" && <AlertCircle className="mr-1 h-3 w-3" />}
-                            {task.priority}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getStatusColor(isGrouped ? task._overallStatus : task.status) as "default" | "destructive" | "outline" | "secondary"}>
-                            {isGrouped ? task._overallStatus : task.status}
-                            {isGrouped && (
-                              <span className="ml-1 text-xs">
-                                ({task._groupItems.filter((t: Task) => t.status === task._overallStatus).length}/{task._groupCount})
-                              </span>
-                            )}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {formatDateTime(task.deadline)}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {task.dueDateTime ? formatDateTime(task.dueDateTime) : "No due time"}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="flex items-center gap-1"
-                            onClick={() => {
-                              setSelectedTask(task);
-                              setShowUpdatesDialog(true);
-                            }}
-                          >
-                            <MessageSquare className="h-4 w-4" />
-                            {isGrouped ? task._totalHourlyUpdates : getHourlyUpdatesCount(task)}
-                            <span className="sr-only">View updates</span>
-                          </Button>
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="flex items-center gap-1"
-                            onClick={() => {
-                              setSelectedTask(task);
-                              setShowAttachmentsDialog(true);
-                            }}
-                          >
-                            <Paperclip className="h-4 w-4" />
-                            {isGrouped ? task._totalAttachments : getAttachmentsCount(task)}
-                            <span className="sr-only">View attachments</span>
-                          </Button>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-end gap-2">
-                            {/* Edit Button */}
-                            {!isGrouped && (
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => handleEditTask(task)}
-                                title="Edit task details"
-                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            )}
-                            
-                            {/* View Button */}
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => {
+          <Button size="sm" className="ml-auto" onClick={() => setAddAssignTaskDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> New Task
+          </Button>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-4 gap-3 mb-4">
+          <Card>
+            <CardContent className="p-3 text-center">
+              <p className="text-2xl font-bold text-blue-600">{siteTasks.length}</p>
+              <p className="text-xs text-muted-foreground">Total</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-yellow-50 border-yellow-200">
+            <CardContent className="p-3 text-center">
+              <p className="text-2xl font-bold text-yellow-600">{pendingTasks.length}</p>
+              <p className="text-xs text-muted-foreground">Pending</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-purple-50 border-purple-200">
+            <CardContent className="p-3 text-center">
+              <p className="text-2xl font-bold text-purple-600">{inProgressTasks.length}</p>
+              <p className="text-xs text-muted-foreground">In Progress</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-green-50 border-green-200">
+            <CardContent className="p-3 text-center">
+              <p className="text-2xl font-bold text-green-600">{completedTasks.length}</p>
+              <p className="text-xs text-muted-foreground">Completed</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Tasks Table for this site */}
+        <Card>
+          <CardContent className="p-0">
+            {siteTasks.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">No tasks at this site</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Task Title</TableHead>
+                      <TableHead>Assignee(s)</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Due Date</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {siteTasks.map((task) => {
+                      const assigneeNames = task.assignedUsers?.map(u => u.name).join(', ') || task.assignedToName || 'Unassigned';
+                      return (
+                        <TableRow key={task._id}>
+                          <TableCell className="font-medium">{task.title}</TableCell>
+                          <TableCell>{assigneeNames}</TableCell>
+                          <TableCell>
+                            <Badge variant={
+                              task.priority === 'high' ? 'destructive' :
+                                task.priority === 'medium' ? 'secondary' : 'outline'
+                            }>
+                              {task.priority}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={
+                              task.status === 'completed' ? 'default' :
+                                task.status === 'in-progress' ? 'secondary' : 'outline'
+                            }>
+                              {task.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{task.deadline ? formatDateTime(task.deadline) : '-'}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button variant="ghost" size="sm" onClick={() => {
                                 setSelectedTask(task);
                                 setShowViewDialog(true);
-                              }}
-                              title="View details"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            
-                            {/* Complete Button - Only show if not already completed */}
-                            {(isGrouped ? task._overallStatus !== "completed" : task.status !== "completed") && (
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => isGrouped ? handleUpdateGroupStatus(task, "completed") : handleUpdateStatus(task._id, "completed")}
-                                className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                                title="Mark as completed"
-                              >
-                                <CheckCircle className="h-4 w-4" />
+                              }}>
+                                <Eye className="h-4 w-4" />
                               </Button>
-                            )}
-                            
-                            {/* Delete Button */}
-                            <Button 
-                              variant="destructive" 
-                              size="sm" 
-                              onClick={() => isGrouped ? handleDeleteGroup(task) : handleDeleteTask(task._id)}
-                              title="Delete task"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
+                              <Button variant="ghost" size="sm" onClick={() => handleEditTask(task)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  // ✅ REPLACED return:
+  return (
+    <PullToRefreshWrapper
+      pageName="Tasks Overview"
+      onRefresh={async () => {
+        try {
+          toast.loading('Refreshing tasks...');
+          await fetchTasks();
+          await fetchSites();
+          await fetchAssignees();
+          toast.dismiss();
+          toast.success('Tasks refreshed successfully');
+        } catch (error) {
+          toast.dismiss();
+          toast.error('Failed to refresh tasks');
+        }
+      }}
+      className="min-h-screen bg-gray-50"
+    >
+      <div className="min-h-screen bg-gray-50">
+        <div className="sticky top-0 z-10 bg-white border-b p-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl font-bold">Tasks</h1>
+            <p className="text-sm text-muted-foreground">Manage tasks across all sites</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Dialogs */}
-      {selectedTask && (
-        <>
-          <ViewTaskDialog
-            task={selectedTask}
-            open={showViewDialog}
-            onOpenChange={setShowViewDialog}
-            getAssigneeType={getAssigneeType}
-            getSiteName={getSiteName}
-            getClientName={getClientName}
-            formatDateTime={formatDateTime}
-            getAllAssigneeNames={getAllAssigneeNames}
-            getAllAssigneeIds={getAllAssigneeIds}
-            siteStaffingRequirements={getTaskStaffingRequirements(selectedTask)}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 md:p-6"
+        >
+          <Tabs defaultValue="sites" onValueChange={setActiveTab}>
+            <TabsList className="mb-4">
+              <TabsTrigger value="sites">
+                <Building className="mr-2 h-4 w-4" />
+                Sites ({realSites.length})
+              </TabsTrigger>
+              <TabsTrigger value="all-tasks">
+                <ClipboardList className="mr-2 h-4 w-4" />
+                All Tasks ({tasks.length})
+              </TabsTrigger>
+            </TabsList>
+
+            {/* SITES TAB - Site Cards View */}
+            <TabsContent value="sites">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Sites Overview</CardTitle>
+                  <p className="text-sm text-muted-foreground">Click a site to view its tasks</p>
+                </CardHeader>
+                <CardContent>
+                  {realSites.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Building className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                      <p className="text-muted-foreground">No sites found</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {realSites.map(site => {
+                        const siteTasks = siteTasksMap.get(site._id) || [];
+                        const pending = siteTasks.filter(t => t.status === 'pending').length;
+                        const inProgress = siteTasks.filter(t => t.status === 'in-progress').length;
+                        const completed = siteTasks.filter(t => t.status === 'completed').length;
+
+                        return (
+                          <Card
+                            key={site._id}
+                            className="cursor-pointer hover:shadow-lg transition-all border-2 hover:border-blue-400 group"
+                            onClick={() => handleViewSiteDetails(site)}
+                          >
+                            <CardContent className="p-4">
+                              <div className="flex items-center gap-2 mb-3">
+                                <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
+                                  <Building className="h-4 w-4 text-blue-600" />
+                                </div>
+                                <h3 className="font-semibold text-sm truncate">{site.name}</h3>
+                                <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-blue-600 ml-auto" />
+                              </div>
+                              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                                <div className="bg-blue-50 rounded-lg p-2">
+                                  <p className="font-bold text-blue-600 text-lg">{siteTasks.length}</p>
+                                  <p className="text-muted-foreground">Total</p>
+                                </div>
+                                <div className="bg-yellow-50 rounded-lg p-2">
+                                  <p className="font-bold text-yellow-600 text-lg">{pending}</p>
+                                  <p className="text-muted-foreground">Pending</p>
+                                </div>
+                                <div className="bg-green-50 rounded-lg p-2">
+                                  <p className="font-bold text-green-600 text-lg">{completed}</p>
+                                  <p className="text-muted-foreground">Completed</p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* ALL TASKS TAB - Your existing table */}
+            <TabsContent value="all-tasks">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                  <div>
+                    <CardTitle>All Tasks</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {filteredTasks.length} assigned task(s) •
+                      {filteredTasks.filter(task => !isGroupedTask(task)).length} individual task(s) •
+                      {filteredTasks.filter(task => isGroupedTask(task)).length} grouped task(s)
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <AddAssignTaskDialog
+                      open={addAssignTaskDialogOpen}
+                      onOpenChange={setAddAssignTaskDialogOpen}
+                      onSubmit={handleUnifiedSubmit}
+                      sites={sites}
+                      assignees={assignees}
+                      selectedSites={selectedSites}
+                      setSelectedSites={setSelectedSites}
+                      selectedAssignees={selectedAssignees}
+                      setSelectedAssignees={setSelectedAssignees}
+                      assigneeType={assigneeType}
+                      setAssigneeType={setAssigneeType}
+                      isLoadingAssignees={isLoadingAssignees}
+                      isLoadingSites={isLoadingSites}
+                      assignedSupervisorsMap={assignedSupervisorsMap}
+                      siteStaffingRequirements={siteStaffingRequirements}
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <div className="flex-1">
+                        <SearchBar
+                          value={searchQuery}
+                          onChange={setSearchQuery}
+                          placeholder="Search assigned tasks by title, description, assignee, site, client, type, priority, status..."
+                        />
+                      </div>
+                      <div className="w-full sm:w-48">
+                        <Select value={selectedSite} onValueChange={setSelectedSite}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Filter by site" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Sites</SelectItem>
+                            {(sites || []).map(site => (
+                              <SelectItem key={site._id} value={site._id}>
+                                {site.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Task Title</TableHead>
+                          <TableHead>Site & Client</TableHead>
+                          <TableHead>Assignee(s) & Role(s)</TableHead>
+                          <TableHead>Priority</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Due Date & Time</TableHead>
+                          <TableHead>Updates</TableHead>
+                          <TableHead>Attachments</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredTasks.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                              {searchQuery || selectedSite !== "all"
+                                ? "No assigned tasks match your search criteria"
+                                : "No tasks assigned yet. Create and assign a new task!"
+                              }
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredTasks.map((task) => {
+                            const isGrouped = isGroupedTask(task);
+                            const staffingRequirements = getTaskStaffingRequirements(task);
+                            const meetsRequirements = doesTaskMeetRequirements(task);
+
+                            return (
+                              <TableRow key={task._id} className={!meetsRequirements ? "bg-amber-50/50" : ""}>
+                                <TableCell className="font-medium">
+                                  <div>
+                                    <div className="font-semibold flex items-center gap-2">
+                                      {task.title || "Untitled Task"}
+                                      {!meetsRequirements && (
+                                        <AlertTriangle className="h-4 w-4 text-amber-600" aria-label="Missing roles" />
+                                      )}
+                                    </div>
+                                    <div className="text-sm text-muted-foreground line-clamp-2">
+                                      {task.description || "No description"}
+                                    </div>
+                                    {isGrouped && (
+                                      <div className="flex items-center gap-1 mt-1">
+                                        <Layers className="h-3 w-3 text-primary" />
+                                        <Badge variant="outline" className="text-xs">
+                                          {task._groupCount} task(s) at this site
+                                        </Badge>
+                                      </div>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-1">
+                                      <Building className="h-3 w-3" />
+                                      <span className="font-medium">{task.siteName}</span>
+                                      {isGrouped && task._groupedSites && task._groupedSites.length > 1 && (
+                                        <Badge variant="outline" className="text-xs ml-1">
+                                          {task._groupedSites.length} sites
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {task.clientName}
+                                    </div>
+                                    {staffingRequirements && staffingRequirements.missingRoles.length > 0 && (
+                                      <div className="mt-2">
+                                        <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 text-xs">
+                                          Missing: {staffingRequirements.missingRoles.join(', ')}
+                                        </Badge>
+                                      </div>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="space-y-2">
+                                    <div className="flex items-start gap-2">
+                                      <Users className="h-4 w-4 text-muted-foreground mt-1" />
+                                      <div className="flex-1">
+                                        {isGrouped ? (
+                                          <>
+                                            <div className="flex flex-wrap gap-1 mb-1">
+                                              {getAllAssigneeNames(task).slice(0, 3).map((name, index) => {
+                                                const assigneeId = getAllAssigneeIds(task)[index];
+                                                const isManager = getAssigneeType(assigneeId) === 'Manager';
+                                                return (
+                                                  <Badge
+                                                    key={index}
+                                                    variant={isManager ? "default" : "secondary"}
+                                                    className="text-xs flex items-center gap-1"
+                                                  >
+                                                    <User className="h-3 w-3" />
+                                                    {name}
+                                                    <span className="ml-1 text-[10px] opacity-70">
+                                                      {isManager ? 'Mgr' : 'Sup'}
+                                                    </span>
+                                                  </Badge>
+                                                );
+                                              })}
+                                              {getAllAssigneeNames(task).length > 3 && (
+                                                <Badge variant="outline" className="text-xs">
+                                                  +{getAllAssigneeNames(task).length - 3} more
+                                                </Badge>
+                                              )}
+                                            </div>
+                                            <div className="flex gap-2 text-xs text-muted-foreground">
+                                              <div className="flex items-center gap-1">
+                                                <span>👨‍💼</span>
+                                                <span>{task._managerCount || 0} Managers</span>
+                                              </div>
+                                              <div className="flex items-center gap-1">
+                                                <span>👨‍🔧</span>
+                                                <span>{task._supervisorCount || 0} Supervisors</span>
+                                              </div>
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <div className="flex flex-wrap gap-1">
+                                              {task.assignedUsers && task.assignedUsers.length > 0 ? (
+                                                task.assignedUsers.map((user, index) => (
+                                                  <Badge
+                                                    key={index}
+                                                    variant={user.role === 'manager' ? "default" : "secondary"}
+                                                    className="text-xs flex items-center gap-1"
+                                                  >
+                                                    <User className="h-3 w-3" />
+                                                    {user.name || 'Unknown'}
+                                                    <span className="ml-1 text-[10px] opacity-70">
+                                                      {user.role === 'manager' ? 'Mgr' : user.role === 'supervisor' ? 'Sup' : 'Emp'}
+                                                    </span>
+                                                  </Badge>
+                                                ))
+                                              ) : (
+                                                <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                                  <User className="h-3 w-3" />
+                                                  {task.assignedToName || 'Unassigned'}
+                                                  <span className="ml-1 text-[10px] opacity-70">
+                                                    {getAssigneeType(task.assignedTo)}
+                                                  </span>
+                                                </Badge>
+                                              )}
+                                            </div>
+                                            {staffingRequirements && (
+                                              <div className="mt-2">
+                                                {staffingRequirements.isManagerRequirementMet ? (
+                                                  <Badge variant="default" className="bg-green-100 text-green-800 border-green-200 text-xs">
+                                                    ✓ Manager requirement met ({staffingRequirements.assignedManagers}/{staffingRequirements.requiredManagers})
+                                                  </Badge>
+                                                ) : (
+                                                  <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 text-xs">
+                                                    Need {staffingRequirements.requiredManagers - staffingRequirements.assignedManagers} more manager(s)
+                                                  </Badge>
+                                                )}
+                                                {staffingRequirements.isSupervisorRequirementMet ? (
+                                                  <Badge variant="default" className="bg-green-100 text-green-800 border-green-200 text-xs ml-1">
+                                                    ✓ Supervisor requirement met ({staffingRequirements.assignedSupervisors}/{staffingRequirements.requiredSupervisors})
+                                                  </Badge>
+                                                ) : (
+                                                  <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 text-xs ml-1">
+                                                    Need {staffingRequirements.requiredSupervisors - staffingRequirements.assignedSupervisors} more supervisor(s)
+                                                  </Badge>
+                                                )}
+                                              </div>
+                                            )}
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={getPriorityColor(task.priority) as "default" | "destructive" | "outline" | "secondary"}>
+                                    {task.priority === "high" && <AlertCircle className="mr-1 h-3 w-3" />}
+                                    {task.priority}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={getStatusColor(isGrouped ? task._overallStatus : task.status) as "default" | "destructive" | "outline" | "secondary"}>
+                                    {isGrouped ? task._overallStatus : task.status}
+                                    {isGrouped && (
+                                      <span className="ml-1 text-xs">
+                                        ({task._groupItems.filter((t: Task) => t.status === task._overallStatus).length}/{task._groupCount})
+                                      </span>
+                                    )}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex flex-col">
+                                    <div className="flex items-center gap-1">
+                                      <Calendar className="h-3 w-3" />
+                                      {formatDateTime(task.deadline)}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {task.dueDateTime ? formatDateTime(task.dueDateTime) : "No due time"}
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="flex items-center gap-1"
+                                    onClick={() => {
+                                      setSelectedTask(task);
+                                      setShowUpdatesDialog(true);
+                                    }}
+                                  >
+                                    <MessageSquare className="h-4 w-4" />
+                                    {isGrouped ? task._totalHourlyUpdates : getHourlyUpdatesCount(task)}
+                                    <span className="sr-only">View updates</span>
+                                  </Button>
+                                </TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="flex items-center gap-1"
+                                    onClick={() => {
+                                      setSelectedTask(task);
+                                      setShowAttachmentsDialog(true);
+                                    }}
+                                  >
+                                    <Paperclip className="h-4 w-4" />
+                                    {isGrouped ? task._totalAttachments : getAttachmentsCount(task)}
+                                    <span className="sr-only">View attachments</span>
+                                  </Button>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex justify-end gap-2">
+                                    {!isGrouped && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleEditTask(task)}
+                                        title="Edit task details"
+                                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setSelectedTask(task);
+                                        setShowViewDialog(true);
+                                      }}
+                                      title="View details"
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                    {(isGrouped ? task._overallStatus !== "completed" : task.status !== "completed") && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => isGrouped ? handleUpdateGroupStatus(task, "completed") : handleUpdateStatus(task._id, "completed")}
+                                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                        title="Mark as completed"
+                                      >
+                                        <CheckCircle className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() => isGrouped ? handleDeleteGroup(task) : handleDeleteTask(task._id)}
+                                      title="Delete task"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </motion.div>
+
+        {/* Dialogs */}
+        {selectedTask && (
+          <>
+            <ViewTaskDialog
+              task={selectedTask}
+              open={showViewDialog}
+              onOpenChange={setShowViewDialog}
+              getAssigneeType={getAssigneeType}
+              getSiteName={getSiteName}
+              getClientName={getClientName}
+              formatDateTime={formatDateTime}
+              getAllAssigneeNames={getAllAssigneeNames}
+              getAllAssigneeIds={getAllAssigneeIds}
+              siteStaffingRequirements={getTaskStaffingRequirements(selectedTask)}
+            />
+
+            {!isGroupedTask(selectedTask) && HourlyUpdatesDialog({
+              task: selectedTask,
+              open: showUpdatesDialog,
+              onOpenChange: setShowUpdatesDialog
+            })}
+
+            {!isGroupedTask(selectedTask) && AttachmentsDialog({
+              task: selectedTask,
+              open: showAttachmentsDialog,
+              onOpenChange: setShowAttachmentsDialog
+            })}
+          </>
+        )}
+
+        {/* Edit Task Dialog */}
+        {taskToEdit && (
+          <EditTaskDialog
+            task={taskToEdit}
+            open={showEditDialog}
+            onOpenChange={setShowEditDialog}
+            onTaskUpdated={handleTaskUpdated}
+            sites={sites}
+            assignees={assignees}
+            assignedSupervisorsMap={assignedSupervisorsMap}
+            siteStaffingRequirements={siteStaffingRequirements}
           />
-          
-          {!isGroupedTask(selectedTask) && HourlyUpdatesDialog({
-            task: selectedTask,
-            open: showUpdatesDialog,
-            onOpenChange: setShowUpdatesDialog
-          })}
-          
-          {!isGroupedTask(selectedTask) && AttachmentsDialog({
-            task: selectedTask,
-            open: showAttachmentsDialog,
-            onOpenChange: setShowAttachmentsDialog
-          })}
-        </>
-      )}
-
-      {/* Edit Task Dialog */}
-      {taskToEdit && (
-        <EditTaskDialog
-          task={taskToEdit}
-          open={showEditDialog}
-          onOpenChange={setShowEditDialog}
-          onTaskUpdated={handleTaskUpdated}
-          sites={sites}
-          assignees={assignees}
-          assignedSupervisorsMap={assignedSupervisorsMap}
-          siteStaffingRequirements={siteStaffingRequirements}
-        />
-      )}
-    </div>
+        )}
+      </div>
+    </PullToRefreshWrapper>
   );
 };
- 
 export default TasksSection;

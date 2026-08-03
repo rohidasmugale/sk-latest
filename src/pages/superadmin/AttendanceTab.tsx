@@ -103,6 +103,8 @@ interface Employee {
   salary?: number | string;
   assignedSites?: string[];
   shift?: string;
+  shiftId?: string; 
+
   workingHours?: string;
   employeeType?: string;
   reportingManager?: string;
@@ -135,6 +137,8 @@ interface AttendanceRecord {
   siteName?: string;
   department?: string;
   shift?: string;
+  shiftId?: string; 
+
   overtimeHours?: number;
   lateMinutes?: number;
   earlyLeaveMinutes?: number;
@@ -156,12 +160,20 @@ interface SiteDeploymentStats {
 }
 
 // Helper function to calculate days between dates
+// ✅ REPLACE this entire function
 const calculateDaysBetween = (startDate: string, endDate: string): number => {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const timeDiff = end.getTime() - start.getTime();
-  const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-  return daysDiff + 1;
+  if (!startDate || !endDate) return 1;
+  try {
+    const start = parseLocalDate(startDate);
+    const end = parseLocalDate(endDate);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return 1;
+    const timeDiff = end.getTime() - start.getTime();
+    if (timeDiff < 0) return 1;
+    const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+    return daysDiff + 1;
+  } catch {
+    return 1;
+  }
 };
 
 // Helper function to format date
@@ -174,7 +186,7 @@ const formatDate = (date: Date | string) => {
 };
 
 const formatDateDisplay = (dateString: string) => {
-  const date = new Date(dateString);
+  const date = parseLocalDate(dateString);
   return date.toLocaleDateString('en-US', {
     weekday: 'short',
     year: 'numeric',
@@ -182,7 +194,28 @@ const formatDateDisplay = (dateString: string) => {
     day: 'numeric'
   });
 };
+// Parses a "YYYY-MM-DD" string as LOCAL midnight (no UTC shift)
+const parseLocalDate = (dateStr: string): Date => {
+  if (!dateStr) return new Date();
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, (month || 1) - 1, day || 1);
+};
 
+// Returns today's date as "YYYY-MM-DD" in LOCAL time
+const getLocalToday = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+// Normalizes any date value to a clean YYYY-MM-DD string using local date parts
+const normalizeDateStr = (d: string | null | undefined): string => {
+  if (!d) return '';
+  // Already clean YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  // Full ISO timestamp or anything Date can parse — take the LOCAL date parts, not UTC
+  const parsed = new Date(d);
+  if (isNaN(parsed.getTime())) return d; // fallback to original
+  return formatDate(parsed); // your existing formatDate uses local getters
+};
 // Helper function to format time
 const formatTimeForDisplay = (timestamp: string | null): string => {
   if (!timestamp || timestamp === "-" || timestamp === "" || timestamp === "null") return "-";
@@ -277,12 +310,13 @@ const fetchEmployees = async (): Promise<Employee[]> => {
         salary: emp.salary || emp.basicSalary || 0,
         assignedSites: emp.assignedSites || emp.sites || [],
         shift: emp.shift || 'General',
+        shiftId: emp.shiftId || '',   // ✅ ADD THIS LINE
         workingHours: emp.workingHours || '9:00 AM - 6:00 PM',
         employeeType: emp.employeeType || emp.type || 'Full-time',
         reportingManager: emp.reportingManager || emp.manager || '',
         createdAt: emp.createdAt || emp.created || new Date().toISOString(),
         updatedAt: emp.updatedAt || emp.updated || new Date().toISOString(),
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalToday(),
         isManager: false,
         isSupervisor: false
       };
@@ -343,7 +377,7 @@ const fetchAttendanceRecords = async (start: string, end: string): Promise<Atten
           _id: record._id || record.id || `att_${Math.random()}`,
           employeeId: record.employeeId || record.employee?._id || '',
           employeeName: record.employeeName || record.employee?.name || 'Unknown',
-          date: record.date || '',
+          date: normalizeDateStr(record.date),
           checkInTime: record.checkInTime || null,
           checkOutTime: record.checkOutTime || null,
           checkInPhoto: record.checkInPhoto || null,
@@ -395,7 +429,7 @@ const fetchAttendanceRecords = async (start: string, end: string): Promise<Atten
           _id: record._id || record.id || `att_${Math.random()}`,
           employeeId: record.employeeId || record.employee?._id || '',
           employeeName: record.employeeName || record.employee?.name || 'Unknown',
-          date: record.date || '',
+          date: normalizeDateStr(record.date),
           checkInTime: record.checkInTime || null,
           checkOutTime: record.checkOutTime || null,
           checkInPhoto: record.checkInPhoto || null,
@@ -427,9 +461,8 @@ const fetchAttendanceRecords = async (start: string, end: string): Promise<Atten
     // Fallback: fetch day by day
     console.log('Falling back to day-by-day attendance fetch...');
     const allRecords: AttendanceRecord[] = [];
-    const startDateObj = new Date(start);
-    const endDateObj = new Date(end);
-
+    const startDateObj = parseLocalDate(start);
+    const endDateObj = parseLocalDate(end);
     const totalDays = calculateDaysBetween(start, end);
     let daysProcessed = 0;
 
@@ -455,7 +488,7 @@ const fetchAttendanceRecords = async (start: string, end: string): Promise<Atten
             _id: record._id || record.id || `att_${Math.random()}`,
             employeeId: record.employeeId || record.employee?._id || '',
             employeeName: record.employeeName || record.employee?.name || 'Unknown',
-            date: record.date || dateStr,
+            date: normalizeDateStr(record.date) || dateStr,
             checkInTime: record.checkInTime || null,
             checkOutTime: record.checkOutTime || null,
             checkInPhoto: record.checkInPhoto || null,
@@ -500,45 +533,83 @@ const fetchAttendanceRecords = async (start: string, end: string): Promise<Atten
   }
 };
 
-// Generate employee data for sites - WITH PHOTO SUPPORT
+// Fix the generateEmployeeData function - it should look like this:
+
 const generateEmployeeData = async (
   siteName: string,
   startDate: string,
   endDate: string
 ): Promise<Employee[]> => {
   try {
+    // Validate dates
+    if (!startDate || !endDate) {
+      console.warn('Invalid dates provided, using today');
+      const today = getLocalToday();
+      startDate = today;
+      endDate = today;
+    }
+
+    console.log(`🔍 generateEmployeeData called with siteName: "${siteName}", startDate: "${startDate}", endDate: "${endDate}"`);
+
     const allEmployees = await fetchEmployees();
-    const siteEmployees = allEmployees.filter(
-      emp => emp.site === siteName || emp.siteName === siteName
-    );
 
-    if (siteEmployees.length === 0) return [];
+    // Normalise target site name
+    const targetSite = siteName.trim().toLowerCase();
 
+    // Try exact match first
+    let siteEmployees = allEmployees.filter(emp => {
+      const empSite = (emp.site || emp.siteName || '').trim().toLowerCase();
+      return empSite === targetSite;
+    });
+
+    // If none, try partial match (e.g., "Global Square" matches "Global Square - Main")
+    if (siteEmployees.length === 0) {
+      console.warn(`⚠️ No exact match for "${siteName}". Trying partial match...`);
+      siteEmployees = allEmployees.filter(emp => {
+        const empSite = (emp.site || emp.siteName || '').trim().toLowerCase();
+        return empSite.includes(targetSite) || targetSite.includes(empSite);
+      });
+    }
+
+    // If still none, log available site names and return empty
+    if (siteEmployees.length === 0) {
+      const availableSites = [...new Set(
+        allEmployees.map(e => (e.site || e.siteName || '').trim()).filter(Boolean)
+      )];
+      console.error(`❌ No employees found for site "${siteName}". Available sites:`, availableSites);
+      toast.error(`No employees found for site "${siteName}"`);
+      return [];
+    }
+
+    console.log(`✅ Found ${siteEmployees.length} employees for site "${siteName}"`);
+
+    // Fetch attendance records
     const attendanceRecords = await fetchAttendanceRecords(startDate, endDate);
 
-    // KEY FIX: index by MongoDB _id (what record.employeeId actually is)
+    // Build attendance map
     const attendanceMap = new Map<string, AttendanceRecord>();
     attendanceRecords.forEach(record => {
-      // Primary key: mongoId_date
-      attendanceMap.set(`${record.employeeId}_${record.date}`, record);
-      // Secondary key: employeeName_date (fallback)
+      const key = `${record.employeeId}_${record.date}`;
+      attendanceMap.set(key, record);
       if (record.employeeName) {
         attendanceMap.set(`name_${record.employeeName}_${record.date}`, record);
       }
     });
 
-    const employees: Employee[] = [];
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    console.log(`📋 Attendance map has ${attendanceMap.size} entries`);
 
+    const employees: Employee[] = [];
+    const start = parseLocalDate(startDate);
+    const end = parseLocalDate(endDate);
+
+    // Loop over each day in range
     for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
       const currentDate = formatDate(date);
 
       for (const employee of siteEmployees) {
-        // Try MongoDB _id first, then name fallback
-        const mongoId = employee._id || employee.id || '';
-        const attendance =
-          attendanceMap.get(`${mongoId}_${currentDate}`) ||
+        const empId = employee.employeeId || employee._id || employee.id || '';
+        const attendanceKey = `${empId}_${currentDate}`;
+        const attendance = attendanceMap.get(attendanceKey) ||
           attendanceMap.get(`name_${employee.name}_${currentDate}`);
 
         let status: 'present' | 'absent' | 'leave' | 'weekly-off' = 'absent';
@@ -548,22 +619,19 @@ const generateEmployeeData = async (
         let checkOutPhoto = '';
         let remark = '';
         let totalHours = 0;
+
         if (attendance) {
           status = attendance.status as any;
-          checkInTime = attendance.checkInTime
-            ? formatTimeForDisplay(attendance.checkInTime)
-            : '';
-          checkOutTime = attendance.checkOutTime
-            ? formatTimeForDisplay(attendance.checkOutTime)
-            : '';
+          checkInTime = attendance.checkInTime ? formatTimeForDisplay(attendance.checkInTime) : '';
+          checkOutTime = attendance.checkOutTime ? formatTimeForDisplay(attendance.checkOutTime) : '';
           checkInPhoto = attendance.checkInPhoto || '';
           checkOutPhoto = attendance.checkOutPhoto || '';
           remark = attendance.remarks || '';
-          totalHours = attendance.totalHours || 0;   // <-- add this line
+          totalHours = attendance.totalHours || 0;
         }
 
         employees.push({
-          id: `${mongoId}_${currentDate}`,
+          id: `${empId}_${currentDate}`,
           _id: employee._id,
           employeeId: employee.employeeId,
           name: employee.name,
@@ -601,121 +669,14 @@ const generateEmployeeData = async (
       }
     }
 
-    if (employees.length === 0) return generateDemoEmployeeData(siteName, startDate, endDate);
-
+    console.log(`✅ Generated ${employees.length} employee records for the selected date range`);
     return employees;
-  } catch (error) {
-    console.error('Error generating employee data:', error);
-    return generateDemoEmployeeData(siteName, startDate, endDate);
+  } catch (error: any) {
+    console.error('❌ generateEmployeeData failed:', error);
+    toast.error('Failed to load employee data', { description: error.message });
+    return [];
   }
 };
-
-// Generate demo employee data with mock photos
-const generateDemoEmployeeData = (siteName: string, startDate: string, endDate: string): Employee[] => {
-  const employees: Employee[] = [];
-  const departments = ['Housekeeping', 'Security', 'Parking', 'Waste Management', 'Consumables', 'Other'];
-  const positions = ['Staff', 'Supervisor', 'Manager', 'Executive'];
-  const actions = ['fine', 'advance', 'other', 'none'] as const;
-  const remarks = [
-    'Late arrival',
-    'Early departure',
-    'Half day',
-    'Permission granted',
-    'Medical leave',
-    'Personal work',
-    '',
-    '',
-    '',
-    ''
-  ];
-
-  // Generate demo employees for each date in the range
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const daysInPeriod = calculateDaysBetween(startDate, endDate);
-
-  // Base employees (same across dates)
-  const baseEmployees: { id: string; name: string; department: string; position: string; isManager: boolean; isSupervisor: boolean; }[] = [];
-  const totalEmployees = 10 + Math.floor(Math.random() * 20);
-
-  for (let i = 1; i <= totalEmployees; i++) {
-    const position = positions[Math.floor(Math.random() * positions.length)];
-    const isManager = position === 'Manager';
-    const isSupervisor = position === 'Supervisor';
-
-    baseEmployees.push({
-      id: `DEMO${siteName.substring(0, 3).toUpperCase()}${i.toString().padStart(3, '0')}`,
-      name: `Demo Employee ${i}`,
-      department: departments[Math.floor(Math.random() * departments.length)],
-      position: position,
-      isManager,
-      isSupervisor
-    });
-  }
-
-  // For each date, create attendance records
-  for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
-    const currentDate = formatDate(date);
-    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-
-    baseEmployees.forEach((baseEmp, index) => {
-      let status: 'present' | 'absent' | 'leave' | 'weekly-off';
-
-      // Only set weekly-off on weekends and based on probability
-      // This ensures weekly-off is explicitly set, not default
-      if (isWeekend && Math.random() > 0.8) {
-        status = 'weekly-off';
-      } else {
-        const rand = Math.random();
-        if (rand < 0.75) {
-          status = 'present';
-        } else if (rand < 0.9) {
-          status = 'absent';
-        } else {
-          status = 'leave';
-        }
-      }
-
-      const hasRemark = Math.random() > 0.5;
-      const hasAction = Math.random() > 0.7;
-
-      // Mock photo URLs for demo
-      const mockPhotoUrl = status === 'present'
-        ? `http://picsum.photos/id/${Math.floor(Math.random() * 100)}/200/200`
-        : '';
-
-      employees.push({
-        id: `${baseEmp.id}_${currentDate}`,
-        employeeId: baseEmp.id,
-        name: baseEmp.name,
-        department: baseEmp.department,
-        position: baseEmp.position,
-        isManager: baseEmp.isManager,
-        isSupervisor: baseEmp.isSupervisor,
-        status: status,
-        checkInTime: status === 'present' ? '09:00 AM' : '',
-        checkOutTime: status === 'present' ? '06:00 PM' : '',
-        checkInPhoto: status === 'present' ? mockPhotoUrl : '',
-        checkOutPhoto: status === 'present' ? mockPhotoUrl : '',
-        site: siteName,
-        siteName: siteName,
-        date: currentDate,
-        remark: hasRemark ? remarks[Math.floor(Math.random() * remarks.length)] : '',
-        action: hasAction ? actions[Math.floor(Math.random() * actions.length)] : 'none',
-        email: `demo${index}@example.com`,
-        phone: `+123456789${index}`,
-        employeeStatus: 'active',
-        role: 'employee',
-        shift: 'General',
-        workingHours: '9:00 AM - 6:00 PM',
-        employeeType: 'Full-time'
-      });
-    });
-  }
-
-  return employees;
-};
-
 // Calculate site deployment statistics
 const calculateSiteDeploymentStats = (site: Site, employees: Employee[]): SiteDeploymentStats => {
   const managerRequirement = site.managerCount || 0;
@@ -780,7 +741,7 @@ const calculateSiteAttendanceData = async (site: Site, startDate: string, endDat
     employees = await generateEmployeeData(site.name, startDate, endDate);
   } catch (error) {
     console.error('Error fetching employee data:', error);
-    employees = generateDemoEmployeeData(site.name, startDate, endDate);
+    employees = [];
   }
 
   const deploymentStats = calculateSiteDeploymentStats(site, employees);
@@ -794,8 +755,8 @@ const calculateSiteAttendanceData = async (site: Site, startDate: string, endDat
 
   const dailyStats: { [date: string]: { present: number; absent: number; weeklyOff: number; leave: number; total: number } } = {};
 
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = parseLocalDate(startDate);
+  const end = parseLocalDate(endDate);
   for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
     const dateStr = formatDate(date);
     dailyStats[dateStr] = { present: 0, absent: 0, weeklyOff: 0, leave: 0, total: 0 };
@@ -949,12 +910,14 @@ interface SiteEmployeeDetailsProps {
   siteData: any;
   onBack: () => void;
   viewType: "site" | "department";
+  department?: string;   // ✅ ADD THIS
 }
 
 const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
   siteData,
   onBack,
   viewType,
+  department,
 }) => {
   const { role } = useRole();
 
@@ -963,7 +926,7 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
   const [employeeSearch, setEmployeeSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedDate, setSelectedDate] = useState<string>(
-    siteData?.startDate || new Date().toISOString().split("T")[0]
+    siteData?.startDate || getLocalToday()
   );
   const [employees, setEmployees] = useState<any[]>(siteData?.employees || []);
   const [refreshing, setRefreshing] = useState(false);
@@ -1019,6 +982,17 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
   const [trainingSessions, setTrainingSessions] = useState<any[]>([]);
   const [staffBriefings, setStaffBriefings] = useState<any[]>([]);
   const [loadingTraining, setLoadingTraining] = useState(false);
+  const [fetchTrigger, setFetchTrigger] = useState(0);
+  // Add this inside SiteEmployeeDetails component:
+  const filterByDept = (data: any[]) => {
+    if (viewType === 'department' && department) {
+      const target = department.trim().toLowerCase();
+      return data.filter(emp =>
+        (emp.department || '').trim().toLowerCase() === target
+      );
+    }
+    return data;
+  };
   const handleSaveRemark = async (machineId: string) => {
     setSavingRemarkId(machineId);
     try {
@@ -1067,42 +1041,124 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
     }
   };
   // ---- Add this helper inside SiteEmployeeDetails ----
-  const getDerivedAttendanceStatus = (employee: any) => {
-    const status = employee.status;
-    const checkInTime = employee.checkInTime;
-    if (status === 'weekly-off' || status === 'leave') {
-      return { status, isLate: false };
+ 
+const getDerivedAttendanceStatus = (employee: any) => {
+  const status = employee.status;
+  const checkInTime = employee.checkInTime;
+  if (status === 'weekly-off' || status === 'leave') {
+    return { status, isLate: false };
+  }
+
+  let isLate = false;
+  const site = siteData?.originalSite;
+  if (checkInTime && checkInTime !== '-' && site) {
+    const shifts = site.shifts || [];
+    let shift = null;
+
+    // 1. Try to match by shiftId (most reliable)
+    if (employee.shiftId) {
+      shift = shifts.find(s => s.id === employee.shiftId);
     }
-    let isLate = false;
-    if (checkInTime && checkInTime !== '-') {
-      const timeStr = checkInTime;
-      const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+
+    // 2. Fallback: match by shift name (for legacy employees)
+    if (!shift && employee.shift) {
+      shift = shifts.find(s => 
+        s.name.toLowerCase() === employee.shift.toLowerCase() ||
+        (s.label && s.label.toLowerCase() === employee.shift.toLowerCase())
+      );
+    }
+
+    // 3. If still no match, use the first shift defined for this site (or none)
+    if (!shift && shifts.length > 0) {
+      shift = shifts[0];
+    }
+
+    if (shift) {
+      // Parse check-in time
+      const match = checkInTime.match(/(\d+):(\d+)\s*(AM|PM)/i);
       if (match) {
         let hours = parseInt(match[1]);
         const minutes = parseInt(match[2]);
         const period = match[3].toUpperCase();
         if (period === 'PM' && hours !== 12) hours += 12;
         if (period === 'AM' && hours === 12) hours = 0;
-        const totalMinutes = hours * 60 + minutes;
-        isLate = totalMinutes > 9 * 60 + 30;
+        const checkInMinutes = hours * 60 + minutes;
+
+        // Parse shift start time
+        const [shiftHour, shiftMin] = shift.startTime.split(':').map(Number);
+        const cutoffMinutes = shiftHour * 60 + shiftMin + (shift.graceMinutes || 0);
+
+        if (shift.isOvernight) {
+          const [endHour, endMin] = shift.endTime.split(':').map(Number);
+          const endMinutes = endHour * 60 + endMin;
+          if (checkInMinutes > cutoffMinutes && checkInMinutes <= endMinutes + 60) {
+            isLate = true;
+          } else if (checkInMinutes > cutoffMinutes && checkInMinutes < (shiftHour * 60)) {
+            isLate = true;
+          }
+        } else {
+          isLate = checkInMinutes > cutoffMinutes;
+        }
+      }
+    } else {
+      // No shift: fallback to 9:30 AM
+      const match = checkInTime.match(/(\d+):(\d+)\s*(AM|PM)/i);
+      if (match) {
+        let hours = parseInt(match[1]);
+        const minutes = parseInt(match[2]);
+        const period = match[3].toUpperCase();
+        if (period === 'PM' && hours !== 12) hours += 12;
+        if (period === 'AM' && hours === 12) hours = 0;
+        const checkInMinutes = hours * 60 + minutes;
+        isLate = checkInMinutes > 9 * 60 + 30;
       }
     }
-    let derivedStatus = status;
-    if (employee.checkOutTime && employee.totalHours !== undefined) {
-      const totalHours = employee.totalHours || 0;
-      if (totalHours < 4) derivedStatus = 'absent';
-      else if (totalHours < 9) derivedStatus = 'half-day';
-      else derivedStatus = 'present';
-    }
-    return { status: derivedStatus, isLate };
-  };
+  }
+
+  let derivedStatus = status;
+  if (employee.checkOutTime && employee.totalHours !== undefined) {
+    const totalHours = employee.totalHours || 0;
+    if (totalHours < 4) derivedStatus = 'absent';
+    else if (totalHours < 9) derivedStatus = 'half-day';
+    else derivedStatus = 'present';
+  }
+  return { status: derivedStatus, isLate };
+};
+
   useEffect(() => {
     const checkMobile = () => setIsMobileView(window.innerWidth < 768);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-  // Call it whenever selectedDate or siteName changes
+
+  useEffect(() => {
+    console.log(`🔄 useEffect RUNNING for site: "${siteName}", date: "${selectedDate}"`); // <-- moved inside
+
+    if (!selectedDate || !siteName) {
+      console.warn('⚠️ useEffect blocked: missing selectedDate or siteName', { selectedDate, siteName });
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      setRefreshing(true);
+      try {
+        const data = await generateEmployeeData(siteName, selectedDate, selectedDate);
+        if (!cancelled) {
+          setEmployees(filterByDept(data));
+        }
+      } catch (e) {
+        console.error('Error loading employees for date:', e);
+      } finally {
+        if (!cancelled) setRefreshing(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [selectedDate, siteName, viewType, department, fetchTrigger]); // ✅ Remove dailyView from deps// ✅ Add dependencies
+
+
   useEffect(() => {
     if (siteName && mainTab === "employees") {
       fetchGroomingCount();
@@ -1179,7 +1235,7 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
     if (!siteName) return;
     setLoadingShift(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalToday();
       const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
       const [todayRes, tomorrowRes] = await Promise.all([
@@ -1243,7 +1299,7 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
 
   const saveShiftDeployment = async () => {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalToday();
       const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
       // Save today
@@ -1304,24 +1360,13 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
     return Array.from(dates).sort();
   }, [employees]);
 
-  useEffect(() => {
-    if (siteData?.employees) {
-      setEmployees(siteData.employees || []);
-      if (siteData.daysInPeriod === 1) {
-        setDailyView(true);
-        setSelectedDate(siteData.startDate);
-      } else {
-        setDailyView(false);
-      }
-    }
-  }, [siteData?.employees, siteData?.daysInPeriod, siteData?.startDate]);
 
   const filteredEmployeesByDate = useMemo(() => {
-    if (dailyView && selectedDate) {
+    if (selectedDate) {
       return employees.filter((emp) => emp.date === selectedDate);
     }
     return employees;
-  }, [employees, dailyView, selectedDate]);
+  }, [employees, selectedDate]);
 
   const allEmployees = filteredEmployeesByDate;
   const presentEmployees = allEmployees.filter((emp: any) => emp.status === "present");
@@ -1354,7 +1399,8 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
       siteData?.startDate,
       siteData?.endDate
     );
-    setEmployees(refreshed);
+    // ✅ Apply department filter here
+    setEmployees(filterByDept(refreshed));
     setRefreshing(false);
     toast.success("Data refreshed");
   };
@@ -1478,11 +1524,9 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
       // Get the month from startDate
       const month = siteData.startDate?.substring(0, 7) || new Date().toISOString().substring(0, 7);
       const monthStart = `${month}-01`;
-      const monthEnd = new Date(
-        parseInt(month.split('-')[0]),
-        parseInt(month.split('-')[1]),
-        0
-      ).toISOString().split('T')[0];
+      const monthEnd = formatDate(
+        new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0)
+      );
 
       // ✅ FETCH FULL MONTH DATA
       const fullMonthEmployees = await generateEmployeeData(
@@ -1744,12 +1788,13 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
           <Input
             type="date"
             value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
+            onChange={(e) => {
+              setSelectedDate(e.target.value);
+              setFetchTrigger(prev => prev + 1);   // 👈 force re-fetch
+            }}
             className="w-36 h-8 text-sm"
           />
-          <Button variant="outline" size="sm" onClick={() => setDailyView(false)} className="h-8">
-            Cumulative
-          </Button>
+
         </div>
         <div className="relative w-64">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -2274,7 +2319,7 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
   };
 
   const renderShiftTab = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalToday();
     const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
     return (
@@ -2711,7 +2756,7 @@ const SuperAdminAttendanceView = () => {
   const searchParams = new URLSearchParams(location.search);
   const initialViewType = searchParams.get('view') || 'site';
   const initialDepartment = searchParams.get('department') || '';
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalToday();
   const initialStartDate = searchParams.get('startDate') || today;
   const initialEndDate = searchParams.get('endDate') || today;
   const initialSiteDetails = searchParams.get('siteDetails') === 'true';
@@ -2757,7 +2802,7 @@ const SuperAdminAttendanceView = () => {
     }
   }, [location.search]);
   // ✅ ADD THIS - Force refresh when date changes
-  
+
   useEffect(() => {
     const checkMobile = () => setIsMobileSiteView(window.innerWidth < 768);
     checkMobile();
@@ -2844,7 +2889,7 @@ const SuperAdminAttendanceView = () => {
       if (sitesData && Array.isArray(sitesData)) {
         console.log(`✅ Successfully fetched ${sitesData.length} sites`);
         setSites(sitesData);
-        
+
       } else {
         console.warn('⚠️ No sites data received or invalid format');
         setSites([]);
@@ -2930,7 +2975,12 @@ const SuperAdminAttendanceView = () => {
     }
   }, [sites, viewType, selectedDepartment, startDate, endDate]); // ← sites added!
 
-  const daysInPeriod = useMemo(() => calculateDaysBetween(startDate, endDate), [startDate, endDate]);
+  // ✅ REPLACE this line
+  const daysInPeriod = useMemo(() => {
+    if (!startDate || !endDate) return 1;
+    const days = calculateDaysBetween(startDate, endDate);
+    return isNaN(days) ? 1 : days;
+  }, [startDate, endDate]);
 
   const filteredData = useMemo(() => {
     if (!displayData || displayData.length === 0) return [];
@@ -3347,6 +3397,7 @@ const SuperAdminAttendanceView = () => {
         siteData={selectedSite}
         onBack={handleBackFromDetails}
         viewType={viewType}
+        department={selectedDepartment}   // ✅ ADD THIS
       />
     );
   }
@@ -3371,11 +3422,9 @@ const SuperAdminAttendanceView = () => {
     // Get the month from startDate
     const month = startDate.substring(0, 7); // YYYY-MM
     const monthStart = `${month}-01`;
-    const monthEnd = new Date(
-      parseInt(month.split('-')[0]),
-      parseInt(month.split('-')[1]),
-      0
-    ).toISOString().split('T')[0];
+    const monthEnd = formatDate(
+      new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0)
+    );
 
     // Re-fetch data for full month
     const fetchFullMonthData = async () => {

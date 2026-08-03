@@ -62,9 +62,22 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useRole } from "@/context/RoleContext";
 
+// Site interface
+interface Site {
+  _id: string;
+  name: string;
+  clientName?: string;
+  location?: string;
+}
+
+// Site Service
+import { siteService } from "@/services/SiteService";
+
 interface LeaveManagementTabProps {
   leaveRequests: LeaveRequest[];
   setLeaveRequests: React.Dispatch<React.SetStateAction<LeaveRequest[]>>;
+  selectedSite?: string;
+  sites?: Site[];
 }
 
 interface ApiLeaveRequest {
@@ -111,6 +124,8 @@ interface ApiLeaveRequest {
   adminContact?: string;
   adminEmail?: string;
   adminPosition?: string;
+  site?: string;
+  siteName?: string;
 }
 
 interface ApiManagerLeaveRequest {
@@ -138,6 +153,8 @@ interface ApiManagerLeaveRequest {
   requestType: 'manager-leave';
   isManagerLeave: boolean;
   isAdminLeave?: boolean;
+  site?: string;
+  siteName?: string;
 }
 
 interface ApiAdminLeaveRequest {
@@ -164,6 +181,8 @@ interface ApiAdminLeaveRequest {
   rejectedAt?: string;
   requestType: 'admin-leave';
   isAdminLeave: boolean;
+  site?: string;
+  siteName?: string;
 }
 
 interface AdminInfo {
@@ -178,7 +197,40 @@ interface AdminInfo {
 const API_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
-const LeaveManagementTab = ({ leaveRequests, setLeaveRequests }: LeaveManagementTabProps) => {
+// Site Filter Component
+const SiteFilter: React.FC<{
+  selectedSite: string;
+  onSiteChange: (value: string) => void;
+  sites: Site[];
+  isLoading?: boolean;
+}> = ({ selectedSite, onSiteChange, sites, isLoading = false }) => {
+  return (
+    <div className="flex items-center gap-2">
+      <Building className="h-4 w-4 text-gray-500" />
+      <select
+        value={selectedSite}
+        onChange={(e) => onSiteChange(e.target.value)}
+        disabled={isLoading}
+        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white text-sm min-w-[180px]"
+      >
+        <option value="all">🏢 All Sites</option>
+        {sites.map((site) => (
+          <option key={site._id} value={site._id}>
+            {site.name}
+          </option>
+        ))}
+      </select>
+      {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
+    </div>
+  );
+};
+
+const LeaveManagementTab = ({ 
+  leaveRequests, 
+  setLeaveRequests,
+  selectedSite: propSelectedSite = 'all',
+  sites: propSites = []
+}: LeaveManagementTabProps) => {
   const { user } = useRole();
   const [activeTab, setActiveTab] = useState<string>("supervisor-employee");
   
@@ -235,6 +287,11 @@ const LeaveManagementTab = ({ leaveRequests, setLeaveRequests }: LeaveManagement
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [isSubmittingDelete, setIsSubmittingDelete] = useState(false);
 
+  // Site state
+  const [sites, setSites] = useState<Site[]>(propSites);
+  const [selectedSite, setSelectedSite] = useState<string>(propSelectedSite);
+  const [isLoadingSites, setIsLoadingSites] = useState<boolean>(false);
+
   // Apply form state
   const [applyFormData, setApplyFormData] = useState({
     leaveType: '',
@@ -277,6 +334,32 @@ const LeaveManagementTab = ({ leaveRequests, setLeaveRequests }: LeaveManagement
   // Mobile view state
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
+  // Fetch sites if not provided as props
+  useEffect(() => {
+    if (propSites.length === 0) {
+      fetchSites();
+    } else {
+      setSites(propSites);
+    }
+  }, [propSites]);
+
+  // Sync with props
+  useEffect(() => {
+    setSelectedSite(propSelectedSite);
+  }, [propSelectedSite]);
+
+  const fetchSites = async () => {
+    setIsLoadingSites(true);
+    try {
+      const sitesData = await siteService.getAllSites();
+      setSites(sitesData || []);
+    } catch (error) {
+      console.error('Error fetching sites:', error);
+    } finally {
+      setIsLoadingSites(false);
+    }
+  };
+
   // Initialize admin info from user context
   useEffect(() => {
     if (user) {
@@ -309,7 +392,6 @@ const LeaveManagementTab = ({ leaveRequests, setLeaveRequests }: LeaveManagement
     } else if (data?.items && Array.isArray(data.items)) {
       return data.items;
     } else if (data && typeof data === 'object') {
-      // Try to find any array property
       for (const key in data) {
         if (Array.isArray(data[key])) {
           return data[key];
@@ -319,62 +401,52 @@ const LeaveManagementTab = ({ leaveRequests, setLeaveRequests }: LeaveManagement
     return [];
   };
 
-  // IMPROVED: Helper functions to identify leave types with better detection
+  // Helper functions to identify leave types
   const isManagerLeave = (leave: any): boolean => {
-    // Check by explicit flags first
     if (leave.isManagerLeave === true) return true;
     if (leave.requestType === 'manager-leave') return true;
-    
-    // Check by presence of manager-specific fields
     if (leave.managerId) return true;
     if (leave.managerName) return true;
-    
-    // Check if it's from manager collection (has manager-specific fields)
     if (leave.managerDepartment && leave.managerPosition) return true;
-    
     return false;
   };
 
   const isAdminLeave = (leave: any): boolean => {
-    // Check by explicit flags first
     if (leave.isAdminLeave === true) return true;
     if (leave.requestType === 'admin-leave') return true;
-    
-    // Check by presence of admin-specific fields
     if (leave.adminId) return true;
     if (leave.adminName) return true;
-    
-    // Check if it's from admin collection
     if (leave.adminDepartment && leave.adminPosition) return true;
-    
     return false;
   };
 
   const isSupervisorLeave = (leave: any): boolean => {
-    // Check by explicit flags
     if (leave.isSupervisorLeave === true) return true;
-    
-    // Check if applied by supervisor
     if (leave.appliedBy && leave.appliedBy.toLowerCase().includes('supervisor')) return true;
     if (leave.employeeName && leave.employeeName.toLowerCase().includes('supervisor')) return true;
-    
-    // Check by supervisor field
     if (leave.supervisorId) return true;
-    
     return false;
   };
 
   const isEmployeeLeave = (leave: any): boolean => {
-    // If it's not manager, not admin, and not supervisor, it's an employee
     return !isManagerLeave(leave) && !isAdminLeave(leave) && !isSupervisorLeave(leave);
   };
 
-  // Check if the leave belongs to the current admin
   const isOwnLeave = (leave: any): boolean => {
     if (isAdminLeave(leave)) {
       return leave.adminId === adminInfo.adminId;
     }
     return false;
+  };
+
+  // Filter by site
+  const filterBySite = (leaves: any[]): any[] => {
+    if (selectedSite === 'all') return leaves;
+    return leaves.filter(leave => 
+      leave.site === selectedSite || 
+      leave.siteName === selectedSite ||
+      leave.siteName === sites.find(s => s._id === selectedSite)?.name
+    );
   };
 
   // Fetch supervisor and employee leaves
@@ -391,30 +463,35 @@ const LeaveManagementTab = ({ leaveRequests, setLeaveRequests }: LeaveManagement
       const data = await response.json();
       console.log('Supervisor/Employee API response:', data);
       
-      // Extract array from response
       const allLeaves = extractArrayFromResponse(data);
       
       // Filter for supervisor/employee leaves (not manager, not admin)
-      const filteredLeaves = allLeaves.filter((leave: any) => {
-        // Skip manager and admin leaves
+      let filteredLeaves = allLeaves.filter((leave: any) => {
         if (isManagerLeave(leave)) return false;
         if (isAdminLeave(leave)) return false;
-        
-        // Apply status filter
-        if (statusFilter !== 'all' && leave.status !== statusFilter) return false;
-        
-        // Apply department filter
-        if (departmentFilter !== 'all' && leave.department !== departmentFilter) return false;
-        
-        // Apply search filter
-        if (searchQuery) {
-          const matchesId = leave.employeeId?.toLowerCase().includes(searchQuery.toLowerCase());
-          const matchesName = leave.employeeName?.toLowerCase().includes(searchQuery.toLowerCase());
-          if (!matchesId && !matchesName) return false;
-        }
-        
         return true;
       });
+      
+      // Apply site filter
+      filteredLeaves = filterBySite(filteredLeaves);
+      
+      // Apply status filter
+      if (statusFilter !== 'all') {
+        filteredLeaves = filteredLeaves.filter((l: any) => l.status === statusFilter);
+      }
+      
+      // Apply department filter
+      if (departmentFilter !== 'all') {
+        filteredLeaves = filteredLeaves.filter((l: any) => l.department === departmentFilter);
+      }
+      
+      // Apply search filter
+      if (searchQuery) {
+        filteredLeaves = filteredLeaves.filter((l: any) => 
+          l.employeeId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          l.employeeName?.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      }
       
       // Apply pagination client-side
       const startIndex = (page - 1) * itemsPerPage;
@@ -423,7 +500,6 @@ const LeaveManagementTab = ({ leaveRequests, setLeaveRequests }: LeaveManagement
       
       setSupervisorEmployeeLeaves(paginatedLeaves);
       
-      // Calculate stats
       const stats = {
         total: filteredLeaves.length,
         pending: filteredLeaves.filter((l: any) => l.status === 'pending').length,
@@ -447,161 +523,164 @@ const LeaveManagementTab = ({ leaveRequests, setLeaveRequests }: LeaveManagement
   };
 
   // Fetch manager leaves
- // Fetch manager leaves
-const fetchManagerLeaves = async (page = 1) => {
-  try {
-    setIsLoading(true);
-    
-    const response = await fetch(
-      `${API_URL}/manager-leaves/admin/all?status=${
-        statusFilter === 'all' ? '' : statusFilter
-      }&page=${page}&limit=${itemsPerPage}`
-    );
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch manager leaves');
+  const fetchManagerLeaves = async (page = 1) => {
+    try {
+      setIsLoading(true);
+      
+      const response = await fetch(
+        `${API_URL}/manager-leaves/admin/all?status=${
+          statusFilter === 'all' ? '' : statusFilter
+        }&page=${page}&limit=${itemsPerPage}`
+      );
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch manager leaves');
+      }
+      
+      const data = await response.json();
+      console.log('Manager leaves API response:', data);
+      
+      if (data.success) {
+        let transformedLeaves = (data.leaves || []).map((leave: any) => ({
+          ...leave,
+          type: 'manager',
+          appliedDate: leave.appliedDate || leave.createdAt,
+          contactNumber: leave.managerContact || leave.contactNumber || 'N/A',
+          employeeId: leave.managerId || leave.employeeId,
+          employeeName: leave.managerName || leave.employeeName,
+          department: leave.managerDepartment || leave.department,
+          isManagerLeave: true,
+          remarks: leave.adminRemarks || leave.remarks
+        }));
+        
+        // Apply site filter
+        transformedLeaves = filterBySite(transformedLeaves);
+        
+        // Apply filters
+        let filteredLeaves = transformedLeaves;
+        
+        if (searchQuery) {
+          filteredLeaves = filteredLeaves.filter((leave: any) => 
+            leave.employeeName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            leave.managerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            leave.employeeId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            leave.managerId?.toLowerCase().includes(searchQuery.toLowerCase())
+          );
+        }
+        
+        if (departmentFilter !== 'all') {
+          filteredLeaves = filteredLeaves.filter((leave: any) => 
+            leave.managerDepartment === departmentFilter || leave.department === departmentFilter
+          );
+        }
+        
+        if (statusFilter !== 'all') {
+          filteredLeaves = filteredLeaves.filter((leave: any) => leave.status === statusFilter);
+        }
+        
+        setManagerLeaves(filteredLeaves);
+        setManagerStats(data.stats || {
+          total: filteredLeaves.length,
+          pending: filteredLeaves.filter((l: any) => l.status === 'pending').length,
+          approved: filteredLeaves.filter((l: any) => l.status === 'approved').length,
+          rejected: filteredLeaves.filter((l: any) => l.status === 'rejected').length,
+          cancelled: filteredLeaves.filter((l: any) => l.status === 'cancelled').length
+        });
+        setTotalItems(data.pagination?.total || filteredLeaves.length);
+        setTotalPages(data.pagination?.pages || Math.ceil(filteredLeaves.length / itemsPerPage));
+        setCurrentPage(page);
+      } else {
+        throw new Error(data.message || 'Failed to fetch manager leaves');
+      }
+      
+    } catch (error) {
+      console.error("Error fetching manager leaves:", error);
+      toast.error("Failed to load manager leaves");
+      setManagerLeaves([]);
+    } finally {
+      setIsLoading(false);
     }
-    
-    const data = await response.json();
-    console.log('Manager leaves API response:', data);
-    
-    if (data.success) {
-      const transformedLeaves = (data.leaves || []).map((leave: any) => ({
-        ...leave,
-        type: 'manager',
-        appliedDate: leave.appliedDate || leave.createdAt,
-        contactNumber: leave.managerContact || leave.contactNumber || 'N/A',
-        employeeId: leave.managerId || leave.employeeId,
-        employeeName: leave.managerName || leave.employeeName,
-        department: leave.managerDepartment || leave.department,
-        isManagerLeave: true,
-        // Map adminRemarks to a consistent field
-        remarks: leave.adminRemarks || leave.remarks
-      }));
-      
-      // Apply filters
-      let filteredLeaves = transformedLeaves;
-      
-      if (searchQuery) {
-        filteredLeaves = filteredLeaves.filter((leave: any) => 
-          leave.employeeName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          leave.managerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          leave.employeeId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          leave.managerId?.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-      }
-      
-      if (departmentFilter !== 'all') {
-        filteredLeaves = filteredLeaves.filter((leave: any) => 
-          leave.managerDepartment === departmentFilter || leave.department === departmentFilter
-        );
-      }
-      
-      if (statusFilter !== 'all') {
-        filteredLeaves = filteredLeaves.filter((leave: any) => leave.status === statusFilter);
-      }
-      
-      setManagerLeaves(filteredLeaves);
-      setManagerStats(data.stats || {
-        total: filteredLeaves.length,
-        pending: filteredLeaves.filter((l: any) => l.status === 'pending').length,
-        approved: filteredLeaves.filter((l: any) => l.status === 'approved').length,
-        rejected: filteredLeaves.filter((l: any) => l.status === 'rejected').length,
-        cancelled: filteredLeaves.filter((l: any) => l.status === 'cancelled').length
-      });
-      setTotalItems(data.pagination?.total || filteredLeaves.length);
-      setTotalPages(data.pagination?.pages || Math.ceil(filteredLeaves.length / itemsPerPage));
-      setCurrentPage(page);
-    } else {
-      throw new Error(data.message || 'Failed to fetch manager leaves');
-    }
-    
-  } catch (error) {
-    console.error("Error fetching manager leaves:", error);
-    toast.error("Failed to load manager leaves");
-    setManagerLeaves([]);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
-// Fetch admin leaves
-const fetchAdminLeaves = async (page = 1) => {
-  try {
-    setIsLoading(true);
-    
-    const response = await fetch(
-      `${API_URL}/admin-leaves/admin/all?status=${
-        statusFilter === 'all' ? '' : statusFilter
-      }&page=${page}&limit=${itemsPerPage}`
-    );
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch admin leaves');
+  // Fetch admin leaves
+  const fetchAdminLeaves = async (page = 1) => {
+    try {
+      setIsLoading(true);
+      
+      const response = await fetch(
+        `${API_URL}/admin-leaves/admin/all?status=${
+          statusFilter === 'all' ? '' : statusFilter
+        }&page=${page}&limit=${itemsPerPage}`
+      );
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch admin leaves');
+      }
+      
+      const data = await response.json();
+      console.log('Admin leaves API response:', data);
+      
+      if (data.success) {
+        let transformedLeaves = (data.leaves || []).map((leave: any) => ({
+          ...leave,
+          type: 'admin',
+          appliedDate: leave.appliedDate || leave.createdAt,
+          contactNumber: leave.adminContact || leave.contactNumber || 'N/A',
+          employeeId: leave.adminId || leave.employeeId,
+          employeeName: leave.adminName || leave.employeeName,
+          department: leave.adminDepartment || leave.department,
+          isAdminLeave: true,
+          remarks: leave.adminRemarks || leave.remarks
+        }));
+        
+        // Apply site filter
+        transformedLeaves = filterBySite(transformedLeaves);
+        
+        // Apply filters
+        let filteredLeaves = transformedLeaves;
+        
+        if (searchQuery) {
+          filteredLeaves = filteredLeaves.filter((leave: any) => 
+            leave.employeeName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            leave.adminName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            leave.employeeId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            leave.adminId?.toLowerCase().includes(searchQuery.toLowerCase())
+          );
+        }
+        
+        if (departmentFilter !== 'all') {
+          filteredLeaves = filteredLeaves.filter((leave: any) => 
+            leave.adminDepartment === departmentFilter || leave.department === departmentFilter
+          );
+        }
+        
+        if (statusFilter !== 'all') {
+          filteredLeaves = filteredLeaves.filter((leave: any) => leave.status === statusFilter);
+        }
+        
+        setAdminLeaves(filteredLeaves);
+        setAdminStats(data.stats || {
+          total: filteredLeaves.length,
+          pending: filteredLeaves.filter((l: any) => l.status === 'pending').length,
+          approved: filteredLeaves.filter((l: any) => l.status === 'approved').length,
+          rejected: filteredLeaves.filter((l: any) => l.status === 'rejected').length,
+          cancelled: filteredLeaves.filter((l: any) => l.status === 'cancelled').length
+        });
+        setTotalItems(data.pagination?.total || filteredLeaves.length);
+        setTotalPages(data.pagination?.pages || Math.ceil(filteredLeaves.length / itemsPerPage));
+        setCurrentPage(page);
+      } else {
+        throw new Error(data.message || 'Failed to fetch admin leaves');
+      }
+      
+    } catch (error) {
+      console.error("Error fetching admin leaves:", error);
+      toast.error("Failed to load admin leaves");
+      setAdminLeaves([]);
+    } finally {
+      setIsLoading(false);
     }
-    
-    const data = await response.json();
-    console.log('Admin leaves API response:', data);
-    
-    if (data.success) {
-      const transformedLeaves = (data.leaves || []).map((leave: any) => ({
-        ...leave,
-        type: 'admin',
-        appliedDate: leave.appliedDate || leave.createdAt,
-        contactNumber: leave.adminContact || leave.contactNumber || 'N/A',
-        employeeId: leave.adminId || leave.employeeId,
-        employeeName: leave.adminName || leave.employeeName,
-        department: leave.adminDepartment || leave.department,
-        isAdminLeave: true,
-        // Map adminRemarks to a consistent field
-        remarks: leave.adminRemarks || leave.remarks
-      }));
-      
-      // Apply filters
-      let filteredLeaves = transformedLeaves;
-      
-      if (searchQuery) {
-        filteredLeaves = filteredLeaves.filter((leave: any) => 
-          leave.employeeName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          leave.adminName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          leave.employeeId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          leave.adminId?.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-      }
-      
-      if (departmentFilter !== 'all') {
-        filteredLeaves = filteredLeaves.filter((leave: any) => 
-          leave.adminDepartment === departmentFilter || leave.department === departmentFilter
-        );
-      }
-      
-      if (statusFilter !== 'all') {
-        filteredLeaves = filteredLeaves.filter((leave: any) => leave.status === statusFilter);
-      }
-      
-      setAdminLeaves(filteredLeaves);
-      setAdminStats(data.stats || {
-        total: filteredLeaves.length,
-        pending: filteredLeaves.filter((l: any) => l.status === 'pending').length,
-        approved: filteredLeaves.filter((l: any) => l.status === 'approved').length,
-        rejected: filteredLeaves.filter((l: any) => l.status === 'rejected').length,
-        cancelled: filteredLeaves.filter((l: any) => l.status === 'cancelled').length
-      });
-      setTotalItems(data.pagination?.total || filteredLeaves.length);
-      setTotalPages(data.pagination?.pages || Math.ceil(filteredLeaves.length / itemsPerPage));
-      setCurrentPage(page);
-    } else {
-      throw new Error(data.message || 'Failed to fetch admin leaves');
-    }
-    
-  } catch (error) {
-    console.error("Error fetching admin leaves:", error);
-    toast.error("Failed to load admin leaves");
-    setAdminLeaves([]);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   // Load data based on active tab
   useEffect(() => {
@@ -627,7 +706,7 @@ const fetchAdminLeaves = async (page = 1) => {
     }, 500);
     
     return () => clearTimeout(timer);
-  }, [statusFilter, departmentFilter, searchQuery]);
+  }, [statusFilter, departmentFilter, searchQuery, selectedSite]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -641,408 +720,395 @@ const fetchAdminLeaves = async (page = 1) => {
   };
 
   const handleLeaveAction = async (leave: any, action: "approved" | "rejected") => {
-  try {
-    setIsUpdating(true);
-    setSelectedLeave(leave);
-    
-    let response;
-    let endpoint = '';
-    let requestBody = {};
-    
-    const leaveId = leave._id || leave.id || '';
-    
-    if (!leaveId) {
-      toast.error("Leave ID is missing");
+    try {
+      setIsUpdating(true);
+      setSelectedLeave(leave);
+      
+      let response;
+      let endpoint = '';
+      let requestBody = {};
+      
+      const leaveId = leave._id || leave.id || '';
+      
+      if (!leaveId) {
+        toast.error("Leave ID is missing");
+        setIsUpdating(false);
+        return;
+      }
+
+      console.log(`Processing leave action for:`, {
+        leaveId,
+        action,
+        leaveType: isAdminLeave(leave) ? 'Admin' : isManagerLeave(leave) ? 'Manager' : 'Employee/Supervisor'
+      });
+      
+      if (isAdminLeave(leave)) {
+        endpoint = `${API_URL}/admin-leaves/admin/${leaveId}/status`;
+        requestBody = {
+          status: action,
+          [action === 'approved' ? 'approvedBy' : 'rejectedBy']: adminInfo.adminName || 'Admin',
+          adminRemarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
+        };
+      } else if (isManagerLeave(leave)) {
+        endpoint = `${API_URL}/manager-leaves/admin/${leaveId}/status`;
+        requestBody = {
+          status: action,
+          [action === 'approved' ? 'approvedBy' : 'rejectedBy']: adminInfo.adminName || 'Admin',
+          adminRemarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
+        };
+      } else {
+        endpoint = `${API_URL}/leaves/${leaveId}/status`;
+        requestBody = { 
+          status: action,
+          approvedBy: action === 'approved' ? adminInfo.adminName || 'Admin' : undefined,
+          rejectedBy: action === 'rejected' ? adminInfo.adminName || 'Admin' : undefined,
+          remarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
+        };
+      }
+
+      console.log(`Updating leave at ${endpoint}`, requestBody);
+      
+      response = await fetch(endpoint, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = 'Failed to update leave status';
+        
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.message || errorMessage;
+        } catch (e) {
+          errorMessage = response.statusText || errorMessage;
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      
+      if (activeTab === "supervisor-employee") {
+        setSupervisorEmployeeLeaves(prev => 
+          prev.map(l => {
+            const lId = l._id || l.id;
+            if (lId === leaveId) {
+              return { 
+                ...l, 
+                status: action,
+                approvedBy: action === 'approved' ? adminInfo.adminName || 'Admin' : undefined,
+                rejectedBy: action === 'rejected' ? adminInfo.adminName || 'Admin' : undefined,
+                approvedAt: action === 'approved' ? new Date().toISOString() : undefined,
+                rejectedAt: action === 'rejected' ? new Date().toISOString() : undefined,
+                remarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
+              };
+            }
+            return l;
+          })
+        );
+        
+        setSupervisorEmployeeStats(prev => {
+          const newStats = { ...prev };
+          if (action === 'approved') {
+            newStats.approved++;
+            newStats.pending--;
+          } else if (action === 'rejected') {
+            newStats.rejected++;
+            newStats.pending--;
+          }
+          return newStats;
+        });
+      } else if (activeTab === "manager") {
+        setManagerLeaves(prev => 
+          prev.map(l => {
+            const lId = l._id || l.id;
+            if (lId === leaveId) {
+              return { 
+                ...l, 
+                status: action,
+                approvedBy: action === 'approved' ? adminInfo.adminName || 'Admin' : undefined,
+                rejectedBy: action === 'rejected' ? adminInfo.adminName || 'Admin' : undefined,
+                approvedAt: action === 'approved' ? new Date().toISOString() : undefined,
+                rejectedAt: action === 'rejected' ? new Date().toISOString() : undefined,
+                adminRemarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
+              };
+            }
+            return l;
+          })
+        );
+        
+        setManagerStats(prev => {
+          const newStats = { ...prev };
+          if (action === 'approved') {
+            newStats.approved++;
+            newStats.pending--;
+          } else if (action === 'rejected') {
+            newStats.rejected++;
+            newStats.pending--;
+          }
+          return newStats;
+        });
+      } else if (activeTab === "admin") {
+        setAdminLeaves(prev => 
+          prev.map(l => {
+            const lId = l._id || l.id;
+            if (lId === leaveId) {
+              return { 
+                ...l, 
+                status: action,
+                approvedBy: action === 'approved' ? adminInfo.adminName || 'Admin' : undefined,
+                rejectedBy: action === 'rejected' ? adminInfo.adminName || 'Admin' : undefined,
+                approvedAt: action === 'approved' ? new Date().toISOString() : undefined,
+                rejectedAt: action === 'rejected' ? new Date().toISOString() : undefined,
+                adminRemarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
+              };
+            }
+            return l;
+          })
+        );
+        
+        setAdminStats(prev => {
+          const newStats = { ...prev };
+          if (action === 'approved') {
+            newStats.approved++;
+            newStats.pending--;
+          } else if (action === 'rejected') {
+            newStats.rejected++;
+            newStats.pending--;
+          }
+          return newStats;
+        });
+      }
+
+      window.dispatchEvent(new CustomEvent('leave-update', {
+        detail: {
+          leaveId: leaveId,
+          title: action === 'approved' ? '✅ Leave Approved' : '❌ Leave Rejected',
+          message: `${leave.employeeName || leave.managerName || leave.adminName || 'Employee'}'s ${leave.leaveType || 'leave'} leave has been ${action} by ${adminInfo.adminName || 'Admin'}`,
+          notificationType: action === 'approved' ? 'leave_approved' : 'leave_rejected',
+          employeeName: leave.employeeName || leave.managerName || leave.adminName || 'Employee',
+          leaveType: leave.leaveType || 'leave',
+          actionBy: adminInfo.adminName || 'Admin'
+        }
+      }));
+
+      toast.success(data.message || `Leave request ${action} successfully!`);
+      setViewDialogOpen(false);
+      setRemarks("");
+      
+      if (activeTab === "supervisor-employee") {
+        fetchSupervisorEmployeeLeaves(currentPage);
+      } else if (activeTab === "manager") {
+        fetchManagerLeaves(currentPage);
+      } else if (activeTab === "admin") {
+        fetchAdminLeaves(currentPage);
+      }
+    } catch (error: any) {
+      console.error("Error updating leave status:", error);
+      toast.error(error.message || "Failed to update leave status");
+    } finally {
       setIsUpdating(false);
-      return;
+      setSelectedLeave(null);
     }
+  };
 
-    console.log(`Processing leave action for:`, {
-      leaveId,
-      action,
-      leaveType: isAdminLeave(leave) ? 'Admin' : isManagerLeave(leave) ? 'Manager' : 'Employee/Supervisor'
-    });
-    
-    // Determine correct endpoint based on leave type
-    if (isAdminLeave(leave)) {
-      endpoint = `${API_URL}/admin-leaves/admin/${leaveId}/status`;
-      requestBody = {
-        status: action,
-        [action === 'approved' ? 'approvedBy' : 'rejectedBy']: adminInfo.adminName || 'Admin',
-        adminRemarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
-      };
-    } else if (isManagerLeave(leave)) {
-      endpoint = `${API_URL}/manager-leaves/admin/${leaveId}/status`;
-      requestBody = {
-        status: action,
-        [action === 'approved' ? 'approvedBy' : 'rejectedBy']: adminInfo.adminName || 'Admin',
-        adminRemarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
-      };
-    } else {
-      endpoint = `${API_URL}/leaves/${leaveId}/status`;
-      requestBody = { 
-        status: action,
-        approvedBy: action === 'approved' ? adminInfo.adminName || 'Admin' : undefined,
-        rejectedBy: action === 'rejected' ? adminInfo.adminName || 'Admin' : undefined,
-        remarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
-      };
-    }
-
-    console.log(`Updating leave at ${endpoint}`, requestBody);
-    
-    response = await fetch(endpoint, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage = 'Failed to update leave status';
+  // Handle revert to pending
+  const handleRevertToPending = async (leave: any) => {
+    try {
+      setIsUpdating(true);
+      setSelectedLeave(leave);
       
-      try {
-        const errorData = JSON.parse(errorText);
-        errorMessage = errorData.message || errorMessage;
-      } catch (e) {
-        errorMessage = response.statusText || errorMessage;
+      let response;
+      let endpoint = '';
+      let requestBody = {};
+      
+      const leaveId = leave._id || leave.id || '';
+      
+      if (!leaveId) {
+        toast.error("Leave ID is missing");
+        setIsUpdating(false);
+        return;
       }
-      
-      throw new Error(errorMessage);
-    }
 
-    const data = await response.json();
-    
-    // Update local state based on active tab and leave type
-    if (activeTab === "supervisor-employee") {
-      setSupervisorEmployeeLeaves(prev => 
-        prev.map(l => {
-          const lId = l._id || l.id;
-          if (lId === leaveId) {
-            return { 
-              ...l, 
-              status: action,
-              approvedBy: action === 'approved' ? adminInfo.adminName || 'Admin' : undefined,
-              rejectedBy: action === 'rejected' ? adminInfo.adminName || 'Admin' : undefined,
-              approvedAt: action === 'approved' ? new Date().toISOString() : undefined,
-              rejectedAt: action === 'rejected' ? new Date().toISOString() : undefined,
-              remarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
-            };
-          }
-          return l;
-        })
-      );
-      
-      setSupervisorEmployeeStats(prev => {
-        const newStats = { ...prev };
-        if (action === 'approved') {
-          newStats.approved++;
-          newStats.pending--;
-        } else if (action === 'rejected') {
-          newStats.rejected++;
-          newStats.pending--;
-        }
-        return newStats;
+      console.log(`Reverting leave:`, {
+        leaveId,
+        leaveType: isAdminLeave(leave) ? 'Admin' : isManagerLeave(leave) ? 'Manager' : 'Employee/Supervisor'
       });
-    } else if (activeTab === "manager") {
-      setManagerLeaves(prev => 
-        prev.map(l => {
-          const lId = l._id || l.id;
-          if (lId === leaveId) {
-            return { 
-              ...l, 
-              status: action,
-              approvedBy: action === 'approved' ? adminInfo.adminName || 'Admin' : undefined,
-              rejectedBy: action === 'rejected' ? adminInfo.adminName || 'Admin' : undefined,
-              approvedAt: action === 'approved' ? new Date().toISOString() : undefined,
-              rejectedAt: action === 'rejected' ? new Date().toISOString() : undefined,
-              adminRemarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
-            };
-          }
-          return l;
-        })
-      );
       
-      setManagerStats(prev => {
-        const newStats = { ...prev };
-        if (action === 'approved') {
-          newStats.approved++;
-          newStats.pending--;
-        } else if (action === 'rejected') {
-          newStats.rejected++;
-          newStats.pending--;
-        }
-        return newStats;
-      });
-    } else if (activeTab === "admin") {
-      setAdminLeaves(prev => 
-        prev.map(l => {
-          const lId = l._id || l.id;
-          if (lId === leaveId) {
-            return { 
-              ...l, 
-              status: action,
-              approvedBy: action === 'approved' ? adminInfo.adminName || 'Admin' : undefined,
-              rejectedBy: action === 'rejected' ? adminInfo.adminName || 'Admin' : undefined,
-              approvedAt: action === 'approved' ? new Date().toISOString() : undefined,
-              rejectedAt: action === 'rejected' ? new Date().toISOString() : undefined,
-              adminRemarks: remarks || `${action} by ${adminInfo.adminName || 'Admin'}`
-            };
-          }
-          return l;
-        })
-      );
-      
-      setAdminStats(prev => {
-        const newStats = { ...prev };
-        if (action === 'approved') {
-          newStats.approved++;
-          newStats.pending--;
-        } else if (action === 'rejected') {
-          newStats.rejected++;
-          newStats.pending--;
-        }
-        return newStats;
-      });
-    }
-
-    // ✅ Dispatch leave-update event
-    const leaveName = leave.employeeName || leave.managerName || leave.adminName || 'Employee';
-    const leaveType = leave.leaveType || 'leave';
-    
-    window.dispatchEvent(new CustomEvent('leave-update', {
-      detail: {
-        leaveId: leaveId,
-        title: action === 'approved' ? '✅ Leave Approved' : '❌ Leave Rejected',
-        message: `${leaveName}'s ${leaveType} leave has been ${action} by ${adminInfo.adminName || 'Admin'}`,
-        notificationType: action === 'approved' ? 'leave_approved' : 'leave_rejected',
-        employeeName: leaveName,
-        leaveType: leaveType,
-        actionBy: adminInfo.adminName || 'Admin'
+      if (isAdminLeave(leave)) {
+        endpoint = `${API_URL}/admin-leaves/admin/${leaveId}/revert`;
+        requestBody = {
+          remarks: remarks || 'Reverted to pending',
+          revertedBy: adminInfo.adminName || 'Admin'
+        };
+      } else if (isManagerLeave(leave)) {
+        endpoint = `${API_URL}/manager-leaves/admin/${leaveId}/revert`;
+        requestBody = {
+          remarks: remarks || 'Reverted to pending',
+          revertedBy: adminInfo.adminName || 'Admin'
+        };
+      } else {
+        endpoint = `${API_URL}/leaves/${leaveId}/status`;
+        requestBody = { 
+          status: 'pending',
+          remarks: remarks || `Reverted to pending by ${adminInfo.adminName || 'Admin'}`,
+          revertedBy: adminInfo.adminName || 'Admin'
+        };
       }
-    }));
 
-    toast.success(data.message || `Leave request ${action} successfully!`);
-    setViewDialogOpen(false);
-    setRemarks("");
-    
-    // Refresh the list
-    if (activeTab === "supervisor-employee") {
-      fetchSupervisorEmployeeLeaves(currentPage);
-    } else if (activeTab === "manager") {
-      fetchManagerLeaves(currentPage);
-    } else if (activeTab === "admin") {
-      fetchAdminLeaves(currentPage);
-    }
-  } catch (error: any) {
-    console.error("Error updating leave status:", error);
-    toast.error(error.message || "Failed to update leave status");
-  } finally {
-    setIsUpdating(false);
-    setSelectedLeave(null);
-  }
-};
-// Handle revert to pending
-const handleRevertToPending = async (leave: any) => {
-  try {
-    setIsUpdating(true);
-    setSelectedLeave(leave);
-    
-    let response;
-    let endpoint = '';
-    let requestBody = {};
-    
-    const leaveId = leave._id || leave.id || '';
-    
-    if (!leaveId) {
-      toast.error("Leave ID is missing");
+      console.log(`Reverting leave at ${endpoint}`, requestBody);
+      
+      response = await fetch(endpoint, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = 'Failed to revert leave status';
+        
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.message || errorMessage;
+        } catch (e) {
+          errorMessage = response.statusText || errorMessage;
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      
+      if (activeTab === "supervisor-employee") {
+        setSupervisorEmployeeLeaves(prev => 
+          prev.map(l => {
+            const lId = l._id || l.id;
+            if (lId === leaveId) {
+              return { 
+                ...l, 
+                status: 'pending',
+                approvedBy: undefined,
+                rejectedBy: undefined,
+                approvedAt: undefined,
+                rejectedAt: undefined,
+                remarks: remarks || `Reverted to pending by ${adminInfo.adminName || 'Admin'}`
+              };
+            }
+            return l;
+          })
+        );
+        
+        setSupervisorEmployeeStats(prev => {
+          const newStats = { ...prev };
+          if (leave.status === 'approved') {
+            newStats.approved--;
+            newStats.pending++;
+          } else if (leave.status === 'rejected') {
+            newStats.rejected--;
+            newStats.pending++;
+          }
+          return newStats;
+        });
+      } else if (activeTab === "manager") {
+        setManagerLeaves(prev => 
+          prev.map(l => {
+            const lId = l._id || l.id;
+            if (lId === leaveId) {
+              return { 
+                ...l, 
+                status: 'pending',
+                approvedBy: undefined,
+                rejectedBy: undefined,
+                approvedAt: undefined,
+                rejectedAt: undefined,
+                adminRemarks: remarks || `Reverted to pending by ${adminInfo.adminName || 'Admin'}`
+              };
+            }
+            return l;
+          })
+        );
+        
+        setManagerStats(prev => {
+          const newStats = { ...prev };
+          if (leave.status === 'approved') {
+            newStats.approved--;
+            newStats.pending++;
+          } else if (leave.status === 'rejected') {
+            newStats.rejected--;
+            newStats.pending++;
+          }
+          return newStats;
+        });
+      } else if (activeTab === "admin") {
+        setAdminLeaves(prev => 
+          prev.map(l => {
+            const lId = l._id || l.id;
+            if (lId === leaveId) {
+              return { 
+                ...l, 
+                status: 'pending',
+                approvedBy: undefined,
+                rejectedBy: undefined,
+                approvedAt: undefined,
+                rejectedAt: undefined,
+                adminRemarks: remarks || `Reverted to pending by ${adminInfo.adminName || 'Admin'}`
+              };
+            }
+            return l;
+          })
+        );
+        
+        setAdminStats(prev => {
+          const newStats = { ...prev };
+          if (leave.status === 'approved') {
+            newStats.approved--;
+            newStats.pending++;
+          } else if (leave.status === 'rejected') {
+            newStats.rejected--;
+            newStats.pending++;
+          }
+          return newStats;
+        });
+      }
+
+      window.dispatchEvent(new CustomEvent('leave-update', {
+        detail: {
+          leaveId: leaveId,
+          title: '🔄 Leave Reverted to Pending',
+          message: `${leave.employeeName || leave.managerName || leave.adminName || 'Employee'}'s ${leave.leaveType || 'leave'} leave has been reverted to pending by ${adminInfo.adminName || 'Admin'}`,
+          notificationType: 'leave_pending',
+          employeeName: leave.employeeName || leave.managerName || leave.adminName || 'Employee',
+          leaveType: leave.leaveType || 'leave',
+          actionBy: adminInfo.adminName || 'Admin'
+        }
+      }));
+
+      toast.success(data.message || 'Leave request reverted to pending successfully!');
+      setViewDialogOpen(false);
+      setRemarks("");
+      
+      if (activeTab === "supervisor-employee") {
+        fetchSupervisorEmployeeLeaves(currentPage);
+      } else if (activeTab === "manager") {
+        fetchManagerLeaves(currentPage);
+      } else if (activeTab === "admin") {
+        fetchAdminLeaves(currentPage);
+      }
+    } catch (error: any) {
+      console.error("Error reverting leave:", error);
+      toast.error(error.message || "Failed to revert leave status");
+    } finally {
       setIsUpdating(false);
-      return;
+      setSelectedLeave(null);
     }
-
-    console.log(`Reverting leave:`, {
-      leaveId,
-      leaveType: isAdminLeave(leave) ? 'Admin' : isManagerLeave(leave) ? 'Manager' : 'Employee/Supervisor'
-    });
-    
-    // Determine correct endpoint based on leave type
-    if (isAdminLeave(leave)) {
-      endpoint = `${API_URL}/admin-leaves/admin/${leaveId}/revert`;
-      requestBody = {
-        remarks: remarks || 'Reverted to pending',
-        revertedBy: adminInfo.adminName || 'Admin'
-      };
-    } else if (isManagerLeave(leave)) {
-      endpoint = `${API_URL}/manager-leaves/admin/${leaveId}/revert`;
-      requestBody = {
-        remarks: remarks || 'Reverted to pending',
-        revertedBy: adminInfo.adminName || 'Admin'
-      };
-    } else {
-      endpoint = `${API_URL}/leaves/${leaveId}/status`;
-      requestBody = { 
-        status: 'pending',
-        remarks: remarks || `Reverted to pending by ${adminInfo.adminName || 'Admin'}`,
-        revertedBy: adminInfo.adminName || 'Admin'
-      };
-    }
-
-    console.log(`Reverting leave at ${endpoint}`, requestBody);
-    
-    response = await fetch(endpoint, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage = 'Failed to revert leave status';
-      
-      try {
-        const errorData = JSON.parse(errorText);
-        errorMessage = errorData.message || errorMessage;
-      } catch (e) {
-        errorMessage = response.statusText || errorMessage;
-      }
-      
-      throw new Error(errorMessage);
-    }
-
-    const data = await response.json();
-    
-    // Update local state based on active tab
-    if (activeTab === "supervisor-employee") {
-      setSupervisorEmployeeLeaves(prev => 
-        prev.map(l => {
-          const lId = l._id || l.id;
-          if (lId === leaveId) {
-            return { 
-              ...l, 
-              status: 'pending',
-              approvedBy: undefined,
-              rejectedBy: undefined,
-              approvedAt: undefined,
-              rejectedAt: undefined,
-              remarks: remarks || `Reverted to pending by ${adminInfo.adminName || 'Admin'}`
-            };
-          }
-          return l;
-        })
-      );
-      
-      setSupervisorEmployeeStats(prev => {
-        const newStats = { ...prev };
-        if (leave.status === 'approved') {
-          newStats.approved--;
-          newStats.pending++;
-        } else if (leave.status === 'rejected') {
-          newStats.rejected--;
-          newStats.pending++;
-        }
-        return newStats;
-      });
-    } else if (activeTab === "manager") {
-      setManagerLeaves(prev => 
-        prev.map(l => {
-          const lId = l._id || l.id;
-          if (lId === leaveId) {
-            return { 
-              ...l, 
-              status: 'pending',
-              approvedBy: undefined,
-              rejectedBy: undefined,
-              approvedAt: undefined,
-              rejectedAt: undefined,
-              adminRemarks: remarks || `Reverted to pending by ${adminInfo.adminName || 'Admin'}`
-            };
-          }
-          return l;
-        })
-      );
-      
-      setManagerStats(prev => {
-        const newStats = { ...prev };
-        if (leave.status === 'approved') {
-          newStats.approved--;
-          newStats.pending++;
-        } else if (leave.status === 'rejected') {
-          newStats.rejected--;
-          newStats.pending++;
-        }
-        return newStats;
-      });
-    } else if (activeTab === "admin") {
-      setAdminLeaves(prev => 
-        prev.map(l => {
-          const lId = l._id || l.id;
-          if (lId === leaveId) {
-            return { 
-              ...l, 
-              status: 'pending',
-              approvedBy: undefined,
-              rejectedBy: undefined,
-              approvedAt: undefined,
-              rejectedAt: undefined,
-              adminRemarks: remarks || `Reverted to pending by ${adminInfo.adminName || 'Admin'}`
-            };
-          }
-          return l;
-        })
-      );
-      
-      setAdminStats(prev => {
-        const newStats = { ...prev };
-        if (leave.status === 'approved') {
-          newStats.approved--;
-          newStats.pending++;
-        } else if (leave.status === 'rejected') {
-          newStats.rejected--;
-          newStats.pending++;
-        }
-        return newStats;
-      });
-    }
-
-    // ✅ Dispatch leave-update event
-    const leaveName = leave.employeeName || leave.managerName || leave.adminName || 'Employee';
-    const leaveType = leave.leaveType || 'leave';
-    
-    window.dispatchEvent(new CustomEvent('leave-update', {
-      detail: {
-        leaveId: leaveId,
-        title: '🔄 Leave Reverted to Pending',
-        message: `${leaveName}'s ${leaveType} leave has been reverted to pending by ${adminInfo.adminName || 'Admin'}`,
-        notificationType: 'leave_pending',
-        employeeName: leaveName,
-        leaveType: leaveType,
-        actionBy: adminInfo.adminName || 'Admin'
-      }
-    }));
-
-    toast.success(data.message || 'Leave request reverted to pending successfully!');
-    setViewDialogOpen(false);
-    setRemarks("");
-    
-    // Refresh the list
-    if (activeTab === "supervisor-employee") {
-      fetchSupervisorEmployeeLeaves(currentPage);
-    } else if (activeTab === "manager") {
-      fetchManagerLeaves(currentPage);
-    } else if (activeTab === "admin") {
-      fetchAdminLeaves(currentPage);
-    }
-  } catch (error: any) {
-    console.error("Error reverting leave:", error);
-    toast.error(error.message || "Failed to revert leave status");
-  } finally {
-    setIsUpdating(false);
-    setSelectedLeave(null);
-  }
-};
+  };
 
   // Handle apply for admin leave
   const validateApplyForm = (): boolean => {
@@ -1121,7 +1187,9 @@ const handleRevertToPending = async (leave: any) => {
         totalDays,
         reason: applyFormData.reason.trim(),
         appliedBy: adminInfo.adminName,
-        appliedDate: new Date().toISOString()
+        appliedDate: new Date().toISOString(),
+        site: selectedSite !== 'all' ? selectedSite : 'unspecified',
+        siteName: selectedSite !== 'all' ? sites.find(s => s._id === selectedSite)?.name : 'Unspecified Site'
       };
 
       console.log('📤 Submitting admin leave:', leaveData);
@@ -1144,7 +1212,6 @@ const handleRevertToPending = async (leave: any) => {
           reason: ''
         });
         
-        // Refresh admin leaves if on that tab
         if (activeTab === 'admin') {
           fetchAdminLeaves(currentPage);
         }
@@ -1241,7 +1308,9 @@ const handleRevertToPending = async (leave: any) => {
           toDate: editFormData.toDate,
           totalDays,
           reason: editFormData.reason.trim(),
-          updatedBy: adminInfo.adminName
+          updatedBy: adminInfo.adminName,
+          site: selectedSite !== 'all' ? selectedSite : selectedLeaveForEdit.site || 'unspecified',
+          siteName: selectedSite !== 'all' ? sites.find(s => s._id === selectedSite)?.name : selectedLeaveForEdit.siteName || 'Unspecified Site'
         })
       });
 
@@ -1373,6 +1442,7 @@ const handleRevertToPending = async (leave: any) => {
     setDepartmentFilter('all');
     setStatusFilter('pending');
     setSearchQuery('');
+    setSelectedSite('all');
     if (activeTab === "supervisor-employee") {
       fetchSupervisorEmployeeLeaves(1);
     } else if (activeTab === "manager") {
@@ -1447,6 +1517,13 @@ const handleRevertToPending = async (leave: any) => {
       return leave.adminDepartment;
     }
     return leave.department || 'N/A';
+  };
+
+  // Get site name for display
+  const getSiteName = () => {
+    if (selectedSite === 'all') return 'All Sites';
+    const site = sites.find(s => s._id === selectedSite);
+    return site ? site.name : 'Unknown Site';
   };
 
   // Toggle row expansion on mobile
@@ -1625,6 +1702,19 @@ const handleRevertToPending = async (leave: any) => {
 
   return (
     <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
+      {/* Site Filter Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SiteFilter
+          selectedSite={selectedSite}
+          onSiteChange={setSelectedSite}
+          sites={sites}
+          isLoading={isLoadingSites}
+        />
+        <span className="text-xs text-muted-foreground">
+          {selectedSite !== 'all' && `Showing: ${getSiteName()}`}
+        </span>
+      </div>
+
       {/* Admin Info and Apply Button */}
       <Card>
         <CardContent className="p-4">
@@ -2128,6 +2218,12 @@ const handleRevertToPending = async (leave: any) => {
                   <span className="text-xs text-muted-foreground">Position:</span>
                   <p className="font-medium">{adminInfo.adminPosition}</p>
                 </div>
+                {selectedSite !== 'all' && (
+                  <div className="col-span-2">
+                    <span className="text-xs text-muted-foreground">Site:</span>
+                    <p className="font-medium">{getSiteName()}</p>
+                  </div>
+                )}
               </div>
             </div>
 

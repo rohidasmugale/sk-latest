@@ -20,6 +20,7 @@ import * as XLSX from 'xlsx';
 import { format, differenceInDays } from 'date-fns';
 import DocumentUpload from "../../pages/superadmin/DocumentUpload";
 import { FaceRegisterButton } from "@/pages/supervisor/FaceRegisterButton";
+import { siteService, Site } from "@/services/SiteService";
 // ─── API URL ──────────────────────────────────────────────────────────────
 const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
@@ -179,8 +180,38 @@ interface EmployeesTabProps {
   initialSiteFilter?: string;
   allowImport?: boolean;
   allowExport?: boolean;
+  selectedSite?: string;
+  sites?: Site[];
 }
 
+// ─── Site Filter Component ──────────────────────────────────────────────
+
+const SiteFilter: React.FC<{
+  selectedSite: string;
+  onSiteChange: (value: string) => void;
+  sites: Site[];
+  isLoading?: boolean;
+}> = ({ selectedSite, onSiteChange, sites, isLoading = false }) => {
+  return (
+    <div className="flex items-center gap-2">
+      <Building className="h-4 w-4 text-gray-500" />
+      <select
+        value={selectedSite}
+        onChange={(e) => onSiteChange(e.target.value)}
+        disabled={isLoading}
+        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white text-sm min-w-[180px]"
+      >
+        <option value="all">🏢 All Sites</option>
+        {sites.map((site) => (
+          <option key={site._id} value={site._id}>
+            {site.name}
+          </option>
+        ))}
+      </select>
+      {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
+    </div>
+  );
+};
 // ─── Component ────────────────────────────────────────────────────────────
 
 const EmployeesTab = ({
@@ -188,7 +219,9 @@ const EmployeesTab = ({
   employees: propEmployees,
   setEmployees: propSetEmployees,
   onEmployeeUpdate,
-  onEmployeesBulkUpdate
+  onEmployeesBulkUpdate,
+  selectedSite: propSelectedSite = 'all',
+  sites: propSites = []
 }: EmployeesTabProps) => {
   // ─── State ──────────────────────────────────────────────────────────────
 
@@ -198,7 +231,7 @@ const EmployeesTab = ({
   const [employeesItemsPerPage, setEmployeesItemsPerPage] = useState(25);
   const [sortBy, setSortBy] = useState<string>("");
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
-  const [selectedSite, setSelectedSite] = useState<string>("all");
+const [selectedSite, setSelectedSite] = useState<string>(propSelectedSite);
   const [selectedJoinDate, setSelectedJoinDate] = useState<string>("");
   const [selectedEmployeeForDocuments, setSelectedEmployeeForDocuments] = useState<ExtendedEmployee | null>(null);
   const [documentsDialogOpen, setDocumentsDialogOpen] = useState(false);
@@ -319,7 +352,16 @@ const EmployeesTab = ({
   }, [employees, sitesFromAPI]);
 
   // ─── Data Fetching ──────────────────────────────────────────────────────
+// Sync with props
+useEffect(() => {
+  if (propSites.length > 0) {
+    setSitesFromAPI(propSites);
+  }
+}, [propSites]);
 
+useEffect(() => {
+  setSelectedSite(propSelectedSite);
+}, [propSelectedSite]);
   const fetchEmployees = async () => {
     try {
       setLoading(true);
@@ -335,7 +377,7 @@ const EmployeesTab = ({
       };
       if (searchTerm) params.search = searchTerm;
       if (selectedDepartment !== "all") params.department = selectedDepartment;
-      if (selectedSite !== "all") params.siteName = selectedSite;
+      if (selectedSite !== "all") params.siteName = resolveSiteName(selectedSite);
       if (selectedJoinDate) params.dateOfJoining = selectedJoinDate;
       if (sortBy) {
         params.sortBy = sortBy;
@@ -457,10 +499,10 @@ const EmployeesTab = ({
   };
   const fetchEmployeeStats = async () => {
     try {
-      // Fetch ALL employees just for counting (no pagination)
-      const response = await axios.get(`${API_URL}/employees`, {
-        params: { limit: 10000 } // Get all
-      });
+      const params: any = { limit: 10000 };
+    if (selectedSite !== "all") params.siteName = resolveSiteName(selectedSite);
+    
+    const response = await axios.get(`${API_URL}/employees`, { params });
 
       if (response.data && response.data.success) {
         const allEmps = response.data.data || response.data.employees || [];
@@ -530,7 +572,14 @@ const EmployeesTab = ({
       setLoadingSites(false);
     }
   };
-
+// Place this after your state declarations, e.g. after `sitesFromAPI`
+const resolveSiteName = (value: string): string => {
+  if (!value || value === 'all') return value;
+  // Try sitesFromAPI first, then fallback to propSites
+  const combined = [...sitesFromAPI, ...propSites];
+  const match = combined.find(s => s._id === value);
+  return match ? match.name : value; // fallback to value (assume it's already a name)
+};
   const calculateSiteDeploymentStatus = () => {
     setLoadingDeploymentStatus(true);
 
@@ -703,7 +752,7 @@ const EmployeesTab = ({
       emp.siteName?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesDepartment = selectedDepartment === "all" || emp.department === selectedDepartment;
-    const matchesSite = selectedSite === "all" || emp.siteName === selectedSite;
+    const matchesSite = selectedSite === "all" || emp.siteName === resolveSiteName(selectedSite);
     const matchesJoinDate = !selectedJoinDate || emp.joinDate === selectedJoinDate;
 
     return matchesSearch && matchesDepartment && matchesSite && matchesJoinDate;
@@ -1088,7 +1137,13 @@ const EmployeesTab = ({
   };
 
   // ─── Delete Individual ──────────────────────────────────────────────
+// ─── Get site name for display ──────────────────────────────────────
 
+const getSiteName = () => {
+  if (selectedSite === 'all') return 'All Sites';
+  const site = sitesFromAPI.find(s => s._id === selectedSite);
+  return site ? site.name : 'Unknown Site';
+};
   const handleDeleteEmployee = async (id: string) => {
     try {
       setIsDeleting(id);
@@ -1161,15 +1216,18 @@ const EmployeesTab = ({
 
   const handleExportEmployees = async () => {
     try {
-      setIsExporting(true);
-
-      const response = await axios.get(`${API_URL}/employees/export`, {
-        responseType: "blob",
-        params: {
-          department: selectedDepartment !== "all" ? selectedDepartment : undefined,
-          status: "active"
-        }
-      });
+       setIsExporting(true);
+    
+    const params: any = {
+      department: selectedDepartment !== "all" ? selectedDepartment : undefined,
+      status: "active"
+    };
+    if (selectedSite !== "all") params.siteName = resolveSiteName(selectedSite);
+    
+    const response = await axios.get(`${API_URL}/employees/export`, {
+      responseType: "blob",
+      params
+    });
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
@@ -2674,182 +2732,221 @@ const EmployeesTab = ({
   };
   // ─── ID Card Functions ──────────────────────────────────────────────────
 
-  const generateIDCard = (employee: ExtendedEmployee) => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      toast.error("Please allow popups to generate ID card");
-      return;
-    }
+ const generateIDCard = (employee: ExtendedEmployee) => {
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    toast.error("Please allow popups to generate ID card");
+    return;
+  }
 
-    const photoUrl = getPhotoUrl(employee);
+  const photoUrl = getPhotoUrl(employee);
 
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>ID Card - ${employee.name}</title>
-          <style>
-            body { 
-              font-family: Arial, sans-serif; 
-              margin: 0; 
-              padding: 20px;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              min-height: 100vh;
-              background: #f5f5f5;
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>ID Card - ${employee.name}</title>
+        <style>
+          body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #f5f5f5;
+          }
+          .id-card {
+            width: 420px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            overflow: hidden;
+            border: 2px solid #e11d48;
+          }
+          .header {
+            background: linear-gradient(135deg, #e11d48, #be123c);
+            color: white;
+            padding: 20px;
+            text-align: center;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: bold;
+          }
+          .header .subtitle {
+            font-size: 12px;
+            opacity: 0.9;
+          }
+          .photo-section {
+            padding: 25px 20px 15px 20px;
+            text-align: center;
+            background: white;
+          }
+          .employee-photo {
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            border: 4px solid #e11d48;
+            object-fit: cover;
+            margin: 0 auto;
+            background: #f5f5f5;
+          }
+          .no-photo {
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            border: 4px solid #e11d48;
+            background: #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6b7280;
+            font-size: 14px;
+            margin: 0 auto;
+          }
+          .details {
+            padding: 15px 25px 25px 25px;
+            background: white;
+          }
+          .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid #f0f0f0;
+          }
+          .detail-row:last-child {
+            border-bottom: none;
+          }
+          .label {
+            font-weight: 600;
+            color: #6b7280;
+            font-size: 12px;
+            min-width: 100px;
+          }
+          .value {
+            color: #1f2937;
+            font-size: 13px;
+            font-weight: 500;
+            text-align: right;
+            word-break: break-word;
+          }
+          .footer {
+            background: #f8f9fa;
+            padding: 12px 15px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+          }
+          .footer-text {
+            font-size: 10px;
+            color: #6b7280;
+          }
+          .signature-area {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #e5e7eb;
+          }
+          .signature-item {
+            text-align: center;
+            font-size: 10px;
+            color: #6b7280;
+          }
+          .signature-line {
+            width: 100px;
+            border-top: 1px solid #1f2937;
+            margin: 4px auto 0 auto;
+          }
+          @media print {
+            body { background: white; }
+            .id-card { box-shadow: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="id-card">
+          <div class="header">
+            <h1>SK ENTERPRISES</h1>
+            <div class="subtitle">EMPLOYEE IDENTIFICATION CARD</div>
+          </div>
+          <div class="photo-section">
+            ${photoUrl
+              ? `<img src="${photoUrl}" alt="Employee Photo" class="employee-photo" onerror="this.style.display='none'; document.getElementById('no-photo').style.display='flex';" />` +
+                `<div id="no-photo" class="no-photo" style="display: none;">No Photo</div>`
+              : '<div class="no-photo">No Photo</div>'
             }
-            .id-card {
-              width: 350px;
-              background: white;
-              border-radius: 15px;
-              box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-              overflow: hidden;
-              border: 2px solid #e11d48;
-            }
-            .header {
-              background: linear-gradient(135deg, #e11d48, #be123c);
-              color: white;
-              padding: 20px;
-              text-align: center;
-            }
-            .header h1 {
-              margin: 0;
-              font-size: 24px;
-              font-weight: bold;
-            }
-            .header .subtitle {
-              font-size: 12px;
-              opacity: 0.9;
-            }
-            .photo-section {
-              padding: 20px;
-              text-align: center;
-              background: white;
-            }
-            .employee-photo {
-              width: 120px;
-              height: 120px;
-              border-radius: 50%;
-              border: 3px solid #e11d48;
-              object-fit: cover;
-              margin: 0 auto;
-              background: #f5f5f5;
-            }
-            .no-photo {
-              width: 120px;
-              height: 120px;
-              border-radius: 50%;
-              border: 3px solid #e11d48;
-              background: #ccc;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              color: #666;
-              font-size: 14px;
-              margin: 0 auto;
-            }
-            .details {
-              padding: 20px;
-              background: white;
-            }
-            .detail-row {
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 8px;
-              padding: 4px 0;
-              border-bottom: 1px solid #f0f0f0;
-            }
-            .label {
-              font-weight: bold;
-              color: #666;
-              font-size: 12px;
-            }
-            .value {
-              color: #333;
-              font-size: 12px;
-            }
-            .footer {
-              background: #f8f9fa;
-              padding: 15px;
-              text-align: center;
-              border-top: 1px solid #e9ecef;
-            }
-            .signature {
-              margin-top: 10px;
-              border-top: 1px solid #ccc;
-              padding-top: 5px;
-              font-size: 10px;
-              color: #666;
-            }
-            @media print {
-              body { background: white; }
-              .id-card { box-shadow: none; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="id-card">
-            <div class="header">
-              <h1>SK ENTERPRISES</h1>
-              <div class="subtitle">ID CARD</div>
+          </div>
+          <div class="details">
+            <div class="detail-row">
+              <span class="label">Employee Name</span>
+              <span class="value">${employee.name}</span>
             </div>
-            <div class="photo-section">
-              ${photoUrl
-        ? `<img src="${photoUrl}" alt="Employee Photo" class="employee-photo" onerror="this.style.display='none'; document.getElementById('no-photo').style.display='flex';" />` +
-        `<div id="no-photo" class="no-photo" style="display: none;">No Photo</div>`
-        : '<div class="no-photo">No Photo</div>'
-      }
+            <div class="detail-row">
+              <span class="label">Employee ID</span>
+              <span class="value">${employee.employeeId}</span>
             </div>
-            <div class="details">
-              <div class="detail-row">
-                <span class="label">Name:</span>
-                <span class="value">${employee.name}</span>
-              </div>
-              <div class="detail-row">
-                <span class="label">Employee ID:</span>
-                <span class="value">${employee.employeeId}</span>
-              </div>
-              <div class="detail-row">
-                <span class="label">Department:</span>
-                <span class="value">${employee.department}</span>
-              </div>
-              <div class="detail-row">
-                <span class="label">Position:</span>
-                <span class="value">${employee.position}</span>
-              </div>
-              <div class="detail-row">
-                <span class="label">Blood Group:</span>
-                <span class="value">${employee.bloodGroup || "N/A"}</span>
-              </div>
-              <div class="detail-row">
-                <span class="label">Join Date:</span>
-                <span class="value">${employee.joinDate}</span>
-              </div>
+            <div class="detail-row">
+              <span class="label">Designation</span>
+              <span class="value">${employee.position || "N/A"}</span>
             </div>
-            <div class="footer">
-              <div>Authorized Signature</div>
-              <div class="signature">This card is property of SK Enterprises</div>
+            <div class="detail-row">
+              <span class="label">Site Name</span>
+              <span class="value">${employee.siteName || "N/A"}</span>
+            </div>
+            <div class="detail-row">
+              <span class="label">Date of Birth</span>
+              <span class="value">${employee.dateOfBirth || "N/A"}</span>
+            </div>
+            <div class="detail-row">
+              <span class="label">Aadhaar Number</span>
+              <span class="value">${employee.aadharNumber ? employee.aadharNumber.replace(/(\d{4})(\d{4})(\d{4})/, '$1-$2-$3') : "N/A"}</span>
+            </div>
+            <div class="detail-row">
+              <span class="label">Blood Group</span>
+              <span class="value">${employee.bloodGroup || "N/A"}</span>
+            </div>
+            <div class="detail-row">
+              <span class="label">Join Date</span>
+              <span class="value">${employee.joinDate || "N/A"}</span>
             </div>
           </div>
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(() => {
-                window.close();
-              }, 1000);
-            };
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
+          <div class="footer">
+            <div class="signature-area">
+              <div class="signature-item">
+                <div>Employee Signature</div>
+                <div class="signature-line"></div>
+              </div>
+              <div class="signature-item">
+                <div>Authorized Signature</div>
+                <div class="signature-line"></div>
+              </div>
+            </div>
+            <div class="footer-text" style="margin-top: 8px;">
+              This card is the property of SK Enterprises • Valid until employment
+            </div>
+          </div>
+        </div>
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(() => {
+              window.close();
+            }, 1000);
+          };
+        </script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+};
 
-  const downloadIDCard = (employee: ExtendedEmployee) => {
-    generateIDCard(employee);
-    toast.success(`ID Card downloaded for ${employee.name}`);
-  };
+ const downloadIDCard = (employee: ExtendedEmployee) => {
+  generateIDCard(employee);
+  toast.success(`ID Card generated for ${employee.name}`);
+};
 
   const downloadNomineeForm = (employee: ExtendedEmployee) => {
     const printWindow = window.open("", "_blank");
@@ -3125,6 +3222,7 @@ const EmployeesTab = ({
 
   return (
     <div className="space-y-4 md:space-y-6">
+      
       {/* ─── Import progress banner ──────────────────────────────────── */}
       {isImporting && importProgress.total > 0 && (
         <Card className="border-primary/20 bg-primary/5">

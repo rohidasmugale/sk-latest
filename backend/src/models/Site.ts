@@ -41,6 +41,18 @@ export interface ISite extends Document {
   latitude?: number;
   longitude?: number;
    geofenceRadius?: number; // in km, default 0.5
+
+   shifts?: Array<{
+    id: string;
+    name: string;
+    label?: string;
+    startTime: string;
+    endTime: string;
+    graceMinutes?: number;
+    color?: string;
+    appliesTo?: string[];
+    isOvernight?: boolean;
+  }>;
 }
 
 const SiteSchema: Schema = new Schema(
@@ -100,7 +112,8 @@ const SiteSchema: Schema = new Schema(
             'Housekeeping',
             'Security',
             'Parking',
-            'Waste Management'
+            'Waste Management',
+            'Other'
           ];
           return services.every(service => validServices.includes(service));
         },
@@ -168,8 +181,24 @@ const SiteSchema: Schema = new Schema(
    employeeCounter: {
       type: Number,
       default: 0
-    }
+    },
+    shifts: {
+  type: [{
+    id: { type: String, required: true },
+    name: { type: String, required: true },
+    label: { type: String, default: '' },
+    startTime: { type: String, required: true, match: /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/ },
+    endTime: { type: String, required: true, match: /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/ },
+    graceMinutes: { type: Number, default: 15, min: 0 },
+    color: { type: String, default: '#4CAF50' },
+    appliesTo: { type: [String], default: [] },
+    isOvernight: { type: Boolean, default: false }
+  }],
+  default: []
+},
   },
+  // After the existing fields, before timestamps
+
   {
     timestamps: true,
     toJSON: { virtuals: true },

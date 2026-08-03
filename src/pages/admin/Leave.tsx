@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Calendar, 
-  X, 
-  Plus, 
-  Clock, 
+import {
+  Calendar,
+  X,
+  Plus,
+  Clock,
   CalendarDays,
   AlertCircle,
   CheckCircle2,
@@ -18,8 +18,12 @@ import {
   Users,
   Briefcase,
   Calendar as CalendarIcon,
-  Filter
+  Filter,
+  Building,
+  RefreshCw
 } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { siteService, Site } from '@/services/SiteService';
 
 // Types
 type LeaveType = 'annual' | 'sick' | 'personal' | 'maternity' | 'paternity' | 'unpaid';
@@ -43,6 +47,8 @@ interface LeaveRecord {
   remarks?: string;
   cancellationReason?: string;
   contactNumber?: string;
+  site?: string;
+  siteName?: string;
 }
 
 interface AdminLeaveStats {
@@ -165,7 +171,7 @@ const DatePickerCalendar: React.FC<{
     }
 
     // Next month's days
-    const totalCells = 42; // 6 weeks * 7 days
+    const totalCells = 42;
     const remainingCells = totalCells - days.length;
     for (let i = 1; i <= remainingCells; i++) {
       days.push(
@@ -191,7 +197,6 @@ const DatePickerCalendar: React.FC<{
 
   return (
     <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-50 w-72">
-      {/* Calendar Header */}
       <div className="flex items-center justify-between mb-4">
         <button
           onClick={handlePrevMonth}
@@ -210,7 +215,6 @@ const DatePickerCalendar: React.FC<{
         </button>
       </div>
 
-      {/* Day Headers */}
       <div className="grid grid-cols-7 gap-1 mb-2">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
           <div key={day} className="text-center text-sm font-medium text-gray-500">
@@ -219,12 +223,10 @@ const DatePickerCalendar: React.FC<{
         ))}
       </div>
 
-      {/* Calendar Grid */}
       <div className="grid grid-cols-7 gap-1">
         {renderCalendar()}
       </div>
 
-      {/* Today Button */}
       <div className="mt-4 pt-4 border-t border-gray-100">
         <button
           onClick={() => handleDateClick(new Date())}
@@ -279,7 +281,6 @@ const ViewLeaveDetailsModal: React.FC<{
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
       <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl max-h-[90vh] overflow-hidden">
-        {/* Modal Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <div>
             <h2 className="text-xl font-semibold text-gray-900">Leave Details</h2>
@@ -293,10 +294,8 @@ const ViewLeaveDetailsModal: React.FC<{
           </button>
         </div>
 
-        {/* Modal Content with scrolling */}
         <div className="overflow-y-auto max-h-[calc(90vh-140px)] p-6">
           <div className="space-y-6">
-            {/* Employee Information */}
             <div className="bg-blue-50 p-4 rounded-lg">
               <h3 className="font-medium text-blue-800 mb-3 flex items-center gap-2">
                 <Users className="w-5 h-5" />
@@ -339,9 +338,7 @@ const ViewLeaveDetailsModal: React.FC<{
               </div>
             </div>
 
-            {/* Leave Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Leave Type and Status */}
               <div>
                 <h3 className="font-medium text-gray-700 mb-3">Leave Information</h3>
                 <div className="space-y-4">
@@ -359,7 +356,6 @@ const ViewLeaveDetailsModal: React.FC<{
                 </div>
               </div>
 
-              {/* Dates Information */}
               <div>
                 <h3 className="font-medium text-gray-700 mb-3">Dates</h3>
                 <div className="space-y-4">
@@ -385,7 +381,6 @@ const ViewLeaveDetailsModal: React.FC<{
               </div>
             </div>
 
-            {/* Application Details */}
             <div>
               <h3 className="font-medium text-gray-700 mb-3">Application Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -396,15 +391,14 @@ const ViewLeaveDetailsModal: React.FC<{
                 <div>
                   <p className="text-sm text-gray-500">Application Status</p>
                   <p className="font-medium text-gray-900">
-                    {leave.status === 'pending' ? 'Awaiting Approval' : 
-                     leave.status === 'approved' ? 'Approved' :
-                     leave.status === 'rejected' ? 'Rejected' : 'Cancelled'}
+                    {leave.status === 'pending' ? 'Awaiting Approval' :
+                      leave.status === 'approved' ? 'Approved' :
+                        leave.status === 'rejected' ? 'Rejected' : 'Cancelled'}
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Reason */}
             <div>
               <h3 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
                 <FileText className="w-5 h-5" />
@@ -415,7 +409,6 @@ const ViewLeaveDetailsModal: React.FC<{
               </div>
             </div>
 
-            {/* Additional Information */}
             {(leave.remarks || leave.cancellationReason) && (
               <div>
                 <h3 className="font-medium text-gray-700 mb-3">Additional Information</h3>
@@ -442,7 +435,6 @@ const ViewLeaveDetailsModal: React.FC<{
           </div>
         </div>
 
-        {/* Modal Footer */}
         <div className="p-6 border-t bg-gray-50">
           <button
             onClick={onClose}
@@ -456,6 +448,34 @@ const ViewLeaveDetailsModal: React.FC<{
   );
 };
 
+// Simple Site Filter Component (using native select, no shadcn dependencies)
+const SiteFilter: React.FC<{
+  selectedSite: string;
+  onSiteChange: (value: string) => void;
+  sites: Site[];
+  isLoading?: boolean;
+}> = ({ selectedSite, onSiteChange, sites, isLoading = false }) => {
+  return (
+    <div className="flex items-center gap-2">
+      <Building className="h-4 w-4 text-gray-500" />
+      <select
+        value={selectedSite}
+        onChange={(e) => onSiteChange(e.target.value)}
+        disabled={isLoading}
+        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white text-sm min-w-[180px]"
+      >
+        <option value="all">🏢 All Sites</option>
+        {sites.map((site) => (
+          <option key={site._id} value={site._id}>
+            {site.name}
+          </option>
+        ))}
+      </select>
+      {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
+    </div>
+  );
+};
+
 const AdminLeavePage: React.FC = () => {
   // State for form inputs
   const [leaveType, setLeaveType] = useState<LeaveType>('annual');
@@ -463,13 +483,13 @@ const AdminLeavePage: React.FC = () => {
   const [toDate, setToDate] = useState<string>('');
   const [reason, setReason] = useState<string>('');
   const [contactNumber, setContactNumber] = useState<string>('');
-  
+
   // Calendar states
   const [showFromCalendar, setShowFromCalendar] = useState<boolean>(false);
   const [showToCalendar, setShowToCalendar] = useState<boolean>(false);
   const [fromDateObj, setFromDateObj] = useState<Date | null>(null);
   const [toDateObj, setToDateObj] = useState<Date | null>(null);
-  
+
   // State for popup and data
   const [isPopupOpen, setIsPopupOpen] = useState<boolean>(false);
   const [isEditMode, setIsEditMode] = useState<boolean>(false);
@@ -484,18 +504,23 @@ const AdminLeavePage: React.FC = () => {
     cancelled: 0,
     totalDays: 0
   });
-  
+
   // Filter state
   const [statusFilter, setStatusFilter] = useState<LeaveStatus | 'all'>('all');
-  
+
+  // Site state - USING YOUR SITE SERVICE
+  const [sites, setSites] = useState<Site[]>([]);
+  const [selectedSite, setSelectedSite] = useState<string>('all');
+  const [isLoadingSites, setIsLoadingSites] = useState<boolean>(false);
+
   // View details modal state
   const [viewModalOpen, setViewModalOpen] = useState<boolean>(false);
   const [selectedLeave, setSelectedLeave] = useState<LeaveRecord | null>(null);
-  
+
   // Loading states
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
-  
+
   // User state (fetched from profile/localStorage)
   const [currentUser, setCurrentUser] = useState<{ name: string; email: string; department: string }>({
     name: '',
@@ -504,8 +529,14 @@ const AdminLeavePage: React.FC = () => {
   });
 
   // API Base URL
- const API_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
+  const API_URL = import.meta.env.VITE_API_URL ||
+    (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
+
+  // Fetch sites using YOUR siteService
+  useEffect(() => {
+    fetchSites();
+  }, []);
+
   // Fetch current user from localStorage on component mount
   useEffect(() => {
     fetchCurrentUser();
@@ -519,14 +550,38 @@ const AdminLeavePage: React.FC = () => {
     }
   }, [currentUser.name]);
 
-  // Filter leaves when status filter or leaveRecords change
+  // Filter leaves when status filter, site filter, or leaveRecords change
   useEffect(() => {
-    if (statusFilter === 'all') {
-      setFilteredLeaves(leaveRecords);
-    } else {
-      setFilteredLeaves(leaveRecords.filter(leave => leave.status === statusFilter));
+    let filtered = leaveRecords;
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(leave => leave.status === statusFilter);
     }
-  }, [statusFilter, leaveRecords]);
+
+    // Apply site filter
+    if (selectedSite !== 'all') {
+      filtered = filtered.filter(leave =>
+        leave.site === selectedSite || leave.siteName === selectedSite
+      );
+    }
+
+    setFilteredLeaves(filtered);
+  }, [statusFilter, leaveRecords, selectedSite]);
+
+  // Fetch sites - USING YOUR SITE SERVICE
+  const fetchSites = async () => {
+    setIsLoadingSites(true);
+    try {
+      const sitesData = await siteService.getAllSites();
+      setSites(sitesData || []);
+    } catch (error) {
+      console.error('Error fetching sites:', error);
+      setSites([]);
+    } finally {
+      setIsLoadingSites(false);
+    }
+  };
 
   const fetchCurrentUser = () => {
     try {
@@ -539,7 +594,6 @@ const AdminLeavePage: React.FC = () => {
           department: parsedUser.department || 'Administration'
         });
       } else {
-        // Fallback to default
         setCurrentUser({
           name: 'Admin User',
           email: '',
@@ -556,7 +610,6 @@ const AdminLeavePage: React.FC = () => {
     }
   };
 
-  // Format date to dd-mm-yyyy
   const formatDate = (date: Date): string => {
     const day = date.getDate().toString().padStart(2, '0');
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -564,7 +617,6 @@ const AdminLeavePage: React.FC = () => {
     return `${day}-${month}-${year}`;
   };
 
-  // Format date for API (YYYY-MM-DD)
   const formatDateForAPI = (dateStr: string): string => {
     const parts = dateStr.split('-');
     if (parts.length === 3) {
@@ -573,7 +625,6 @@ const AdminLeavePage: React.FC = () => {
     return dateStr;
   };
 
-  // Format date from API (YYYY-MM-DD to dd-mm-yyyy)
   const formatDateFromAPI = (dateStr: string): string => {
     if (!dateStr) return '';
     try {
@@ -585,127 +636,117 @@ const AdminLeavePage: React.FC = () => {
   };
 
   // Fetch admin leave records from MongoDB - FILTERED FOR CURRENT USER
-const fetchAdminLeaves = async () => {
-  try {
-    setLoading(true);
-    
-    // Get current user from localStorage
-    const storedUser = localStorage.getItem('sk_user');
-    const userId = storedUser ? JSON.parse(storedUser).name : currentUser.name;
-    
-    // CORRECTED ENDPOINT: /api/admin-leaves (not /api/admin/leaves)
-    const response = await fetch(`${API_URL}/admin-leaves?userId=${encodeURIComponent(userId)}`);
-    
-    if (!response.ok) {
-      throw new Error(`http error! status: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    if (data.success) {
-      // Transform the data to match our frontend format
-      const transformedLeaves = data.leaves
-        .map((leave: any) => ({
-          id: leave._id || leave.id,
-          employeeId: leave.employeeId,
-          employeeName: leave.employeeName,
-          leaveType: leave.leaveType,
-          fromDate: formatDateFromAPI(leave.fromDate),
-          toDate: formatDateFromAPI(leave.toDate),
-          totalDays: leave.totalDays,
-          reason: leave.reason,
-          appliedDate: formatDateFromAPI(leave.appliedDate || leave.createdAt),
-          appliedBy: leave.appliedBy,
-          department: leave.department,
-          status: leave.status,
-          createdAt: leave.createdAt,
-          updatedAt: leave.updatedAt,
-          remarks: leave.superadminRemarks || leave.remarks,
-          cancellationReason: leave.cancellationReason,
-          contactNumber: leave.contactNumber
-        }))
-        // Sort by date (newest first)
-        .sort((a: LeaveRecord, b: LeaveRecord) => {
-          const dateA = new Date(a.appliedDate.split('-').reverse().join('-'));
-          const dateB = new Date(b.appliedDate.split('-').reverse().join('-'));
-          return dateB.getTime() - dateA.getTime();
-        });
-      
-      setLeaveRecords(transformedLeaves);
-    }
-  } catch (error) {
-    console.error('Error fetching admin leaves:', error);
-    // Fallback to sample data if API fails
-    const sampleData = [
-      {
-        id: '1',
-        employeeId: 'ADMIN-001',
-        employeeName: currentUser.name,
-        leaveType: 'annual',
-        fromDate: '15-01-2024',
-        toDate: '16-01-2024',
-        totalDays: 2,
-        reason: 'Annual vacation',
-        appliedDate: '14-01-2024',
-        appliedBy: currentUser.name,
-        department: 'Administration',
-        status: 'pending' as LeaveStatus // Changed to pending for testing
+  const fetchAdminLeaves = async () => {
+    try {
+      setLoading(true);
+
+      const storedUser = localStorage.getItem('sk_user');
+      const userId = storedUser ? JSON.parse(storedUser).name : currentUser.name;
+
+      const response = await fetch(`${API_URL}/admin-leaves?userId=${encodeURIComponent(userId)}`);
+
+      if (!response.ok) {
+        throw new Error(`http error! status: ${response.status}`);
       }
-    ];
-    
-    setLeaveRecords(sampleData);
-  } finally {
-    setLoading(false);
-  }
-};
 
-
-  // Fetch admin leave statistics - CALCULATED FOR CURRENT USER ONLY
-const fetchAdminStats = async () => {
-  try {
-    // Get current user from localStorage
-    const storedUser = localStorage.getItem('sk_user');
-    const userId = storedUser ? JSON.parse(storedUser).name : currentUser.name;
-    
-    // CORRECTED ENDPOINT: /api/admin-leaves/stats
-    const response = await fetch(`${API_URL}/admin-leaves/stats?userId=${encodeURIComponent(userId)}`);
-    
-    if (response.ok) {
       const data = await response.json();
-      
-      if (data.success) {
-        setStats(data.stats);
-        return;
-      }
-    }
-    
-    // Fallback: Calculate stats from local data
-    const localStats = {
-      total: leaveRecords.length,
-      pending: leaveRecords.filter(l => l.status === 'pending').length,
-      approved: leaveRecords.filter(l => l.status === 'approved').length,
-      rejected: leaveRecords.filter(l => l.status === 'rejected').length,
-      cancelled: leaveRecords.filter(l => l.status === 'cancelled').length,
-      totalDays: leaveRecords.reduce((sum, record) => sum + record.totalDays, 0)
-    };
-    setStats(localStats);
-    
-  } catch (error) {
-    console.error('Error fetching admin stats:', error);
-    // Calculate stats from local data if API fails
-    const localStats = {
-      total: leaveRecords.length,
-      pending: leaveRecords.filter(l => l.status === 'pending').length,
-      approved: leaveRecords.filter(l => l.status === 'approved').length,
-      rejected: leaveRecords.filter(l => l.status === 'rejected').length,
-      cancelled: leaveRecords.filter(l => l.status === 'cancelled').length,
-      totalDays: leaveRecords.reduce((sum, record) => sum + record.totalDays, 0)
-    };
-    setStats(localStats);
-  }
-};
 
-  // Handle from date selection
+      if (data.success) {
+        const transformedLeaves = data.leaves
+          .map((leave: any) => ({
+            id: leave._id || leave.id,
+            employeeId: leave.employeeId,
+            employeeName: leave.employeeName,
+            leaveType: leave.leaveType,
+            fromDate: formatDateFromAPI(leave.fromDate),
+            toDate: formatDateFromAPI(leave.toDate),
+            totalDays: leave.totalDays,
+            reason: leave.reason,
+            appliedDate: formatDateFromAPI(leave.appliedDate || leave.createdAt),
+            appliedBy: leave.appliedBy,
+            department: leave.department,
+            status: leave.status,
+            createdAt: leave.createdAt,
+            updatedAt: leave.updatedAt,
+            remarks: leave.superadminRemarks || leave.remarks,
+            cancellationReason: leave.cancellationReason,
+            contactNumber: leave.contactNumber,
+            site: leave.site || leave.siteName || 'unspecified',
+            siteName: leave.siteName || leave.site || 'Unspecified Site'
+          }))
+          .sort((a: LeaveRecord, b: LeaveRecord) => {
+            const dateA = new Date(a.appliedDate.split('-').reverse().join('-'));
+            const dateB = new Date(b.appliedDate.split('-').reverse().join('-'));
+            return dateB.getTime() - dateA.getTime();
+          });
+
+        setLeaveRecords(transformedLeaves);
+      }
+    } catch (error) {
+      console.error('Error fetching admin leaves:', error);
+      const sampleData = [
+        {
+          id: '1',
+          employeeId: 'ADMIN-001',
+          employeeName: currentUser.name,
+          leaveType: 'annual' as LeaveType,
+          fromDate: '15-01-2024',
+          toDate: '16-01-2024',
+          totalDays: 2,
+          reason: 'Annual vacation',
+          appliedDate: '14-01-2024',
+          appliedBy: currentUser.name,
+          department: 'Administration',
+          status: 'pending' as LeaveStatus,
+          site: 'unspecified',
+          siteName: 'Unspecified Site'
+        }
+      ];
+      setLeaveRecords(sampleData);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAdminStats = async () => {
+    try {
+      const storedUser = localStorage.getItem('sk_user');
+      const userId = storedUser ? JSON.parse(storedUser).name : currentUser.name;
+
+      const response = await fetch(`${API_URL}/admin-leaves/stats?userId=${encodeURIComponent(userId)}`);
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setStats(data.stats);
+          return;
+        }
+      }
+
+      const localStats = {
+        total: leaveRecords.length,
+        pending: leaveRecords.filter(l => l.status === 'pending').length,
+        approved: leaveRecords.filter(l => l.status === 'approved').length,
+        rejected: leaveRecords.filter(l => l.status === 'rejected').length,
+        cancelled: leaveRecords.filter(l => l.status === 'cancelled').length,
+        totalDays: leaveRecords.reduce((sum, record) => sum + record.totalDays, 0)
+      };
+      setStats(localStats);
+
+    } catch (error) {
+      console.error('Error fetching admin stats:', error);
+      const localStats = {
+        total: leaveRecords.length,
+        pending: leaveRecords.filter(l => l.status === 'pending').length,
+        approved: leaveRecords.filter(l => l.status === 'approved').length,
+        rejected: leaveRecords.filter(l => l.status === 'rejected').length,
+        cancelled: leaveRecords.filter(l => l.status === 'cancelled').length,
+        totalDays: leaveRecords.reduce((sum, record) => sum + record.totalDays, 0)
+      };
+      setStats(localStats);
+    }
+  };
+
   const handleFromDateSelect = (date: Date) => {
     setFromDateObj(date);
     setFromDate(formatDate(date));
@@ -716,7 +757,6 @@ const fetchAdminStats = async () => {
     setShowFromCalendar(false);
   };
 
-  // Handle to date selection
   const handleToDateSelect = (date: Date) => {
     if (fromDateObj && date < fromDateObj) {
       alert('To date must be after from date');
@@ -727,34 +767,32 @@ const fetchAdminStats = async () => {
     setShowToCalendar(false);
   };
 
-  // Function to calculate days between dates
   const calculateDays = (from: string, to: string): number => {
     if (!from || !to) return 0;
-    
+
     const fromParts = from.split('-');
     const toParts = to.split('-');
-    
+
     if (fromParts.length !== 3 || toParts.length !== 3) return 0;
-    
+
     const fromDateObj = new Date(
       parseInt(fromParts[2]),
       parseInt(fromParts[1]) - 1,
       parseInt(fromParts[0])
     );
-    
+
     const toDateObj = new Date(
       parseInt(toParts[2]),
       parseInt(toParts[1]) - 1,
       parseInt(toParts[0])
     );
-    
+
     const timeDiff = toDateObj.getTime() - fromDateObj.getTime();
     const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
-    
+
     return daysDiff > 0 ? daysDiff : 1;
   };
 
-  // Reset form
   const resetForm = () => {
     setLeaveType('annual');
     setFromDate('');
@@ -769,7 +807,6 @@ const fetchAdminStats = async () => {
     setEditingLeaveId(null);
   };
 
-  // Open form for editing
   const handleEditLeave = (leave: LeaveRecord) => {
     setLeaveType(leave.leaveType);
     setFromDate(leave.fromDate);
@@ -781,110 +818,103 @@ const fetchAdminStats = async () => {
     setIsPopupOpen(true);
   };
 
-  // Handle view leave details
   const handleViewLeave = (leave: LeaveRecord) => {
     setSelectedLeave(leave);
     setViewModalOpen(true);
   };
 
-  // Handle form submission - Send to MongoDB
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  
-  if (!fromDate || !toDate || !reason) {
-    alert('Please fill all required fields');
-    return;
-  }
-  
-  // Calculate total days
-  const totalDays = calculateDays(fromDate, toDate);
-  if (totalDays <= 0) {
-    alert('Invalid date range');
-    return;
-  }
-  
-  try {
-    setSubmitting(true);
-    
-    const leaveData = {
-      leaveType,
-      fromDate: formatDateForAPI(fromDate),
-      toDate: formatDateForAPI(toDate),
-      reason,
-      appliedBy: currentUser.name,
-      employeeName: currentUser.name,
-      contactNumber: contactNumber || 'N/A',
-      department: currentUser.department
-    };
-    
-    // CORRECTED ENDPOINT: /api/admin-leaves/apply
-    const response = await fetch(`${API_URL}/admin-leaves/apply`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(leaveData)
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || `http error! status: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    if (data.success) {
-      // Add the new leave to local state
-      const newLeave: LeaveRecord = {
-        id: data.leave._id || data.leave.id,
-        employeeId: data.leave.employeeId,
-        employeeName: data.leave.employeeName,
-        leaveType: data.leave.leaveType as LeaveType,
-        fromDate: formatDateFromAPI(data.leave.fromDate),
-        toDate: formatDateFromAPI(data.leave.toDate),
-        totalDays: data.leave.totalDays,
-        reason: data.leave.reason,
-        appliedDate: formatDateFromAPI(data.leave.appliedDate || new Date().toISOString()),
-        appliedBy: data.leave.appliedBy,
-        department: data.leave.department,
-        status: data.leave.status as LeaveStatus,
-        contactNumber: data.leave.contactNumber
-      };
-      window.dispatchEvent(new CustomEvent('leave-update', {
-        detail: {
-          leaveId: data.leave._id || data.leave.id,
-          title: '📅 New Admin Leave Request',
-          message: `${currentUser.name} (Admin) applied for ${leaveType} leave (${totalDays} days)`,
-          notificationType: 'leave_request',
-          employeeName: currentUser.name,
-          leaveType: leaveType,
-          totalDays: totalDays,
-          department: currentUser.department
-        }
-      }));
-      setLeaveRecords(prev => [newLeave, ...prev]);
-      
-      // Update stats
-      fetchAdminStats();
-      
-      alert('Leave request submitted successfully! Waiting for superadmin approval.');
-      
-      // Reset form and close popup
-      resetForm();
-      setIsPopupOpen(false);
-      
-    } else {
-      throw new Error(data.message || 'Failed to submit leave request');
-    }
-  } catch (error) {
-    console.error('Error submitting leave request:', error);
-    alert(`Error: ${error instanceof Error ? error.message : 'Failed to submit leave request'}`);
-  } finally {
-    setSubmitting(false);
-  }
-};
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  // Get status badge color
+    if (!fromDate || !toDate || !reason) {
+      alert('Please fill all required fields');
+      return;
+    }
+
+    const totalDays = calculateDays(fromDate, toDate);
+    if (totalDays <= 0) {
+      alert('Invalid date range');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+
+      const leaveData = {
+        leaveType,
+        fromDate: formatDateForAPI(fromDate),
+        toDate: formatDateForAPI(toDate),
+        reason,
+        appliedBy: currentUser.name,
+        employeeName: currentUser.name,
+        contactNumber: contactNumber || 'N/A',
+        department: currentUser.department
+      };
+
+      const response = await fetch(`${API_URL}/admin-leaves/apply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(leaveData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `http error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        const newLeave: LeaveRecord = {
+          id: data.leave._id || data.leave.id,
+          employeeId: data.leave.employeeId,
+          employeeName: data.leave.employeeName,
+          leaveType: data.leave.leaveType as LeaveType,
+          fromDate: formatDateFromAPI(data.leave.fromDate),
+          toDate: formatDateFromAPI(data.leave.toDate),
+          totalDays: data.leave.totalDays,
+          reason: data.leave.reason,
+          appliedDate: formatDateFromAPI(data.leave.appliedDate || new Date().toISOString()),
+          appliedBy: data.leave.appliedBy,
+          department: data.leave.department,
+          status: data.leave.status as LeaveStatus,
+          contactNumber: data.leave.contactNumber,
+          site: data.leave.site || 'unspecified',
+          siteName: data.leave.siteName || 'Unspecified Site'
+        };
+
+        window.dispatchEvent(new CustomEvent('leave-update', {
+          detail: {
+            leaveId: data.leave._id || data.leave.id,
+            title: '📅 New Admin Leave Request',
+            message: `${currentUser.name} (Admin) applied for ${leaveType} leave (${totalDays} days)`,
+            notificationType: 'leave_request',
+            employeeName: currentUser.name,
+            leaveType: leaveType,
+            totalDays: totalDays,
+            department: currentUser.department
+          }
+        }));
+
+        setLeaveRecords(prev => [newLeave, ...prev]);
+        fetchAdminStats();
+
+        alert('Leave request submitted successfully! Waiting for superadmin approval.');
+        resetForm();
+        setIsPopupOpen(false);
+      } else {
+        throw new Error(data.message || 'Failed to submit leave request');
+      }
+    } catch (error) {
+      console.error('Error submitting leave request:', error);
+      alert(`Error: ${error instanceof Error ? error.message : 'Failed to submit leave request'}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const getStatusColor = (status: LeaveStatus) => {
     switch (status) {
       case 'approved': return 'bg-green-100 text-green-800';
@@ -895,7 +925,6 @@ const handleSubmit = async (e: React.FormEvent) => {
     }
   };
 
-  // Get status icon
   const getStatusIcon = (status: LeaveStatus) => {
     switch (status) {
       case 'approved': return <CheckCircle2 className="w-4 h-4" />;
@@ -905,7 +934,6 @@ const handleSubmit = async (e: React.FormEvent) => {
     }
   };
 
-  // Get leave type label
   const getLeaveTypeLabel = (type: LeaveType) => {
     switch (type) {
       case 'sick': return 'Sick Leave';
@@ -918,10 +946,17 @@ const handleSubmit = async (e: React.FormEvent) => {
     }
   };
 
-  // Refresh data
   const handleRefresh = () => {
     fetchAdminLeaves();
     fetchAdminStats();
+    fetchSites();
+  };
+
+  // Get site name for display
+  const getSiteName = () => {
+    if (selectedSite === 'all') return 'All Sites';
+    const site = sites.find(s => s._id === selectedSite);
+    return site ? site.name : 'Unknown Site';
   };
 
   return (
@@ -935,19 +970,25 @@ const handleSubmit = async (e: React.FormEvent) => {
               Welcome, <span className="font-semibold text-blue-600">{currentUser.name}</span> • {currentUser.department}
             </p>
           </div>
-          
-          <div className="flex gap-3 mt-4 md:mt-0">
+
+          <div className="flex gap-3 mt-4 md:mt-0 flex-wrap">
+            {/* Site Filter */}
+            <SiteFilter
+              selectedSite={selectedSite}
+              onSiteChange={setSelectedSite}
+              sites={sites}
+              isLoading={isLoadingSites}
+            />
+
             {/* Refresh Button */}
             <button
               onClick={handleRefresh}
               className="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-3 px-4 rounded-lg transition-colors duration-200"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
+              <RefreshCw className="w-5 h-5" />
               Refresh
             </button>
-            
+
             {/* Apply Leave Button */}
             <button
               onClick={() => {
@@ -974,7 +1015,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             </div>
             <p className="text-xs text-gray-500 mt-2">Your total leave applications</p>
           </div>
-          
+
           <div className="bg-white p-6 rounded-xl shadow-sm border">
             <div className="flex items-center justify-between">
               <div>
@@ -987,7 +1028,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             </div>
             <p className="text-xs text-gray-500 mt-2">Awaiting approval</p>
           </div>
-          
+
           <div className="bg-white p-6 rounded-xl shadow-sm border">
             <div className="flex items-center justify-between">
               <div>
@@ -1000,7 +1041,7 @@ const handleSubmit = async (e: React.FormEvent) => {
             </div>
             <p className="text-xs text-gray-500 mt-2">Approved leaves</p>
           </div>
-          
+
           <div className="bg-white p-6 rounded-xl shadow-sm border">
             <div className="flex items-center justify-between">
               <div>
@@ -1016,14 +1057,15 @@ const handleSubmit = async (e: React.FormEvent) => {
         </div>
 
         {/* Filter Section */}
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-semibold text-gray-900">My Leave History</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Showing your {statusFilter === 'all' ? 'all' : statusFilter} leave requests
+              Showing {selectedSite !== 'all' ? `site: ${getSiteName()}, ` : ''}
+              {statusFilter === 'all' ? 'all' : statusFilter} leave requests
             </p>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-gray-500" />
             <select
@@ -1058,7 +1100,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               )}
             </div>
           </div>
-          
+
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
@@ -1102,8 +1144,8 @@ const handleSubmit = async (e: React.FormEvent) => {
                         <Calendar className="w-12 h-12 text-gray-300 mb-2" />
                         <p className="text-lg font-medium mb-2">No leave records found</p>
                         <p className="text-gray-500 mb-4">
-                          {statusFilter === 'all' 
-                            ? "You haven't applied for any leaves yet" 
+                          {statusFilter === 'all'
+                            ? "You haven't applied for any leaves yet"
                             : `You don't have any ${statusFilter} leave requests`}
                         </p>
                         <button
@@ -1127,6 +1169,12 @@ const handleSubmit = async (e: React.FormEvent) => {
                           <div className="text-xs text-gray-500">
                             ID: {record.employeeId}
                           </div>
+                          {record.siteName && record.siteName !== 'Unspecified Site' && (
+                            <Badge variant="outline" className="text-xs">
+                              <Building className="h-3 w-3 mr-1" />
+                              {record.siteName}
+                            </Badge>
+                          )}
                         </div>
                       </td>
                       <td className="py-4 px-6">
@@ -1157,7 +1205,6 @@ const handleSubmit = async (e: React.FormEvent) => {
                       </td>
                       <td className="py-4 px-6">
                         <div className="flex gap-3">
-                          {/* View Button */}
                           <button
                             onClick={() => handleViewLeave(record)}
                             className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1 px-3 py-1 rounded-md hover:bg-blue-50 transition-colors"
@@ -1166,8 +1213,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                             <Eye className="w-4 h-4" />
                             View
                           </button>
-                          
-                          {/* Edit Button (only for pending leaves) */}
+
                           {record.status === 'pending' && (
                             <button
                               onClick={() => handleEditLeave(record)}
@@ -1192,7 +1238,6 @@ const handleSubmit = async (e: React.FormEvent) => {
         {isPopupOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl max-h-[90vh] overflow-hidden">
-              {/* Modal Header */}
               <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10">
                 <h2 className="text-xl font-semibold text-gray-900">
                   {isEditMode ? 'Edit Your Leave Request' : 'Apply for Leave'}
@@ -1206,7 +1251,6 @@ const handleSubmit = async (e: React.FormEvent) => {
                 </button>
               </div>
 
-              {/* Current User Info */}
               <div className="px-6 pt-6">
                 <div className="bg-blue-50 p-3 rounded-lg">
                   <div className="flex items-center gap-2">
@@ -1219,10 +1263,8 @@ const handleSubmit = async (e: React.FormEvent) => {
                 </div>
               </div>
 
-              {/* Modal Form with scrolling */}
               <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(90vh-180px)]">
                 <div className="p-6 space-y-6">
-                  {/* Leave Type */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Leave Type <span className="text-red-500">*</span>
@@ -1243,7 +1285,6 @@ const handleSubmit = async (e: React.FormEvent) => {
                     </select>
                   </div>
 
-                  {/* Contact Number */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Contact Number
@@ -1258,7 +1299,6 @@ const handleSubmit = async (e: React.FormEvent) => {
                     />
                   </div>
 
-                  {/* Date Inputs */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="relative">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1292,7 +1332,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                         </div>
                       )}
                     </div>
-                    
+
                     <div className="relative">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         To Date <span className="text-red-500">*</span>
@@ -1327,7 +1367,6 @@ const handleSubmit = async (e: React.FormEvent) => {
                     </div>
                   </div>
 
-                  {/* Reason */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Reason <span className="text-red-500">*</span>
@@ -1343,7 +1382,6 @@ const handleSubmit = async (e: React.FormEvent) => {
                     />
                   </div>
 
-                  {/* Info about days calculation */}
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <div className="flex items-start gap-3">
                       <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
@@ -1363,7 +1401,6 @@ const handleSubmit = async (e: React.FormEvent) => {
                   </div>
                 </div>
 
-                {/* Action Buttons - Sticky bottom */}
                 <div className="p-6 border-t bg-white sticky bottom-0">
                   <div className="flex gap-3">
                     <button

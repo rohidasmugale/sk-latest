@@ -7,18 +7,25 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { 
-  Plus, Eye, Trash2, Edit, MapPin, Building, DollarSign, Square, 
+import {
+  Plus, Eye, Trash2, Edit, MapPin, Building, DollarSign, Square,
   Search, Users, Filter, BarChart, Calendar, RefreshCw, User, Briefcase,
   Loader2, AlertCircle, ChevronDown, Phone, Mail, Upload, Download, FileText,
   CheckCircle, XCircle, UploadCloud
 } from "lucide-react";
 import { toast } from "sonner";
 import { FormField } from "./shared";
-import { siteService, Site, Client, SiteStats, CreateSiteRequest } from "@/services/SiteService";
+// At the top of SitesSection.tsx, add ShiftDefinition to the import
+import { siteService, Site, Client, SiteStats, CreateSiteRequest, ShiftDefinition } from "@/services/SiteService";
 import { crmService } from "@/services/crmService";
 import * as XLSX from "xlsx";
-
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 // Define Services and Roles
 const ServicesList = [
   "Housekeeping",
@@ -46,7 +53,7 @@ class ClientService {
       console.log('👥 Fetching clients from CRM...');
       const crmClients = await crmService.clients.getAll(searchTerm);
       console.log('👥 CRM clients fetched:', crmClients);
-      
+
       const transformedClients = crmClients.map(client => ({
         _id: client._id,
         name: client.name,
@@ -56,11 +63,11 @@ class ClientService {
         city: client.city || "",
         state: ""
       }));
-      
+
       return transformedClients;
     } catch (error) {
       console.error('❌ Failed to fetch from CRM, falling back to site service:', error);
-      
+
       try {
         if (searchTerm) {
           return await siteService.searchClients(searchTerm);
@@ -78,7 +85,7 @@ class ClientService {
     return this.getAllClients(query);
   }
 }
-const SitesSection = ({ refreshTrigger = 0 }: SitesSectionProps) =>  {
+const SitesSection = ({ refreshTrigger = 0 }: SitesSectionProps) => {
   const [sites, setSites] = useState<Site[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -97,7 +104,7 @@ const SitesSection = ({ refreshTrigger = 0 }: SitesSectionProps) =>  {
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [clientSearch, setClientSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
-  
+
   // Import states
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importLoading, setImportLoading] = useState(false);
@@ -109,10 +116,13 @@ const SitesSection = ({ refreshTrigger = 0 }: SitesSectionProps) =>  {
     invalid: any[];
     missingClients: string[];
   }>({ valid: [], invalid: [], missingClients: [] });
-
+  // Inside the SitesSection component, add this state
+  const [siteShifts, setSiteShifts] = useState<ShiftDefinition[]>([]);
+  const [editingShiftIndex, setEditingShiftIndex] = useState<number | null>(null);
+  const [shiftFormData, setShiftFormData] = useState<Partial<ShiftDefinition>>({});
   // Initialize client service
   const clientService = new ClientService();
-useEffect(() => {
+  useEffect(() => {
     if (refreshTrigger > 0) {
       fetchSites();
       fetchStats();
@@ -151,7 +161,56 @@ useEffect(() => {
     fetchStats();
     fetchClients();
   }, []);
+  // Add these helper functions inside the SitesSection component
 
+  // Add a new shift
+  const addShift = () => {
+    const newShift: ShiftDefinition = {
+      id: `shift_${Date.now()}`,
+      name: 'New Shift',
+      label: 'Shift',
+      startTime: '09:00',
+      endTime: '18:00',
+      graceMinutes: 15,
+      color: '#4CAF50',
+      appliesTo: [],
+      isOvernight: false,
+    };
+    setSiteShifts([...siteShifts, newShift]);
+  };
+
+  // Update a shift
+  const updateShift = (index: number, field: keyof ShiftDefinition, value: any) => {
+    const updated = [...siteShifts];
+    updated[index] = {
+      ...updated[index],
+      [field]: value,
+    };
+    // Auto-calculate isOvernight
+    if (field === 'startTime' || field === 'endTime') {
+      const start = updated[index].startTime || '09:00';
+      const end = updated[index].endTime || '18:00';
+      updated[index].isOvernight = end < start;
+    }
+    setSiteShifts(updated);
+  };
+
+  // Remove a shift
+  const removeShift = (index: number) => {
+    setSiteShifts(siteShifts.filter((_, i) => i !== index));
+  };
+
+  // Shift color options
+  const SHIFT_COLORS = [
+    { name: 'Green', value: '#4CAF50' },
+    { name: 'Blue', value: '#2196F3' },
+    { name: 'Orange', value: '#FF9800' },
+    { name: 'Red', value: '#F44336' },
+    { name: 'Purple', value: '#9C27B0' },
+    { name: 'Teal', value: '#009688' },
+    { name: 'Yellow', value: '#FFC107' },
+    { name: 'Pink', value: '#E91E63' },
+  ];
   // Fetch all sites using SiteService
   const fetchSites = async () => {
     try {
@@ -175,7 +234,7 @@ useEffect(() => {
       setIsLoadingClients(true);
       const clientsData = await clientService.getAllClients();
       setClients(clientsData || []);
-      
+
       if (clientsData && clientsData.length > 0 && !selectedClient) {
         setSelectedClient(clientsData[0]._id);
       }
@@ -265,6 +324,7 @@ useEffect(() => {
   const resetForm = () => {
     setSelectedServices([]);
     setStaffDeployment([]);
+    setSiteShifts([]);  // ✅ ADD THIS
     setEditMode(false);
     setEditingSiteId(null);
     setSelectedClient("");
@@ -292,7 +352,7 @@ useEffect(() => {
     setEditingSiteId(site._id);
     setSelectedServices(site.services || []);
     setStaffDeployment(site.staffDeployment || []);
-    
+    setSiteShifts(site.shifts || []);  // ✅ ADD THIS
     if (site.clientId) {
       const client = clients.find(c => c._id === site.clientId);
       if (client) {
@@ -306,16 +366,16 @@ useEffect(() => {
         setSelectedClient("");
       }
     }
-    
+
     setTimeout(() => {
       const form = document.getElementById('site-form') as HTMLFormElement;
       if (form) {
         const safeAreaSqft = site.areaSqft || 0;
         const safeContractValue = site.contractValue || 0;
-        const safeContractDate = site.contractEndDate 
+        const safeContractDate = site.contractEndDate
           ? new Date(site.contractEndDate).toISOString().split('T')[0]
           : new Date().toISOString().split('T')[0];
-        
+
         (form.elements.namedItem('site-name') as HTMLInputElement).value = site.name || '';
         (form.elements.namedItem('location') as HTMLInputElement).value = site.location || '';
         (form.elements.namedItem('area-sqft') as HTMLInputElement).value = safeAreaSqft.toString();
@@ -323,7 +383,7 @@ useEffect(() => {
         (form.elements.namedItem('contract-end-date') as HTMLInputElement).value = safeContractDate;
       }
     }, 0);
-    
+
     setDialogOpen(true);
   };
 
@@ -331,7 +391,7 @@ useEffect(() => {
   const handleAddOrUpdateSite = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
-    
+
     const formData = new FormData(e.currentTarget);
 
     let clientName = "";
@@ -363,6 +423,7 @@ useEffect(() => {
       contractEndDate: formData.get("contract-end-date") as string,
       services: selectedServices,
       staffDeployment: staffDeployment.filter(item => item.count > 0),
+      shifts: siteShifts.filter(s => s.name && s.startTime && s.endTime),  // ✅ ADD THIS
       status: 'active'
     };
 
@@ -377,24 +438,26 @@ useEffect(() => {
         const updatedSite = await siteService.updateSite(editingSiteId, siteData);
         if (updatedSite) {
           toast.success("Site updated successfully!");
+          window.dispatchEvent(new CustomEvent('siteUpdated'));
         }
       } else {
         const newSite = await siteService.createSite(siteData);
         if (newSite) {
           toast.success("Site added successfully!");
+          window.dispatchEvent(new CustomEvent('siteUpdated'));
         }
       }
 
       setDialogOpen(false);
       resetForm();
       (e.target as HTMLFormElement).reset();
-      
+
       await fetchSites();
       await fetchStats();
-      
+
     } catch (error: any) {
       console.error("Error saving site:", error);
-      
+
       if (error.message?.includes('Duplicate entry') || error.message?.includes('duplicate')) {
         toast.error("Site name might already exist. Please try a different name.");
       } else if (error.message?.includes('id')) {
@@ -418,7 +481,7 @@ useEffect(() => {
       } else {
         toast.error("Failed to delete site");
       }
-      
+
       await fetchSites();
       await fetchStats();
     } catch (error: any) {
@@ -434,7 +497,7 @@ useEffect(() => {
       if (updatedSite) {
         toast.success("Site status updated!");
       }
-      
+
       await fetchSites();
       await fetchStats();
     } catch (error: any) {
@@ -498,27 +561,27 @@ useEffect(() => {
   const readExcelFile = (file: File): Promise<any[]> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      
+
       reader.onload = (e) => {
         try {
           const data = e.target?.result;
           const workbook = XLSX.read(data, { type: 'binary' });
           const sheetName = workbook.SheetNames[0];
           const sheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(sheet, { 
+          const jsonData = XLSX.utils.sheet_to_json(sheet, {
             header: 1,
             blankrows: false,
             defval: ''
           });
-          
+
           if (jsonData.length < 2) {
             resolve([]);
             return;
           }
-          
+
           const headers = (jsonData[0] as string[]).map(h => h?.toString().trim() || '');
           const rows = jsonData.slice(1) as any[];
-          
+
           const formattedData = rows
             .filter(row => {
               return row.some((cell: any) => cell !== null && cell !== undefined && cell.toString().trim() !== '');
@@ -534,17 +597,17 @@ useEffect(() => {
               });
               return obj;
             });
-          
+
           resolve(formattedData);
         } catch (error) {
           reject(error);
         }
       };
-      
+
       reader.onerror = (error) => {
         reject(error);
       };
-      
+
       reader.readAsBinaryString(file);
     });
   };
@@ -558,11 +621,11 @@ useEffect(() => {
 
     // Fetch all clients for validation
     await fetchClients();
-    
+
     for (let index = 0; index < importedData.length; index++) {
       const row = importedData[index];
       const rowNumber = index + 2; // +2 for header row and 1-based index
-      
+
       // Check required fields
       const siteName = row['Site Name'] || row['SITE NAME'] || row['site name'] || '';
       const clientName = row['Client Name'] || row['CLIENT NAME'] || row['client name'] || '';
@@ -608,7 +671,7 @@ useEffect(() => {
       }
 
       // Check if client exists in CRM
-      const clientExists = clients.some(client => 
+      const clientExists = clients.some(client =>
         client.name.toLowerCase() === clientName.toLowerCase() ||
         client.company.toLowerCase() === clientName.toLowerCase()
       );
@@ -623,13 +686,13 @@ useEffect(() => {
       let services: string[] = [];
       const servicesStr = row['Services'] || row['SERVICES'] || row['services'] || '';
       if (servicesStr) {
-        services = servicesStr.split(',').map((s: string) => s.trim()).filter((s: string) => 
+        services = servicesStr.split(',').map((s: string) => s.trim()).filter((s: string) =>
           ServicesList.includes(s)
         );
       }
 
       // Parse staff deployment
-      let staffDeployment: Array<{ role: string; count: number }> = [];
+      const staffDeployment: Array<{ role: string; count: number }> = [];
       StaffRoles.forEach(role => {
         const roleKey = role.replace(/\s+/g, '');
         const roleCount = row[role] || row[roleKey] || row[role.toUpperCase()] || 0;
@@ -643,7 +706,7 @@ useEffect(() => {
       const managerCount = staffDeployment
         .filter(item => item.role === 'Manager')
         .reduce((sum, item) => sum + item.count, 0);
-      
+
       const supervisorCount = staffDeployment
         .filter(item => item.role === 'Supervisor')
         .reduce((sum, item) => sum + item.count, 0);
@@ -683,12 +746,12 @@ useEffect(() => {
     try {
       const importedData = await readExcelFile(file);
       setImportPreview(importedData);
-      
+
       // Validate against CRM clients
       const results = await validateImportedSites(importedData);
       setValidationResults(results);
       setShowPreview(true);
-      
+
       if (results.valid.length > 0) {
         toast.success(`${results.valid.length} valid sites ready for import`);
       }
@@ -718,7 +781,7 @@ useEffect(() => {
     for (const siteData of validationResults.valid) {
       try {
         // Find client ID from CRM
-        const client = clients.find(c => 
+        const client = clients.find(c =>
           c.name.toLowerCase() === siteData.clientName.toLowerCase() ||
           c.company.toLowerCase() === siteData.clientName.toLowerCase()
         );
@@ -744,11 +807,11 @@ useEffect(() => {
       if (errors.length > 0) {
         console.error('Import errors:', errors);
       }
-      
+
       // Refresh data
       await fetchSites();
       await fetchStats();
-      
+
       // Close import dialog and reset
       setImportDialogOpen(false);
       resetImport();
@@ -763,48 +826,48 @@ useEffect(() => {
   const downloadTemplate = () => {
     const templateData = [
       [
-        'Site Name*', 
-        'Client Name*', 
-        'Location*', 
-        'Area (sqft)*', 
-        'Contract Value*', 
-        'Contract End Date*', 
-        'Services', 
-        'Manager', 
-        'Supervisor', 
-        'Housekeeping Staff', 
-        'Security Guard', 
-        'Parking Attendant', 
+        'Site Name*',
+        'Client Name*',
+        'Location*',
+        'Area (sqft)*',
+        'Contract Value*',
+        'Contract End Date*',
+        'Services',
+        'Manager',
+        'Supervisor',
+        'Housekeeping Staff',
+        'Security Guard',
+        'Parking Attendant',
         'Waste Collector'
       ],
       [
-        'Phoenix Mall', 
-        'PHOENIX MALL', 
-        'Wakad, Pune', 
-        '50000', 
-        '5000000', 
-        '2025-12-31', 
-        'Housekeeping,Security', 
-        '1', 
-        '2', 
-        '10', 
-        '5', 
-        '3', 
+        'Phoenix Mall',
+        'PHOENIX MALL',
+        'Wakad, Pune',
+        '50000',
+        '5000000',
+        '2025-12-31',
+        'Housekeeping,Security',
+        '1',
+        '2',
+        '10',
+        '5',
+        '3',
         '2'
       ],
       [
-        'Highstreet Mall', 
-        'HIGHSTREET MALL', 
-        'Hinjewadi, Pune', 
-        '75000', 
-        '7500000', 
-        '2025-06-30', 
-        'Security,Parking,Waste Management', 
-        '1', 
-        '3', 
-        '0', 
-        '8', 
-        '4', 
+        'Highstreet Mall',
+        'HIGHSTREET MALL',
+        'Hinjewadi, Pune',
+        '75000',
+        '7500000',
+        '2025-06-30',
+        'Security,Parking,Waste Management',
+        '1',
+        '3',
+        '0',
+        '8',
+        '4',
         '3'
       ],
       ['', '', '', '', '', '', '', '', '', '', '', '', ''],
@@ -814,7 +877,7 @@ useEffect(() => {
       ['Contract End Date format: YYYY-MM-DD'],
       ['Note: Client Name must match exactly with client name in CRM']
     ];
-    
+
     const ws = XLSX.utils.aoa_to_sheet(templateData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Site Import Template');
@@ -831,9 +894,9 @@ useEffect(() => {
         </div>
       );
     }
-    
+
     const safeClients = clients || [];
-    
+
     return (
       <>
         <div className="relative">
@@ -852,15 +915,15 @@ useEffect(() => {
             className="pl-10 mb-2"
           />
         </div>
-        
+
         <div className="border rounded-md max-h-60 overflow-y-auto">
           {safeClients.length === 0 ? (
             <div className="p-4 text-center text-sm text-muted-foreground">
-              No clients found in CRM. 
+              No clients found in CRM.
               <br />
-              <Button 
-                variant="link" 
-                size="sm" 
+              <Button
+                variant="link"
+                size="sm"
                 className="mt-1"
                 onClick={() => {
                   toast.info("Please add clients in the CRM section first");
@@ -872,7 +935,7 @@ useEffect(() => {
           ) : (
             <div className="space-y-1 p-1">
               {safeClients.map((client) => (
-                <div 
+                <div
                   key={client._id}
                   className={`p-2 rounded cursor-pointer hover:bg-gray-100 ${selectedClient === client._id ? 'bg-blue-50 border border-blue-200' : ''}`}
                   onClick={() => setSelectedClient(client._id)}
@@ -896,7 +959,7 @@ useEffect(() => {
             </div>
           )}
         </div>
-        
+
         {selectedClient && safeClients.length > 0 && (
           <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
             <div className="flex justify-between items-start">
@@ -906,7 +969,7 @@ useEffect(() => {
                   {(() => {
                     const client = safeClients.find(c => c._id === selectedClient);
                     if (!client) return null;
-                    
+
                     return (
                       <>
                         <div className="font-semibold">{client.name} - {client.company}</div>
@@ -920,9 +983,9 @@ useEffect(() => {
                   })()}
                 </div>
               </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setSelectedClient("")}
                 className="h-6 text-xs"
               >
@@ -975,7 +1038,7 @@ useEffect(() => {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
@@ -987,7 +1050,7 @@ useEffect(() => {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
@@ -999,7 +1062,7 @@ useEffect(() => {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-center justify-between">
@@ -1029,7 +1092,7 @@ useEffect(() => {
                   />
                 </div>
               </div>
-              
+
               <div className="w-full sm:w-48">
                 <div className="relative">
                   <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1044,7 +1107,7 @@ useEffect(() => {
                   </select>
                 </div>
               </div>
-              
+
               <div className="flex flex-wrap gap-2">
                 <Button type="submit" size="sm" className="flex-1 sm:flex-none">
                   <Search className="h-4 w-4 mr-2" />
@@ -1092,9 +1155,9 @@ useEffect(() => {
                   <div className="space-y-2">
                     <Label htmlFor="site-excel-file" className="text-xs sm:text-sm font-medium">Upload Excel File</Label>
                     <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 sm:p-8 text-center hover:border-blue-400 transition-colors bg-gray-50">
-                      <Input 
+                      <Input
                         id="site-excel-file"
-                        type="file" 
+                        type="file"
                         accept=".xlsx,.xls,.csv"
                         onChange={handleFileSelect}
                         className="hidden"
@@ -1122,7 +1185,7 @@ useEffect(() => {
 
                   {/* Download Template */}
                   <div className="flex justify-center">
-                    <Button 
+                    <Button
                       onClick={downloadTemplate}
                       variant="outline"
                       size="sm"
@@ -1189,7 +1252,7 @@ useEffect(() => {
 
                   {/* Action Buttons */}
                   <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                    <Button 
+                    <Button
                       onClick={handleImportSites}
                       disabled={validationResults.valid.length === 0 || importLoading}
                       className="flex-1 bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm py-2 sm:py-2"
@@ -1204,8 +1267,8 @@ useEffect(() => {
                         `Import ${validationResults.valid.length} Sites`
                       )}
                     </Button>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={() => {
                         setImportDialogOpen(false);
                         resetImport();
@@ -1239,22 +1302,22 @@ useEffect(() => {
                 <form id="site-form" onSubmit={handleAddOrUpdateSite} className="space-y-3 sm:space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <FormField label="Site Name" id="site-name" required>
-                      <Input 
-                        id="site-name" 
-                        name="site-name" 
-                        placeholder="Enter site name" 
-                        required 
+                      <Input
+                        id="site-name"
+                        name="site-name"
+                        placeholder="Enter site name"
+                        required
                         defaultValue=""
                         className="text-sm"
                       />
                     </FormField>
 
                     <FormField label="Location" id="location" required>
-                      <Input 
-                        id="location" 
-                        name="location" 
-                        placeholder="Enter location" 
-                        required 
+                      <Input
+                        id="location"
+                        name="location"
+                        placeholder="Enter location"
+                        required
                         defaultValue=""
                         className="text-sm"
                       />
@@ -1269,7 +1332,7 @@ useEffect(() => {
                       Search and select a client from your CRM database
                     </div>
                     {renderClientsDropdown()}
-                    
+
                     {!selectedClient && !isLoadingClients && clients.length > 0 && (
                       <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
                         <p className="text-xs text-yellow-700">
@@ -1281,35 +1344,35 @@ useEffect(() => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                     <FormField label="Area (sqft)" id="area-sqft" required>
-                      <Input 
-                        id="area-sqft" 
-                        name="area-sqft" 
-                        type="number" 
-                        placeholder="Area" 
-                        required 
+                      <Input
+                        id="area-sqft"
+                        name="area-sqft"
+                        type="number"
+                        placeholder="Area"
+                        required
                         min="1"
                         defaultValue="1000"
                         className="text-sm"
                       />
                     </FormField>
                     <FormField label="Contract Value (₹)" id="contract-value" required>
-                      <Input 
-                        id="contract-value" 
-                        name="contract-value" 
-                        type="number" 
-                        placeholder="Value" 
-                        required 
+                      <Input
+                        id="contract-value"
+                        name="contract-value"
+                        type="number"
+                        placeholder="Value"
+                        required
                         min="0"
                         defaultValue="100000"
                         className="text-sm"
                       />
                     </FormField>
                     <FormField label="Contract End Date" id="contract-end-date" required>
-                      <Input 
-                        id="contract-end-date" 
-                        name="contract-end-date" 
-                        type="date" 
-                        required 
+                      <Input
+                        id="contract-end-date"
+                        name="contract-end-date"
+                        type="date"
+                        required
                         min={new Date().toISOString().split('T')[0]}
                         defaultValue={new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
                         className="text-sm"
@@ -1334,7 +1397,119 @@ useEffect(() => {
                       ))}
                     </div>
                   </div>
+                  {/* Shift Management Section - ADD THIS AFTER Services and BEFORE Staff Deployment */}
+                  <div className="border p-3 sm:p-4 rounded-md">
+                    <div className="flex items-center justify-between mb-2 sm:mb-3">
+                      <p className="font-medium text-sm">Shift Timings for this Site</p>
+                      <Button type="button" variant="outline" size="sm" onClick={addShift}>
+                        <Plus className="h-4 w-4 mr-1" /> Add Shift
+                      </Button>
+                    </div>
 
+                    <div className="text-xs text-muted-foreground mb-2">
+                      Define shift start/end times for this site. Employees will be assigned to these shifts.
+                      <span className="text-amber-600 ml-1">Overnight shifts are auto-detected.</span>
+                    </div>
+
+                    {siteShifts.length === 0 ? (
+                      <div className="text-center py-4 text-sm text-muted-foreground border rounded bg-gray-50">
+                        No shifts defined. Click "Add Shift" to configure.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {siteShifts.map((shift, index) => (
+                          <div key={shift.id || index} className="flex flex-col gap-2 p-2 border rounded bg-gray-50">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: shift.color }} />
+                              <Input
+                                placeholder="Shift Name (e.g. Morning)"
+                                value={shift.name}
+                                onChange={(e) => updateShift(index, 'name', e.target.value)}
+                                className="h-8 text-sm flex-1"
+                              />
+                              <Input
+                                placeholder="Label (e.g. Sakali)"
+                                value={shift.label}
+                                onChange={(e) => updateShift(index, 'label', e.target.value)}
+                                className="h-8 text-sm w-24"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeShift(index)}
+                                className="h-8 w-8 p-0 text-red-500"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+
+                            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                              <div className="space-y-0.5">
+                                <Label className="text-[10px] text-muted-foreground">Start</Label>
+                                <Input
+                                  type="time"
+                                  value={shift.startTime}
+                                  onChange={(e) => updateShift(index, 'startTime', e.target.value)}
+                                  className="h-7 text-sm"
+                                />
+                              </div>
+                              <div className="space-y-0.5">
+                                <Label className="text-[10px] text-muted-foreground">End</Label>
+                                <Input
+                                  type="time"
+                                  value={shift.endTime}
+                                  onChange={(e) => updateShift(index, 'endTime', e.target.value)}
+                                  className="h-7 text-sm"
+                                />
+                              </div>
+                              <div className="space-y-0.5">
+                                <Label className="text-[10px] text-muted-foreground">Grace (min)</Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="60"
+                                  value={shift.graceMinutes}
+                                  onChange={(e) => updateShift(index, 'graceMinutes', parseInt(e.target.value) || 0)}
+                                  className="h-7 text-sm"
+                                />
+                              </div>
+                              <div className="space-y-0.5">
+                                <Label className="text-[10px] text-muted-foreground">Color</Label>
+                                <Select
+                                  value={shift.color}
+                                  onValueChange={(value) => updateShift(index, 'color', value)}
+                                >
+                                  <SelectTrigger className="h-7 text-sm">
+                                    <div className="flex items-center gap-1">
+                                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: shift.color }} />
+                                    </div>
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {SHIFT_COLORS.map(c => (
+                                      <SelectItem key={c.value} value={c.value}>
+                                        <div className="flex items-center gap-2">
+                                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.value }} />
+                                          <span>{c.name}</span>
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-0.5 flex items-center">
+                                {shift.isOvernight && (
+                                  <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200">
+                                    🌙 Overnight
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <div className="border p-3 sm:p-4 rounded-md">
                     <p className="font-medium mb-2 sm:mb-3 text-sm">Staff Deployment</p>
                     <div className="space-y-2 sm:space-y-3">
@@ -1403,7 +1578,7 @@ useEffect(() => {
               <Building className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
               <h3 className="text-base sm:text-lg font-semibold mb-2">No Sites Found</h3>
               <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
-                {searchQuery || statusFilter !== 'all' 
+                {searchQuery || statusFilter !== 'all'
                   ? 'Try adjusting your search filters'
                   : 'Get started by adding your first site'
                 }
@@ -1441,7 +1616,7 @@ useEffect(() => {
                     const safeContractValue = site.contractValue || 0;
                     const safeStaffDeployment = Array.isArray(site.staffDeployment) ? site.staffDeployment : [];
                     const safeServices = Array.isArray(site.services) ? site.services : [];
-                    
+
                     return (
                       <TableRow key={site._id}>
                         <TableCell className="text-xs sm:text-sm">
@@ -1489,8 +1664,8 @@ useEffect(() => {
                         </TableCell>
                         <TableCell>
                           <div className="flex justify-end gap-1 sm:gap-2">
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="sm"
                               onClick={() => handleViewSite(site)}
                               className="h-7 w-7 sm:h-8 sm:w-8 p-0"
@@ -1532,14 +1707,14 @@ useEffect(() => {
           )}
         </CardContent>
       </Card>
-      
+
       {/* View Site Dialog - Responsive */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl">Site Details</DialogTitle>
           </DialogHeader>
-          
+
           {selectedSite && (
             <div className="space-y-4 sm:space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
@@ -1548,12 +1723,12 @@ useEffect(() => {
                     <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Site Name</h3>
                     <p className="text-base sm:text-lg font-semibold">{selectedSite.name}</p>
                   </div>
-                  
+
                   <div>
                     <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Client</h3>
                     <p className="text-base sm:text-lg font-semibold">{selectedSite.clientName}</p>
                   </div>
-                  
+
                   <div>
                     <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Location</h3>
                     <div className="flex items-center gap-2">
@@ -1561,7 +1736,7 @@ useEffect(() => {
                       <p className="text-base sm:text-lg font-semibold">{selectedSite.location}</p>
                     </div>
                   </div>
-                  
+
                   <div>
                     <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Area</h3>
                     <div className="flex items-center gap-2">
@@ -1570,7 +1745,7 @@ useEffect(() => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="space-y-3 sm:space-y-4">
                   <div>
                     <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Contract Value</h3>
@@ -1579,7 +1754,7 @@ useEffect(() => {
                       <p className="text-base sm:text-lg font-semibold">{formatCurrency(selectedSite.contractValue)}</p>
                     </div>
                   </div>
-                  
+
                   <div>
                     <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Contract End Date</h3>
                     <div className="flex items-center gap-2">
@@ -1587,21 +1762,21 @@ useEffect(() => {
                       <p className="text-base sm:text-lg font-semibold">{formatDate(selectedSite.contractEndDate)}</p>
                     </div>
                   </div>
-                  
+
                   <div>
                     <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Status</h3>
                     <Badge variant={selectedSite.status === "active" ? "default" : "secondary"} className="text-xs sm:text-sm">
                       {selectedSite.status?.toUpperCase() || 'ACTIVE'}
                     </Badge>
                   </div>
-                  
+
                   <div>
                     <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Created</h3>
                     <p className="text-sm">{formatDate(selectedSite.createdAt)}</p>
                   </div>
                 </div>
               </div>
-              
+
               <div className="border rounded-lg p-3 sm:p-4">
                 <h3 className="text-xs sm:text-sm font-medium text-muted-foreground mb-2 sm:mb-3">Services</h3>
                 <div className="flex flex-wrap gap-1 sm:gap-2">
@@ -1616,7 +1791,7 @@ useEffect(() => {
                   )}
                 </div>
               </div>
-              
+
               <div className="border rounded-lg p-3 sm:p-4">
                 <h3 className="text-xs sm:text-sm font-medium text-muted-foreground mb-2 sm:mb-3">Staff Deployment</h3>
                 <div className="space-y-2 sm:space-y-3">
@@ -1643,7 +1818,7 @@ useEffect(() => {
                   )}
                 </div>
               </div>
-              
+
               <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-2 pt-3 sm:pt-4 border-t">
                 <Button
                   variant="outline"

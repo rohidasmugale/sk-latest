@@ -1,6 +1,17 @@
 // services/SiteService.ts
 
-// Define interfaces
+export interface ShiftDefinition {
+  id: string;              // e.g. "morning", "dupari", "night"
+  name: string;            // "Morning", "Dupari", "Night"
+  label: string;           // Display label (e.g., "Sakali", "Dupari")
+  startTime: string;       // "07:00" (24-hour format)
+  endTime: string;         // "16:00" (24-hour format)
+  graceMinutes: number;    // 15 — how late is still "on time"
+  color: string;           // "#4CAF50" for UI display
+  appliesTo?: string[];    // optional: ["Housekeeping", "Parking"] if role-specific
+  isOvernight?: boolean;   // auto-calculated if endTime < startTime
+}
+
 export interface Site {
   _id: string;
   name: string;
@@ -23,6 +34,7 @@ export interface Site {
   contractValue: number;
   contractEndDate: string;
   status: 'active' | 'inactive';
+  shifts?: ShiftDefinition[];  // ✅ ADD THIS
   createdAt?: string;
   updatedAt?: string;
 }
@@ -49,10 +61,11 @@ export interface CreateSiteRequest {
   contractEndDate: string;
   services: string[];
   staffDeployment: Array<{ role: string; count: number }>;
+   shifts?: ShiftDefinition[];  // ✅ ADD THIS
   status: 'active' | 'inactive';
 }
 
-export interface UpdateSiteRequest extends Partial<CreateSiteRequest> {}
+export type UpdateSiteRequest = Partial<CreateSiteRequest>;
 
 export interface SiteStats {
   totalSites: number;
@@ -105,9 +118,7 @@ const defaultStats: SiteStats = {
 
 // API Service Class
 class SiteService {
-  static getAllSites() {
-    throw new Error("Method not implemented.");
-  }
+ 
   // Generic fetch method with error handling
   private async fetchApi<T>(
     endpoint: string, 
@@ -199,13 +210,9 @@ class SiteService {
     }
   }
 
-  // Site-related methods
-  // services/SiteService.ts - Fix the getAllSites method
-
-async getAllSites(): Promise<Site[]> {
+  async getAllSites(): Promise<Site[]> {
   try {
     console.log('📡 Fetching all sites...');
-    
     const token = localStorage.getItem('sk_token');
     const response = await fetch(`${API_URL}/sites`, {
       method: 'GET',
@@ -214,31 +221,17 @@ async getAllSites(): Promise<Site[]> {
         ...(token && { 'Authorization': `Bearer ${token}` })
       }
     });
-    
-    console.log('📡 Response status:', response.status);
-    
     if (!response.ok) {
       console.error(`❌ API Error: ${response.status}`);
       return [];
     }
-    
     const data = await response.json();
-    console.log('📡 Raw sites data:', data);
-    
-    // Handle different response formats
     let sitesArray = [];
-    if (data.success && Array.isArray(data.data)) {
-      sitesArray = data.data;
-    } else if (Array.isArray(data)) {
-      sitesArray = data;
-    } else if (Array.isArray(data.sites)) {
-      sitesArray = data.sites;
-    } else {
-      console.warn('⚠️ Unknown response format:', data);
-      return [];
-    }
-    
-    // Transform to Site interface
+    if (data.success && Array.isArray(data.data)) sitesArray = data.data;
+    else if (Array.isArray(data)) sitesArray = data;
+    else if (Array.isArray(data.sites)) sitesArray = data.sites;
+    else return [];
+
     const transformedSites = sitesArray.map((site: any) => ({
       _id: site._id || site.id || `site-${Date.now()}`,
       name: site.name || 'Unnamed Site',
@@ -254,10 +247,21 @@ async getAllSites(): Promise<Site[]> {
       contractValue: Number(site.contractValue || site.contract || 0),
       contractEndDate: site.contractEndDate || site.endDate || new Date().toISOString(),
       status: site.status === 'inactive' ? 'inactive' : 'active',
+      shifts: Array.isArray(site.shifts) ? site.shifts.map((s: any) => ({
+        id: s.id || `shift_${Date.now()}_${Math.random()}`,
+        name: s.name || 'Shift',
+        label: s.label || s.name || 'Shift',
+        startTime: s.startTime || '09:00',
+        endTime: s.endTime || '18:00',
+        graceMinutes: Number(s.graceMinutes) || 15,
+        color: s.color || '#4CAF50',
+        appliesTo: Array.isArray(s.appliesTo) ? s.appliesTo : [],
+        isOvernight: s.isOvernight || (s.endTime && s.startTime && s.endTime < s.startTime)
+      })) : [],
       createdAt: site.createdAt || site.created || new Date().toISOString(),
       updatedAt: site.updatedAt || site.updated || new Date().toISOString()
-    }));
-    
+    })) as Site[];   // 👈 cast here
+
     console.log(`✅ Transformed ${transformedSites.length} sites`);
     return transformedSites;
   } catch (error) {
@@ -265,6 +269,8 @@ async getAllSites(): Promise<Site[]> {
     return [];
   }
 }
+
+
 
   async getSiteById(siteId: string): Promise<Site | null> {
     try {
@@ -431,35 +437,36 @@ async getAllSites(): Promise<Site[]> {
 
 private transformSiteData(data: any): Site | null {
   if (!data) return null;
-  
-  console.log('🔧 Transforming site data:', data);
-  
-  // Handle different data structures
-  const siteData = data.data || data;
-  
+
   return {
-    _id: siteData._id || siteData.id || `temp-${Date.now()}`,
-    name: siteData.name || 'Unnamed Site',
-    clientId: siteData.clientId || '',
-    clientName: siteData.clientName || 'Unknown Client',
-    clientDetails: siteData.clientDetails || siteData.client,
-    location: siteData.location || 'Unknown Location',
-    areaSqft: Number(siteData.areaSqft || siteData.area || 0),
-    
-    // Existing manager field
-    manager: siteData.manager || '',
-    
-    // NEW: Manager and Supervisor limits
-    managerCount: Number(siteData.managerCount || 0), // ADD THIS
-    supervisorCount: Number(siteData.supervisorCount || 0), // ADD THIS
-    
-    services: Array.isArray(siteData.services) ? siteData.services : [],
-    staffDeployment: Array.isArray(siteData.staffDeployment) ? siteData.staffDeployment : [],
-    contractValue: Number(siteData.contractValue || siteData.contract || 0),
-    contractEndDate: siteData.contractEndDate || siteData.endDate || new Date().toISOString(),
-    status: (siteData.status === 'inactive' || siteData.status === 'inactive') ? 'inactive' : 'active',
-    createdAt: siteData.createdAt || siteData.created || new Date().toISOString(),
-    updatedAt: siteData.updatedAt || siteData.updated || new Date().toISOString()
+    _id: data._id || data.id || `temp-${Date.now()}`,
+    name: data.name || 'Unnamed Site',
+    clientId: data.clientId || '',
+    clientName: data.clientName || 'Unknown Client',
+    clientDetails: data.clientDetails || data.client,
+    location: data.location || 'Unknown Location',
+    areaSqft: Number(data.areaSqft || data.area || 0),
+    manager: data.manager || '',
+    managerCount: Number(data.managerCount || 0),
+    supervisorCount: Number(data.supervisorCount || 0),
+    services: Array.isArray(data.services) ? data.services : [],
+    staffDeployment: Array.isArray(data.staffDeployment) ? data.staffDeployment : [],
+    contractValue: Number(data.contractValue || data.contract || 0),
+    contractEndDate: data.contractEndDate || data.endDate || new Date().toISOString(),
+    status: (data.status === 'inactive' || data.status === 'inactive') ? 'inactive' : 'active',
+    shifts: Array.isArray(data.shifts) ? data.shifts.map((s: any) => ({
+      id: s.id || `shift_${Date.now()}_${Math.random()}`,
+      name: s.name || 'Shift',
+      label: s.label || s.name || 'Shift',
+      startTime: s.startTime || '09:00',
+      endTime: s.endTime || '18:00',
+      graceMinutes: Number(s.graceMinutes) || 15,
+      color: s.color || '#4CAF50',
+      appliesTo: Array.isArray(s.appliesTo) ? s.appliesTo : [],
+      isOvernight: s.isOvernight || (s.endTime && s.startTime && s.endTime < s.startTime)
+    })) : [],
+    createdAt: data.createdAt || data.created || new Date().toISOString(),
+    updatedAt: data.updatedAt || data.updated || new Date().toISOString()
   };
 }
 

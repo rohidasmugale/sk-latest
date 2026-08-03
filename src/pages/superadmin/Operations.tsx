@@ -16,13 +16,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from 'sonner';
 import AssignTaskPage from "./components/AssignTaskPage";
-import SitesSection from "./components/SitesSection";
-// ✅ CORRECT IMPORT PATH
+import SitesSection from "./components/SitesSection"; // superadmin version
 import TrainingBriefingSectionManager from "@/pages/manager/components/TrainingBriefingSectionManager";
 import { PullToRefreshWrapper } from '@/components/shared/PullToRefreshWrapper';
 import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 // Mobile responsive tab selector
@@ -80,8 +79,12 @@ const SuperAdminOperations = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  
+
   const [isMobileView, setIsMobileView] = useState(false);
+
+  // ✅ Site filter state
+  const [selectedSite, setSelectedSite] = useState<string>("all");
+  const [allSites, setAllSites] = useState<any[]>([]);
 
   const tabs = [
     { value: "assign", label: "Assign Task", icon: <ClipboardList className="h-4 w-4" /> },
@@ -104,11 +107,14 @@ const SuperAdminOperations = () => {
         axios.get(`${API_URL}/sites`)
       ]);
 
-      window.dispatchEvent(new CustomEvent('refreshOperations', { 
-        detail: { 
+      const sitesData = sitesRes.data.data || sitesRes.data || [];
+      setAllSites(sitesData);
+
+      window.dispatchEvent(new CustomEvent('refreshOperations', {
+        detail: {
           tasks: tasksRes.data.data || tasksRes.data || [],
-          sites: sitesRes.data.data || sitesRes.data || []
-        } 
+          sites: sitesData
+        }
       }));
 
       setRefreshTrigger(prev => prev + 1);
@@ -120,7 +126,7 @@ const SuperAdminOperations = () => {
     } catch (error: any) {
       console.error("Error fetching operations data:", error);
       setError(error.message || "Failed to load data");
-      
+
       if (showToast) {
         toast.dismiss();
         toast.error('Failed to refresh data');
@@ -154,12 +160,12 @@ const SuperAdminOperations = () => {
       }}
       className="min-h-screen bg-background relative overflow-y-auto"
     >
-      <DashboardHeader 
-        title="Operations & Task Management" 
+      <DashboardHeader
+        title="Operations & Task Management"
         onMenuClick={onMenuClick}
       />
-      
-      <motion.div 
+
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="p-4 md:p-6 space-y-4 md:space-y-6"
@@ -172,9 +178,9 @@ const SuperAdminOperations = () => {
                   <AlertCircle className="h-5 w-5" />
                   <span>{error}</span>
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setError(null)}
                   className="text-red-700 hover:text-red-900"
                 >
@@ -185,10 +191,32 @@ const SuperAdminOperations = () => {
           </Card>
         )}
 
-        <div className="flex justify-end">
-          <Button 
-            variant="outline" 
-            size="sm" 
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* ✅ Site Filter */}
+          <div className="flex items-center gap-2">
+            <Building className="h-4 w-4 text-gray-500" />
+            <select
+              value={selectedSite}
+              onChange={(e) => setSelectedSite(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white text-sm min-w-[180px]"
+            >
+              <option value="all">🏢 All Sites</option>
+              {allSites.map((site) => (
+                <option key={site._id} value={site._id}>
+                  {site.name}
+                </option>
+              ))}
+            </select>
+            {selectedSite !== 'all' && (
+              <Badge variant="outline" className="bg-blue-50">
+                Filtered: {allSites.find(s => s._id === selectedSite)?.name || 'Unknown'}
+              </Badge>
+            )}
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => fetchAllData(true)}
             disabled={refreshing}
           >
@@ -229,15 +257,26 @@ const SuperAdminOperations = () => {
               </TabsList>
 
               <TabsContent value="assign">
-                <AssignTaskPage refreshTrigger={refreshTrigger} />
-              </TabsContent> 
+                <AssignTaskPage
+                  refreshTrigger={refreshTrigger}
+                  selectedSite={selectedSite}
+                  sites={allSites}
+                />
+              </TabsContent>
 
               <TabsContent value="sites">
-                <SitesSection refreshTrigger={refreshTrigger} />
+                <SitesSection
+                  refreshTrigger={refreshTrigger}
+                  selectedSite={selectedSite}
+                  sites={allSites}
+                />
               </TabsContent>
 
               <TabsContent value="training">
-                <TrainingBriefingSectionManager />
+                <TrainingBriefingSectionManager
+                  selectedSite={selectedSite}
+                  sites={allSites}
+                />
               </TabsContent>
             </Tabs>
           </>

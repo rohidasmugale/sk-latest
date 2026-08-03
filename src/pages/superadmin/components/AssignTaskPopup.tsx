@@ -25,12 +25,16 @@ import { assignTaskService, type AssignTask, type CreateAssignTaskRequest } from
 import { taskService, type ExtendedSite, type StaffWithTaskCount } from '@/services/TaskService';
 import { useRole } from '@/context/RoleContext';
 import { createNotificationForSuperadmin } from '@/lib/notificationHelper';
+import { siteService, Site } from '@/services/SiteService';
+
 interface AssignTaskPopupProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onTaskCreated?: () => void;
   taskToEdit?: AssignTask | null;
   isEditMode?: boolean;
+  selectedSite?: string;
+  sites?: Site[];
 }
 
 interface SiteStaff {
@@ -38,15 +42,50 @@ interface SiteStaff {
   supervisors: StaffWithTaskCount[];
 }
 
+// Site Filter Component
+const SiteFilter: React.FC<{
+  selectedSite: string;
+  onSiteChange: (value: string) => void;
+  sites: Site[];
+  isLoading?: boolean;
+}> = ({ selectedSite, onSiteChange, sites, isLoading = false }) => {
+  return (
+    <div className="flex items-center gap-2">
+      <Building className="h-4 w-4 text-gray-500" />
+      <select
+        value={selectedSite}
+        onChange={(e) => onSiteChange(e.target.value)}
+        disabled={isLoading}
+        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white text-sm min-w-[180px]"
+      >
+        <option value="all">🏢 All Sites</option>
+        {sites.map((site) => (
+          <option key={site._id} value={site._id}>
+            {site.name}
+          </option>
+        ))}
+      </select>
+      {isLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-500" />}
+    </div>
+  );
+};
+
 const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
   open,
   onOpenChange,
   onTaskCreated,
   taskToEdit,
-  isEditMode = false
+  isEditMode = false,
+  selectedSite: propSelectedSite = 'all',
+  sites: propSites = []
 }) => {
   const { user } = useRole();
-  
+
+  // Site state
+  const [allSites, setAllSites] = useState<Site[]>(propSites);
+  const [selectedSite, setSelectedSite] = useState<string>(propSelectedSite);
+  const [isLoadingSites, setIsLoadingSites] = useState<boolean>(false);
+
   // Form state
   const [sites, setSites] = useState<ExtendedSite[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>('');
@@ -57,16 +96,33 @@ const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
   const [dueDateTime, setDueDateTime] = useState('');
   const [priority, setPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [taskType, setTaskType] = useState('routine');
-  
+
   // Staff state
   const [siteStaff, setSiteStaff] = useState<SiteStaff>({ managers: [], supervisors: [] });
   const [selectedManagers, setSelectedManagers] = useState<string[]>([]);
   const [selectedSupervisors, setSelectedSupervisors] = useState<string[]>([]);
-  
+
   // Loading states
-  const [isLoadingSites, setIsLoadingSites] = useState(false);
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Sync with props
+  useEffect(() => {
+    if (propSites.length > 0) {
+      setAllSites(propSites);
+    }
+  }, [propSites]);
+
+  useEffect(() => {
+    setSelectedSite(propSelectedSite);
+  }, [propSelectedSite]);
+
+  // Get site name for display
+  const getSiteDisplayName = () => {
+    if (selectedSite === 'all') return 'All Sites';
+    const site = allSites.find(s => s._id === selectedSite);
+    return site ? site.name : 'Unknown Site';
+  };
 
   // Load task data for edit mode
   useEffect(() => {
@@ -80,25 +136,25 @@ const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
 
   const loadTaskForEdit = () => {
     if (!taskToEdit) return;
-    
+
     console.log('Loading task for edit:', taskToEdit);
-    
+
     setSelectedSiteId(taskToEdit.siteId);
     setTaskTitle(taskToEdit.taskTitle);
     setDescription(taskToEdit.description);
-    
+
     // Format dates for input fields
     setStartDate(taskToEdit.startDate.split('T')[0]);
     setEndDate(taskToEdit.endDate.split('T')[0]);
     setDueDateTime(taskToEdit.dueDateTime.slice(0, 16));
-    
+
     setPriority(taskToEdit.priority);
     setTaskType(taskToEdit.taskType);
-    
+
     // Set selected staff
     setSelectedManagers(taskToEdit.assignedManagers?.map(m => m.userId) || []);
     setSelectedSupervisors(taskToEdit.assignedSupervisors?.map(s => s.userId) || []);
-    
+
     // Fetch sites and then fetch staff for this site
     fetchSites().then(() => {
       if (taskToEdit.siteId) {
@@ -136,25 +192,25 @@ const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
   const fetchSiteStaff = async (siteId: string) => {
     try {
       setIsLoadingStaff(true);
-      
+
       console.log('🔍 Fetching staff for site:', siteId);
-      
+
       // Get staff with task counts from all tasks
       const staffData = await taskService.getSiteStaffWithCounts(siteId);
-      
+
       console.log('📊 Site staff fetched:', {
         managers: staffData.managers.length,
         supervisors: staffData.supervisors.length,
         managerDetails: staffData.managers,
         supervisorDetails: staffData.supervisors
       });
-      
+
       setSiteStaff(staffData);
-      
+
       if (staffData.supervisors.length === 0) {
         console.warn('⚠️ No supervisors found for this site');
       }
-      
+
     } catch (error) {
       console.error('❌ Error fetching site staff:', error);
       toast.error('Failed to load staff for this site');
@@ -166,79 +222,79 @@ const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validation
     if (!selectedSiteId) {
       toast.error('Please select a site');
       return;
     }
-    
+
     if (!taskTitle.trim()) {
       toast.error('Please enter task title');
       return;
     }
-    
+
     if (!description.trim()) {
       toast.error('Please enter description');
       return;
     }
-    
+
     if (!startDate || !endDate || !dueDateTime) {
       toast.error('Please fill in all date fields');
       return;
     }
-    
+
     // Validate dates
     const start = new Date(startDate);
     const end = new Date(endDate);
     const due = new Date(dueDateTime);
-    
+
     if (start > end) {
       toast.error('End date must be after start date');
       return;
     }
-    
+
     if (end > due) {
       toast.error('Due date must be after end date');
       return;
     }
-    
+
     // Validate that at least one staff member is selected
     if (selectedManagers.length === 0 && selectedSupervisors.length === 0) {
       toast.error('Please select at least one manager or supervisor');
       return;
     }
-    
+
     setIsSubmitting(true);
-    
+
     try {
       const selectedSite = sites.find(s => s._id === selectedSiteId);
       if (!selectedSite) throw new Error('Site not found');
-      
+
       // Prepare assigned staff
       const assignedManagers = siteStaff.managers
         .filter(m => selectedManagers.includes(m.userId))
-        .map(m => ({ 
+        .map(m => ({
           userId: m.userId,
-          name: m.name, 
+          name: m.name,
           role: 'manager' as const
         }));
-      
+
       const assignedSupervisors = siteStaff.supervisors
         .filter(s => selectedSupervisors.includes(s.userId))
-        .map(s => ({ 
+        .map(s => ({
           userId: s.userId,
-          name: s.name, 
+          name: s.name,
           role: 'supervisor' as const
         }));
-      
+
       console.log('Final assigned data:', {
         assignedManagers,
         assignedSupervisors,
         managersCount: assignedManagers.length,
         supervisorsCount: assignedSupervisors.length
       });
-      
+
       if (isEditMode && taskToEdit) {
         // Update existing task
         const updateData = {
@@ -252,15 +308,15 @@ const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
           assignedManagers,
           assignedSupervisors
         };
-        
+
         console.log('Updating task with data:', updateData);
         const updatedTask = await assignTaskService.updateAssignTask(taskToEdit._id, updateData);
         toast.success('Task updated successfully!');
-        
+
         // 🔔 Dispatch for new supervisors
         const oldSupervisorIds = new Set(taskToEdit.assignedSupervisors?.map(s => s.userId) || []);
         const newSupervisors = updatedTask.assignedSupervisors?.filter(s => !oldSupervisorIds.has(s.userId)) || [];
-        
+
         newSupervisors.forEach((supervisor: any) => {
           window.dispatchEvent(new CustomEvent('task-assigned', {
             detail: {
@@ -273,7 +329,7 @@ const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
             }
           }));
         });
-        
+
         // 🎯 If status changed to 'completed', stop persistent sound
         if (updatedTask.status === 'completed' && taskToEdit.status !== 'completed') {
           window.dispatchEvent(new CustomEvent('task-completed', {
@@ -299,12 +355,12 @@ const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
           createdBy: user?._id || user?.id || 'system',
           createdByName: user?.name || 'Admin'
         };
-        
+
         console.log('Submitting new task data:', JSON.stringify(taskData, null, 2));
-        
+
         const result = await assignTaskService.createAssignTask(taskData);
         console.log('Task created result:', result);
-        
+
         // 🔔 Trigger notification for each assigned supervisor
         if (result && result.assignedSupervisors) {
           result.assignedSupervisors.forEach((supervisor: any) => {
@@ -319,33 +375,33 @@ const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
               }
             }));
           });
-           createNotificationForSuperadmin(
-    `📋 New Task: ${result.taskTitle}`,
-    `Task "${result.taskTitle}" assigned to ${result.siteName} – Priority: ${result.priority}`,
-    'info',
-    result.priority === 'high' ? 'high' : 'medium',
-    {
-      taskId: result._id,
-      siteName: result.siteName,
-      priority: result.priority,
-      taskTitle: result.taskTitle
-    },
-    'task_creation'
-  );
+          createNotificationForSuperadmin(
+            `📋 New Task: ${result.taskTitle}`,
+            `Task "${result.taskTitle}" assigned to ${result.siteName} – Priority: ${result.priority}`,
+            'info',
+            result.priority === 'high' ? 'high' : 'medium',
+            {
+              taskId: result._id,
+              siteName: result.siteName,
+              priority: result.priority,
+              taskTitle: result.taskTitle
+            },
+            'task_creation'
+          );
         }
-        
+
         toast.success('Task assigned successfully!');
       }
-      
+
       // Reset form and close
       resetForm();
       onOpenChange(false);
-      
+
       // Notify parent
       if (onTaskCreated) {
         onTaskCreated();
       }
-      
+
     } catch (error: any) {
       console.error('Error saving task:', error);
       toast.error(error.message || 'Failed to save task');
@@ -375,10 +431,10 @@ const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
     }
   };
 
-  const selectedSite = sites.find(s => s._id === selectedSiteId);
-  const requiredManagers = selectedSite?.managerCount || 0;
-  const requiredSupervisors = selectedSite?.supervisorCount || 0;
-  
+  const foundSite = sites.find(s => s._id === selectedSiteId);
+  const requiredManagers = foundSite?.managerCount || 0;
+  const requiredSupervisors = foundSite?.supervisorCount || 0;
+
   const isManagerRequirementMet = requiredManagers === 0 || selectedManagers.length >= requiredManagers;
   const isSupervisorRequirementMet = requiredSupervisors === 0 || selectedSupervisors.length >= requiredSupervisors;
   const isFullyStaffed = isManagerRequirementMet && isSupervisorRequirementMet;
@@ -392,7 +448,7 @@ const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
             {isEditMode ? 'Edit Task' : 'Assign New Task'}
           </DialogTitle>
           <DialogDescription>
-            {isEditMode 
+            {isEditMode
               ? 'Update the task details and staff assignments'
               : 'Fill in the task details and select staff to assign'}
           </DialogDescription>
@@ -404,8 +460,8 @@ const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
             <Label htmlFor="site" className="text-base font-semibold">
               Select Site <span className="text-destructive">*</span>
             </Label>
-            <Select 
-              value={selectedSiteId} 
+            <Select
+              value={selectedSiteId}
               onValueChange={setSelectedSiteId}
               disabled={isLoadingSites || (isEditMode && !!taskToEdit)}
             >
@@ -438,18 +494,18 @@ const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
             </Select>
           </div>
 
-          {/* Site Details Card */}
-          {selectedSiteId && selectedSite && (
+          {/* Site Details Card - Using foundSite instead of selectedSite */}
+          {selectedSiteId && foundSite && (
             <Card className="bg-primary/5 border-primary/10">
               <CardContent className="p-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Location</p>
-                    <p className="font-medium">{selectedSite.location || 'N/A'}</p>
+                    <p className="font-medium">{foundSite.location || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Client</p>
-                    <p className="font-medium">{selectedSite.clientName || 'N/A'}</p>
+                    <p className="font-medium">{foundSite.clientName || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Managers at Site</p>
@@ -507,7 +563,7 @@ const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
           {/* Task Details */}
           <div className="space-y-4">
             <h3 className="text-base font-semibold">Task Details</h3>
-            
+
             <div className="space-y-2">
               <Label htmlFor="taskTitle">
                 Task Title <span className="text-destructive">*</span>
@@ -587,7 +643,7 @@ const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
                   required
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="endDate">
                   End Date <span className="text-destructive">*</span>
@@ -601,7 +657,7 @@ const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
                   required
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="dueDateTime">
                   Due Date & Time <span className="text-destructive">*</span>
@@ -622,7 +678,7 @@ const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
           {selectedSiteId && (
             <div className="space-y-4">
               <h3 className="text-base font-semibold">Select Staff</h3>
-              
+
               {isLoadingStaff ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin" />
@@ -639,17 +695,16 @@ const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
                         {selectedManagers.length} selected
                       </Badge>
                     </Label>
-                    
+
                     {siteStaff.managers.length > 0 ? (
                       <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto border rounded-lg p-2">
                         {siteStaff.managers.map(manager => (
                           <div
                             key={manager.userId}
-                            className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
-                              selectedManagers.includes(manager.userId)
+                            className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${selectedManagers.includes(manager.userId)
                                 ? 'bg-primary/10 border-primary'
                                 : 'hover:bg-primary/5'
-                            }`}
+                              }`}
                             onClick={() => {
                               setSelectedManagers(prev => {
                                 if (prev.includes(manager.userId)) {
@@ -691,17 +746,16 @@ const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
                         {selectedSupervisors.length} selected
                       </Badge>
                     </Label>
-                    
+
                     {siteStaff.supervisors.length > 0 ? (
                       <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto border rounded-lg p-2">
                         {siteStaff.supervisors.map(supervisor => (
                           <div
                             key={supervisor.userId}
-                            className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
-                              selectedSupervisors.includes(supervisor.userId)
+                            className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${selectedSupervisors.includes(supervisor.userId)
                                 ? 'bg-primary/10 border-primary'
                                 : 'hover:bg-primary/5'
-                            }`}
+                              }`}
                             onClick={() => {
                               setSelectedSupervisors(prev => {
                                 if (prev.includes(supervisor.userId)) {
@@ -758,8 +812,8 @@ const AssignTaskPopup: React.FC<AssignTaskPopupProps> = ({
             >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="flex-1"
               disabled={!selectedSiteId || isSubmitting || (selectedManagers.length === 0 && selectedSupervisors.length === 0)}
             >
