@@ -3,7 +3,7 @@ import {
   getAllCommunications,
   createCommunication,
   deleteCommunication
-} from '../controllers/Communicationcontroller';
+} from '../controllers/communicationController';
 
 const router = express.Router();
 

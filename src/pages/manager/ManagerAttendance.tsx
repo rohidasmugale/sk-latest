@@ -1291,7 +1291,6 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
 
   const handleExportFullMonth = async () => {
     try {
-      // 1. Determine the start and end date of the selected month
       const currentDate = new Date(selectedDate);
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth();
@@ -1302,10 +1301,8 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
       setRefreshing(true);
       toast.loading('Generating professional monthly grid...');
 
-      // 2. Fetch the entire month's data
       const fullMonthEmployees = await generateEmployeeData(siteName, monthStart, monthEnd);
 
-      // 3. Filter by department if currently in 'department' view
       let filtered = fullMonthEmployees;
       if (viewType === 'department' && department) {
         const targetDept = department.trim().toLowerCase();
@@ -1321,7 +1318,6 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
         return;
       }
 
-      // 4. Group the daily data by Employee ID
       const employeeMap = new Map<string, { name: string; data: Map<string, string> }>();
       filtered.forEach(emp => {
         const key = emp.employeeId || emp.id || emp.name;
@@ -1331,31 +1327,27 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
         employeeMap.get(key)!.data.set(emp.date, emp.status);
       });
 
-      // 5. Sort employees alphabetically by name
       const sortedEmployees = Array.from(employeeMap.entries())
         .map(([id, info]) => ({ id, ...info }))
         .sort((a, b) => a.name.localeCompare(b.name));
 
-      // 6. Generate the column headers (01, 02, 03...)
       const daysArray = Array.from({ length: lastDay }, (_, i) => String(i + 1).padStart(2, '0'));
       const numDays = daysArray.length;
 
-      // 7. Create the ExcelJS Workbook and Worksheet
       const wb = new ExcelJS.Workbook();
       const ws = wb.addWorksheet('Attendance Grid');
 
-      // Define fixed column widths
-      ws.getColumn(1).width = 6;   // SR NO
-      ws.getColumn(2).width = 25;  // NAME
+      ws.getColumn(1).width = 6;
+      ws.getColumn(2).width = 25;
       for (let i = 3; i <= 2 + numDays; i++) {
-        ws.getColumn(i).width = 5; // Days 01-31
+        ws.getColumn(i).width = 5;
       }
-      ws.getColumn(3 + numDays).width = 12; // Total Duty
-      ws.getColumn(4 + numDays).width = 6;  // W/O
-      ws.getColumn(5 + numDays).width = 6;  // PH
-      ws.getColumn(6 + numDays).width = 8;  // Total
+      ws.getColumn(3 + numDays).width = 12;
+      ws.getColumn(4 + numDays).width = 6;
+      ws.getColumn(5 + numDays).width = 6;
+      ws.getColumn(6 + numDays).width = 8;
 
-      // 8. Build the Headers row
+      // 8. Header row (row 1)
       const headers = ['SR NO', 'NAME', ...daysArray, 'Total Duty', 'W/O', 'PH', 'Total'];
       const headerRow = ws.getRow(1);
       headerRow.values = headers;
@@ -1364,15 +1356,31 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
         cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
         cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0E2568' } }; // Dark Navy Blue
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0E2568' } };
       });
 
-      // 9. Build the Data Rows
+      // 8b. Day-of-week row (row 2)
+      const dayNames = daysArray.map(d => {
+        const dateObj = new Date(year, month, Number(d));
+        return dateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+      });
+      const dowRow = ws.getRow(2);
+      dowRow.values = ['', '', ...dayNames, '', '', '', ''];
+      dowRow.height = 16;
+      dowRow.eachCell((cell, colNumber) => {
+        if (colNumber >= 3 && colNumber <= 2 + numDays) {
+          cell.font = { name: 'Arial', size: 8, bold: true, color: { argb: 'FF0E2568' } };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F0F0' } };
+        }
+      });
+
+      // 9. Build data rows (start at row 3)
       let srNo = 1;
       const dateKeys = daysArray.map(d => `${year}-${String(month + 1).padStart(2, '0')}-${d}`);
-      let currentRow = 2;
+      let currentRow = 3;
 
-      // Variables for Grand Totals
       let grandTotalDuty = 0;
       let grandTotalWO = 0;
 
@@ -1391,34 +1399,30 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
 
           if (status === 'present' || status === 'half-day') {
             cell.value = '1';
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1C62C2' } }; // Bold Blue
-            cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+            // no background fill
             totalDuty++;
           } else if (status === 'weekly-off') {
             cell.value = 'WO';
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE9E9E9' } }; // Light Grey
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE9E9E9' } };
             cell.font = { color: { argb: 'FF333333' }, bold: true };
             totalWO++;
           } else {
-            // Absent or Leave
             cell.value = 'A';
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3C7C7' } }; // Pastel Red/Pink
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3C7C7' } };
             cell.font = { color: { argb: 'FF8B0000' }, bold: true };
           }
           cell.alignment = { horizontal: 'center', vertical: 'middle' };
           cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
         });
 
-        // Row Totals at the end
         row.getCell(3 + numDays).value = totalDuty;
         row.getCell(4 + numDays).value = totalWO;
-        row.getCell(5 + numDays).value = 0; // PH fixed
-        row.getCell(6 + numDays).value = totalDuty + totalWO; // Total = Duty + WO
+        row.getCell(5 + numDays).value = 0;
+        row.getCell(6 + numDays).value = totalDuty + totalWO;
 
         grandTotalDuty += totalDuty;
         grandTotalWO += totalWO;
 
-        // Apply borders and alignment to totals
         for (let i = 3 + numDays; i <= 6 + numDays; i++) {
           const cell = row.getCell(i);
           cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
@@ -1428,9 +1432,8 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
         currentRow++;
       });
 
-      // 10. Calculate and build the Bottom Daily Summary Rows (PRESENT, WEEKLY OFF, COMPANY OFF, TOTAL, DEPLOYMENT, EXTRAS)
+      // 10. Daily summary rows (PRESENT, WEEKLY OFF, ...) – unchanged
       const summaryStartRow = currentRow + 1;
-
       const presentRow = ws.getRow(summaryStartRow);
       const weeklyOffRow = ws.getRow(summaryStartRow + 1);
       const companyOffRow = ws.getRow(summaryStartRow + 2);
@@ -1438,29 +1441,18 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
       const deploymentRow = ws.getRow(summaryStartRow + 4);
       const extrasRow = ws.getRow(summaryStartRow + 5);
 
-      // Set labels
       const summaryLabels = ['PRESENT', 'WEEKLY OFF', 'COMPANY OFF', 'TOTAL', 'DEPLOYMENT', 'EXTRAS'];
       [presentRow, weeklyOffRow, companyOffRow, totalRow, deploymentRow, extrasRow].forEach((row, idx) => {
         row.getCell(1).value = summaryLabels[idx];
         row.getCell(1).font = { name: 'Arial', size: 10, bold: true };
       });
 
-      // Fetch the stored Daily Requirement
       const dailyRequirement = siteData?.dailyRequirement || siteData?.deploymentStats?.dailyStaffRequirement || 0;
+      let sumPresent = 0, sumWO = 0, sumCO = 0, sumTotal = 0, sumDeployment = 0, sumExtras = 0;
 
-      // Monthly totals for the Summary rows
-      let sumPresent = 0;
-      let sumWO = 0;
-      let sumCO = 0;
-      let sumTotal = 0;
-      let sumDeployment = 0;
-      let sumExtras = 0;
-
-      // Loop through date columns to sum them up
       for (let col = 3; col < 3 + numDays; col++) {
-        let presentCount = 0;
-        let woCount = 0;
-        for (let r = 2; r < currentRow; r++) {
+        let presentCount = 0, woCount = 0;
+        for (let r = 3; r < currentRow; r++) {
           const val = ws.getRow(r).getCell(col).value;
           if (val === '1') presentCount++;
           if (val === 'WO') woCount++;
@@ -1472,16 +1464,13 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
         deploymentRow.getCell(col).value = dailyRequirement;
         extrasRow.getCell(col).value = presentCount - dailyRequirement;
 
-        // Accumulate for Grand Monthly Totals
         sumPresent += presentCount;
         sumWO += woCount;
-        sumCO += 0;
         sumTotal += (presentCount + woCount);
         sumDeployment += dailyRequirement;
         sumExtras += (presentCount - dailyRequirement);
       }
 
-      // Add Monthly Totals to the last column of Summary rows
       const totalColIndex = 3 + numDays;
       presentRow.getCell(totalColIndex).value = sumPresent;
       weeklyOffRow.getCell(totalColIndex).value = sumWO;
@@ -1490,9 +1479,8 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
       deploymentRow.getCell(totalColIndex).value = sumDeployment;
       extrasRow.getCell(totalColIndex).value = sumExtras;
 
-      // 11. Style the Bottom Daily Summary Rows
-      const summaryRows = [presentRow, weeklyOffRow, companyOffRow, totalRow, deploymentRow, extrasRow];
-      summaryRows.forEach(row => {
+      // 11. Style daily summary rows
+      [presentRow, weeklyOffRow, companyOffRow, totalRow, deploymentRow, extrasRow].forEach(row => {
         row.eachCell((cell) => {
           cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
           cell.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -1500,59 +1488,28 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
         });
       });
 
-      // 12. Build the Professional Grand Totals Block (Yellow & Green)
-      const grandTotalRowIndex = summaryStartRow + 7;
-      const grandTotalRow = ws.getRow(grandTotalRowIndex);
-      grandTotalRow.getCell(2).value = 'GRAND TOTALS';
+      // 12. Simplified bottom total row (yellow highlight)
+      const sumRowIndex = summaryStartRow + 7;
+      const sumRow = ws.getRow(sumRowIndex);
+      sumRow.getCell(2).value = 'TOTAL';
 
-      // Populate Grand Totals (Yellow)
-      grandTotalRow.getCell(3 + numDays).value = grandTotalDuty;
-      grandTotalRow.getCell(4 + numDays).value = grandTotalWO;
-      grandTotalRow.getCell(5 + numDays).value = 0;
-      grandTotalRow.getCell(6 + numDays).value = grandTotalDuty + grandTotalWO;
+      sumRow.getCell(3 + numDays).value = grandTotalDuty;
+      sumRow.getCell(4 + numDays).value = grandTotalWO;
+      sumRow.getCell(5 + numDays).value = 0;
+      sumRow.getCell(6 + numDays).value = grandTotalDuty + grandTotalWO;
 
-      // Style the Grand Total Row (YELLOW)
-      grandTotalRow.eachCell((cell, col) => {
-        if (col >= 2) {
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } }; // Bright Yellow
-          cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF000000' } };
-          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-          cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        }
+      [3 + numDays, 4 + numDays, 5 + numDays, 6 + numDays].forEach(col => {
+        const cell = sumRow.getCell(col);
+        cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF000000' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } }; // yellow
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
       });
+      sumRow.getCell(2).font = { name: 'Arial', size: 10, bold: true };
 
-      // 13. Build the Extras Summary (Green)
-      const grandExtrasRowIndex = grandTotalRowIndex + 1;
-      const grandExtrasRow = ws.getRow(grandExtrasRowIndex);
-      grandExtrasRow.getCell(2).value = 'TOTAL EXTRAS';
+      // 13. Freeze both header rows
+      ws.views = [{ state: 'frozen', ySplit: 2 }];
 
-      // Totals = Sum of all Daily Extras
-      grandExtrasRow.getCell(6 + numDays).value = sumExtras; // Monthly total extras
-
-      // Style the Extras Summary Row (GREEN)
-      grandExtrasRow.eachCell((cell, col) => {
-        if (col >= 2) {
-          // If Extras is negative, style it red. If positive, style it green.
-          const val = cell.value;
-          if (col === 6 + numDays && typeof val === 'number' && val >= 0) {
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4EDDA' } }; // Pastel Green for positive extras
-            cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF155724' } };
-          } else if (col === 6 + numDays && typeof val === 'number' && val < 0) {
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8D7DA' } }; // Pastel Red for negative extras
-            cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF721C24' } };
-          } else {
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4EDDA' } }; // Default Green
-            cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF155724' } };
-          }
-          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-          cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        }
-      });
-
-      // 14. Freeze the header row
-      ws.views = [{ state: 'frozen', ySplit: 1 }];
-
-      // 15. Download the .xlsx file
       const buffer = await wb.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = URL.createObjectURL(blob);
@@ -1566,7 +1523,7 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
       URL.revokeObjectURL(url);
 
       toast.dismiss();
-      toast.success(`Professional colorful grid exported successfully!`);
+      toast.success(`Professional grid exported successfully!`);
     } catch (error) {
       toast.dismiss();
       toast.error('Failed to export monthly grid');
@@ -1575,7 +1532,6 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
       setRefreshing(false);
     }
   };
-
 
   const handleViewPhoto = (photoUrl: string | null | undefined, type: "checkin" | "checkout") => {
     if (photoUrl) {
