@@ -763,8 +763,9 @@ const MobilePayrollCard = ({ item, formatCurrency, index }: any) => {
 const SuperAdminDashboard = () => {
   const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
   const [employees, setEmployees] = useState<Employee[]>([]);
-  // Dynamic department data based on real employees
-  // Allowed departments in desired display order (always show all, even if zero)
+    const [sites, setSites] = useState<Site[]>([]);
+  const departmentData = useMemo(() => {
+  // Define allowed departments with icons/colors
   const allowedDepartments = [
     { name: 'Housekeeping', icon: Home, color: 'from-blue-50 to-blue-100 border-blue-200' },
     { name: 'Security', icon: Shield, color: 'from-green-50 to-green-100 border-green-200' },
@@ -774,51 +775,37 @@ const SuperAdminDashboard = () => {
     { name: 'Other', icon: Droplets, color: 'from-cyan-50 to-cyan-100 border-cyan-200' }
   ];
 
-  // Dynamic department data – always show all allowed departments, count only staff (exclude managers/supervisors)
-  // ✅ REPLACE this entire useMemo
-  const departmentData = useMemo(() => {
-    // Count SITES per department, not employees
-    const departmentSites = new Map<string, Set<string>>();
-
-    employees.forEach(emp => {
-      const deptRaw = emp.department?.trim().toLowerCase() || '';
-      if (!deptRaw) return;
-
-      // Map to allowed department
-      let allowedDept = '';
-      const mapping: Record<string, string> = {
-        'housekeeping': 'Housekeeping',
-        'security': 'Security',
-        'waste management': 'Waste Management',
-        'parking management': 'Parking Management',
-        'consumables': 'Consumables',
-        'other': 'Other'
-      };
-
-      allowedDept = mapping[deptRaw] || deptRaw;
-
-      // Get site name
-      const siteName = emp.siteName || emp.site || 'Unknown';
-
-      if (!departmentSites.has(allowedDept)) {
-        departmentSites.set(allowedDept, new Set());
+  // Count sites per service
+  const deptSiteCounts = new Map<string, Set<string>>();
+  sites.forEach(site => {
+    const services = site.services || [];
+    services.forEach(service => {
+      // Match service to allowed department name (case‑insensitive)
+      const matchedDept = allowedDepartments.find(d => 
+        d.name.toLowerCase() === service.toLowerCase().trim()
+      );
+      const deptName = matchedDept ? matchedDept.name : service;
+      if (!deptSiteCounts.has(deptName)) {
+        deptSiteCounts.set(deptName, new Set());
       }
-      departmentSites.get(allowedDept)!.add(siteName);
+      deptSiteCounts.get(deptName)!.add(site._id);
     });
+  });
 
-    // Build final array in allowed order
-    return allowedDepartments.map(dept => {
-      const sites = departmentSites.get(dept.name) || new Set();
-      return {
-        department: dept.name,
-        total: sites.size,  // ✅ Now counts SITES, not employees
-        present: sites.size,
-        icon: dept.icon,
-        color: dept.color,
-        siteNames: Array.from(sites) // Optional: for tooltip
-      };
-    });
-  }, [employees]);
+  // Build final array in allowed order
+  return allowedDepartments.map(dept => {
+    const siteIds = deptSiteCounts.get(dept.name) || new Set();
+    return {
+      department: dept.name,
+      total: siteIds.size,
+      present: siteIds.size, // keep for compatibility
+      icon: dept.icon,
+      color: dept.color,
+      siteNames: Array.from(siteIds)
+    };
+  });
+}, [sites]);
+
   const navigate = useNavigate();
 
 
@@ -827,7 +814,7 @@ const SuperAdminDashboard = () => {
   const [refreshingAttendance, setRefreshingAttendance] = useState(false);
   const [attendanceError, setAttendanceError] = useState<string | null>(null);
   const [totalEmployeesAssignedToSites, setTotalEmployeesAssignedToSites] = useState(0);
-  const [sites, setSites] = useState<Site[]>([]);
+
   const [siteEmployeeCounts, setSiteEmployeeCounts] = useState<SiteEmployeeCount[]>([]);
 
   // State for UI navigation
@@ -1112,8 +1099,8 @@ const SuperAdminDashboard = () => {
   };
 
  const handleDepartmentCardClick = (department: string) => {
-  const todayStr = new Date().toISOString().split('T')[0]; // "2026-07-28"
-  navigate(`/superadmin/attendaceview?view=department&department=${department}&date=${todayStr}`);
+  const todayStr = new Date().toISOString().split('T')[0];
+  navigate(`/superadmin/attendaceview?view=service&service=${encodeURIComponent(department)}&date=${todayStr}`);
 };
   // Custom tooltips
   // ✅ Replace the CustomPieTooltip

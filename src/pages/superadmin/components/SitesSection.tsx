@@ -31,7 +31,9 @@ const ServicesList = [
   "Housekeeping",
   "Security",
   "Parking",
-  "Waste Management"
+  "Waste Management",
+  "Consumables",
+  "Other"
 ];
 
 const StaffRoles = [

@@ -32,6 +32,7 @@ import {
 import { useRole, UserRole } from "@/context/RoleContext";
 import { motion, AnimatePresence } from "framer-motion";
 import SKLogo from "@/assets/images/SKLogo.ico";
+import CRM from "@/pages/superadmin/CRM";
 
 
 // Separate component for Inventory button
@@ -109,6 +110,7 @@ const getSidebarItems = (role: UserRole) => {
         { name: "Billing & Finance", icon: DollarSign, path: "billing" },
         { name: "Site Visits", icon: Calendar, path: "site-visits" },
         { name: "Users & Roles", icon: UserCog, path: "users" },
+        {name: "CRM", icon: UserCog, path: "crm"},
         { name: "HRMS", icon: Users, path: "hrms" },
 
       ];
@@ -118,14 +120,13 @@ const getSidebarItems = (role: UserRole) => {
         ...baseItems,
 
 
-
+ { name: "Operations", icon: ClipboardList, path: "operations" },
         { name: "Machine Inventory", icon: ClipboardList, path: "erp" },
-        // Inside getSidebarItems for each role, add:
+          { name: "Billing & Finance", icon: DollarSign, path: "billing" },
+       
+        {name: "CRM", icon: UserCog, path: "crm"},
+        
         { name: "HRMS", icon: Users, path: "hrms" },
-
-        { name: "Billing & Finance", icon: DollarSign, path: "billing" },
-        { name: "Operations", icon: ClipboardList, path: "operations" },
-
 
 
       ];

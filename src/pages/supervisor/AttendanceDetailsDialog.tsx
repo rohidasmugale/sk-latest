@@ -47,7 +47,7 @@ import { toast } from "sonner";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 interface Employee {
@@ -139,10 +139,10 @@ const AttendanceDetailsDialog: React.FC<AttendanceDetailsDialogProps> = ({
     const checkMobile = () => {
       setIsMobileView(window.innerWidth < 768);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    
+
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
@@ -167,7 +167,7 @@ const AttendanceDetailsDialog: React.FC<AttendanceDetailsDialogProps> = ({
 
   const getFilteredEmployeesByType = () => {
     const recordsForDate = attendanceRecords.filter(record => record.date === date);
-    
+
     switch (type) {
       case 'present':
         return employees.filter(emp => {
@@ -207,7 +207,7 @@ const AttendanceDetailsDialog: React.FC<AttendanceDetailsDialogProps> = ({
 
   const getFilteredEmployees = () => {
     let filtered = [...filteredEmployeesByType];
-    
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter(emp =>
@@ -216,15 +216,15 @@ const AttendanceDetailsDialog: React.FC<AttendanceDetailsDialogProps> = ({
         emp.email.toLowerCase().includes(query)
       );
     }
-    
+
     if (selectedSite !== "all") {
       filtered = filtered.filter(emp => emp.siteName === selectedSite);
     }
-    
+
     if (selectedDepartment !== "all") {
       filtered = filtered.filter(emp => emp.department === selectedDepartment);
     }
-    
+
     return filtered;
   };
 
@@ -253,7 +253,7 @@ const AttendanceDetailsDialog: React.FC<AttendanceDetailsDialogProps> = ({
 
     try {
       setUpdatingStatus(true);
-      
+
       const response = await axios.post(`${API_URL}/attendance/update-status`, {
         employeeId: statusUpdateData.employeeId,
         attendanceId: statusUpdateData.attendanceId || null,
@@ -265,7 +265,7 @@ const AttendanceDetailsDialog: React.FC<AttendanceDetailsDialogProps> = ({
       });
 
       const data = response.data;
-      
+
       if (data.success) {
         toast.success(`Status updated to ${statusUpdateData.newStatus.replace('-', ' ')} for ${selectedEmployee.name}`);
         setStatusUpdateDialogOpen(false);
@@ -345,8 +345,8 @@ const AttendanceDetailsDialog: React.FC<AttendanceDetailsDialogProps> = ({
                 <Badge className={attendanceRecord ? getStatusBadge(attendanceRecord.status) : getTypeBadgeClass()}>
                   {attendanceRecord ? getStatusIcon(attendanceRecord.status) : getStatusIcon(type)}
                   <span className="ml-1 text-xs">
-                    {attendanceRecord ? 
-                      attendanceRecord.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 
+                    {attendanceRecord ?
+                      attendanceRecord.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()) :
                       title.replace(' Employees', '')}
                   </span>
                 </Badge>
@@ -571,22 +571,7 @@ const AttendanceDetailsDialog: React.FC<AttendanceDetailsDialogProps> = ({
                     className="overflow-hidden"
                   >
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 border rounded-lg bg-gray-50">
-                      <div>
-                        <Label className="text-xs font-medium">Site</Label>
-                        <Select value={selectedSite} onValueChange={setSelectedSite}>
-                          <SelectTrigger className="text-sm h-9">
-                            <SelectValue placeholder="All Sites" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Sites</SelectItem>
-                            {siteOptions.map(site => (
-                              <SelectItem key={site} value={site || ''} className="text-sm">
-                                {site}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+
                       <div>
                         <Label className="text-xs font-medium">Department</Label>
                         <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
@@ -611,26 +596,26 @@ const AttendanceDetailsDialog: React.FC<AttendanceDetailsDialogProps> = ({
 
             {/* Stats Summary - Mobile Optimized */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <StatsCard 
-                label="Present" 
+              <StatsCard
+                label="Present"
                 count={attendanceRecords.filter(r => r.date === date && r.status === 'present').length}
                 icon={<CheckCircle className="h-5 w-5 text-green-600" />}
                 colorClass="bg-green-50 border-green-200"
               />
-              <StatsCard 
-                label="Absent" 
+              <StatsCard
+                label="Absent"
                 count={employees.length - attendanceRecords.filter(r => r.date === date && r.status !== 'absent').length}
                 icon={<XCircle className="h-5 w-5 text-red-600" />}
                 colorClass="bg-red-50 border-red-200"
               />
-              <StatsCard 
-                label="Half Day" 
+              <StatsCard
+                label="Half Day"
                 count={attendanceRecords.filter(r => r.date === date && r.status === 'half-day').length}
                 icon={<Clock className="h-5 w-5 text-yellow-600" />}
                 colorClass="bg-yellow-50 border-yellow-200"
               />
-              <StatsCard 
-                label="On Leave" 
+              <StatsCard
+                label="On Leave"
                 count={attendanceRecords.filter(r => r.date === date && r.status === 'leave').length}
                 icon={<Calendar className="h-5 w-5 text-blue-600" />}
                 colorClass="bg-blue-50 border-blue-200"
@@ -680,9 +665,9 @@ const AttendanceDetailsDialog: React.FC<AttendanceDetailsDialogProps> = ({
                         <TableBody>
                           {displayedEmployees.map((employee) => {
                             const attendanceRecord = getEmployeeAttendanceRecord(employee._id);
-                            
+
                             return (
-                              <TableRow 
+                              <TableRow
                                 key={employee._id}
                                 className="cursor-pointer hover:bg-gray-50"
                                 onClick={() => handleStatusUpdate(employee)}
@@ -754,8 +739,8 @@ const AttendanceDetailsDialog: React.FC<AttendanceDetailsDialogProps> = ({
                                 <TableCell>
                                   <Badge className={attendanceRecord ? getStatusBadge(attendanceRecord.status) : getTypeBadgeClass()}>
                                     {attendanceRecord ? getStatusIcon(attendanceRecord.status) : getStatusIcon(type)}
-                                    {attendanceRecord ? 
-                                      attendanceRecord.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 
+                                    {attendanceRecord ?
+                                      attendanceRecord.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()) :
                                       title.replace(' Employees', '')}
                                   </Badge>
                                 </TableCell>
@@ -805,7 +790,7 @@ const AttendanceDetailsDialog: React.FC<AttendanceDetailsDialogProps> = ({
               Update status for {selectedEmployee?.name}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             <div>
               <Label className="text-sm">Employee Details</Label>
@@ -833,11 +818,11 @@ const AttendanceDetailsDialog: React.FC<AttendanceDetailsDialogProps> = ({
               <Input
                 type="date"
                 value={statusUpdateData.date}
-                onChange={(e) => setStatusUpdateData({...statusUpdateData, date: e.target.value})}
+                onChange={(e) => setStatusUpdateData({ ...statusUpdateData, date: e.target.value })}
                 className="mt-1"
               />
             </div>
-            
+
             <div>
               <Label className="text-sm">Current Status</Label>
               <div className="p-2 border rounded-md bg-gray-50 mt-1">
@@ -847,13 +832,13 @@ const AttendanceDetailsDialog: React.FC<AttendanceDetailsDialogProps> = ({
                 </Badge>
               </div>
             </div>
-            
+
             <div>
               <Label htmlFor="new-status" className="text-sm">New Status</Label>
               <Select
                 value={statusUpdateData.newStatus}
-                onValueChange={(value: 'present' | 'absent' | 'half-day' | 'leave' | 'weekly-off') => 
-                  setStatusUpdateData({...statusUpdateData, newStatus: value})
+                onValueChange={(value: 'present' | 'absent' | 'half-day' | 'leave' | 'weekly-off') =>
+                  setStatusUpdateData({ ...statusUpdateData, newStatus: value })
                 }
               >
                 <SelectTrigger className="mt-1">
@@ -893,20 +878,20 @@ const AttendanceDetailsDialog: React.FC<AttendanceDetailsDialogProps> = ({
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div>
               <Label htmlFor="status-remarks" className="text-sm">Remarks</Label>
               <Textarea
                 id="status-remarks"
                 value={statusUpdateData.remarks}
-                onChange={(e) => setStatusUpdateData({...statusUpdateData, remarks: e.target.value})}
+                onChange={(e) => setStatusUpdateData({ ...statusUpdateData, remarks: e.target.value })}
                 placeholder="Enter reason for status update..."
                 rows={3}
                 className="mt-1 text-sm"
               />
             </div>
           </div>
-          
+
           <DialogFooter className="flex-col sm:flex-row gap-2 mt-4">
             <Button variant="outline" onClick={() => setStatusUpdateDialogOpen(false)} disabled={updatingStatus} className="w-full sm:w-auto">
               Cancel

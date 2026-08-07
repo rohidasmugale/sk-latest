@@ -11,8 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Search, Plus, Edit, Trash2, Phone, Mail, Calendar, Eye, MapPin, Building, 
+import {
+  Search, Plus, Edit, Trash2, Phone, Mail, Calendar, Eye, MapPin, Building,
   Loader2, Upload, Download, Users, TrendingUp, Target, BarChart3, MessageSquare,
   ChevronRight, Filter, MoreVertical, CheckCircle, XCircle, AlertCircle,
   ArrowUpRight, Users as UsersIcon, FileText, Clock, Bell, Sun, Moon,
@@ -21,12 +21,12 @@ import {
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import * as XLSX from "xlsx";
-import { 
-  crmService, 
-  Client, 
-  Lead, 
+import {
+  crmService,
+  Client,
+  Lead,
   Communication,
-  CRMStats 
+  CRMStats
 } from "../../services/crmService";
 
 // Indian Data constants
@@ -373,7 +373,7 @@ const CRM = () => {
         try {
           const date = new Date(followUpDate);
           if (!isNaN(date.getTime())) formattedFollowUpDate = date.toISOString();
-        } catch (e) {}
+        } catch (e) { }
       }
       validLeads.push({
         _id: `temp-${Date.now()}-${index}`,
@@ -788,7 +788,7 @@ const CRM = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <DashboardHeader 
+      <DashboardHeader
         title={<span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">CRM Management</span>}
         subtitle="Manage your clients, leads, and communications"
         onMenuClick={handleMenuClick}
@@ -920,7 +920,93 @@ const CRM = () => {
             </div>
           </DialogContent>
         </Dialog>
-
+        <Dialog open={!!viewClientDialog} onOpenChange={() => setViewClientDialog(null)}>
+          <DialogContent className="max-w-2xl bg-white rounded-xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Client Details</DialogTitle>
+            </DialogHeader>
+            {viewClientDialog && (() => {
+              const client = clients.find(c => c._id === viewClientDialog);
+              if (!client) return <div>Client not found</div>;
+              return (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><Label>Name</Label><div className="font-medium">{client.name}</div></div>
+                    <div><Label>Company</Label><div className="font-medium">{client.company}</div></div>
+                    <div><Label>Email</Label><div>{client.email}</div></div>
+                    <div><Label>Phone</Label><div>{client.phone}</div></div>
+                    <div><Label>Industry</Label><div>{client.industry}</div></div>
+                    <div><Label>City</Label><div>{client.city}</div></div>
+                    <div><Label>Value</Label><div className="font-bold text-green-600">{client.value}</div></div>
+                    <div><Label>Status</Label><Badge className={client.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100'}>{client.status}</Badge></div>
+                    <div className="col-span-2"><Label>Address</Label><div>{client.address || 'N/A'}</div></div>
+                    <div className="col-span-2"><Label>Contact Person</Label><div>{client.contactPerson || 'N/A'}</div></div>
+                  </div>
+                  <Button onClick={() => setViewClientDialog(null)} className="w-full">Close</Button>
+                </div>
+              );
+            })()}
+          </DialogContent>
+        </Dialog><Dialog open={!!editingClient} onOpenChange={() => setEditingClient(null)}>
+          <DialogContent className="max-w-2xl bg-white rounded-xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Client</DialogTitle>
+            </DialogHeader>
+            {editingClient && (
+              <form onSubmit={handleEditClient} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Client Name *</Label>
+                    <Input name="name" defaultValue={editingClient.name} required className="h-9" />
+                  </div>
+                  <div>
+                    <Label>Company *</Label>
+                    <Input name="company" defaultValue={editingClient.company} required className="h-9" />
+                  </div>
+                  <div>
+                    <Label>Email *</Label>
+                    <Input name="email" type="email" defaultValue={editingClient.email} required className="h-9" />
+                  </div>
+                  <div>
+                    <Label>Phone *</Label>
+                    <Input name="phone" defaultValue={editingClient.phone} required className="h-9" />
+                  </div>
+                  <div>
+                    <Label>Contact Person</Label>
+                    <Input name="contactPerson" defaultValue={editingClient.contactPerson || ''} className="h-9" />
+                  </div>
+                  <div>
+                    <Label>Industry</Label>
+                    <Select name="industry" defaultValue={editingClient.industry || 'MALL'}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {industries.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>City</Label>
+                    <Select name="city" defaultValue={editingClient.city || 'Mumbai'}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {indianCities.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Value *</Label>
+                    <Input name="value" defaultValue={editingClient.value} required className="h-9" />
+                  </div>
+                </div>
+                <div>
+                  <Label>Address</Label>
+                  <Textarea name="address" defaultValue={editingClient.address || ''} className="min-h-[80px]" />
+                </div>
+                <Button type="submit" className="w-full">Update Client</Button>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
         {/* Tabs Section */}
         <div className="space-y-4 md:space-y-6">
           <div className="border-b border-gray-200 overflow-x-auto">
@@ -1037,9 +1123,9 @@ const CRM = () => {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div><CardTitle className="text-base md:text-xl font-bold">Lead Tracker</CardTitle><p className="text-xs md:text-sm text-gray-500">Track and convert potential opportunities</p></div>
                       <div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => setImportLeadDialogOpen(true)} className="h-8 md:h-10 text-xs"><Upload className="mr-1 h-3 w-3" /> Import</Button>
-                      <Dialog open={leadDialogOpen} onOpenChange={setLeadDialogOpen}><DialogTrigger asChild><Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-8 md:h-10 text-xs"><Plus className="mr-1 h-3 w-3" /> Add</Button></DialogTrigger>
-                      <DialogContent className="max-w-[95vw] sm:max-w-2xl bg-white rounded-xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>Add New Lead</DialogTitle></DialogHeader>
-                      <form onSubmit={handleAddLead} className="space-y-4"><div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><Label>Lead Name *</Label><Input name="name" required className="h-9 text-sm" /></div><div><Label>Company *</Label><Input name="company" required className="h-9 text-sm" /></div><div><Label>Email *</Label><Input name="email" type="email" required className="h-9 text-sm" /></div><div><Label>Phone *</Label><Input name="phone" required className="h-9 text-sm" /></div><div><Label>Source *</Label><Select name="source" required><SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger><SelectContent>{leadSources.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div><div><Label>Value *</Label><Input name="value" placeholder="₹30,00,000" required className="h-9 text-sm" /></div><div><Label>Assign To *</Label><Input name="assignedTo" required className="h-9 text-sm" /></div><div><Label>Follow-up Date</Label><Input name="followUpDate" type="date" className="h-9 text-sm" /></div></div><div><Label>Notes</Label><Textarea name="notes" className="min-h-[80px] text-sm" /></div><Button type="submit" className="w-full h-9 text-sm">Add Lead</Button></form></DialogContent></Dialog></div></div>
+                        <Dialog open={leadDialogOpen} onOpenChange={setLeadDialogOpen}><DialogTrigger asChild><Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-8 md:h-10 text-xs"><Plus className="mr-1 h-3 w-3" /> Add</Button></DialogTrigger>
+                          <DialogContent className="max-w-[95vw] sm:max-w-2xl bg-white rounded-xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>Add New Lead</DialogTitle></DialogHeader>
+                            <form onSubmit={handleAddLead} className="space-y-4"><div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><Label>Lead Name *</Label><Input name="name" required className="h-9 text-sm" /></div><div><Label>Company *</Label><Input name="company" required className="h-9 text-sm" /></div><div><Label>Email *</Label><Input name="email" type="email" required className="h-9 text-sm" /></div><div><Label>Phone *</Label><Input name="phone" required className="h-9 text-sm" /></div><div><Label>Source *</Label><Select name="source" required><SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger><SelectContent>{leadSources.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div><div><Label>Value *</Label><Input name="value" placeholder="₹30,00,000" required className="h-9 text-sm" /></div><div><Label>Assign To *</Label><Input name="assignedTo" required className="h-9 text-sm" /></div><div><Label>Follow-up Date</Label><Input name="followUpDate" type="date" className="h-9 text-sm" /></div></div><div><Label>Notes</Label><Textarea name="notes" className="min-h-[80px] text-sm" /></div><Button type="submit" className="w-full h-9 text-sm">Add Lead</Button></form></DialogContent></Dialog></div></div>
                     <div className="relative mt-3"><Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" /><Input placeholder="Search leads..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-7 h-9 text-sm" /></div>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -1068,8 +1154,8 @@ const CRM = () => {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div><CardTitle className="text-base md:text-xl font-bold">Communication Logs</CardTitle><p className="text-xs md:text-sm text-gray-500">Track all client interactions</p></div>
                       <Dialog open={commDialogOpen} onOpenChange={setCommDialogOpen}><DialogTrigger asChild><Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-8 md:h-10 text-xs"><Plus className="mr-1 h-3 w-3" /> Log</Button></DialogTrigger>
-                      <DialogContent className="max-w-[95vw] sm:max-w-2xl bg-white rounded-xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>Log Communication</DialogTitle></DialogHeader>
-                      <form onSubmit={handleAddCommunication} className="space-y-4"><div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><Label>Client Name *</Label><Select name="clientName" required><SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger><SelectContent>{clients.map(c => <SelectItem key={c._id} value={c.name}>{c.name}</SelectItem>)}</SelectContent></Select></div><div><Label>Type *</Label><Select name="type" required><SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger><SelectContent>{communicationTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select></div><div><Label>Date *</Label><Input name="date" type="date" defaultValue={new Date().toISOString().split('T')[0]} required className="h-9 text-sm" /></div><div><Label>Client ID</Label><Select name="clientId"><SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger><SelectContent>{clients.map(c => <SelectItem key={c._id} value={c._id}>{c._id.slice(-6)}</SelectItem>)}</SelectContent></Select></div></div><div><Label>Notes *</Label><Textarea name="notes" required className="min-h-[80px] text-sm" /></div><div className="flex items-center gap-2"><input type="checkbox" id="followUpRequired" name="followUpRequired" className="rounded" /><Label htmlFor="followUpRequired" className="text-sm">Follow-up Required</Label></div><div><Label>Follow-up Date</Label><Input name="followUpDate" type="date" className="h-9 text-sm" /></div><Button type="submit" className="w-full h-9 text-sm">Log Communication</Button></form></DialogContent></Dialog></div>
+                        <DialogContent className="max-w-[95vw] sm:max-w-2xl bg-white rounded-xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>Log Communication</DialogTitle></DialogHeader>
+                          <form onSubmit={handleAddCommunication} className="space-y-4"><div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><Label>Client Name *</Label><Select name="clientName" required><SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger><SelectContent>{clients.map(c => <SelectItem key={c._id} value={c.name}>{c.name}</SelectItem>)}</SelectContent></Select></div><div><Label>Type *</Label><Select name="type" required><SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger><SelectContent>{communicationTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select></div><div><Label>Date *</Label><Input name="date" type="date" defaultValue={new Date().toISOString().split('T')[0]} required className="h-9 text-sm" /></div><div><Label>Client ID</Label><Select name="clientId"><SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger><SelectContent>{clients.map(c => <SelectItem key={c._id} value={c._id}>{c._id.slice(-6)}</SelectItem>)}</SelectContent></Select></div></div><div><Label>Notes *</Label><Textarea name="notes" required className="min-h-[80px] text-sm" /></div><div className="flex items-center gap-2"><input type="checkbox" id="followUpRequired" name="followUpRequired" className="rounded" /><Label htmlFor="followUpRequired" className="text-sm">Follow-up Required</Label></div><div><Label>Follow-up Date</Label><Input name="followUpDate" type="date" className="h-9 text-sm" /></div><Button type="submit" className="w-full h-9 text-sm">Log Communication</Button></form></DialogContent></Dialog></div>
                   </CardHeader>
                   <CardContent className="p-0">
                     {loading.communications ? (<div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-blue-500" /></div>) : communications.length === 0 ? (<div className="text-center py-8"><MessageSquare className="h-12 w-12 mx-auto text-gray-400 mb-3" /><h3 className="font-semibold">No communications found</h3></div>) : (

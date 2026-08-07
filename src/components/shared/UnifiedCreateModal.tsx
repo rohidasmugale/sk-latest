@@ -384,7 +384,14 @@ const SiteForm = ({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: ()
   const [staffDeployment, setStaffDeployment] = useState<Array<{ role: string; count: number }>>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const ServicesList = ["Housekeeping", "Security", "Parking", "Waste Management"];
+ const ServicesList = [
+  "Housekeeping",
+  "Security",
+  "Parking",
+  "Waste Management",
+  "Consumables",
+  "Other"
+];
   const StaffRoles = [
     "Manager", "Supervisor", "Housekeeping Staff", "Security Guard",
     "Parking Attendant", "Waste Collector"

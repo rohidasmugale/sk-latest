@@ -461,7 +461,9 @@ const generateMockStats = (totalEmployees: number, assignedTasks: number, comple
 const SupervisorDashboard = () => {
   const { onMenuClick } = useOutletContext<OutletContext>();
   const navigate = useNavigate();
-
+  const [markPresentDialogOpen, setMarkPresentDialogOpen] = useState(false);
+  const [selectedEmployeeForMarkPresent, setSelectedEmployeeForMarkPresent] = useState<Employee | null>(null);
+  const [markPresentLoading, setMarkPresentLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [attendanceResult, setAttendanceResult] = useState<string | null>(null);
   const [lastCaptureTime, setLastCaptureTime] = useState(0);
@@ -570,7 +572,12 @@ const SupervisorDashboard = () => {
     leaveCount: 0,
     halfDayCount: 0
   });
-
+  // --- Face Recognition Fallback States ---
+  const [fallbackManualOpen, setFallbackManualOpen] = useState(false);
+  const [fallbackPhoto, setFallbackPhoto] = useState<File | null>(null);
+  const [fallbackPhotoPreview, setFallbackPhotoPreview] = useState<string | null>(null);
+  const [fallbackEmployeeId, setFallbackEmployeeId] = useState<string>("");
+  const [submittingFallback, setSubmittingFallback] = useState(false);
   // Date selection
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -744,7 +751,36 @@ const SupervisorDashboard = () => {
       setWeeklyOffLoading(false);
     }
   };
-
+  const handleMarkPresent = async () => {
+    if (!selectedEmployeeForMarkPresent) {
+      toast.error("Please select an employee");
+      return;
+    }
+    setMarkPresentLoading(true);
+    try {
+      // Auto-capture the current time automatically
+      const now = new Date().toISOString();
+      
+      await axios.post(`${API_URL}/attendance/manual`, {
+        employeeId: selectedEmployeeForMarkPresent._id,
+        employeeName: selectedEmployeeForMarkPresent.name,
+        date: selectedDate,
+        checkInTime: now, // Time automatically captured!
+        status: 'present',
+        supervisorId: currentSupervisor.id,
+        remarks: 'Marked present manually via quick action'
+      });
+      
+      toast.success(`${selectedEmployeeForMarkPresent.name} marked as Present!`);
+      setMarkPresentDialogOpen(false);
+      setSelectedEmployeeForMarkPresent(null);
+      loadAttendanceRecords(selectedDate);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to mark present");
+    } finally {
+      setMarkPresentLoading(false);
+    }
+  };
   const openCameraForEmployee = (employee: Employee | null) => {
     setSelectedEmployeeForAttendance(employee);
     setCameraAction('checkin'); // we will determine checkin/out based on current status later

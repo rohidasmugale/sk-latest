@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import CameraCapture from "./CameraCapture";
 import {
   Calendar,
   CheckCircle,
@@ -33,7 +34,7 @@ import { useOutletContext } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 // ---------- API ----------
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 // ---------- Types ----------
 interface Employee {
@@ -166,7 +167,9 @@ const Attendance = () => {
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
   const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null);
-
+  // ------- Photo Capture for Mark Present -------
+  const [attendanceCameraOpen, setAttendanceCameraOpen] = useState(false);
+  const [attendancePhotoTarget, setAttendancePhotoTarget] = useState<Employee | null>(null);
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
   const [selectedEmployeeForManual, setSelectedEmployeeForManual] = useState<Employee | null>(null);
   const [manualData, setManualData] = useState({
@@ -189,13 +192,15 @@ const Attendance = () => {
     date: selectedDate,
     remarks: "",
   });
-
+  // ------- Photo Capture for Check Out -------
+  const [checkoutCameraOpen, setCheckoutCameraOpen] = useState(false);
+  const [checkoutPhotoTarget, setCheckoutPhotoTarget] = useState<Employee | null>(null);
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [selectedPhotoType, setSelectedPhotoType] = useState<'checkin' | 'checkout'>('checkin');
- const [activeShiftId, setActiveShiftId] = useState<string>("");
-const [siteShifts, setSiteShifts] = useState<any[]>([]);
-const [loadingShifts, setLoadingShifts] = useState(false);
+  const [activeShiftId, setActiveShiftId] = useState<string>("");
+  const [siteShifts, setSiteShifts] = useState<any[]>([]);
+  const [loadingShifts, setLoadingShifts] = useState(false);
   // Data fetching
   const fetchSupervisorSites = useCallback(async () => {
     if (!currentUser) return [];
@@ -223,30 +228,30 @@ const [loadingShifts, setLoadingShifts] = useState(false);
       return [];
     }
   }, [currentUser]);
-const fetchSiteShifts = async (siteName: string) => {
-  if (!siteName) return;
-  setLoadingShifts(true);
-  try {
-    const res = await axios.get(`${API_URL}/sites`);
-    const sites = res.data?.data || res.data || [];
-    const site = sites.find((s: any) => s.name === siteName);
-    if (site?.shifts && site.shifts.length > 0) {
-      setSiteShifts(site.shifts);
-      // Set default active shift to first one
-      if (!activeShiftId) {
-        setActiveShiftId(site.shifts[0].id);
+  const fetchSiteShifts = async (siteName: string) => {
+    if (!siteName) return;
+    setLoadingShifts(true);
+    try {
+      const res = await axios.get(`${API_URL}/sites`);
+      const sites = res.data?.data || res.data || [];
+      const site = sites.find((s: any) => s.name === siteName);
+      if (site?.shifts && site.shifts.length > 0) {
+        setSiteShifts(site.shifts);
+        // Set default active shift to first one
+        if (!activeShiftId) {
+          setActiveShiftId(site.shifts[0].id);
+        }
+      } else {
+        setSiteShifts([]);
+        setActiveShiftId("");
       }
-    } else {
+    } catch (error) {
+      console.error("Error fetching shifts:", error);
       setSiteShifts([]);
-      setActiveShiftId("");
+    } finally {
+      setLoadingShifts(false);
     }
-  } catch (error) {
-    console.error("Error fetching shifts:", error);
-    setSiteShifts([]);
-  } finally {
-    setLoadingShifts(false);
-  }
-};
+  };
   const fetchEmployees = useCallback(async () => {
     if (!currentUser) return;
     try {
@@ -271,38 +276,38 @@ const fetchSiteShifts = async (siteName: string) => {
     }
   }, [currentUser, supervisorSites, fetchSupervisorSites]);
 
- const loadAttendanceRecords = useCallback(async () => {
-  if (employees.length === 0) {
-    setAttendanceRecords([]);
-    return;
-  }
+  const loadAttendanceRecords = useCallback(async () => {
+    if (employees.length === 0) {
+      setAttendanceRecords([]);
+      return;
+    }
 
-  try {
-    // ✅ Fix 1: always fetch all records (limit=1000)
-    const response = await axios.get(`${API_URL}/attendance`, {
-      params: { date: selectedDate, limit: 1000 }
-    });
+    try {
+      // ✅ Fix 1: always fetch all records (limit=1000)
+      const response = await axios.get(`${API_URL}/attendance`, {
+        params: { date: selectedDate, limit: 1000 }
+      });
 
-    let records = response.data?.data || response.data || [];
-    if (!Array.isArray(records)) records = [];
+      let records = response.data?.data || response.data || [];
+      if (!Array.isArray(records)) records = [];
 
-    // ✅ Fix 2: match on multiple fields (mongo _id, employeeId, and name)
-    const employeeMongoIds = new Set(employees.map(e => e._id));
-    const employeeEmpIds   = new Set(employees.map(e => e.employeeId));
-    const employeeNames    = new Set(employees.map(e => e.name));
+      // ✅ Fix 2: match on multiple fields (mongo _id, employeeId, and name)
+      const employeeMongoIds = new Set(employees.map(e => e._id));
+      const employeeEmpIds = new Set(employees.map(e => e.employeeId));
+      const employeeNames = new Set(employees.map(e => e.name));
 
-    const filteredRecords = records.filter((r: AttendanceRecord) =>
-      employeeMongoIds.has(r.employeeId) ||
-      employeeEmpIds.has(r.employeeId)   ||
-      employeeNames.has(r.employeeName)
-    );
+      const filteredRecords = records.filter((r: AttendanceRecord) =>
+        employeeMongoIds.has(r.employeeId) ||
+        employeeEmpIds.has(r.employeeId) ||
+        employeeNames.has(r.employeeName)
+      );
 
-    setAttendanceRecords(filteredRecords);
-  } catch (error) {
-    console.error("Error loading attendance:", error);
-    setAttendanceRecords([]);
-  }
-}, [employees, selectedDate]);
+      setAttendanceRecords(filteredRecords);
+    } catch (error) {
+      console.error("Error loading attendance:", error);
+      setAttendanceRecords([]);
+    }
+  }, [employees, selectedDate]);
 
   useEffect(() => {
     if (currentUser && currentUser.role === "supervisor") {
@@ -329,13 +334,13 @@ const fetchSiteShifts = async (siteName: string) => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
- const getEmployeeAttendance = (emp: Employee): AttendanceRecord | undefined => {
-  return attendanceRecords.find(r =>
-    r.employeeId === emp._id ||
-    r.employeeId === emp.employeeId ||
-    r.employeeName === emp.name
-  );
-};
+  const getEmployeeAttendance = (emp: Employee): AttendanceRecord | undefined => {
+    return attendanceRecords.find(r =>
+      r.employeeId === emp._id ||
+      r.employeeId === emp.employeeId ||
+      r.employeeName === emp.name
+    );
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -365,18 +370,80 @@ const fetchSiteShifts = async (siteName: string) => {
   const siteOptions = Array.from(new Set(employees.map(e => e.siteName))).filter(Boolean);
   const departmentOptions = Array.from(new Set(employees.map(e => e.department))).filter(Boolean);
 
-  // Actions
-  const handleManualAttendance = (emp: Employee) => {
-    setSelectedEmployeeForManual(emp);
-    setManualData({
-      checkInTime: "",
-      checkOutTime: "",
-      breakStartTime: "",
-      breakEndTime: "",
-      status: "present",
-      remarks: "",
-    });
-    setManualDialogOpen(true);
+  const handleAttendancePhotoCapture = async (photoFile: File) => {
+    if (!attendancePhotoTarget) return;
+
+    const toastId = toast.loading('Marking present with photo...');
+    try {
+      const formData = new FormData();
+      formData.append('employeeId', attendancePhotoTarget._id);
+      formData.append('employeeName', attendancePhotoTarget.name);
+      formData.append('photo', photoFile);
+
+      // ✅ CRITICAL FIX: Must send siteName to match backend expectations
+      formData.append('siteName', attendancePhotoTarget.siteName || '');
+
+      // If your app uses shifts, you must add this too:
+      // formData.append('shiftId', selectedShiftId || '');
+
+      formData.append('supervisorId', currentUser?._id || currentUser?.id);
+
+      // Note: We removed date, checkInTime, and status. 
+      // The /checkin-with-photo endpoint handles the timestamp automatically!
+
+      const response = await axios.post(`${API_URL}/attendance/checkin-with-photo`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      toast.dismiss(toastId);
+
+      if (response.data.success) {
+        toast.success(`${attendancePhotoTarget.name} marked as Present with photo!`);
+        setAttendanceCameraOpen(false);
+        setAttendancePhotoTarget(null);
+        await loadAttendanceRecords();
+      } else {
+        toast.error(response.data.message || "Failed to mark present");
+      }
+    } catch (error: any) {
+      toast.dismiss(toastId);
+      console.error('Attendance photo error:', error);
+      toast.error(error.response?.data?.message || "Failed to mark present with photo");
+    }
+  };
+  const handleCheckoutPhotoCapture = async (photoFile: File) => {
+    if (!checkoutPhotoTarget) return;
+
+    const toastId = toast.loading('Checking out with photo...');
+    try {
+      const formData = new FormData();
+      formData.append('employeeId', checkoutPhotoTarget._id);
+      formData.append('employeeName', checkoutPhotoTarget.name);
+      formData.append('photo', photoFile);
+      formData.append('siteName', checkoutPhotoTarget.siteName || '');
+      formData.append('supervisorId', currentUser?._id || currentUser?.id);
+      // If your app uses shifts:
+      // formData.append('shiftId', selectedShiftId || '');
+
+      const response = await axios.post(`${API_URL}/attendance/checkout-with-photo`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      toast.dismiss(toastId);
+
+      if (response.data.success) {
+        toast.success(`${checkoutPhotoTarget.name} checked out with photo!`);
+        setCheckoutCameraOpen(false);
+        setCheckoutPhotoTarget(null);
+        await loadAttendanceRecords();
+      } else {
+        toast.error(response.data.message || "Failed to check out");
+      }
+    } catch (error: any) {
+      toast.dismiss(toastId);
+      console.error('Checkout photo error:', error);
+      toast.error(error.response?.data?.message || "Failed to check out with photo");
+    }
   };
 
   const submitManualAttendance = async () => {
@@ -483,7 +550,7 @@ const fetchSiteShifts = async (siteName: string) => {
       return;
     }
     const headers = [
-      "Employee Name", "Employee ID", "Department", "Site",
+      "Employee Name", "Employee ID", "Department",
       "Check In", "Check Out", "Check In Photo URL", "Check Out Photo URL",
       "Hours", "Latitude", "Longitude", "Status", "Remarks"
     ];
@@ -493,7 +560,7 @@ const fetchSiteShifts = async (siteName: string) => {
         emp.name,
         emp.employeeId,
         emp.department,
-        emp.siteName || '-',
+
         record?.checkInTime ? formatTimeForDisplay(record.checkInTime) : '-',
         record?.checkOutTime ? formatTimeForDisplay(record.checkOutTime) : '-',
         record?.checkInPhoto || '',
@@ -520,139 +587,139 @@ const fetchSiteShifts = async (siteName: string) => {
 
 
   const handleExportFullMonth = async () => {
-  try {
-    toast.loading('Fetching full month data...');
+    try {
+      toast.loading('Fetching full month data...');
 
-    // Get the month from selectedDate
-    const month = selectedDate.substring(0, 7);
-    const monthStart = `${month}-01`;
-    const monthEnd = new Date(
-      parseInt(month.split('-')[0]),
-      parseInt(month.split('-')[1]),
-      0
-    ).toISOString().split('T')[0];
+      // Get the month from selectedDate
+      const month = selectedDate.substring(0, 7);
+      const monthStart = `${month}-01`;
+      const monthEnd = new Date(
+        parseInt(month.split('-')[0]),
+        parseInt(month.split('-')[1]),
+        0
+      ).toISOString().split('T')[0];
 
-    // Fetch ALL attendance records for the month
-    const response = await axios.get(`${API_URL}/attendance`, {
-      params: { 
-        startDate: monthStart, 
-        endDate: monthEnd, 
-        limit: 10000 
+      // Fetch ALL attendance records for the month
+      const response = await axios.get(`${API_URL}/attendance`, {
+        params: {
+          startDate: monthStart,
+          endDate: monthEnd,
+          limit: 10000
+        }
+      });
+
+      let allRecords = response.data?.data || response.data || [];
+      if (!Array.isArray(allRecords)) allRecords = [];
+
+      // Filter records for supervisor's employees
+      const employeeIds = new Set(employees.map(e => e._id));
+      const filteredRecords = allRecords.filter((r: AttendanceRecord) =>
+        employeeIds.has(r.employeeId)
+      );
+
+      if (filteredRecords.length === 0) {
+        toast.dismiss();
+        toast.warning('No attendance records found for this month');
+        return;
       }
-    });
 
-    let allRecords = response.data?.data || response.data || [];
-    if (!Array.isArray(allRecords)) allRecords = [];
-
-    // Filter records for supervisor's employees
-    const employeeIds = new Set(employees.map(e => e._id));
-    const filteredRecords = allRecords.filter((r: AttendanceRecord) => 
-      employeeIds.has(r.employeeId)
-    );
-
-    if (filteredRecords.length === 0) {
       toast.dismiss();
-      toast.warning('No attendance records found for this month');
-      return;
+
+      // Group records by employee
+      const employeeRecordMap = new Map();
+      filteredRecords.forEach((record: AttendanceRecord) => {
+        if (!employeeRecordMap.has(record.employeeId)) {
+          employeeRecordMap.set(record.employeeId, []);
+        }
+        employeeRecordMap.get(record.employeeId).push(record);
+      });
+
+      // Build CSV data
+      const headers = [
+        'Date', 'Employee Name', 'Employee ID', 'Department',
+        'Check In', 'Check Out', 'Total Hours', 'Status', 'Remarks'
+      ];
+
+      const rows: string[][] = [];
+      let totalPresent = 0, totalAbsent = 0, totalHalfDay = 0, totalWeeklyOff = 0, totalLeave = 0;
+
+      // Sort records by date
+      filteredRecords.sort((a: AttendanceRecord, b: AttendanceRecord) =>
+        a.date.localeCompare(b.date)
+      );
+
+      filteredRecords.forEach((record: AttendanceRecord) => {
+        const emp = employees.find(e => e._id === record.employeeId);
+        const status = record.status || 'absent';
+
+        // Count statuses
+        if (status === 'present') totalPresent++;
+        else if (status === 'absent') totalAbsent++;
+        else if (status === 'half-day') totalHalfDay++;
+        else if (status === 'weekly-off') totalWeeklyOff++;
+        else if (status === 'leave') totalLeave++;
+
+        rows.push([
+          record.date,
+          emp?.name || record.employeeName || 'Unknown',
+          emp?.employeeId || 'N/A',
+          emp?.department || 'N/A',
+
+          record.checkInTime ? formatTimeForDisplay(record.checkInTime) : '-',
+          record.checkOutTime ? formatTimeForDisplay(record.checkOutTime) : '-',
+          record.totalHours ? record.totalHours.toFixed(2) : '0',
+          status.replace('-', ' '),
+          record.remarks || ''
+        ]);
+      });
+
+      // Summary row
+      const totalEmployees = employees.length;
+      const totalDays = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0).getDate();
+      const totalRequired = totalEmployees * totalDays;
+
+      const summaryRow = [
+        '=== SUMMARY ===',
+        `Total Employees: ${totalEmployees}`,
+        `Total Days: ${totalDays}`,
+        `Total Required: ${totalRequired}`,
+        `Present: ${totalPresent}`,
+        `Absent: ${totalAbsent}`,
+        `Half Day: ${totalHalfDay}`,
+        `Weekly Off: ${totalWeeklyOff}`,
+        `Leave: ${totalLeave}`,
+        `Attendance Rate: ${totalRequired > 0 ? ((totalPresent / totalRequired) * 100).toFixed(1) + '%' : '0.0%'}`
+      ];
+
+      const emptyRow = headers.map(() => '');
+
+      // Create CSV
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.join(',')),
+        emptyRow.join(','),
+        summaryRow.join(',')
+      ].join('\n');
+
+      // Download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `attendance_${month}_full_month.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success(`Full month data exported successfully!`);
+
+    } catch (error) {
+      console.error('Error exporting full month:', error);
+      toast.dismiss();
+      toast.error('Failed to export full month data');
     }
-
-    toast.dismiss();
-
-    // Group records by employee
-    const employeeRecordMap = new Map();
-    filteredRecords.forEach((record: AttendanceRecord) => {
-      if (!employeeRecordMap.has(record.employeeId)) {
-        employeeRecordMap.set(record.employeeId, []);
-      }
-      employeeRecordMap.get(record.employeeId).push(record);
-    });
-
-    // Build CSV data
-    const headers = [
-      'Date', 'Employee Name', 'Employee ID', 'Department', 'Site',
-      'Check In', 'Check Out', 'Total Hours', 'Status', 'Remarks'
-    ];
-
-    const rows: string[][] = [];
-    let totalPresent = 0, totalAbsent = 0, totalHalfDay = 0, totalWeeklyOff = 0, totalLeave = 0;
-
-    // Sort records by date
-    filteredRecords.sort((a: AttendanceRecord, b: AttendanceRecord) => 
-      a.date.localeCompare(b.date)
-    );
-
-    filteredRecords.forEach((record: AttendanceRecord) => {
-      const emp = employees.find(e => e._id === record.employeeId);
-      const status = record.status || 'absent';
-      
-      // Count statuses
-      if (status === 'present') totalPresent++;
-      else if (status === 'absent') totalAbsent++;
-      else if (status === 'half-day') totalHalfDay++;
-      else if (status === 'weekly-off') totalWeeklyOff++;
-      else if (status === 'leave') totalLeave++;
-
-      rows.push([
-        record.date,
-        emp?.name || record.employeeName || 'Unknown',
-        emp?.employeeId || 'N/A',
-        emp?.department || 'N/A',
-        emp?.siteName || 'N/A',
-        record.checkInTime ? formatTimeForDisplay(record.checkInTime) : '-',
-        record.checkOutTime ? formatTimeForDisplay(record.checkOutTime) : '-',
-        record.totalHours ? record.totalHours.toFixed(2) : '0',
-        status.replace('-', ' '),
-        record.remarks || ''
-      ]);
-    });
-
-    // Summary row
-    const totalEmployees = employees.length;
-    const totalDays = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0).getDate();
-    const totalRequired = totalEmployees * totalDays;
-
-    const summaryRow = [
-      '=== SUMMARY ===',
-      `Total Employees: ${totalEmployees}`,
-      `Total Days: ${totalDays}`,
-      `Total Required: ${totalRequired}`,
-      `Present: ${totalPresent}`,
-      `Absent: ${totalAbsent}`,
-      `Half Day: ${totalHalfDay}`,
-      `Weekly Off: ${totalWeeklyOff}`,
-      `Leave: ${totalLeave}`,
-      `Attendance Rate: ${totalRequired > 0 ? ((totalPresent / totalRequired) * 100).toFixed(1) + '%' : '0.0%'}`
-    ];
-
-    const emptyRow = headers.map(() => '');
-
-    // Create CSV
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(',')),
-      emptyRow.join(','),
-      summaryRow.join(',')
-    ].join('\n');
-
-    // Download
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `attendance_${month}_full_month.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    toast.success(`Full month data exported successfully!`);
-
-  } catch (error) {
-    console.error('Error exporting full month:', error);
-    toast.dismiss();
-    toast.error('Failed to export full month data');
-  }
-};
+  };
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -699,18 +766,16 @@ const fetchSiteShifts = async (siteName: string) => {
             <Button variant="outline" size="sm" onClick={loadAttendanceRecords}>
               <RefreshCw className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="sm" onClick={exportToExcel}>
-              <FileSpreadsheet className="h-4 w-4 mr-1" /> Export
+
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleExportFullMonth}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Export Full Month
             </Button>
-              <Button 
-    variant="default" 
-    size="sm" 
-    onClick={handleExportFullMonth}
-    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
-  >
-    <FileSpreadsheet className="h-4 w-4" />
-    Export Full Month
-  </Button>
           </div>
         </div>
 
@@ -806,10 +871,45 @@ const fetchSiteShifts = async (siteName: string) => {
                         </Badge>
                       )}
                     </div>
-                    <div className="flex gap-1">
-                      <Button variant="outline" size="sm" onClick={() => handleManualAttendance(emp)}>
-                        <FileText className="h-3 w-3" />
-                      </Button>
+                    <div className="flex gap-1 flex-wrap">
+                      {/* 1. Mark Present (If Absent, Half-Day, or Weekly Off) */}
+                      {derived.status === 'absent' || derived.status === 'half-day' || derived.status === 'weekly-off' ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-green-600 border-green-600 hover:bg-green-50"
+                          onClick={() => {
+                            setAttendancePhotoTarget(emp);
+                            setAttendanceCameraOpen(true);
+                          }}
+                        >
+                          <Camera className="h-4 w-4 mr-1" /> Mark Present
+                        </Button>
+                      ) : null}
+
+                      {/* 2. Check Out (If Present and not checked out yet) */}
+                      {derived.status === 'present' && !record?.checkOutTime ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                          onClick={() => {
+                            setCheckoutPhotoTarget(emp);
+                            setCheckoutCameraOpen(true);
+                          }}
+                        >
+                          <Clock className="h-4 w-4 mr-1" /> Check Out
+                        </Button>
+                      ) : null}
+
+                      {/* 3. Checked Out (Already checked out) */}
+                      {record?.checkOutTime ? (
+                        <Button variant="ghost" size="sm" className="text-gray-500 bg-gray-50 cursor-default" disabled>
+                          <Clock className="h-4 w-4 mr-1" /> Done
+                        </Button>
+                      ) : null}
+
+                      {/* 4. Edit (Always visible) */}
                       <Button variant="outline" size="sm" onClick={() => handleStatusUpdate(emp)}>
                         Edit
                       </Button>
@@ -874,7 +974,6 @@ const fetchSiteShifts = async (siteName: string) => {
                   <TableHead>Employee</TableHead>
                   <TableHead>ID</TableHead>
                   <TableHead>Department</TableHead>
-                  <TableHead>Site</TableHead>
                   <TableHead>Check In</TableHead>
                   <TableHead>Check Out</TableHead>
                   <TableHead>Check In Photo</TableHead>
@@ -897,7 +996,6 @@ const fetchSiteShifts = async (siteName: string) => {
                       </TableCell>
                       <TableCell>{emp.employeeId}</TableCell>
                       <TableCell>{emp.department}</TableCell>
-                      <TableCell>{emp.siteName || '-'}</TableCell>
                       <TableCell className="whitespace-nowrap">
                         {record?.checkInTime ? formatTimeForDisplay(record.checkInTime) : '-'}
                       </TableCell>
@@ -946,10 +1044,47 @@ const fetchSiteShifts = async (siteName: string) => {
                         </div>
                       </TableCell>
                       <TableCell className="text-right whitespace-nowrap">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleManualAttendance(emp)}>
-                            <FileText className="h-4 w-4" />
-                          </Button>
+                        <div className="flex justify-end gap-2 flex-wrap">
+                          {/* ✅ DYNAMIC ACTIONS BASED ON STATUS */}
+
+                          {/* 1. If Absent / Half-Day / Weekly-Off -> Show Mark Present */}
+                          {derived.status === 'absent' || derived.status === 'half-day' || derived.status === 'weekly-off' ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-green-600 border-green-600 hover:bg-green-50"
+                              onClick={() => {
+                                setAttendancePhotoTarget(emp);
+                                setAttendanceCameraOpen(true);
+                              }}
+                            >
+                              <Camera className="h-4 w-4 mr-1" /> Mark Present
+                            </Button>
+                          ) : null}
+
+                          {/* 2. If Present (Checked In) -> Show Mark Check Out */}
+                          {derived.status === 'present' && !record?.checkOutTime ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                              onClick={() => {
+                                setCheckoutPhotoTarget(emp);
+                                setCheckoutCameraOpen(true);
+                              }}
+                            >
+                              <Camera className="h-4 w-4 mr-1" /> Check Out
+                            </Button>
+                          ) : null}
+
+                          {/* 3. If Already Checked Out for the day -> Show Disabled Status */}
+                          {record?.checkOutTime ? (
+                            <Button variant="outline" size="sm" className="text-gray-500 bg-gray-50 border-gray-200 cursor-default" disabled>
+                              <Clock className="h-4 w-4 mr-1" /> Checked Out
+                            </Button>
+                          ) : null}
+
+                          {/* ✅ Always show the Edit (Update Status) button */}
                           <Button variant="outline" size="sm" onClick={() => handleStatusUpdate(emp)}>
                             <Save className="h-4 w-4" />
                           </Button>
@@ -962,36 +1097,27 @@ const fetchSiteShifts = async (siteName: string) => {
             </Table>
           </div>
         )}
+        {/* ✅ Quick Photo Capture Dialog */}
+        <CameraCapture
+          open={attendanceCameraOpen}
+          onOpenChange={setAttendanceCameraOpen}
+          onCapture={handleAttendancePhotoCapture}
+          title="Mark Present with Photo"
+          description="Take a photo to verify the employee's presence for today."
+          actionLabel="Confirm Present"
+        />
+        {/* ✅ Checkout Photo Capture Dialog */}
+        <CameraCapture
+          open={checkoutCameraOpen}
+          onOpenChange={setCheckoutCameraOpen}
+          onCapture={handleCheckoutPhotoCapture}
+          title="Check Out with Photo"
+          description="Take a photo to verify the employee's checkout for today."
+          actionLabel="Confirm Check Out"
+        />
       </div>
 
-      {/* Dialogs */}
-      <Dialog open={manualDialogOpen} onOpenChange={setManualDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Manual Attendance – {selectedEmployeeForManual?.name}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div><Label>Check In</Label><Input type="time" value={manualData.checkInTime} onChange={e => setManualData({ ...manualData, checkInTime: e.target.value })} /></div>
-              <div><Label>Check Out</Label><Input type="time" value={manualData.checkOutTime} onChange={e => setManualData({ ...manualData, checkOutTime: e.target.value })} /></div>
-              <div><Label>Break Start</Label><Input type="time" value={manualData.breakStartTime} onChange={e => setManualData({ ...manualData, breakStartTime: e.target.value })} /></div>
-              <div><Label>Break End</Label><Input type="time" value={manualData.breakEndTime} onChange={e => setManualData({ ...manualData, breakEndTime: e.target.value })} /></div>
-            </div>
-            <div>
-              <Label>Status</Label>
-              <Select value={manualData.status} onValueChange={(v: any) => setManualData({ ...manualData, status: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="present">Present</SelectItem>
-                  <SelectItem value="absent">Absent</SelectItem>
-                  <SelectItem value="half-day">Half Day</SelectItem>
-                  <SelectItem value="weekly-off">Weekly Off</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div><Label>Remarks</Label><Textarea value={manualData.remarks} onChange={e => setManualData({ ...manualData, remarks: e.target.value })} /></div>
-          </div>
-          <DialogFooter><Button onClick={submitManualAttendance}>Save</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+
 
       <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
         <DialogContent className="sm:max-w-md">

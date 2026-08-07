@@ -487,51 +487,49 @@ private transformSiteData(data: any): Site | null {
     })).filter(Boolean);
   }
 
-  private transformStatsData(data: any): SiteStats {
-    console.log('🔧 Transforming stats data:', data);
-    
-    // Check if data has the expected structure
-    if (data.totalSites !== undefined) {
-      // Already in correct format
-      return {
-        totalSites: data.totalSites || 0,
-        totalStaff: data.totalStaff || 0,
-        activeSites: data.activeSites || 0,
-        inactiveSites: data.inactiveSites || 0,
-        totalContractValue: data.totalContractValue || 0
-      };
-    }
-    
-    // Try to extract from nested structure
-    if (data.data) {
-      const stats = data.data;
-      return {
-        totalSites: stats.totalSites || 0,
-        totalStaff: stats.totalStaff || 0,
-        activeSites: stats.activeSites || 0,
-        inactiveSites: stats.inactiveSites || 0,
-        totalContractValue: stats.totalContractValue || 0
-      };
-    }
-    
-    // Try to calculate from stats array
-    if (Array.isArray(data.stats)) {
-      const activeStat = data.stats.find((s: any) => s._id === 'active');
-      const inactiveStat = data.stats.find((s: any) => s._id === 'inactive');
-      
-      return {
-        totalSites: data.totalSites || 0,
-        totalStaff: data.totalStaff || 0,
-        activeSites: activeStat?.count || 0,
-        inactiveSites: inactiveStat?.count || 0,
-        totalContractValue: data.stats.reduce((sum: number, stat: any) => 
-          sum + (stat.totalContractValue || 0), 0)
-      };
-    }
-    
-    console.warn('⚠️ Could not parse stats data, returning defaults');
-    return defaultStats;
+private transformStatsData(data: any): SiteStats {
+  console.log('🔧 Transforming stats data:', data);
+
+  // 1. If stats array exists, compute active/inactive from it (most reliable)
+  if (Array.isArray(data.stats)) {
+    const activeStat = data.stats.find((s: any) => s._id === 'active');
+    const inactiveStat = data.stats.find((s: any) => s._id === 'inactive');
+    return {
+      totalSites: data.totalSites || 0,
+      totalStaff: data.totalStaff || 0,
+      activeSites: activeStat?.count || 0,
+      inactiveSites: inactiveStat?.count || 0,
+      totalContractValue: data.stats.reduce((sum: number, stat: any) => 
+        sum + (stat.totalContractValue || 0), 0)
+    };
   }
+
+  // 2. Fallback: if data already has activeSites/inactiveSites directly
+  if (data.activeSites !== undefined || data.inactiveSites !== undefined) {
+    return {
+      totalSites: data.totalSites || 0,
+      totalStaff: data.totalStaff || 0,
+      activeSites: data.activeSites || 0,
+      inactiveSites: data.inactiveSites || 0,
+      totalContractValue: data.totalContractValue || 0
+    };
+  }
+
+  // 3. Try to extract from nested structure (if data.data exists)
+  if (data.data) {
+    const stats = data.data;
+    return {
+      totalSites: stats.totalSites || 0,
+      totalStaff: stats.totalStaff || 0,
+      activeSites: stats.activeSites || 0,
+      inactiveSites: stats.inactiveSites || 0,
+      totalContractValue: stats.totalContractValue || 0
+    };
+  }
+
+  console.warn('⚠️ Could not parse stats data, returning defaults');
+  return defaultStats;
+}
 
   // Utility methods
   private cleanSiteData(data: any): any {

@@ -48,6 +48,9 @@ import assignTaskRoutes from './routes/assignTaskRoutes';
 import siteVisitRoutes from './routes/siteVisitRoutes';
 import incidentRoutes from './routes/incidentRoutes';
 import cleaningPhotoRoutes from './routes/cleaningPhotoRoutes';
+import communicationRoutes from './routes/communicationRoutes';
+// ... other imports ...
+
 
 import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
@@ -632,6 +635,7 @@ app.use('/api/tasks', tasksRoutes);
 app.use('/api/crm/clients', clientRoutes);
 app.use('/api/crm/leads', leadRoutes);
 
+app.use('/api/crm/communications', communicationRoutes);   // <--- ADD THIS LINE
 app.use('/api/admin-leaves', adminLeaveRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/upload', uploadRoutes);

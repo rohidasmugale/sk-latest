@@ -789,8 +789,9 @@ const MobilePayrollCard = ({ item, formatCurrency, index }: any) => {
 const ManagerDashboard = () => {
   const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
   const [employees, setEmployees] = useState<Employee[]>([]);
-  // Dynamic department data based on real employees
-  // Allowed departments in desired display order (always show all, even if zero)
+    const [sites, setSites] = useState<Site[]>([]);
+const departmentData = useMemo(() => {
+  // Define allowed departments (same as services in sites)
   const allowedDepartments = [
     { name: 'Housekeeping', icon: Home, color: 'from-blue-50 to-blue-100 border-blue-200' },
     { name: 'Security', icon: Shield, color: 'from-green-50 to-green-100 border-green-200' },
@@ -800,45 +801,36 @@ const ManagerDashboard = () => {
     { name: 'Other', icon: Droplets, color: 'from-cyan-50 to-cyan-100 border-cyan-200' }
   ];
 
-  // Dynamic department data – always show all allowed departments, count only staff (exclude managers/supervisors)
- const departmentData = useMemo(() => {
-  // Count SITES per department, not employees
-  const departmentSites = new Map<string, Set<string>>();
-
-  employees.forEach(emp => {
-    const deptRaw = emp.department?.trim().toLowerCase() || '';
-    if (!deptRaw) return;
-
-    const mapping: Record<string, string> = {
-      'housekeeping': 'Housekeeping',
-      'security': 'Security',
-      'waste management': 'Waste Management',
-      'parking management': 'Parking Management',
-      'consumables': 'Consumables',
-      'other': 'Other'
-    };
-
-    const allowedDept = mapping[deptRaw] || deptRaw;
-    const siteName = emp.siteName || emp.site || 'Unknown';
-
-    if (!departmentSites.has(allowedDept)) {
-      departmentSites.set(allowedDept, new Set());
-    }
-    departmentSites.get(allowedDept)!.add(siteName);
+  // Count sites per service
+  const deptSiteCounts = new Map<string, Set<string>>();
+  sites.forEach(site => {
+    const services = site.services || [];
+    services.forEach(service => {
+      // Match service to allowed department name (case‑insensitive)
+      const matchedDept = allowedDepartments.find(d =>
+        d.name.toLowerCase() === service.toLowerCase().trim()
+      );
+      const deptName = matchedDept ? matchedDept.name : service;
+      if (!deptSiteCounts.has(deptName)) {
+        deptSiteCounts.set(deptName, new Set());
+      }
+      deptSiteCounts.get(deptName)!.add(site._id);
+    });
   });
 
+  // Build final array in allowed order
   return allowedDepartments.map(dept => {
-    const sites = departmentSites.get(dept.name) || new Set();
+    const siteIds = deptSiteCounts.get(dept.name) || new Set();
     return {
       department: dept.name,
-      total: sites.size,  // ✅ Now counts SITES
-      present: sites.size,
+      total: siteIds.size,
+      present: siteIds.size, // keep for compatibility
       icon: dept.icon,
       color: dept.color,
-      siteNames: Array.from(sites)
+      siteNames: Array.from(siteIds)
     };
   });
-}, [employees]);
+}, [sites]);   // ✅ depends on sites, not employees
 
   const navigate = useNavigate();
 
@@ -847,7 +839,7 @@ const ManagerDashboard = () => {
   const [refreshingAttendance, setRefreshingAttendance] = useState(false);
   const [attendanceError, setAttendanceError] = useState<string | null>(null);
   const [totalEmployeesAssignedToSites, setTotalEmployeesAssignedToSites] = useState(0);
-  const [sites, setSites] = useState<Site[]>([]);
+
   const [siteEmployeeCounts, setSiteEmployeeCounts] = useState<SiteEmployeeCount[]>([]);
 // Attendance marking state
 const [attendance, setAttendance] = useState<AttendanceStatus>({
@@ -876,8 +868,6 @@ const [weeklyOffLoading, setWeeklyOffLoading] = useState(false);
   const [sixDaysStartIndex, setSixDaysStartIndex] = useState(1);
   const [selectedYear, setSelectedYear] = useState('2024');
   const [selectedMonth, setSelectedMonth] = useState('01');
-  const [payrollData, setPayrollData] = useState(generatePayrollData());
-  const [payrollTab, setPayrollTab] = useState('list-view');
   const [selectedSite, setSelectedSite] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);

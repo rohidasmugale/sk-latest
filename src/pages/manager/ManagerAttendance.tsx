@@ -60,6 +60,8 @@ import { siteService, Site } from "@/services/SiteService";
 import axios from "axios";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { exportStyledExcel } from "@/utils/excelExport";
+import * as ExcelJS from "exceljs";
 // API URL
 const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
@@ -132,7 +134,7 @@ interface AttendanceRecord {
   siteName?: string;
   department?: string;
   shift?: string;
-  shiftId?: string; 
+  shiftId?: string;
 
   overtimeHours?: number;
   lateMinutes?: number;
@@ -1287,253 +1289,293 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
     );
   };
 
-  const handleExport = (detailed = false) => {
-    const headers = detailed
-      ? [
-        "Employee ID",
-        "Name",
-        "Department",
-        "Position",
-        "Status",
-        "Check In",
-        "Check Out",
-        "Check In Photo URL",
-        "Check Out Photo URL",
-        "Email",
-        "Phone",
-        "Employee Type",
-        "Shift",
-        "Working Hours",
-        "Reporting Manager",
-        "Date of Joining",
-        "Action",
-        "Remark",
-        "Site",
-        "Date",
-        "Role Type",
-      ]
-      : [
-        "Employee ID",
-        "Name",
-        "Department",
-        "Position",
-        "Status",
-        "Check In",
-        "Check Out",
-        "Has Check In Photo",
-        "Has Check Out Photo",
-        "Action",
-        "Remark",
-        "Site",
-        "Date",
-        "Role Type",
-      ];
-    const rows = filteredEmployees.map((emp) => {
-      const base = [
-        emp.employeeId,
-        emp.name,
-        emp.department,
-        emp.position,
-        emp.status === "weekly-off"
-          ? "Weekly Off"
-          : emp.status === "leave"
-            ? "Leave"
-            : emp.status.charAt(0).toUpperCase() + emp.status.slice(1),
-        emp.checkInTime || "-",
-        emp.checkOutTime || "-",
-        emp.checkInPhoto ? "Yes" : "No",
-        emp.checkOutPhoto ? "Yes" : "No",
-        emp.action || "-",
-        emp.remark || "",
-        emp.site,
-        emp.date,
-        emp.isManager ? "Manager" : emp.isSupervisor ? "Supervisor" : "Staff",
-      ];
-      if (detailed) {
-        return [
-          ...base.slice(0, 8),
-          emp.email || "-",
-          emp.phone || "-",
-          emp.employeeType || "Full-time",
-          emp.shift || "General",
-          emp.workingHours || "9-6",
-          emp.reportingManager || "-",
-          emp.dateOfJoining ? formatDateDisplay(emp.dateOfJoining) : "-",
-          emp.action || "-",
-          emp.remark || "",
-          emp.site,
-          emp.date,
-          emp.isManager ? "Manager" : emp.isSupervisor ? "Supervisor" : "Staff",
-        ];
-      }
-      return base;
-    });
-    const csv = [headers.join(","), ...rows.map((r) => r.map((cell) => `"${cell}"`).join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `employees_${siteData.name}_${detailed ? "details" : "summary"}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
-    toast.success("Exported");
-  };
-
-  // Add this function after handleExport in SiteEmployeeDetails
   const handleExportFullMonth = async () => {
-    if (!siteData || !siteData.employees || siteData.employees.length === 0) {
-      toast.error('No data to export');
-      return;
-    }
-
     try {
-      toast.loading('Fetching full month data...');
+      // 1. Determine the start and end date of the selected month
+      const currentDate = new Date(selectedDate);
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const monthEnd = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
-      // Get the month from startDate
-      const month = siteData.startDate?.substring(0, 7) || new Date().toISOString().substring(0, 7);
-      const monthStart = `${month}-01`;
-      const monthEnd = new Date(
-        parseInt(month.split('-')[0]),
-        parseInt(month.split('-')[1]),
-        0
-      ).toISOString().split('T')[0];
+      setRefreshing(true);
+      toast.loading('Generating professional monthly grid...');
 
-      // Fetch full month data
-      const fullMonthEmployees = await generateEmployeeData(
-        siteData.siteName || siteData.name,
-        monthStart,
-        monthEnd
-      );
+      // 2. Fetch the entire month's data
+      const fullMonthEmployees = await generateEmployeeData(siteName, monthStart, monthEnd);
 
-      if (!fullMonthEmployees || fullMonthEmployees.length === 0) {
+      // 3. Filter by department if currently in 'department' view
+      let filtered = fullMonthEmployees;
+      if (viewType === 'department' && department) {
+        const targetDept = department.trim().toLowerCase();
+        filtered = fullMonthEmployees.filter(emp =>
+          (emp.department || '').trim().toLowerCase() === targetDept
+        );
+      }
+
+      if (filtered.length === 0) {
         toast.dismiss();
-        toast.error('No data found for this month');
+        toast.error('No data found for the selected month/department.');
+        setRefreshing(false);
         return;
       }
 
-      toast.dismiss();
+      // 4. Group the daily data by Employee ID
+      const employeeMap = new Map<string, { name: string; data: Map<string, string> }>();
+      filtered.forEach(emp => {
+        const key = emp.employeeId || emp.id || emp.name;
+        if (!employeeMap.has(key)) {
+          employeeMap.set(key, { name: emp.name, data: new Map() });
+        }
+        employeeMap.get(key)!.data.set(emp.date, emp.status);
+      });
 
-      // Group employees by employeeId
-      const uniqueEmployees = new Map();
-      fullMonthEmployees.forEach((emp: any) => {
-        if (emp.employeeId && !uniqueEmployees.has(emp.employeeId)) {
-          uniqueEmployees.set(emp.employeeId, {
-            employeeId: emp.employeeId,
-            name: emp.name,
-            department: emp.department,
-            position: emp.position,
-            isManager: emp.isManager || false,
-            isSupervisor: emp.isSupervisor || false,
-            site: emp.site || siteData.siteName || siteData.name,
-          });
+      // 5. Sort employees alphabetically by name
+      const sortedEmployees = Array.from(employeeMap.entries())
+        .map(([id, info]) => ({ id, ...info }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      // 6. Generate the column headers (01, 02, 03...)
+      const daysArray = Array.from({ length: lastDay }, (_, i) => String(i + 1).padStart(2, '0'));
+      const numDays = daysArray.length;
+
+      // 7. Create the ExcelJS Workbook and Worksheet
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet('Attendance Grid');
+
+      // Define fixed column widths
+      ws.getColumn(1).width = 6;   // SR NO
+      ws.getColumn(2).width = 25;  // NAME
+      for (let i = 3; i <= 2 + numDays; i++) {
+        ws.getColumn(i).width = 5; // Days 01-31
+      }
+      ws.getColumn(3 + numDays).width = 12; // Total Duty
+      ws.getColumn(4 + numDays).width = 6;  // W/O
+      ws.getColumn(5 + numDays).width = 6;  // PH
+      ws.getColumn(6 + numDays).width = 8;  // Total
+
+      // 8. Build the Headers row
+      const headers = ['SR NO', 'NAME', ...daysArray, 'Total Duty', 'W/O', 'PH', 'Total'];
+      const headerRow = ws.getRow(1);
+      headerRow.values = headers;
+      headerRow.height = 20;
+      headerRow.eachCell(cell => {
+        cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0E2568' } }; // Dark Navy Blue
+      });
+
+      // 9. Build the Data Rows
+      let srNo = 1;
+      const dateKeys = daysArray.map(d => `${year}-${String(month + 1).padStart(2, '0')}-${d}`);
+      let currentRow = 2;
+
+      // Variables for Grand Totals
+      let grandTotalDuty = 0;
+      let grandTotalWO = 0;
+
+      sortedEmployees.forEach(emp => {
+        const row = ws.getRow(currentRow);
+        row.getCell(1).value = srNo++;
+        row.getCell(2).value = emp.name;
+        row.getCell(2).alignment = { horizontal: 'left', vertical: 'middle' };
+
+        let totalDuty = 0;
+        let totalWO = 0;
+
+        dateKeys.forEach((dateKey, index) => {
+          const status = emp.data.get(dateKey) || 'absent';
+          const cell = row.getCell(3 + index);
+
+          if (status === 'present' || status === 'half-day') {
+            cell.value = '1';
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1C62C2' } }; // Bold Blue
+            cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+            totalDuty++;
+          } else if (status === 'weekly-off') {
+            cell.value = 'WO';
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE9E9E9' } }; // Light Grey
+            cell.font = { color: { argb: 'FF333333' }, bold: true };
+            totalWO++;
+          } else {
+            // Absent or Leave
+            cell.value = 'A';
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3C7C7' } }; // Pastel Red/Pink
+            cell.font = { color: { argb: 'FF8B0000' }, bold: true };
+          }
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        });
+
+        // Row Totals at the end
+        row.getCell(3 + numDays).value = totalDuty;
+        row.getCell(4 + numDays).value = totalWO;
+        row.getCell(5 + numDays).value = 0; // PH fixed
+        row.getCell(6 + numDays).value = totalDuty + totalWO; // Total = Duty + WO
+
+        grandTotalDuty += totalDuty;
+        grandTotalWO += totalWO;
+
+        // Apply borders and alignment to totals
+        for (let i = 3 + numDays; i <= 6 + numDays; i++) {
+          const cell = row.getCell(i);
+          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.font = { name: 'Arial', size: 10, bold: true };
+        }
+        currentRow++;
+      });
+
+      // 10. Calculate and build the Bottom Daily Summary Rows (PRESENT, WEEKLY OFF, COMPANY OFF, TOTAL, DEPLOYMENT, EXTRAS)
+      const summaryStartRow = currentRow + 1;
+
+      const presentRow = ws.getRow(summaryStartRow);
+      const weeklyOffRow = ws.getRow(summaryStartRow + 1);
+      const companyOffRow = ws.getRow(summaryStartRow + 2);
+      const totalRow = ws.getRow(summaryStartRow + 3);
+      const deploymentRow = ws.getRow(summaryStartRow + 4);
+      const extrasRow = ws.getRow(summaryStartRow + 5);
+
+      // Set labels
+      const summaryLabels = ['PRESENT', 'WEEKLY OFF', 'COMPANY OFF', 'TOTAL', 'DEPLOYMENT', 'EXTRAS'];
+      [presentRow, weeklyOffRow, companyOffRow, totalRow, deploymentRow, extrasRow].forEach((row, idx) => {
+        row.getCell(1).value = summaryLabels[idx];
+        row.getCell(1).font = { name: 'Arial', size: 10, bold: true };
+      });
+
+      // Fetch the stored Daily Requirement
+      const dailyRequirement = siteData?.dailyRequirement || siteData?.deploymentStats?.dailyStaffRequirement || 0;
+
+      // Monthly totals for the Summary rows
+      let sumPresent = 0;
+      let sumWO = 0;
+      let sumCO = 0;
+      let sumTotal = 0;
+      let sumDeployment = 0;
+      let sumExtras = 0;
+
+      // Loop through date columns to sum them up
+      for (let col = 3; col < 3 + numDays; col++) {
+        let presentCount = 0;
+        let woCount = 0;
+        for (let r = 2; r < currentRow; r++) {
+          const val = ws.getRow(r).getCell(col).value;
+          if (val === '1') presentCount++;
+          if (val === 'WO') woCount++;
+        }
+        presentRow.getCell(col).value = presentCount;
+        weeklyOffRow.getCell(col).value = woCount;
+        companyOffRow.getCell(col).value = 0;
+        totalRow.getCell(col).value = presentCount + woCount;
+        deploymentRow.getCell(col).value = dailyRequirement;
+        extrasRow.getCell(col).value = presentCount - dailyRequirement;
+
+        // Accumulate for Grand Monthly Totals
+        sumPresent += presentCount;
+        sumWO += woCount;
+        sumCO += 0;
+        sumTotal += (presentCount + woCount);
+        sumDeployment += dailyRequirement;
+        sumExtras += (presentCount - dailyRequirement);
+      }
+
+      // Add Monthly Totals to the last column of Summary rows
+      const totalColIndex = 3 + numDays;
+      presentRow.getCell(totalColIndex).value = sumPresent;
+      weeklyOffRow.getCell(totalColIndex).value = sumWO;
+      companyOffRow.getCell(totalColIndex).value = sumCO;
+      totalRow.getCell(totalColIndex).value = sumTotal;
+      deploymentRow.getCell(totalColIndex).value = sumDeployment;
+      extrasRow.getCell(totalColIndex).value = sumExtras;
+
+      // 11. Style the Bottom Daily Summary Rows
+      const summaryRows = [presentRow, weeklyOffRow, companyOffRow, totalRow, deploymentRow, extrasRow];
+      summaryRows.forEach(row => {
+        row.eachCell((cell) => {
+          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.font = { name: 'Arial', size: 10 };
+        });
+      });
+
+      // 12. Build the Professional Grand Totals Block (Yellow & Green)
+      const grandTotalRowIndex = summaryStartRow + 7;
+      const grandTotalRow = ws.getRow(grandTotalRowIndex);
+      grandTotalRow.getCell(2).value = 'GRAND TOTALS';
+
+      // Populate Grand Totals (Yellow)
+      grandTotalRow.getCell(3 + numDays).value = grandTotalDuty;
+      grandTotalRow.getCell(4 + numDays).value = grandTotalWO;
+      grandTotalRow.getCell(5 + numDays).value = 0;
+      grandTotalRow.getCell(6 + numDays).value = grandTotalDuty + grandTotalWO;
+
+      // Style the Grand Total Row (YELLOW)
+      grandTotalRow.eachCell((cell, col) => {
+        if (col >= 2) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } }; // Bright Yellow
+          cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF000000' } };
+          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
         }
       });
 
-      // Count attendance per employee
-      const attendanceCounts = new Map();
-      fullMonthEmployees.forEach((emp: any) => {
-        const key = emp.employeeId || emp.id;
-        if (!attendanceCounts.has(key)) {
-          attendanceCounts.set(key, { present: 0, absent: 0, weeklyOff: 0, leave: 0, total: 0 });
+      // 13. Build the Extras Summary (Green)
+      const grandExtrasRowIndex = grandTotalRowIndex + 1;
+      const grandExtrasRow = ws.getRow(grandExtrasRowIndex);
+      grandExtrasRow.getCell(2).value = 'TOTAL EXTRAS';
+
+      // Totals = Sum of all Daily Extras
+      grandExtrasRow.getCell(6 + numDays).value = sumExtras; // Monthly total extras
+
+      // Style the Extras Summary Row (GREEN)
+      grandExtrasRow.eachCell((cell, col) => {
+        if (col >= 2) {
+          // If Extras is negative, style it red. If positive, style it green.
+          const val = cell.value;
+          if (col === 6 + numDays && typeof val === 'number' && val >= 0) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4EDDA' } }; // Pastel Green for positive extras
+            cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF155724' } };
+          } else if (col === 6 + numDays && typeof val === 'number' && val < 0) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8D7DA' } }; // Pastel Red for negative extras
+            cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF721C24' } };
+          } else {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4EDDA' } }; // Default Green
+            cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF155724' } };
+          }
+          cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
         }
-        const counts = attendanceCounts.get(key);
-        counts.total++;
-        if (emp.status === 'present') counts.present++;
-        else if (emp.status === 'weekly-off') counts.weeklyOff++;
-        else if (emp.status === 'leave') counts.leave++;
-        else counts.absent++;
       });
 
-      const daysInMonth = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0).getDate();
+      // 14. Freeze the header row
+      ws.views = [{ state: 'frozen', ySplit: 1 }];
 
-      let totalPresent = 0, totalAbsent = 0, totalWeeklyOff = 0, totalLeave = 0;
-      let totalManagers = 0, totalSupervisors = 0, totalStaff = 0;
-
-      const rows: string[][] = [];
-
-      uniqueEmployees.forEach((emp: any) => {
-        const counts = attendanceCounts.get(emp.employeeId) || { present: 0, absent: 0, weeklyOff: 0, leave: 0, total: 0 };
-        if (emp.isManager) totalManagers++;
-        else if (emp.isSupervisor) totalSupervisors++;
-        else totalStaff++;
-
-        totalPresent += counts.present;
-        totalAbsent += counts.absent;
-        totalWeeklyOff += counts.weeklyOff;
-        totalLeave += counts.leave;
-
-        const attendanceRate = daysInMonth > 0 ? ((counts.present / daysInMonth) * 100).toFixed(1) + '%' : '0.0%';
-
-        rows.push([
-          `"${emp.employeeId}"`,
-          `"${emp.name}"`,
-          `"${emp.department}"`,
-          `"${emp.position}"`,
-          `"${emp.isManager ? 'Manager' : emp.isSupervisor ? 'Supervisor' : 'Staff'}"`,
-          counts.present.toString(),
-          counts.absent.toString(),
-          counts.weeklyOff.toString(),
-          counts.leave.toString(),
-          daysInMonth.toString(),
-          attendanceRate
-        ]);
-      });
-
-      rows.sort((a, b) => a[1].localeCompare(b[1]));
-
-      const headers = [
-        'Employee ID', 'Employee Name', 'Department', 'Position', 'Role',
-        'Present', 'Absent', 'Weekly Off', 'Leave', 'Total Working Days', 'Attendance Rate'
-      ];
-
-      const totalEmployees = uniqueEmployees.size;
-      const totalRequired = totalEmployees * daysInMonth;
-      const totalAbsentAll = totalAbsent + totalLeave;
-      const overallRate = totalRequired > 0 ? ((totalPresent / totalRequired) * 100).toFixed(1) + '%' : '0.0%';
-
-      const summaryRow = [
-        `"📊 GRAND TOTAL"`,
-        `"${siteData.siteName || siteData.name}"`,
-        `"All Departments"`,
-        `"${totalEmployees} Employees"`,
-        `"M:${totalManagers} S:${totalSupervisors} St:${totalStaff}"`,
-        totalPresent.toString(),
-        totalAbsentAll.toString(),
-        totalWeeklyOff.toString(),
-        totalLeave.toString(),
-        totalRequired.toString(),
-        overallRate
-      ];
-
-      const emptyRow = headers.map(() => '');
-
-      const csvContent = [
-        headers.join(','),
-        ...rows.map(row => row.join(',')),
-        emptyRow.join(','),
-        ['=== SUMMARY ===', '', '', '', '', '', '', '', '', '', ''],
-        summaryRow.join(',')
-      ].join('\n');
-
-      const filename = `Attendance_${(siteData.siteName || siteData.name).replace(/\s/g, '_')}_${month}.csv`;
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
+      // 15. Download the .xlsx file
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', filename);
-      link.style.visibility = 'hidden';
+      const link = document.createElement('a');
+      link.href = url;
+      const fileName = `Attendance_Grid_${siteName}_${monthStart}.xlsx`;
+      link.download = fileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      toast.success(`Full month data exported to ${filename} with summary`);
-
-    } catch (error) {
-      console.error('Error exporting full month:', error);
       toast.dismiss();
-      toast.error('Failed to export full month data');
+      toast.success(`Professional colorful grid exported successfully!`);
+    } catch (error) {
+      toast.dismiss();
+      toast.error('Failed to export monthly grid');
+      console.error(error);
+    } finally {
+      setRefreshing(false);
     }
   };
+
 
   const handleViewPhoto = (photoUrl: string | null | undefined, type: "checkin" | "checkout") => {
     if (photoUrl) {
@@ -2226,13 +2268,7 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
           <Button variant="outline" size="sm" onClick={refreshEmployeeData} disabled={refreshing}>
             <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button variant="outline" size="sm" onClick={() => handleExport(false)}>
-            <Download className="h-4 w-4 mr-1" /> Summary
-          </Button>
-          <Button variant="default" size="sm" onClick={() => handleExport(true)}>
-            <FileText className="h-4 w-4 mr-1" /> Details
-          </Button>
-          {/* ✅ ADD THIS BUTTON */}
+
           <Button
             variant="default"
             size="sm"
@@ -2373,7 +2409,7 @@ const ManagerAttendanceView = () => {
   const initialSelectedSiteId = searchParams.get('selectedSiteId') || '';
 
   const [viewType, setViewType] = useState<'site' | 'department'>(initialViewType as 'site' | 'department');
-  const [selectedDepartment, setSelectedDepartment] = useState(initialDepartment);
+  const [selectedService, setSelectedService] = useState(initialDepartment);
   const [startDate, setStartDate] = useState(initialStartDate);
   const [endDate, setEndDate] = useState(initialEndDate);
   const [searchTerm, setSearchTerm] = useState('');
@@ -2415,7 +2451,8 @@ const ManagerAttendanceView = () => {
     if (sites.length > 0) {
       calculateDisplayData(sites);
     }
-  }, [startDate, endDate, viewType, selectedDepartment]);
+  }, [sites, viewType, selectedService, startDate, endDate]);
+
   useEffect(() => {
     const checkMobile = () => setIsMobileSiteView(window.innerWidth < 768);
     checkMobile();
@@ -2618,100 +2655,72 @@ const ManagerAttendanceView = () => {
       isRealData: employeeData.length > 0 && employeeData[0]?.employeeId?.startsWith?.('DEMO') === false
     };
   };
-  // Calculate display data – unchanged
-  // ✅ NEW - Fetch once, filter in memory
-  const calculateDisplayData = async (sitesData: Site[]) => {
-    try {
-      setRefreshing(true);
+  const calculateDisplayData = useCallback(
+    async (sitesData: Site[]) => {
+      try {
+        setRefreshing(true);
+        let filteredSites = sitesData;
+        if (viewType === 'department' && selectedService) {
+          const serviceLower = selectedService.toLowerCase().trim();
+          filteredSites = sitesData.filter(site =>
+            (site.services || []).some(s => s.toLowerCase().trim() === serviceLower)
+          );
+        }
 
-      // STEP 1: Fetch ALL employees ONCE
-      const allEmployees = await fetchEmployees();
-      console.log(`📊 Fetched ${allEmployees.length} employees once`);
-
-      // STEP 2: Fetch ALL attendance ONCE for the date range
-      const attendanceRecords = await fetchAttendanceRecords(startDate, endDate);
-      console.log(`📊 Fetched ${attendanceRecords.length} attendance records once`);
-
-      // STEP 3: Build lookup map for O(1) access
-      const attendanceMap = new Map<string, any>();
-      attendanceRecords.forEach(record => {
-        attendanceMap.set(`${record.employeeId}_${record.date}`, record);
-      });
-
-      // STEP 4: Process each site using already-fetched data
-      const calculatedData = [];
-      for (const site of sitesData) {
-        // Filter employees for this site
-        const siteEmployees = allEmployees.filter(
-          emp => emp.site === site.name || emp.siteName === site.name
+        const calculatedData = [];
+        for (const site of filteredSites) {
+          const siteData = await calculateSiteAttendanceData(site, startDate, endDate);
+          if (!siteData.employees) siteData.employees = [];
+          calculatedData.push(siteData);
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        setDisplayData(calculatedData);
+      } catch (error) {
+        console.error('Error calculating display data:', error);
+        setDisplayData(
+          sitesData.map(site => ({
+            ...site,
+            employees: [],
+            isRealData: false,
+            daysInPeriod: calculateDaysBetween(startDate, endDate),
+            startDate,
+            endDate,
+            dailyRequirement: 0,
+            totalEmployees: 0,
+            totalRequiredForPeriod: 0,
+            totalPresent: 0,
+            totalWeeklyOff: 0,
+            totalLeave: 0,
+            totalAbsent: 0,
+            deploymentStats: {
+              totalStaff: 0,
+              managerCount: 0,
+              supervisorCount: 0,
+              staffCount: 0,
+              managerRequirement: site.managerCount || 0,
+              supervisorRequirement: site.supervisorCount || 0,
+              staffRequirement: 0,
+              dailyStaffRequirement: 0,
+              totalStaffRequirementForPeriod: 0,
+              isStaffFull: false,
+              remainingStaff: 0,
+            },
+          }))
         );
-
-        // Calculate stats using in-memory data
-        const siteData = calculateSiteAttendanceFromMemory(
-          site,
-          siteEmployees,
-          attendanceMap,
-          startDate,
-          endDate
-        );
-
-        if (!siteData.employees) siteData.employees = [];
-        calculatedData.push(siteData);
-        // ✅ REMOVED the setTimeout delay!
+      } finally {
+        setRefreshing(false);
       }
+    },
+    [viewType, selectedService, startDate, endDate] // ✅ dependencies
+  );
 
-      setDisplayData(calculatedData);
-      console.log(`✅ Calculated ${calculatedData.length} sites in memory (0 API calls)`);
-
-    } catch (error) {
-      console.error('Error calculating display data:', error);
-      // Fallback to demo data
-      setDisplayData(
-        sitesData.map(site => ({
-          ...site,
-          employees: [],
-          isRealData: false,
-          daysInPeriod: calculateDaysBetween(startDate, endDate),
-          startDate,
-          endDate,
-          dailyRequirement: 0,
-          totalEmployees: 0,
-          totalRequiredForPeriod: 0,
-          totalPresent: 0,
-          totalWeeklyOff: 0,
-          totalLeave: 0,
-          totalAbsent: 0,
-          deploymentStats: {
-            totalStaff: 0,
-            managerCount: 0,
-            supervisorCount: 0,
-            staffCount: 0,
-            managerRequirement: site.managerCount || 0,
-            supervisorRequirement: site.supervisorCount || 0,
-            staffRequirement: 0,
-            dailyStaffRequirement: 0,
-            totalStaffRequirementForPeriod: 0,
-            isStaffFull: false,
-            remainingStaff: 0,
-          },
-        }))
-      );
-    } finally {
-      setRefreshing(false);
-    }
-  };
 
   // Initial data fetch – unchanged
   useEffect(() => {
     fetchSitesData();
   }, []);
 
-  // Recalculate data when filters change – unchanged
-  useEffect(() => {
-    if (sites.length > 0) {
-      calculateDisplayData(sites);
-    }
-  }, [viewType, selectedDepartment, startDate, endDate]);
+
 
   const daysInPeriod = useMemo(() => {
     if (!startDate || !endDate) return 1;
@@ -2817,239 +2826,6 @@ const ManagerAttendanceView = () => {
     return filteredData.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredData, currentPage, itemsPerPage]);
 
-  const handleExportToExcel = () => {
-    if (filteredData.length === 0) {
-      toast.error('No data to export');
-      return;
-    }
-    const headers = [
-      'Site Name',
-      'Department',
-      'Period',
-      'Days',
-      'Daily Staff Requirement',
-      'Total Required',
-      'Weekly Off (Staff)',
-      'On Site Requirement',
-      'Total Present (Staff)',
-      'Leave (Staff)',
-      'Absent (Staff)',
-      'Managers',
-      'Supervisors',
-      'Total Staff',
-      'Attendance Rate',
-      'Data Source',
-    ];
-    const filename =
-      viewType === 'department'
-        ? `Attendance_${selectedDepartment}_${startDate}_to_${endDate}.csv`
-        : `Sitewise_Attendance_${startDate}_to_${endDate}.csv`;
-    const csvContent = [
-      headers.join(','),
-      ...filteredData.map(item => {
-        const dailyRequirement = item.dailyRequirement || 0;
-        const totalRequired =
-          item.totalRequiredForPeriod || item.durationTotalRequired || dailyRequirement * daysInPeriod;
-        const weeklyOff = item.totalWeeklyOff || item.weeklyOffCount || 0;
-        const onSiteRequirement = totalRequired - weeklyOff;
-        const present = item.totalPresent || item.presentCount || 0;
-        const leave = item.totalLeave || item.leaveCount || 0;
-        const absent = item.totalAbsent || item.absentCount || 0;
-        const managers = item.deploymentStats?.managerCount || 0;
-        const supervisors = item.deploymentStats?.supervisorCount || 0;
-        const staff = item.deploymentStats?.staffCount || 0;
-        const rate = totalRequired > 0 ? ((present / totalRequired) * 100).toFixed(1) + '%' : '0.0%';
-        const dataSource = item.isRealData ? 'Real Data' : 'Demo Data';
-        return [
-          `"${item.siteName || item.name}"`,
-          `"${viewType === 'department' ? selectedDepartment : 'General'}"`,
-          `"${item.startDate} to ${item.endDate}"`,
-          item.daysInPeriod,
-          dailyRequirement,
-          totalRequired,
-          weeklyOff,
-          onSiteRequirement,
-          present,
-          leave,
-          absent,
-          managers,
-          supervisors,
-          staff,
-          rate,
-          dataSource,
-        ].join(',');
-      }),
-    ].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', filename);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }
-    toast.success(`Data exported to ${filename}`);
-  };
-
-  const handleExportFullMonth = () => {
-    // Get the month from startDate
-    const month = startDate.substring(0, 7); // YYYY-MM
-    const monthStart = `${month}-01`;
-    const monthEnd = new Date(
-      parseInt(month.split('-')[0]),
-      parseInt(month.split('-')[1]),
-      0
-    ).toISOString().split('T')[0];
-
-    // Re-fetch data for full month
-    const fetchFullMonthData = async () => {
-      try {
-        setRefreshing(true);
-        toast.loading('Fetching full month data...');
-
-        const fullMonthData = [];
-        for (const site of sites) {
-          let siteData;
-          if (viewType === 'department' && selectedDepartment) {
-            siteData = await calculateDepartmentSiteData(site, monthStart, monthEnd, selectedDepartment);
-          } else {
-            siteData = await calculateSiteAttendanceData(site, monthStart, monthEnd);
-          }
-          fullMonthData.push(siteData);
-        }
-
-        toast.dismiss();
-
-        const dataToExport = fullMonthData;
-        if (dataToExport.length === 0) {
-          toast.error('No data to export');
-          return;
-        }
-
-        const filename = viewType === 'department'
-          ? `Attendance_${selectedDepartment}_${month}.csv`
-          : `Sitewise_Attendance_${month}.csv`;
-
-        const headers = [
-          'Site Name', 'Department', 'Period', 'Days',
-          'Daily Staff Requirement', 'Total Required', 'Weekly Off (Staff)',
-          'On Site Requirement', 'Total Present (Staff)', 'Leave (Staff)',
-          'Absent (Staff)', 'Managers', 'Supervisors', 'Total Staff',
-          'Attendance Rate', 'Data Source'
-        ];
-
-        const rows = dataToExport.map(item => {
-          const dailyRequirement = item.dailyRequirement || 0;
-          const totalRequired = item.totalRequiredForPeriod || item.durationTotalRequired || dailyRequirement * 30;
-          const weeklyOff = item.totalWeeklyOff || item.weeklyOffCount || 0;
-          const onSiteRequirement = totalRequired - weeklyOff;
-          const present = item.totalPresent || item.presentCount || 0;
-          const leave = item.totalLeave || item.leaveCount || 0;
-          const absent = item.totalAbsent || item.absentCount || 0;
-          const managers = item.deploymentStats?.managerCount || 0;
-          const supervisors = item.deploymentStats?.supervisorCount || 0;
-          const staff = item.deploymentStats?.staffCount || 0;
-          const rate = totalRequired > 0 ? ((present / totalRequired) * 100).toFixed(1) + '%' : '0.0%';
-          const dataSource = item.isRealData ? 'Real Data' : 'Demo Data';
-          return [
-            `"${item.siteName || item.name}"`,
-            `"${viewType === 'department' ? selectedDepartment : 'General'}"`,
-            `"${monthStart} to ${monthEnd}"`,
-            item.daysInPeriod || 30,
-            dailyRequirement,
-            totalRequired,
-            weeklyOff,
-            onSiteRequirement,
-            present,
-            leave,
-            absent,
-            managers,
-            supervisors,
-            staff,
-            rate,
-            dataSource
-          ];
-        });
-
-        // Summary Row
-        const totalRequiredAll = dataToExport.reduce((sum, item) =>
-          sum + (item.totalRequiredForPeriod || item.durationTotalRequired || 0), 0
-        );
-        const totalPresentAll = dataToExport.reduce((sum, item) =>
-          sum + (item.totalPresent || item.presentCount || 0), 0
-        );
-        const totalLeaveAll = dataToExport.reduce((sum, item) =>
-          sum + (item.totalLeave || item.leaveCount || 0), 0
-        );
-        const totalAbsentAll = dataToExport.reduce((sum, item) =>
-          sum + (item.totalAbsent || item.absentCount || 0), 0
-        );
-        const totalWeeklyOffAll = dataToExport.reduce((sum, item) =>
-          sum + (item.totalWeeklyOff || item.weeklyOffCount || 0), 0
-        );
-        const overallRate = totalRequiredAll > 0
-          ? ((totalPresentAll / totalRequiredAll) * 100).toFixed(1) + '%'
-          : '0.0%';
-
-        const summaryRow = [
-          `"📊 GRAND TOTAL"`,
-          `"${viewType === 'department' ? selectedDepartment : 'All'}"`,
-          `"${monthStart} to ${monthEnd}"`,
-          dataToExport.reduce((sum, item) => sum + (item.daysInPeriod || 30), 0),
-          dataToExport.reduce((sum, item) => sum + (item.dailyRequirement || 0), 0),
-          totalRequiredAll,
-          totalWeeklyOffAll,
-          totalRequiredAll - totalWeeklyOffAll,
-          totalPresentAll,
-          totalLeaveAll,
-          totalAbsentAll,
-          dataToExport.reduce((sum, item) => sum + (item.deploymentStats?.managerCount || 0), 0),
-          dataToExport.reduce((sum, item) => sum + (item.deploymentStats?.supervisorCount || 0), 0),
-          dataToExport.reduce((sum, item) => sum + (item.deploymentStats?.staffCount || 0), 0),
-          overallRate,
-          'SUMMARY'
-        ];
-
-        const emptyRow = headers.map(() => '');
-
-        const csvContent = [
-          headers.join(','),
-          ...rows.map(row => row.join(',')),
-          emptyRow.join(','),
-          ['=== SUMMARY ===', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-          summaryRow.join(',')
-        ].join('\n');
-
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', filename);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-
-        toast.success(`Full month data exported to ${filename} with summary`);
-      } catch (error) {
-        toast.dismiss();
-        toast.error('Failed to fetch full month data');
-        console.error(error);
-      } finally {
-        setRefreshing(false);
-      }
-    };
-
-    fetchFullMonthData();
-  };
-  const handleBack = () => {
-    navigate('/superadmin/dashboard');
-  };
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -3059,11 +2835,11 @@ const ManagerAttendanceView = () => {
     setViewType(newViewType);
     setCurrentPage(1);
     if (newViewType === 'site') {
-      setSelectedDepartment('');
-    } else if (newViewType === 'department' && !selectedDepartment) {
+      setSelectedService('');
+    } else if (newViewType === 'department' && !selectedService) {
       // Fallback – set to first department from stats if available
       const firstDept = departmentStats[0]?.department || '';
-      setSelectedDepartment(firstDept);
+      setSelectedService(firstDept);
     }
   };
 
@@ -3073,7 +2849,7 @@ const ManagerAttendanceView = () => {
     setShowSiteDetails(true);
     const params = new URLSearchParams();
     params.set('view', viewType);
-    if (viewType === 'department') params.set('department', selectedDepartment);
+    if (viewType === 'department') params.set('department', selectedService);
     params.set('startDate', startDate);
     params.set('endDate', endDate);
     params.set('siteDetails', 'true');
@@ -3086,7 +2862,7 @@ const ManagerAttendanceView = () => {
     setSelectedSite(null);
     const params = new URLSearchParams();
     params.set('view', viewType);
-    if (viewType === 'department') params.set('department', selectedDepartment);
+    if (viewType === 'department') params.set('department', selectedService);
     params.set('startDate', startDate);
     params.set('endDate', endDate);
     navigate(`?${params.toString()}`, { replace: true });
@@ -3216,7 +2992,7 @@ const ManagerAttendanceView = () => {
         siteData={selectedSite}
         onBack={handleBackFromDetails}
         viewType={viewType}
-        department={selectedDepartment}
+        department={selectedService}
       />
     );
   }
@@ -3263,7 +3039,7 @@ const ManagerAttendanceView = () => {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
                 {viewType === 'department'
-                  ? `${selectedDepartment} Department Attendance`
+                  ? `${selectedService} Department Attendance`
                   : 'Site-wise Attendance Overview'}
               </h1>
             </div>
@@ -3322,38 +3098,9 @@ const ManagerAttendanceView = () => {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <CardTitle>
                 {viewType === 'department'
-                  ? `${selectedDepartment} Sites Attendance - Cumulative Totals (${daysInPeriod} days)`
+                  ? `${selectedService} Sites Attendance - Cumulative Totals (${daysInPeriod} days)`
                   : `All Sites Attendance - Cumulative Totals (${daysInPeriod} days)`}
               </CardTitle>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRefreshAll}
-                  disabled={refreshing || loading}
-                >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
-                  Data
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleExportToExcel}
-                  disabled={filteredData.length === 0}
-                >
-                  <Download className="h-4 w-4 mr-2" /> Export to Excel
-                </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={handleExportFullMonth}
-                  disabled={filteredData.length === 0}
-                  className="flex items-center gap-2"
-                >
-                  <FileSpreadsheet className="h-4 w-4" />
-                  Export Full Month
-                </Button>
-              </div>
             </div>
           </CardHeader>
           <CardContent>

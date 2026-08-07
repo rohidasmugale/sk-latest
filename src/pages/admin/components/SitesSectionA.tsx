@@ -18,13 +18,13 @@ import { FormField } from "./sharedA";
 import { siteService, Site, Client, SiteStats, CreateSiteRequest } from "@/services/SiteService";
 import { crmService } from "@/services/crmService";
 import * as XLSX from "xlsx";
-
-// Define Services and Roles
 const ServicesList = [
   "Housekeeping",
   "Security",
   "Parking",
-  "Waste Management"
+  "Waste Management",
+  "Consumables",
+  "Other"
 ];
 
 const StaffRoles = [
