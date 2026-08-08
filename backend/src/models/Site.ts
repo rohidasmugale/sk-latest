@@ -70,7 +70,7 @@ const SiteSchema: Schema = new Schema(
     },
     clientName: {
       type: String,
-      required: [true, 'Client name is required'],
+      required: false,
       trim: true
     },
     location: {

@@ -579,8 +579,7 @@ const generateEmployeeData = async (
       const availableSites = [...new Set(
         allEmployees.map(e => (e.site || e.siteName || '').trim()).filter(Boolean)
       )];
-      console.error(`❌ No employees found for site "${siteName}". Available sites:`, availableSites);
-      toast.error(`No employees found for site "${siteName}"`);
+
       return [];
     }
 
@@ -1048,6 +1047,10 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
   const getDerivedAttendanceStatus = (employee: any) => {
     const status = employee.status;
     const checkInTime = employee.checkInTime;
+    if (employee.isManual) {
+    // Keep the status as is, but force isLate = false
+    return { status, isLate: false };
+  }
     if (status === 'weekly-off' || status === 'leave') {
       return { status, isLate: false };
     }

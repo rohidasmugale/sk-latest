@@ -996,6 +996,10 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
   const getDerivedAttendanceStatus = (employee: any) => {
     const status = employee.status;
     const checkInTime = employee.checkInTime;
+    if (employee.isManual) {
+    // Keep the status as is, but force isLate = false
+    return { status, isLate: false };
+  }
     if (status === 'weekly-off' || status === 'leave') {
       return { status, isLate: false };
     }

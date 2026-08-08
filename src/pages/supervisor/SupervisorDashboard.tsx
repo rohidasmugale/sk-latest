@@ -589,7 +589,34 @@ const SupervisorDashboard = () => {
     inProgressTasks: 0,
     overdueTasks: 0
   });
+  const SHIFT_SESSION_KEY = 'supervisorShiftSession';
+  const SHIFT_SESSION_DURATION_MS = 60 * 60 * 1000; // 1 hour
 
+  const getActiveShiftSession = (): { shiftId: string; siteName: string } | null => {
+    try {
+      const raw = localStorage.getItem(SHIFT_SESSION_KEY);
+      if (!raw) return null;
+      const session = JSON.parse(raw);
+      const isExpired = Date.now() - session.selectedAt > SHIFT_SESSION_DURATION_MS;
+      const isSameSite = session.siteName === (selectedSite || supervisorSites[0]?.name);
+      if (isExpired || !isSameSite) {
+        localStorage.removeItem(SHIFT_SESSION_KEY);
+        return null;
+      }
+      return { shiftId: session.shiftId, siteName: session.siteName };
+    } catch {
+      return null;
+    }
+  };
+
+  const saveShiftSession = (shiftId: string) => {
+    const siteName = selectedSite || supervisorSites[0]?.name || '';
+    localStorage.setItem(SHIFT_SESSION_KEY, JSON.stringify({
+      shiftId,
+      siteName,
+      selectedAt: Date.now()
+    }));
+  };
 
   // Chart data
   const [weeklyAttendanceTrend, setWeeklyAttendanceTrend] = useState<{ date: string; present: number; total: number }[]>([]);
@@ -760,7 +787,7 @@ const SupervisorDashboard = () => {
     try {
       // Auto-capture the current time automatically
       const now = new Date().toISOString();
-      
+
       await axios.post(`${API_URL}/attendance/manual`, {
         employeeId: selectedEmployeeForMarkPresent._id,
         employeeName: selectedEmployeeForMarkPresent.name,
@@ -770,7 +797,7 @@ const SupervisorDashboard = () => {
         supervisorId: currentSupervisor.id,
         remarks: 'Marked present manually via quick action'
       });
-      
+
       toast.success(`${selectedEmployeeForMarkPresent.name} marked as Present!`);
       setMarkPresentDialogOpen(false);
       setSelectedEmployeeForMarkPresent(null);
@@ -788,10 +815,19 @@ const SupervisorDashboard = () => {
   };
 
   const handleAttendanceCamera = () => {
+    const activeSession = getActiveShiftSession();
+
+    if (activeSession) {
+      setSelectedShiftId(activeSession.shiftId);
+      setCameraAction('recognize');
+      setCameraOpen(true);
+      return;
+    }
+
     if (siteShifts.length === 0) {
       if (selectedSite) {
         fetchShiftsForSite(selectedSite).then((shifts) => {
-          if (shifts.length > 0) {          // ✅ use the returned value, not stale state
+          if (shifts.length > 0) {
             setShiftSelectionOpen(true);
           } else {
             setCameraAction('recognize');
@@ -803,7 +839,6 @@ const SupervisorDashboard = () => {
       }
       return;
     }
-    // If we already have shifts in state, open dialog directly
     setShiftSelectionOpen(true);
   };
 
@@ -2877,6 +2912,7 @@ const SupervisorDashboard = () => {
                   toast.error("Please select a shift");
                   return;
                 }
+                saveShiftSession(selectedShiftId);   // ✅ remember choice
                 setShiftSelectionOpen(false);
                 setCameraAction('recognize');
                 setCameraOpen(true);

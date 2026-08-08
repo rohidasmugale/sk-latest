@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -231,7 +231,7 @@ const EmployeesTab = ({
   const [employeesItemsPerPage, setEmployeesItemsPerPage] = useState(25);
   const [sortBy, setSortBy] = useState<string>("");
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
-const [selectedSite, setSelectedSite] = useState<string>(propSelectedSite);
+  const [selectedSite, setSelectedSite] = useState<string>(propSelectedSite);
   const [selectedJoinDate, setSelectedJoinDate] = useState<string>("");
   const [selectedEmployeeForDocuments, setSelectedEmployeeForDocuments] = useState<ExtendedEmployee | null>(null);
   const [documentsDialogOpen, setDocumentsDialogOpen] = useState(false);
@@ -328,7 +328,15 @@ const [selectedSite, setSelectedSite] = useState<string>(propSelectedSite);
     left: 0
   });
   // ─── Effects ─────────────────────────────────────────────────────────────
+  // Photo Preview state
+  const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false);
+  const [selectedPhotoPreview, setSelectedPhotoPreview] = useState<string | null>(null);
 
+  // Handle photo click to maximize
+  const handlePhotoClick = (photoUrl: string) => {
+    setSelectedPhotoPreview(photoUrl);
+    setPhotoPreviewOpen(true);
+  };
   // Handle resize for mobile detection
   useEffect(() => {
     const handleResize = () => setIsMobileView(window.innerWidth < 768);
@@ -352,16 +360,16 @@ const [selectedSite, setSelectedSite] = useState<string>(propSelectedSite);
   }, [employees, sitesFromAPI]);
 
   // ─── Data Fetching ──────────────────────────────────────────────────────
-// Sync with props
-useEffect(() => {
-  if (propSites.length > 0) {
-    setSitesFromAPI(propSites);
-  }
-}, [propSites]);
+  // Sync with props
+  useEffect(() => {
+    if (propSites.length > 0) {
+      setSitesFromAPI(propSites);
+    }
+  }, [propSites]);
 
-useEffect(() => {
-  setSelectedSite(propSelectedSite);
-}, [propSelectedSite]);
+  useEffect(() => {
+    setSelectedSite(propSelectedSite);
+  }, [propSelectedSite]);
   const fetchEmployees = async () => {
     try {
       setLoading(true);
@@ -500,9 +508,9 @@ useEffect(() => {
   const fetchEmployeeStats = async () => {
     try {
       const params: any = { limit: 10000 };
-    if (selectedSite !== "all") params.siteName = resolveSiteName(selectedSite);
-    
-    const response = await axios.get(`${API_URL}/employees`, { params });
+      if (selectedSite !== "all") params.siteName = resolveSiteName(selectedSite);
+
+      const response = await axios.get(`${API_URL}/employees`, { params });
 
       if (response.data && response.data.success) {
         const allEmps = response.data.data || response.data.employees || [];
@@ -572,14 +580,14 @@ useEffect(() => {
       setLoadingSites(false);
     }
   };
-// Place this after your state declarations, e.g. after `sitesFromAPI`
-const resolveSiteName = (value: string): string => {
-  if (!value || value === 'all') return value;
-  // Try sitesFromAPI first, then fallback to propSites
-  const combined = [...sitesFromAPI, ...propSites];
-  const match = combined.find(s => s._id === value);
-  return match ? match.name : value; // fallback to value (assume it's already a name)
-};
+  // Place this after your state declarations, e.g. after `sitesFromAPI`
+  const resolveSiteName = (value: string): string => {
+    if (!value || value === 'all') return value;
+    // Try sitesFromAPI first, then fallback to propSites
+    const combined = [...sitesFromAPI, ...propSites];
+    const match = combined.find(s => s._id === value);
+    return match ? match.name : value; // fallback to value (assume it's already a name)
+  };
   const calculateSiteDeploymentStatus = () => {
     setLoadingDeploymentStatus(true);
 
@@ -1137,13 +1145,13 @@ const resolveSiteName = (value: string): string => {
   };
 
   // ─── Delete Individual ──────────────────────────────────────────────
-// ─── Get site name for display ──────────────────────────────────────
+  // ─── Get site name for display ──────────────────────────────────────
 
-const getSiteName = () => {
-  if (selectedSite === 'all') return 'All Sites';
-  const site = sitesFromAPI.find(s => s._id === selectedSite);
-  return site ? site.name : 'Unknown Site';
-};
+  const getSiteName = () => {
+    if (selectedSite === 'all') return 'All Sites';
+    const site = sitesFromAPI.find(s => s._id === selectedSite);
+    return site ? site.name : 'Unknown Site';
+  };
   const handleDeleteEmployee = async (id: string) => {
     try {
       setIsDeleting(id);
@@ -1216,40 +1224,70 @@ const getSiteName = () => {
 
   const handleExportEmployees = async () => {
     try {
-       setIsExporting(true);
-    
-    const params: any = {
-      department: selectedDepartment !== "all" ? selectedDepartment : undefined,
-      status: "active"
-    };
-    if (selectedSite !== "all") params.siteName = resolveSiteName(selectedSite);
-    
-    const response = await axios.get(`${API_URL}/employees/export`, {
-      responseType: "blob",
-      params
-    });
+      setIsExporting(true);
+      toast.loading('Fetching employee data for export...');
 
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `employees_export_${new Date().toISOString().split("T")[0]}.xlsx`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      // Fetch ALL employees (limit=10000)
+      const response = await axios.get(`${API_URL}/employees`, {
+        params: { limit: 10000 }
+      });
+      let allEmps = response.data?.data || response.data?.employees || response.data || [];
+      if (!Array.isArray(allEmps)) allEmps = [];
 
-      toast.success("Employees exported successfully!");
+      // Map to the exact columns the client requested in the handwritten note
+      const exportData = allEmps.map((emp: any) => ({
+        'Site Name': emp.siteName || emp.site || '',
+        'Status': emp.status || 'active',
+        'UAN NO': emp.uanNumber || emp.uan || '',
+        'ESIC NO': emp.esicNumber || '',
+        'Emp Code': emp.employeeId || '',
+        'Designation': emp.position || '',
+        'Name as per Aadhar': emp.name || '',
+        'Gender': emp.gender || '',
+        'Date of Birth': emp.dateOfBirth || '',
+        'Date of Joining': emp.joinDate || emp.dateOfJoining || '',
+        'Date of Exit': emp.exitDate || '',
+        'Aadhar No': emp.aadharNumber || '',
+        'Mobile No': emp.phone || '',
+        'PAN No': emp.panNumber || '',
+        'Blood Group': emp.bloodGroup || '',
+        'Father Name': emp.fatherName || '',
+        'Relation': emp.relation || emp.emergencyContactRelation || '',
+        'Bank Account No': emp.accountNumber || '',
+        'IFSC code': emp.ifscCode || '',
+        'Bank Branch': emp.branchName || '',
+        'Nominee Name': emp.nomineeName || '',
+        'Nominee Relation': emp.nomineeRelation || '',
+        'Emergency contact no': emp.emergencyContactPhone || '',
+        'Local Address': emp.localAddress || '',
+        'Permanent Address': emp.permanentAddress || ''
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      XLSX.utils.book_append_sheet(wb, ws, 'Master Employee Data');
+      const fileName = `Master_Employee_Data_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+
+      toast.dismiss();
+      toast.success('Master data exported successfully!');
     } catch (err: any) {
-      console.error("Error exporting employees:", err);
-      if (err.response?.status === 404) {
-        toast.error("Export feature is not available. Please check backend configuration.");
-      } else {
-        toast.error(err.response?.data?.message || "Export failed");
-      }
+      toast.dismiss();
+      console.error('Error exporting employees:', err);
+      toast.error(err.response?.data?.message || 'Export failed');
     } finally {
       setIsExporting(false);
     }
   };
-
+  // Helper to safely convert any cell value to a clean string, especially for numbers
+  const safeNumericString = (value: any): string => {
+    if (value === undefined || value === null || value === '') return '';
+    if (typeof value === 'number') {
+      // Round to avoid floating-point artifacts (e.g., 765568123456.0001)
+      return String(Math.round(value));
+    }
+    return String(value).trim();
+  };
   const handleImportEmployees = async (file: File) => {
     try {
       setIsImporting(true);
@@ -1387,7 +1425,7 @@ const getSiteName = () => {
       const jsonData = XLSX.utils.sheet_to_json(worksheet, {
         header: 1,
         defval: '',
-        raw: false,
+        raw: true,           // ✅ true → get real numeric values
         dateNF: 'mm/dd/yyyy'
       });
 
@@ -1409,27 +1447,34 @@ const getSiteName = () => {
 
       const headers = jsonData[0] as string[];
 
+      // ✅ FIX 1: DECLARE ALL COLUMN INDICES HERE
       const siteIndex = 0;
-      const nameIndex = 1;
-      const dobIndex = 3;
-      const dojIndex = 4;
-      const contactIndex = 6;
-      const bloodGroupIndex = 7;
-      const emailIndex = 8;
-      const aadharIndex = 9;
-      const panIndex = 10;
-      const positionIndex = 36;
-      const salaryIndex = 37;
-      const departmentIndex = 35;
-      const accountNumberIndex = 18;
-      const ifscIndex = 19;
-      const bankNameIndex = 17;
-      const fatherNameIndex = 20;
-      const motherNameIndex = 21;
-      const spouseNameIndex = 22;
-      const emergencyContactNameIndex = 23;
-      const emergencyContactPhoneIndex = 24;
-      const permanentAddressIndex = 13;
+      const statusIndex = 1;
+      const uanIndex = 2;
+      const esicIndex = 3;
+      const empCodeIndex = 4;
+      const positionIndex = 5;
+      const nameIndex = 6;
+      const genderIndex = 7;
+      const dobIndex = 8;
+      const dojIndex = 9;
+      const dateOfExitIndex = 10;
+      const aadharIndex = 11;
+      const contactIndex = 12;
+      const panIndex = 13;
+      const bloodGroupIndex = 14;
+      const relativeNameIndex = 15;
+      const relationIndex = 16;
+      const accountNumberIndex = 17;
+      const ifscIndex = 18;
+      const bankBranchIndex = 19;
+      const nomineeNameIndex = 20;
+      const nomineeRelationIndex = 21;
+      const emergencyContactPhoneIndex = 22;
+      const localAddressIndex = 23;
+      const permanentAddressIndex = 24;
+
+      // ❌ DELETED: The orphaned `const siteName = row[siteIndex]...` block that was here earlier.
 
       const employeesBySiteAndRole: Map<string, {
         managers: any[],
@@ -1445,6 +1490,7 @@ const getSiteName = () => {
       const invalidSiteNames: Set<string> = new Set();
       const capacityViolations: Array<{ site: string; role: string; count: number; available: number }> = [];
 
+      // --- Grouping Loop ---
       for (let i = 1; i < jsonData.length; i++) {
         const row = jsonData[i] as any[];
         if (!row || row.length === 0) continue;
@@ -1459,10 +1505,10 @@ const getSiteName = () => {
         }
 
         const position = row[positionIndex] ? String(row[positionIndex]).trim() : '';
-        const department = row[departmentIndex] ? String(row[departmentIndex]).trim() : '';
 
-        const isManager = position.toLowerCase().includes('manager') || department.toLowerCase().includes('manager');
-        const isSupervisor = position.toLowerCase().includes('supervisor') || department.toLowerCase().includes('supervisor');
+        // ✅ FIX 2: Remove departmentIndex usage; detect role from position only
+        const isManager = position.toLowerCase().includes('manager');
+        const isSupervisor = position.toLowerCase().includes('supervisor');
 
         if (!siteName) {
           continue;
@@ -1484,7 +1530,7 @@ const getSiteName = () => {
           row: i,
           siteName,
           position,
-          department,
+          department: '', // No longer used; kept for compatibility
           isManager,
           isSupervisor,
           data: row
@@ -1508,32 +1554,41 @@ const getSiteName = () => {
 
       const sortedRows = Array.from(allRows).sort((a, b) => a - b);
 
+      // --- Processing Loop ---
       for (const rowIndex of sortedRows) {
         const row = jsonData[rowIndex] as any[];
 
+        // ✅ FIX 3: Extract only the 25 mapped variables, no orphaned indices
         const siteName = row[siteIndex] ? String(row[siteIndex]).trim().replace(/[^\x20-\x7E]/g, '').trim() : '';
-        const name = row[nameIndex] ? String(row[nameIndex]).trim() : '';
-        const aadhar = row[aadharIndex] ? String(row[aadharIndex]).trim().replace(/\s/g, '') : '';
+        const status = row[statusIndex] ? String(row[statusIndex]).trim().toLowerCase() : 'active';
+        const uanNumber = safeNumericString(row[uanIndex]);
+        const esicNumber = safeNumericString(row[esicIndex]);
+        const employeeCode = safeNumericString(row[empCodeIndex]);
         const position = row[positionIndex] ? String(row[positionIndex]).trim() : '';
-        const department = row[departmentIndex] ? String(row[departmentIndex]).trim() : '';
-
+        const name = row[nameIndex] ? String(row[nameIndex]).trim() : '';
+        const gender = row[genderIndex] ? String(row[genderIndex]).trim() : '';
         const dobRaw = row[dobIndex];
         const dojRaw = row[dojIndex];
-
-        const contact = row[contactIndex] ? String(row[contactIndex]).trim() : '';
+        const dateOfExitRaw = row[dateOfExitIndex];
+        const aadhar = safeNumericString(row[aadharIndex]).replace(/\s/g, '');
+        const paddedAadhar = aadhar.length < 12 && /^\d+$/.test(aadhar)
+          ? aadhar.padStart(12, '0')
+          : aadhar;
+        const contact = safeNumericString(row[contactIndex]);
+        const pan = safeNumericString(row[panIndex]).toUpperCase();
         const bloodGroup = row[bloodGroupIndex] ? String(row[bloodGroupIndex]).trim() : '';
-        const email = row[emailIndex] ? String(row[emailIndex]).trim() : '';
-        const pan = row[panIndex] ? String(row[panIndex]).trim().toUpperCase() : '';
-        const salaryStr = row[salaryIndex] ? String(row[salaryIndex]).trim() : '';
-        const accountNumber = row[accountNumberIndex] ? String(row[accountNumberIndex]).trim() : '';
-        const ifscCode = row[ifscIndex] ? String(row[ifscIndex]).trim().toUpperCase() : '';
-        const bankName = row[bankNameIndex] ? String(row[bankNameIndex]).trim() : '';
-        const fatherName = row[fatherNameIndex] ? String(row[fatherNameIndex]).trim() : '';
-        const motherName = row[motherNameIndex] ? String(row[motherNameIndex]).trim() : '';
-        const spouseName = row[spouseNameIndex] ? String(row[spouseNameIndex]).trim() : '';
-        const emergencyContactName = row[emergencyContactNameIndex] ? String(row[emergencyContactNameIndex]).trim() : '';
+        const relativeName = row[relativeNameIndex] ? String(row[relativeNameIndex]).trim() : '';
+        const relation = row[relationIndex] ? String(row[relationIndex]).trim() : '';
+        const accountNumber = safeNumericString(row[accountNumberIndex]);
+        const ifscCode = safeNumericString(row[ifscIndex]).toUpperCase();
+        const bankBranch = row[bankBranchIndex] ? String(row[bankBranchIndex]).trim() : '';
+        const nomineeName = row[nomineeNameIndex] ? String(row[nomineeNameIndex]).trim() : '';
+        const nomineeRelation = row[nomineeRelationIndex] ? String(row[nomineeRelationIndex]).trim() : '';
         const emergencyContactPhone = row[emergencyContactPhoneIndex] ? String(row[emergencyContactPhoneIndex]).trim() : '';
+        const localAddress = row[localAddressIndex] ? String(row[localAddressIndex]).trim() : '';
         const permanentAddress = row[permanentAddressIndex] ? String(row[permanentAddressIndex]).trim() : '';
+        const isManager = position.toLowerCase().includes('manager');
+        const isSupervisor = position.toLowerCase().includes('supervisor');
 
         if (!siteName) {
           skippedCount++;
@@ -1560,9 +1615,6 @@ const getSiteName = () => {
           skippedReasons.push(`Row ${rowIndex}: Invalid Aadhar format (${aadhar.length} digits)`);
           continue;
         }
-
-        const isManager = position.toLowerCase().includes('manager') || department.toLowerCase().includes('manager');
-        const isSupervisor = position.toLowerCase().includes('supervisor') || department.toLowerCase().includes('supervisor');
 
         const taken = takenCounts.get(siteName)!;
 
@@ -1682,7 +1734,7 @@ const getSiteName = () => {
           'SALES': 'Sales'
         };
 
-        let finalDepartment = department || 'General Staff';
+        let finalDepartment = 'General Staff';
         if (position) {
           const posUpper = position.toUpperCase();
           if (positionToDepartmentMap[posUpper]) {
@@ -1690,8 +1742,9 @@ const getSiteName = () => {
           }
         }
 
-        let finalEmail = email;
-        if (!email && name) {
+        // Auto-generate email
+        let finalEmail = '';
+        if (name) {
           const nameParts = name.toLowerCase().split(' ');
           const firstName = nameParts[0]?.replace(/[^a-z]/g, '') || 'employee';
           const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1].replace(/[^a-z]/g, '') : '';
@@ -1713,14 +1766,7 @@ const getSiteName = () => {
           finalPhone = '98' + Math.floor(10000000 + Math.random() * 90000000).toString();
         }
 
-        let salary = 15000;
-        if (salaryStr) {
-          const cleaned = salaryStr.replace(/[^0-9.]/g, '');
-          const parsed = parseFloat(cleaned);
-          if (!isNaN(parsed) && parsed > 0) {
-            salary = parsed;
-          }
-        }
+        let salary = 15000; // default
 
         let finalBloodGroup = null;
         if (bloodGroup) {
@@ -1731,44 +1777,41 @@ const getSiteName = () => {
           }
         }
 
+        // ✅ FIX 4 & 5: CORRECT employeeData (NO duplicate keys)
         const employeeData = {
           name: name,
           email: finalEmail,
           phone: finalPhone,
           aadharNumber: aadhar,
+          employeeId: employeeCode || undefined,
           dateOfJoining: dateOfJoining,
+          dateOfExit: dateOfExitRaw ? (typeof dateOfExitRaw === 'number' ? excelSerialToDate(dateOfExitRaw) : parseDateString(String(dateOfExitRaw))) : null,
           department: finalDepartment,
           position: position || 'Employee',
           salary: salary,
-          status: 'active',
+          status: status === 'left' || status === 'inactive' ? status : 'active',
           role: 'employee',
           siteName: siteName,
           dateOfBirth: dateOfBirth,
+          gender: gender || null,
           bloodGroup: finalBloodGroup,
           panNumber: pan || null,
-          gender: null,
-          maritalStatus: null,
-          bankName: bankName || null,
+          uanNumber: uanNumber || null,
+          esicNumber: esicNumber || null,
+          bankName: null,
+          branchName: bankBranch || null,
           accountNumber: accountNumber || null,
           ifscCode: ifscCode || null,
-          branchName: null,
-          bankBranch: null,
+          fatherName: relation.toLowerCase().includes('father') ? relativeName : null,
+          spouseName: relation.toLowerCase().includes('spouse') ? relativeName : null,
+          motherName: relation.toLowerCase().includes('mother') ? relativeName : null,
           permanentAddress: permanentAddress || null,
-          permanentPincode: null,
-          localAddress: null,
-          localPincode: null,
-          fatherName: fatherName || null,
-          motherName: motherName || null,
-          spouseName: spouseName || null,
-          numberOfChildren: 0,
-          emergencyContactName: emergencyContactName || null,
+          localAddress: localAddress || null,
+          nomineeName: nomineeName || null,
+          nomineeRelation: nomineeRelation || null,
+          emergencyContactName: null,
           emergencyContactPhone: emergencyContactPhone || null,
           emergencyContactRelation: null,
-          nomineeName: null,
-          nomineeRelation: null,
-          esicNumber: null,
-          uanNumber: null,
-          dateOfExit: null,
           pantSize: null,
           shirtSize: null,
           capSize: null,
@@ -2623,7 +2666,6 @@ const getSiteName = () => {
 
   // ─── Mobile Employee Card Component ────────────────────────────────────
 
-  // ─── Mobile Employee Card Component ────────────────────────────────────
 
   const MobileEmployeeCard = ({ employee, selected, onSelect, onEdit, onViewHistory, onUpload, onViewDocs, onEPF, onMarkLeft, onDelete, onViewID, onDownloadID }: any) => {
     const [expanded, setExpanded] = useState(false);
@@ -2639,7 +2681,12 @@ const getSiteName = () => {
             className="mt-1 h-4 w-4 rounded border-gray-300"
           />
           {photoUrl ? (
-            <img src={photoUrl} alt={employee.name} className="w-10 h-10 rounded-full object-cover border flex-shrink-0" />
+            <img
+              src={photoUrl}
+              alt={employee.name}
+              className="w-10 h-10 rounded-full object-cover border flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => handlePhotoClick(photoUrl)} // ✅ Added click-to-maximize
+            />
           ) : (
             <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
               <User className="h-5 w-5 text-gray-500" />
@@ -2663,7 +2710,7 @@ const getSiteName = () => {
               {employee.panNumber && <Badge variant="outline" className="text-[10px]">PAN</Badge>}
               {employee.uan && <Badge variant="outline" className="text-[10px]">UAN</Badge>}
               {employee.esicNumber && <Badge variant="outline" className="text-[10px]">ESIC</Badge>}
-              {(employee.photo || employee.photoPublicId) && <Badge variant="outline" className="text-[10px]"><Camera className="h-3 w-3 mr-0.5" />Photo</Badge>}
+
               {employee.kycDocuments?.length > 0 && <Badge variant="outline" className="text-[10px] bg-blue-50">KYC</Badge>}
             </div>
           </div>
@@ -2684,6 +2731,15 @@ const getSiteName = () => {
                   employeeId={employee._id || employee.id || ''}
                   employeeName={employee.name}
                   currentEmbeddingDim={(employee as any).faceEmbeddings?.[0]?.length}
+                  onPhotoRegistered={(photoUrl) => {
+                    setEmployees(prev =>
+                      prev.map(emp =>
+                        (emp._id === employee._id || emp.id === employee.id)
+                          ? { ...emp, photo: photoUrl }
+                          : emp
+                      )
+                    );
+                  }}
                 />
               </div>
             </div>
@@ -2732,16 +2788,16 @@ const getSiteName = () => {
   };
   // ─── ID Card Functions ──────────────────────────────────────────────────
 
- const generateIDCard = (employee: ExtendedEmployee) => {
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) {
-    toast.error("Please allow popups to generate ID card");
-    return;
-  }
+  const generateIDCard = (employee: ExtendedEmployee) => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      toast.error("Please allow popups to generate ID card");
+      return;
+    }
 
-  const photoUrl = getPhotoUrl(employee);
+    const photoUrl = getPhotoUrl(employee);
 
-  printWindow.document.write(`
+    printWindow.document.write(`
     <!DOCTYPE html>
     <html>
       <head>
@@ -2874,10 +2930,10 @@ const getSiteName = () => {
           </div>
           <div class="photo-section">
             ${photoUrl
-              ? `<img src="${photoUrl}" alt="Employee Photo" class="employee-photo" onerror="this.style.display='none'; document.getElementById('no-photo').style.display='flex';" />` +
-                `<div id="no-photo" class="no-photo" style="display: none;">No Photo</div>`
-              : '<div class="no-photo">No Photo</div>'
-            }
+        ? `<img src="${photoUrl}" alt="Employee Photo" class="employee-photo" onerror="this.style.display='none'; document.getElementById('no-photo').style.display='flex';" />` +
+        `<div id="no-photo" class="no-photo" style="display: none;">No Photo</div>`
+        : '<div class="no-photo">No Photo</div>'
+      }
           </div>
           <div class="details">
             <div class="detail-row">
@@ -2940,13 +2996,13 @@ const getSiteName = () => {
       </body>
     </html>
   `);
-  printWindow.document.close();
-};
+    printWindow.document.close();
+  };
 
- const downloadIDCard = (employee: ExtendedEmployee) => {
-  generateIDCard(employee);
-  toast.success(`ID Card generated for ${employee.name}`);
-};
+  const downloadIDCard = (employee: ExtendedEmployee) => {
+    generateIDCard(employee);
+    toast.success(`ID Card generated for ${employee.name}`);
+  };
 
   const downloadNomineeForm = (employee: ExtendedEmployee) => {
     const printWindow = window.open("", "_blank");
@@ -3222,7 +3278,7 @@ const getSiteName = () => {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      
+
       {/* ─── Import progress banner ──────────────────────────────────── */}
       {isImporting && importProgress.total > 0 && (
         <Card className="border-primary/20 bg-primary/5">
@@ -5143,7 +5199,8 @@ const getSiteName = () => {
                         <img
                           src={getPhotoUrl(employee)}
                           alt={employee.name}
-                          className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 flex-shrink-0"
+                          className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => handlePhotoClick(getPhotoUrl(employee))} // ✅ Added click-to-maximize
                           onError={(e) => {
                             console.log('Image failed to load:', employee.photo);
                             e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E";
@@ -5186,18 +5243,7 @@ const getSiteName = () => {
                           {employee.esicNumber && (
                             <Badge variant="secondary" className="text-xs">ESIC</Badge>
                           )}
-                          {(employee.photo || employee.photoPublicId) && (
-                            <Badge variant="secondary" className="text-xs">
-                              <Camera className="h-3 w-3 mr-1" />
-                              Photo
-                            </Badge>
-                          )}
-                          {employee.siteHistory && employee.siteHistory.length > 0 && (
-                            <Badge variant="secondary" className="text-xs">
-                              <History className="h-3 w-3 mr-1" />
-                              {employee.siteHistory.length} {employee.siteHistory.length === 1 ? 'Move' : 'Moves'}
-                            </Badge>
-                          )}
+
                           {employee.kycDocuments && employee.kycDocuments.length > 0 && (
                             <Badge variant="secondary" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
                               <Shield className="h-3 w-3 mr-1" />
@@ -5224,6 +5270,15 @@ const getSiteName = () => {
                         employeeId={employee._id || employee.id || ''}
                         employeeName={employee.name}
                         currentEmbeddingDim={(employee as any).faceEmbeddings?.[0]?.length}
+                        onPhotoRegistered={(photoUrl) => {
+                          setEmployees(prev =>
+                            prev.map(emp =>
+                              (emp._id === employee._id || emp.id === employee.id)
+                                ? { ...emp, photo: photoUrl }
+                                : emp
+                            )
+                          );
+                        }}
                       />
 
                       <Button
@@ -5696,6 +5751,28 @@ const getSiteName = () => {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+      {/* ─── Photo Maximize Dialog ──────────────────────────────────────────── */}
+      <Dialog open={photoPreviewOpen} onOpenChange={setPhotoPreviewOpen}>
+        <DialogContent className="sm:max-w-lg p-0 overflow-hidden border-0">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle className="text-center">Employee Photo</DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-center p-4 bg-black/5">
+            {selectedPhotoPreview && (
+              <img
+                src={selectedPhotoPreview}
+                alt="Employee Photo"
+                className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-sm"
+              />
+            )}
+          </div>
+          <DialogFooter className="p-4 pt-0">
+            <Button variant="outline" onClick={() => setPhotoPreviewOpen(false)} className="w-full sm:w-auto">
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

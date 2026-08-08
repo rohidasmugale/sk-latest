@@ -222,7 +222,7 @@ export const autoAttendance = async (req: Request, res: Response) => {
         totalHours: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
-        shiftId: shiftId || attendance.shiftId,
+         shiftId: shiftId || null,
       });
 
       const saved = await newAttendance.save();
@@ -456,6 +456,7 @@ export const checkInWithPhoto = async (req: Request, res: Response) => {
           isOutOfGeofence: false,
            shiftId: shiftId || null,
           updatedAt: new Date(),
+          isManual: true,   // ✅ ADD THIS
         },
         { new: true }
       );
@@ -490,6 +491,7 @@ export const checkInWithPhoto = async (req: Request, res: Response) => {
         isLocationTracking: parsedLatitude !== null && parsedLongitude !== null,
          shiftId: shiftId || null,
         isOutOfGeofence: false,
+        isManual: true,   // ✅ ADD THIS
       });
     }
 
@@ -609,6 +611,7 @@ export const checkIn = async (req: Request, res: Response) => {
           isCheckedIn: true,
           status: 'present',
           updatedAt: new Date(),
+          isManual: true,   // ✅ ADD THIS
         },
         { new: true }
       );
@@ -648,6 +651,7 @@ export const checkIn = async (req: Request, res: Response) => {
   isLocationTracking: !!(latitude && longitude),
    shiftId: shiftId || null,
   isOutOfGeofence: false,
+  isManual: true,   // ✅ ADD THIS
       });
     }
 
@@ -1190,6 +1194,7 @@ export const manualAttendance = async (req: Request, res: Response) => {
           siteName: employee?.siteName || existingRecord.siteName,
           updatedAt: new Date(),
           shiftId: shiftId || existingRecord.shiftId,
+          isManual: true,   // ✅ ADD THIS
         },
         { new: true }
       );
@@ -1214,6 +1219,7 @@ export const manualAttendance = async (req: Request, res: Response) => {
         department: employee?.department || 'General',
         siteName: employee?.siteName || null,
         shiftId: shiftId || existingRecord.shiftId,
+        isManual: true,   // ✅ ADD THIS
         
       });
     }

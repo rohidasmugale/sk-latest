@@ -397,7 +397,7 @@ const SitesSection = ({ refreshTrigger = 0 }: SitesSectionProps) => {
     const formData = new FormData(e.currentTarget);
 
     let clientName = "";
-    let clientId = "";
+    let clientId = undefined;
 
     if (selectedClient) {
       const client = clients.find(c => c._id === selectedClient);
@@ -405,19 +405,12 @@ const SitesSection = ({ refreshTrigger = 0 }: SitesSectionProps) => {
         clientName = client.name;
         clientId = client._id;
       }
-    } else {
-      toast.error("Please select a client from the list");
-      return;
     }
 
-    if (!clientName?.trim()) {
-      toast.error("Please select a valid client");
-      return;
-    }
 
     const siteData: CreateSiteRequest = {
       name: formData.get("site-name") as string,
-      clientName: clientName.trim(),
+      clientName: clientName || "No Client",   // or undefined, depending on backend
       clientId: clientId || undefined,
       location: formData.get("location") as string,
       areaSqft: Number(formData.get("area-sqft")) || 0,
@@ -642,11 +635,6 @@ const SitesSection = ({ refreshTrigger = 0 }: SitesSectionProps) => {
         continue;
       }
 
-      if (!clientName) {
-        errors.push(`Row ${rowNumber}: Missing Client Name`);
-        invalidSites.push(row);
-        continue;
-      }
 
       if (!location) {
         errors.push(`Row ${rowNumber}: Missing Location`);
@@ -1328,20 +1316,12 @@ const SitesSection = ({ refreshTrigger = 0 }: SitesSectionProps) => {
 
                   <div className="space-y-2">
                     <Label className="text-xs sm:text-sm font-medium">
-                      Select Client from CRM <span className="text-muted-foreground">(Required)</span>
+                      Select Client from CRM <span className="text-muted-foreground">(Optional)</span>
                     </Label>
-                    <div className="text-xs text-muted-foreground mb-1 sm:mb-2">
-                      Search and select a client from your CRM database
-                    </div>
+
                     {renderClientsDropdown()}
 
-                    {!selectedClient && !isLoadingClients && clients.length > 0 && (
-                      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                        <p className="text-xs text-yellow-700">
-                          Please select a client from the list above
-                        </p>
-                      </div>
-                    )}
+
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
@@ -1556,7 +1536,7 @@ const SitesSection = ({ refreshTrigger = 0 }: SitesSectionProps) => {
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-2 sm:gap-2 pt-2">
-                    <Button type="submit" className="flex-1 text-sm py-2" disabled={!selectedClient} size="sm">
+                    <Button type="submit" className="flex-1 text-sm py-2" size="sm">
                       {editMode ? "Update Site" : "Add Site"}
                     </Button>
                     <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="text-sm py-2" size="sm">

@@ -239,7 +239,7 @@ const TaskSchema: Schema<ITask, ITaskModel> = new Schema(
     },
     clientName: {
       type: String,
-      required: [true, 'Client name is required'],
+     
       trim: true
     },
     taskType: {

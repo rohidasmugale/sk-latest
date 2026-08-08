@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import axios from "axios";
-import { Camera, Upload, Trash2, X, UserPlus, Mail, Phone, Calendar, Briefcase, CheckCircle, XCircle, Search, Loader2, MapPin } from "lucide-react";
+import { Camera, Upload, Trash2, X, UserPlus, Mail, Phone, Calendar, Briefcase, CheckCircle, XCircle, Search, Loader2, MapPin, Plus } from "lucide-react";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 // Import the full employee onboarding
@@ -17,10 +17,10 @@ import { Employee } from "@/services/ShiftService";
 import OnboardingTab from './../../pages/superadmin/OnboardingTab';
 // ✅ No named import – we'll infer the props type
 // Import site and client services
-import { siteService, Client, CreateSiteRequest } from "@/services/SiteService";
+import { siteService, Client, CreateSiteRequest, ShiftDefinition } from "@/services/SiteService";
 import { crmService } from "@/services/crmService";
 
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 interface UnifiedCreateModalProps {
@@ -376,22 +376,64 @@ const EnhancedUserForm = ({
 // ===================== SITE FORM =====================
 const SiteForm = ({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: () => void }) => {
   const [loading, setLoading] = useState(false);
-   const [clients, setClients] = useState<Client[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [clientSearch, setClientSearch] = useState("");
   const [isLoadingClients, setIsLoadingClients] = useState(false);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [staffDeployment, setStaffDeployment] = useState<Array<{ role: string; count: number }>>([]);
   const [error, setError] = useState<string | null>(null);
+  // Shift Management State
+  const [siteShifts, setSiteShifts] = useState<ShiftDefinition[]>([]);
+  const SHIFT_COLORS = [
+    { name: 'Green', value: '#4CAF50' },
+    { name: 'Blue', value: '#2196F3' },
+    { name: 'Orange', value: '#FF9800' },
+    { name: 'Red', value: '#F44336' },
+    { name: 'Purple', value: '#9C27B0' },
+    { name: 'Teal', value: '#009688' },
+    { name: 'Yellow', value: '#FFC107' },
+    { name: 'Pink', value: '#E91E63' },
+  ];
 
- const ServicesList = [
-  "Housekeeping",
-  "Security",
-  "Parking",
-  "Waste Management",
-  "Consumables",
-  "Other"
-];
+  // Shift functions
+  const addShift = () => {
+    const newShift: ShiftDefinition = {
+      id: `shift_${Date.now()}`,
+      name: 'New Shift',
+      label: 'Shift',
+      startTime: '09:00',
+      endTime: '18:00',
+      graceMinutes: 15,
+      color: '#4CAF50',
+      appliesTo: [],
+      isOvernight: false,
+    };
+    setSiteShifts([...siteShifts, newShift]);
+  };
+
+  const updateShift = (index: number, field: keyof ShiftDefinition, value: any) => {
+    const updated = [...siteShifts];
+    updated[index] = { ...updated[index], [field]: value };
+    if (field === 'startTime' || field === 'endTime') {
+      const start = updated[index].startTime || '09:00';
+      const end = updated[index].endTime || '18:00';
+      updated[index].isOvernight = end < start;
+    }
+    setSiteShifts(updated);
+  };
+
+  const removeShift = (index: number) => {
+    setSiteShifts(siteShifts.filter((_, i) => i !== index));
+  };
+  const ServicesList = [
+    "Housekeeping",
+    "Security",
+    "Parking",
+    "Waste Management",
+    "Consumables",
+    "Other"
+  ];
   const StaffRoles = [
     "Manager", "Supervisor", "Housekeeping Staff", "Security Guard",
     "Parking Attendant", "Waste Collector"
@@ -451,25 +493,31 @@ const SiteForm = ({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: ()
     setError(null);
     const formData = new FormData(e.currentTarget);
 
-    const client = clients.find(c => c._id === selectedClientId);
-    if (!client) {
-      toast.error("Please select a client from the list");
-      return;
+    // ✅ Allow client to be optional
+    let clientName = "";
+    let clientId = undefined;
+
+    if (selectedClientId) {
+      const client = clients.find(c => c._id === selectedClientId);
+      if (client) {
+        clientName = client.name;
+        clientId = client._id;
+      }
     }
 
     const siteData: CreateSiteRequest = {
       name: formData.get("site-name") as string,
-      clientName: client.name,
-      clientId: client._id,
+      clientName: clientName,
+      clientId: clientId,
       location: formData.get("location") as string,
       areaSqft: Number(formData.get("area-sqft")) || 0,
       contractValue: Number(formData.get("contract-value")) || 0,
       contractEndDate: formData.get("contract-end-date") as string,
       services: selectedServices,
       staffDeployment: staffDeployment.filter(item => item.count > 0),
+      shifts: siteShifts.filter(s => s.name && s.startTime && s.endTime), // ✅ ADD THIS
       status: "active"
     };
-
     const validationErrors = siteService.validateSiteData(siteData);
     if (validationErrors.length > 0) {
       validationErrors.forEach(err => toast.error(err));
@@ -505,7 +553,8 @@ const SiteForm = ({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: ()
       </div>
 
       <div className="space-y-2">
-        <Label>Select Client from CRM *</Label>
+        <Label>Select Client from CRM <span className="text-muted-foreground text-xs">(Optional)</span></Label>
+
         {isLoadingClients ? (
           <div className="flex items-center space-x-2 p-2">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -550,9 +599,8 @@ const SiteForm = ({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: ()
                   {clients.map((client) => (
                     <div
                       key={client._id}
-                      className={`p-2 rounded cursor-pointer hover:bg-gray-100 ${
-                        selectedClientId === client._id ? "bg-blue-50 border border-blue-200" : ""
-                      }`}
+                      className={`p-2 rounded cursor-pointer hover:bg-gray-100 ${selectedClientId === client._id ? "bg-blue-50 border border-blue-200" : ""
+                        }`}
                       onClick={() => setSelectedClientId(client._id)}
                     >
                       <div className="flex justify-between items-start">
@@ -616,7 +664,119 @@ const SiteForm = ({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: ()
           ))}
         </div>
       </div>
+      {/* Shift Management Section - ADD THIS AFTER Services and BEFORE Staff Deployment */}
+      <div className="border p-4 rounded-md">
+        <div className="flex items-center justify-between mb-3">
+          <p className="font-medium text-sm">Shift Timings for this Site</p>
+          <Button type="button" variant="outline" size="sm" onClick={addShift}>
+            <Plus className="h-4 w-4 mr-1" /> Add Shift
+          </Button>
+        </div>
 
+        <div className="text-xs text-muted-foreground mb-2">
+          Define shift start/end times for this site. Employees will be assigned to these shifts.
+          <span className="text-amber-600 ml-1">Overnight shifts are auto-detected.</span>
+        </div>
+
+        {siteShifts.length === 0 ? (
+          <div className="text-center py-4 text-sm text-muted-foreground border rounded bg-gray-50">
+            No shifts defined. Click "Add Shift" to configure.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {siteShifts.map((shift, index) => (
+              <div key={shift.id || index} className="flex flex-col gap-2 p-2 border rounded bg-gray-50">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: shift.color }} />
+                  <Input
+                    placeholder="Shift Name (e.g. Morning)"
+                    value={shift.name}
+                    onChange={(e) => updateShift(index, 'name', e.target.value)}
+                    className="h-8 text-sm flex-1"
+                  />
+                  <Input
+                    placeholder="Label (e.g. Sakali)"
+                    value={shift.label}
+                    onChange={(e) => updateShift(index, 'label', e.target.value)}
+                    className="h-8 text-sm w-24"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeShift(index)}
+                    className="h-8 w-8 p-0 text-red-500"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                  <div className="space-y-0.5">
+                    <Label className="text-[10px] text-muted-foreground">Start</Label>
+                    <Input
+                      type="time"
+                      value={shift.startTime}
+                      onChange={(e) => updateShift(index, 'startTime', e.target.value)}
+                      className="h-7 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-0.5">
+                    <Label className="text-[10px] text-muted-foreground">End</Label>
+                    <Input
+                      type="time"
+                      value={shift.endTime}
+                      onChange={(e) => updateShift(index, 'endTime', e.target.value)}
+                      className="h-7 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-0.5">
+                    <Label className="text-[10px] text-muted-foreground">Grace (min)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="60"
+                      value={shift.graceMinutes}
+                      onChange={(e) => updateShift(index, 'graceMinutes', parseInt(e.target.value) || 0)}
+                      className="h-7 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-0.5">
+                    <Label className="text-[10px] text-muted-foreground">Color</Label>
+                    <Select
+                      value={shift.color}
+                      onValueChange={(value) => updateShift(index, 'color', value)}
+                    >
+                      <SelectTrigger className="h-7 text-sm">
+                        <div className="flex items-center gap-1">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: shift.color }} />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SHIFT_COLORS.map(c => (
+                          <SelectItem key={c.value} value={c.value}>
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.value }} />
+                              <span>{c.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-0.5 flex items-center">
+                    {shift.isOvernight && (
+                      <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200">
+                        🌙 Overnight
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       <div className="border p-4 rounded-md">
         <p className="font-medium mb-3">Staff Deployment</p>
         <div className="space-y-3">
@@ -789,11 +949,11 @@ export const UnifiedCreateModal = ({ open, onOpenChange, onSuccess, employees, s
                     employees: employees,
                     setEmployees: setEmployees,
                     salaryStructures: [],
-                    setSalaryStructures: () => {},
+                    setSalaryStructures: () => { },
                     newJoinees: [],
-                    setNewJoinees: () => {},
+                    setNewJoinees: () => { },
                     leftEmployees: [],
-                    setLeftEmployees: () => {},
+                    setLeftEmployees: () => { },
                   } as unknown as OnboardingTabProps)}
                 />
               </div>
@@ -805,15 +965,15 @@ export const UnifiedCreateModal = ({ open, onOpenChange, onSuccess, employees, s
             <TabsContent value="client">
               <form onSubmit={handleClientSubmit} className="space-y-4 py-4 px-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label>Client Name *</Label><Input required value={clientForm.name} onChange={e => setClientForm({...clientForm, name: e.target.value})} /></div>
-                  <div className="space-y-2"><Label>Company *</Label><Input required value={clientForm.company} onChange={e => setClientForm({...clientForm, company: e.target.value})} /></div>
-                  <div className="space-y-2"><Label>Email *</Label><Input type="email" required value={clientForm.email} onChange={e => setClientForm({...clientForm, email: e.target.value})} /></div>
-                  <div className="space-y-2"><Label>Phone *</Label><Input required value={clientForm.phone} onChange={e => setClientForm({...clientForm, phone: e.target.value})} /></div>
-                  <div className="space-y-2"><Label>City</Label><Input value={clientForm.city} onChange={e => setClientForm({...clientForm, city: e.target.value})} /></div>
-                  <div className="space-y-2"><Label>Expected Value *</Label><Input required value={clientForm.value} onChange={e => setClientForm({...clientForm, value: e.target.value})} /></div>
-                  <div className="space-y-2"><Label>Industry</Label><Select value={clientForm.industry} onValueChange={v => setClientForm({...clientForm, industry: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MALL">MALL</SelectItem><SelectItem value="COMMERCIAL">COMMERCIAL</SelectItem><SelectItem value="Banking">Banking</SelectItem><SelectItem value="Healthcare">Healthcare</SelectItem></SelectContent></Select></div>
-                  <div className="space-y-2"><Label>Address</Label><Textarea value={clientForm.address} onChange={e => setClientForm({...clientForm, address: e.target.value})} className="min-h-[80px]" placeholder="Enter full address" /></div>
-                  <div className="space-y-2"><Label>Contact Person</Label><Input value={clientForm.contactPerson} onChange={e => setClientForm({...clientForm, contactPerson: e.target.value})} placeholder="Contact person name" /></div>
+                  <div className="space-y-2"><Label>Client Name *</Label><Input required value={clientForm.name} onChange={e => setClientForm({ ...clientForm, name: e.target.value })} /></div>
+                  <div className="space-y-2"><Label>Company *</Label><Input required value={clientForm.company} onChange={e => setClientForm({ ...clientForm, company: e.target.value })} /></div>
+                  <div className="space-y-2"><Label>Email *</Label><Input type="email" required value={clientForm.email} onChange={e => setClientForm({ ...clientForm, email: e.target.value })} /></div>
+                  <div className="space-y-2"><Label>Phone *</Label><Input required value={clientForm.phone} onChange={e => setClientForm({ ...clientForm, phone: e.target.value })} /></div>
+                  <div className="space-y-2"><Label>City</Label><Input value={clientForm.city} onChange={e => setClientForm({ ...clientForm, city: e.target.value })} /></div>
+                  <div className="space-y-2"><Label>Expected Value *</Label><Input required value={clientForm.value} onChange={e => setClientForm({ ...clientForm, value: e.target.value })} /></div>
+                  <div className="space-y-2"><Label>Industry</Label><Select value={clientForm.industry} onValueChange={v => setClientForm({ ...clientForm, industry: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MALL">MALL</SelectItem><SelectItem value="COMMERCIAL">COMMERCIAL</SelectItem><SelectItem value="Banking">Banking</SelectItem><SelectItem value="Healthcare">Healthcare</SelectItem></SelectContent></Select></div>
+                  <div className="space-y-2"><Label>Address</Label><Textarea value={clientForm.address} onChange={e => setClientForm({ ...clientForm, address: e.target.value })} className="min-h-[80px]" placeholder="Enter full address" /></div>
+                  <div className="space-y-2"><Label>Contact Person</Label><Input value={clientForm.contactPerson} onChange={e => setClientForm({ ...clientForm, contactPerson: e.target.value })} placeholder="Contact person name" /></div>
                 </div>
                 <Button type="submit" disabled={loading} className="w-full">{loading ? "Creating..." : "Create Client"}</Button>
               </form>

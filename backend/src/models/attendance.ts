@@ -28,7 +28,7 @@ export interface IAttendance extends Document {
   isLocationTracking: boolean; // whether watcher is active
   checkInLatitude?: number | null;   // geofence center (set at check-in)
 checkInLongitude?: number | null;
-
+ isManual?: boolean;   // ✅ ADD THIS
 isOutOfGeofence: boolean;
 shiftId?: string;
   createdAt: Date;
@@ -136,6 +136,10 @@ currentLatitude:  { type: Number, default: null },
 currentLongitude: { type: Number, default: null },
 lastLocationUpdate: { type: Date, default: null },
 isLocationTracking: { type: Boolean, default: false },
+isManual: {
+    type: Boolean,
+    default: false,
+  },
 isOutOfGeofence:  { type: Boolean, default: false },
  shiftId: {
      type: String,

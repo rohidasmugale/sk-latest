@@ -13,9 +13,10 @@ interface FaceRegisterButtonProps {
   employeeId: string;
   employeeName: string;
   currentEmbeddingDim?: number;
+  onPhotoRegistered?: (photoUrl: string) => void; // ✅ NEW
 }
 
-export const FaceRegisterButton = ({ employeeId, employeeName, currentEmbeddingDim }: FaceRegisterButtonProps) => {
+export const FaceRegisterButton = ({ employeeId, employeeName, currentEmbeddingDim, onPhotoRegistered, }: FaceRegisterButtonProps) => {
   const [open, setOpen] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
@@ -38,10 +39,10 @@ export const FaceRegisterButton = ({ employeeId, employeeName, currentEmbeddingD
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
+        video: {
           facingMode: facingMode,
-          width: { ideal: 1280 }, 
-          height: { ideal: 720 } 
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
         }
       });
       streamRef.current = stream;
@@ -100,7 +101,7 @@ export const FaceRegisterButton = ({ employeeId, employeeName, currentEmbeddingD
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     let brightness = 0;
     for (let i = 0; i < imageData.data.length; i += 16) {
-      brightness += (imageData.data[i] + imageData.data[i+1] + imageData.data[i+2]) / 3;
+      brightness += (imageData.data[i] + imageData.data[i + 1] + imageData.data[i + 2]) / 3;
     }
     brightness = brightness / (imageData.data.length / 16);
 
@@ -113,7 +114,6 @@ export const FaceRegisterButton = ({ employeeId, employeeName, currentEmbeddingD
     setCapturedImage(dataUrl);
     stopCamera();
   }, [isCameraReady, stopCamera, facingMode]);
-
   const handleRegister = async () => {
     if (!capturedImage) return;
     setIsRegistering(true);
@@ -133,6 +133,26 @@ export const FaceRegisterButton = ({ employeeId, employeeName, currentEmbeddingD
 
       if (res.data.success) {
         toast.success(`✅ Face registered for ${employeeName}`);
+
+        let newPhotoUrl: string | undefined;
+        try {
+          const photoFormData = new FormData();
+          photoFormData.append('photo', file);
+
+          // ✅ use the EXISTING employee update route, not a new one
+          const photoRes = await axios.patch(
+            `${API_URL}/employees/${employeeId}`,
+            photoFormData,
+            { headers: { 'Content-Type': 'multipart/form-data' } }
+          );
+
+          // ✅ response shape is { success, message, data: updatedEmployee }
+          newPhotoUrl = photoRes.data?.data?.photo;
+        } catch (photoErr) {
+          console.warn('Photo update failed (face still registered):', photoErr);
+        }
+
+        onPhotoRegistered?.(newPhotoUrl || capturedImage);
         setOpen(false);
         setCapturedImage(null);
       } else {
@@ -228,8 +248,8 @@ export const FaceRegisterButton = ({ employeeId, employeeName, currentEmbeddingD
                   {capturedImage
                     ? "✅ Photo captured"
                     : isCameraReady
-                    ? "👤 Position face in circle"
-                    : "Starting camera..."}
+                      ? "👤 Position face in circle"
+                      : "Starting camera..."}
                 </span>
               </div>
             </div>

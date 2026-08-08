@@ -591,9 +591,7 @@ private transformStatsData(data: any): SiteStats {
       errors.push('Site name is required');
     }
     
-    if (!data?.clientName?.trim()) {
-      errors.push('Client name is required');
-    }
+   
     
     if (!data?.location?.trim()) {
       errors.push('Location is required');
