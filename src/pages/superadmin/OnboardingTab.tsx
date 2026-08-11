@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { useSearchParams } from "react-router-dom";
 import axios from "axios";
 // Define the API Base URL
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 
@@ -130,7 +130,7 @@ interface NewEmployeeForm {
   panNumber: string;
   esicNumber: string;
   uanNumber: string;
-  
+
   // Personal Details
   siteName: string;
   dateOfBirth: string;
@@ -139,49 +139,49 @@ interface NewEmployeeForm {
   bloodGroup: string;
   gender?: string;
   maritalStatus?: string;
-  
+
   // Address
   permanentAddress: string;
   permanentPincode: string;
   localAddress: string;
   localPincode: string;
-  
+
   // Bank Details
   bankName: string;
   accountNumber: string;
   ifscCode: string;
   branchName: string;
-  
+
   // Family Details
   fatherName: string;
   motherName: string;
   spouseName: string;
   numberOfChildren: string;
-  
+
   // Emergency Contact
   emergencyContactName: string;
   emergencyContactPhone: string;
   emergencyContactRelation: string;
-  
+
   // Nominee Details
   nomineeName: string;
   nomineeRelation: string;
-  
+
   // Uniform Details
   pantSize: string;
   shirtSize: string;
   capSize: string;
-  
+
   // Issued Items
   idCardIssued: boolean;
   westcoatIssued: boolean;
   apronIssued: boolean;
-  
+
   // Employment Details
   department: string;
   position: string;
   salary: string;
-  
+
   // Documents
   photo: File | string | null;
   employeeSignature: File | null;
@@ -197,27 +197,27 @@ interface EPFForm11Data {
   maritalStatus: string;
   email: string;
   mobileNumber: string;
-  
+
   previousEPFMember: boolean;
   previousPensionMember: boolean;
-  
+
   previousUAN: string;
   previousPFAccountNumber: string;
   dateOfExit: string;
   schemeCertificateNumber: string;
   pensionPaymentOrder: string;
-  
+
   internationalWorker: boolean;
   countryOfOrigin: string;
   passportNumber: string;
   passportValidityFrom: string;
   passportValidityTo: string;
-  
+
   bankAccountNumber: string;
   ifscCode: string;
   aadharNumber: string;
   panNumber: string;
-  
+
   firstEPFMember: boolean;
   enrolledDate: string;
   firstEmploymentWages: string;
@@ -225,11 +225,11 @@ interface EPFForm11Data {
   epfAmountWithdrawn: boolean;
   epsAmountWithdrawn: boolean;
   epsAmountWithdrawnAfterSep2014: boolean;
-  
+
   declarationDate: string;
   declarationPlace: string;
   employerDeclarationDate: string;
-  
+
   // Additional fields for employer declaration
   kycStatus?: "not_uploaded" | "uploaded_not_approved" | "uploaded_approved";
   transferRequestGenerated?: boolean;
@@ -252,11 +252,11 @@ interface OnboardingTabProps {
 
 // Departments array
 const departments = [
-  "Housekeeping", 
-  "Security", 
-  "Parking Management", 
-  "Waste Management", 
-  "STP Tank Cleaning", 
+  "Housekeeping",
+  "Security",
+  "Parking Management",
+  "Waste Management",
+  "STP Tank Cleaning",
   "Consumables Management",
   "Administration",
   "HR",
@@ -268,15 +268,15 @@ const departments = [
 ];
 
 // FormField Component
-const FormField = ({ 
-  label, 
-  id, 
-  children, 
-  required = false 
-}: { 
-  label: string; 
-  id?: string; 
-  children: React.ReactNode; 
+const FormField = ({
+  label,
+  id,
+  children,
+  required = false
+}: {
+  label: string;
+  id?: string;
+  children: React.ReactNode;
   required?: boolean;
 }) => (
   <div className="space-y-2">
@@ -333,10 +333,10 @@ const resetNewEmployeeForm = () => ({
   authorizedSignature: null
 });
 
-const OnboardingTab = ({ 
-  employees, 
-  setEmployees, 
-  salaryStructures, 
+const OnboardingTab = ({
+  employees,
+  setEmployees,
+  salaryStructures,
   setSalaryStructures,
   newJoinees = [],
   setNewJoinees,
@@ -345,7 +345,7 @@ const OnboardingTab = ({
   onEmployeeUpdate,
   onEmployeesBulkUpdate
 }: OnboardingTabProps) => {
-   const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [isSavingEPF, setIsSavingEPF] = useState(false);
   const [activeTab, setActiveTab] = useState("onboarding");
@@ -404,7 +404,7 @@ const OnboardingTab = ({
   const [showExcelPreview, setShowExcelPreview] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
-  
+
   // New states for Site dropdown
   const [sites, setSites] = useState<Site[]>([]);
   const [loadingSites, setLoadingSites] = useState(false);
@@ -414,7 +414,7 @@ const OnboardingTab = ({
   const [selectedSiteDetails, setSelectedSiteDetails] = useState<Site | null>(null);
   const [currentSiteStaffCount, setCurrentSiteStaffCount] = useState<number>(0);
   const [availableStaffPositions, setAvailableStaffPositions] = useState<number>(0);
-  
+
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -426,14 +426,14 @@ const OnboardingTab = ({
   const excelImportRef = useRef<HTMLInputElement>(null);
   const siteSearchRef = useRef<HTMLInputElement>(null);
   const [currentStep, setCurrentStep] = useState(0);
-const [savedData, setSavedData] = useState<NewEmployeeForm>(resetNewEmployeeForm());
-const steps = [
-  { title: "Personal Info", fields: ["name", "dateOfBirth", "gender", "maritalStatus", "photo"] },
-  { title: "Contact & Address", fields: ["phone", "email", "permanentAddress", "permanentPincode", "localAddress", "localPincode"] },
-  { title: "Employment & Bank", fields: ["department", "position", "salary", "bankName", "accountNumber", "ifscCode", "branchName"] },
-  { title: "Family & Emergency", fields: ["fatherName", "motherName", "spouseName", "numberOfChildren", "emergencyContactName", "emergencyContactPhone", "emergencyContactRelation", "nomineeName", "nomineeRelation"] },
-  { title: "Uniform & Documents", fields: ["pantSize", "shirtSize", "capSize", "idCardIssued", "westcoatIssued", "apronIssued", "employeeSignature", "authorizedSignature", "uploadedDocuments"] }
-];
+  const [savedData, setSavedData] = useState<NewEmployeeForm>(resetNewEmployeeForm());
+  const steps = [
+    { title: "Personal Info", fields: ["name", "dateOfBirth", "gender", "maritalStatus", "photo"] },
+    { title: "Contact & Address", fields: ["phone", "email", "permanentAddress", "permanentPincode", "localAddress", "localPincode"] },
+    { title: "Employment & Bank", fields: ["department", "position", "salary", "bankName", "accountNumber", "ifscCode", "branchName"] },
+    { title: "Family & Emergency", fields: ["fatherName", "motherName", "spouseName", "numberOfChildren", "emergencyContactName", "emergencyContactPhone", "emergencyContactRelation", "nomineeName", "nomineeRelation"] },
+    { title: "Uniform & Documents", fields: ["pantSize", "shirtSize", "capSize", "idCardIssued", "westcoatIssued", "apronIssued", "employeeSignature", "authorizedSignature", "uploadedDocuments"] }
+  ];
   useEffect(() => {
     const addParam = searchParams.get("add");
     const tabParam = searchParams.get("tab");
@@ -459,7 +459,7 @@ const steps = [
       setLoadingSites(true);
       const response = await fetch(`${API_URL}/sites`);
       const data = await response.json();
-      
+
       if (response.ok) {
         const sitesData = data.sites || data.data || data || [];
         setSites(sitesData);
@@ -490,7 +490,7 @@ const steps = [
     }
 
     const searchTerm = siteSearch.toLowerCase();
-    const filtered = sites.filter(site => 
+    const filtered = sites.filter(site =>
       site.name.toLowerCase().includes(searchTerm) ||
       site.clientName.toLowerCase().includes(searchTerm) ||
       site.location.toLowerCase().includes(searchTerm) ||
@@ -504,15 +504,15 @@ const steps = [
     if (newEmployee.siteName && sites.length > 0) {
       const site = sites.find(s => s.name === newEmployee.siteName);
       setSelectedSiteDetails(site || null);
-      
+
       if (site) {
         // Count current employees at this site (active employees only)
-        const siteEmployees = employees.filter(emp => 
-          emp.siteName === site.name && 
+        const siteEmployees = employees.filter(emp =>
+          emp.siteName === site.name &&
           emp.status === "active"
         );
         setCurrentSiteStaffCount(siteEmployees.length);
-        
+
         // Calculate regular staff count (excluding managers and supervisors)
         const regularStaffCount = calculateRegularStaffCount(site);
         setAvailableStaffPositions(regularStaffCount);
@@ -545,33 +545,33 @@ const steps = [
   // Calculate regular staff count (excluding managers and supervisors)
   const calculateRegularStaffCount = (site: Site | null) => {
     if (!site) return 0;
-    
+
     if (site.staffDeployment && Array.isArray(site.staffDeployment)) {
       // Sum all staff counts
       const totalStaff = site.staffDeployment.reduce((sum, item) => sum + (item.count || 0), 0);
-      
+
       // Subtract manager and supervisor counts if they exist in staffDeployment
       const managerCount = site.staffDeployment.find(item => item.role?.toLowerCase() === "manager")?.count || 0;
       const supervisorCount = site.staffDeployment.find(item => item.role?.toLowerCase() === "supervisor")?.count || 0;
-      
+
       return totalStaff - managerCount - supervisorCount;
     }
-    
+
     // If staffDeployment doesn't exist, use totalStaff and subtract managerCount and supervisorCount
     const totalStaff = site.totalStaff || 0;
     const managerCount = site.managerCount || 0;
     const supervisorCount = site.supervisorCount || 0;
-    
+
     return totalStaff - managerCount - supervisorCount;
   };
 
   // Check if site has available positions
   const hasAvailablePositions = (site: Site | null): boolean => {
     if (!site) return false;
-    
+
     const regularStaffCount = calculateRegularStaffCount(site);
-    const siteEmployees = employees.filter(emp => 
-      emp.siteName === site.name && 
+    const siteEmployees = employees.filter(emp =>
+      emp.siteName === site.name &&
       emp.status === "active"
     );
     return siteEmployees.length < regularStaffCount;
@@ -580,10 +580,10 @@ const steps = [
   // Get available positions count
   const getAvailablePositions = (site: Site | null): number => {
     if (!site) return 0;
-    
+
     const regularStaffCount = calculateRegularStaffCount(site);
-    const siteEmployees = employees.filter(emp => 
-      emp.siteName === site.name && 
+    const siteEmployees = employees.filter(emp =>
+      emp.siteName === site.name &&
       emp.status === "active"
     );
     return Math.max(0, regularStaffCount - siteEmployees.length);
@@ -602,10 +602,9 @@ const steps = [
   const SiteDropdown = () => (
     <div className="relative w-full">
       <div className="relative">
-        <div 
-          className={`flex items-center justify-between w-full px-3 py-2.5 text-sm border rounded-md cursor-pointer hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${
-            newEmployee.siteName && selectedSiteDetails && !hasAvailablePositions(selectedSiteDetails) ? 'border-amber-300 bg-amber-50' : 'border-gray-300'
-          }`}
+        <div
+          className={`flex items-center justify-between w-full px-3 py-2.5 text-sm border rounded-md cursor-pointer hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${newEmployee.siteName && selectedSiteDetails && !hasAvailablePositions(selectedSiteDetails) ? 'border-amber-300 bg-amber-50' : 'border-gray-300'
+            }`}
           onClick={() => {
             setShowSiteDropdown(!showSiteDropdown);
             if (!showSiteDropdown) {
@@ -643,7 +642,7 @@ const steps = [
             <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${showSiteDropdown ? 'rotate-180' : ''}`} />
           </div>
         </div>
-        
+
         {showSiteDropdown && (
           <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-80 overflow-hidden">
             {/* Search Header */}
@@ -675,7 +674,7 @@ const steps = [
                 Type to search {sites.length} sites
               </div>
             </div>
-            
+
             {/* Loading State */}
             {loadingSites ? (
               <div className="p-6 text-center">
@@ -705,19 +704,18 @@ const steps = [
               <div className="overflow-y-auto max-h-64">
                 {filteredSites.map((site) => {
                   const regularStaffCount = calculateRegularStaffCount(site);
-                  const siteEmployees = employees.filter(emp => 
-                    emp.siteName === site.name && 
+                  const siteEmployees = employees.filter(emp =>
+                    emp.siteName === site.name &&
                     emp.status === "active"
                   );
                   const availablePositions = regularStaffCount - siteEmployees.length;
                   const isFull = availablePositions <= 0;
-                  
+
                   return (
                     <div
                       key={site._id}
-                      className={`px-3 py-3 text-sm cursor-pointer transition-colors hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
-                        newEmployee.siteName === site.name ? "bg-blue-50 border-l-4 border-l-blue-500" : ""
-                      } ${isFull ? 'opacity-60' : ''}`}
+                      className={`px-3 py-3 text-sm cursor-pointer transition-colors hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${newEmployee.siteName === site.name ? "bg-blue-50 border-l-4 border-l-blue-500" : ""
+                        } ${isFull ? 'opacity-60' : ''}`}
                       onClick={() => !isFull && handleSiteSelect(site)}
                     >
                       <div className="flex items-start justify-between">
@@ -731,18 +729,18 @@ const steps = [
                               <Check className="h-3 w-3 text-blue-600 flex-shrink-0" />
                             )}
                           </div>
-                          
+
                           <div className="mt-2 space-y-1.5">
                             <div className="flex items-center gap-2 text-xs text-gray-600">
                               <Building className="h-3 w-3" />
                               <span className="truncate">Client: {site.clientName}</span>
                             </div>
-                            
+
                             <div className="flex items-center gap-2 text-xs text-gray-600">
                               <MapPin className="h-3 w-3" />
                               <span className="truncate">{site.location}</span>
                             </div>
-                            
+
                             <div className="flex items-center gap-2 text-xs text-gray-600">
                               <Users className="h-3 w-3" />
                               <span>Regular Staff: {regularStaffCount}</span>
@@ -751,18 +749,18 @@ const steps = [
                                 Available: {availablePositions}
                               </span>
                             </div>
-                            
+
                             {site.managerCount && site.managerCount > 0 && (
                               <div className="text-xs text-gray-500">
                                 Managers: {site.managerCount} | Supervisors: {site.supervisorCount || 0}
                               </div>
                             )}
-                            
+
                             {site.services && site.services.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {site.services.slice(0, 2).map((service, idx) => (
-                                  <Badge 
-                                    key={idx} 
+                                  <Badge
+                                    key={idx}
                                     variant="outline"
                                     className="text-[10px] px-1.5 py-0 h-4"
                                   >
@@ -770,7 +768,7 @@ const steps = [
                                   </Badge>
                                 ))}
                                 {site.services.length > 2 && (
-                                  <Badge 
+                                  <Badge
                                     variant="outline"
                                     className="text-[10px] px-1.5 py-0 h-4"
                                   >
@@ -779,7 +777,7 @@ const steps = [
                                 )}
                               </div>
                             )}
-                            
+
                             {site.manager && (
                               <div className="text-xs text-gray-500 mt-1">
                                 Manager: <span className="font-medium">{site.manager}</span>
@@ -787,15 +785,15 @@ const steps = [
                             )}
                           </div>
                         </div>
-                        
+
                         <div className="ml-2 flex-shrink-0 space-y-1">
-                          <Badge 
+                          <Badge
                             variant={site.status === 'active' ? "default" : "secondary"}
                             className={`text-xs ${site.status === 'active' ? 'bg-green-100 text-green-800 hover:bg-green-100' : 'bg-gray-100 text-gray-800'}`}
                           >
                             {site.status === 'active' ? 'Active' : 'Inactive'}
                           </Badge>
-                          
+
                           {isFull && (
                             <Badge variant="destructive" className="text-xs">
                               Full
@@ -803,7 +801,7 @@ const steps = [
                           )}
                         </div>
                       </div>
-                      
+
                       {site.contractEndDate && (
                         <div className="mt-2 text-xs">
                           <span className="text-gray-500">Contract ends: </span>
@@ -816,7 +814,7 @@ const steps = [
                           </span>
                         </div>
                       )}
-                      
+
                       {isFull && (
                         <div className="mt-2 text-xs text-red-600 bg-red-50 p-1 rounded">
                           No regular staff positions available
@@ -827,7 +825,7 @@ const steps = [
                 })}
               </div>
             )}
-            
+
             {/* Footer with count */}
             <div className="sticky bottom-0 bg-gray-50 border-t px-3 py-2">
               <div className="flex justify-between items-center text-xs text-gray-600">
@@ -849,23 +847,22 @@ const steps = [
           </div>
         )}
       </div>
-      
+
       {/* Click outside to close dropdown */}
       {showSiteDropdown && (
-        <div 
-          className="fixed inset-0 z-40" 
+        <div
+          className="fixed inset-0 z-40"
           onClick={() => setShowSiteDropdown(false)}
         />
       )}
-      
+
       {/* Site Status Display */}
       {newEmployee.siteName && selectedSiteDetails && (
         <div className="mt-2 space-y-2">
-          <div className={`p-3 rounded-md ${
-            currentSiteStaffCount >= availableStaffPositions 
-              ? 'bg-red-50 border border-red-200' 
-              : 'bg-green-50 border border-green-200'
-          }`}>
+          <div className={`p-3 rounded-md ${currentSiteStaffCount >= availableStaffPositions
+            ? 'bg-red-50 border border-red-200'
+            : 'bg-green-50 border border-green-200'
+            }`}>
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Staff Status:</span>
               <Badge variant={currentSiteStaffCount >= availableStaffPositions ? "destructive" : "default"}>
@@ -889,7 +886,7 @@ const steps = [
               </div>
             </div>
           </div>
-          
+
           {currentSiteStaffCount >= availableStaffPositions && (
             <div className="text-sm text-red-600 bg-red-50 p-2 rounded border border-red-200">
               ⚠️ This site has reached its regular staff capacity. No more regular staff can be onboarded.
@@ -897,7 +894,7 @@ const steps = [
           )}
         </div>
       )}
-      
+
       {/* Validation message */}
       {!newEmployee.siteName && (
         <div className="text-xs text-amber-600 mt-1">
@@ -910,25 +907,25 @@ const steps = [
   // Helper functions for Excel import
   const parseExcelDate = (excelDate: any): string => {
     if (!excelDate) return '';
-    
+
     try {
       // If it's already a date string with time (like "2023-09-04 00:00:00")
       if (typeof excelDate === 'string') {
         const datePart = excelDate.split(' ')[0];
         return datePart;
       }
-      
+
       // If it's an Excel serial number
       if (typeof excelDate === 'number') {
         const date = new Date(Math.round((excelDate - 25569) * 86400 * 1000));
         return date.toISOString().split('T')[0];
       }
-      
+
       // If it's a Date object
       if (excelDate instanceof Date) {
         return excelDate.toISOString().split('T')[0];
       }
-      
+
       return '';
     } catch (error) {
       console.error('Error parsing date:', error, excelDate);
@@ -938,27 +935,27 @@ const steps = [
 
   const parseBooleanField = (value: any): boolean => {
     if (value === null || value === undefined) return false;
-    
+
     const stringValue = String(value).toLowerCase().trim();
-    
+
     if (stringValue === 'yes' || stringValue === 'true' || stringValue === '1') {
       return true;
     }
-    
+
     if (stringValue === 'no' || stringValue === 'false' || stringValue === '0') {
       return false;
     }
-    
+
     // Check for checkboxes or marks
     if (stringValue === '✓' || stringValue === '✔' || stringValue === 'x') {
       return true;
     }
-    
+
     // If it's just text but not empty, assume true
     if (stringValue !== '') {
       return true;
     }
-    
+
     return false;
   };
 
@@ -969,46 +966,46 @@ const steps = [
 
     try {
       setImporting(true);
-      
+
       // Read the Excel file
       const reader = new FileReader();
-      
+
       reader.onload = (e) => {
         try {
           const data = e.target?.result;
           const workbook = XLSX.read(data, { type: 'binary' });
-          
+
           // Get the first sheet
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-          
+
           // Convert to JSON
           const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-          
+
           if (jsonData.length < 2) {
             toast.error("Excel file is empty or has no data");
             setImporting(false);
             return;
           }
-          
+
           // Get headers (first row)
           const headers = jsonData[0] as string[];
-          
+
           // Process data rows
           const processedData: NewEmployeeForm[] = [];
-          
+
           for (let i = 1; i < jsonData.length; i++) {
             const row = jsonData[i] as any[];
             if (!row || row.every(cell => cell === null || cell === undefined || cell === '')) {
               continue; // Skip empty rows
             }
-            
+
             const employeeData: any = resetNewEmployeeForm();
-            
+
             // Map Excel columns to form fields
             headers.forEach((header, index) => {
               const cellValue = row[index];
-              
+
               if (cellValue !== null && cellValue !== undefined && cellValue !== '') {
                 switch (header.trim()) {
                   case 'Site Name':
@@ -1128,17 +1125,17 @@ const steps = [
                 }
               }
             });
-            
+
             // Only add if there's at least a name
             if (employeeData.name && employeeData.name.trim() !== '') {
               processedData.push(employeeData);
             }
           }
-          
+
           setExcelData(processedData);
           setShowExcelPreview(true);
           toast.success(`Loaded ${processedData.length} employees from Excel`);
-          
+
         } catch (error) {
           console.error('Error processing Excel:', error);
           toast.error('Error reading Excel file. Please check the format.');
@@ -1146,14 +1143,14 @@ const steps = [
           setImporting(false);
         }
       };
-      
+
       reader.onerror = () => {
         toast.error('Error reading file');
         setImporting(false);
       };
-      
+
       reader.readAsBinaryString(file);
-      
+
     } catch (error) {
       console.error('Excel import error:', error);
       toast.error('Failed to import Excel file');
@@ -1171,13 +1168,13 @@ const steps = [
     // Validate site capacities first
     const siteCounts: { [key: string]: number } = {};
     const siteDetails: { [key: string]: Site } = {};
-    
+
     sites.forEach(site => {
       siteDetails[site.name] = site;
     });
-    
+
     const employeesBySite: { [key: string]: NewEmployeeForm[] } = {};
-    
+
     excelData.forEach(emp => {
       if (emp.siteName) {
         if (!employeesBySite[emp.siteName]) {
@@ -1186,33 +1183,33 @@ const steps = [
         employeesBySite[emp.siteName].push(emp);
       }
     });
-    
+
     // Check each site's capacity
     const sitesExceedingCapacity: string[] = [];
-    
+
     for (const siteName in employeesBySite) {
       const site = siteDetails[siteName];
       if (!site) {
         sitesExceedingCapacity.push(`${siteName} (Site not found)`);
         continue;
       }
-      
+
       const regularStaffCount = calculateRegularStaffCount(site);
-      const currentStaff = employees.filter(emp => 
-        emp.siteName === siteName && 
+      const currentStaff = employees.filter(emp =>
+        emp.siteName === siteName &&
         emp.status === "active"
       ).length;
-      
+
       const importCount = employeesBySite[siteName].length;
       const totalAfterImport = currentStaff + importCount;
-      
+
       if (totalAfterImport > regularStaffCount) {
         sitesExceedingCapacity.push(
           `${siteName}: Would exceed capacity (Current: ${currentStaff}, Importing: ${importCount}, Capacity: ${regularStaffCount})`
         );
       }
     }
-    
+
     if (sitesExceedingCapacity.length > 0) {
       toast.error(
         <div>
@@ -1230,14 +1227,14 @@ const steps = [
 
     setImporting(true);
     setImportProgress(0);
-    
+
     const successfulImports: Employee[] = [];
     const failedImports: { name: string; error: string }[] = [];
-    
+
     try {
       for (let i = 0; i < excelData.length; i++) {
         const employeeData = excelData[i];
-        
+
         try {
           // Skip if essential fields are missing
           if (!employeeData.name || !employeeData.aadharNumber) {
@@ -1263,7 +1260,7 @@ const steps = [
 
           // Create FormData for each employee
           const formData = new FormData();
-          
+
           // Add employee data
           const employeeDataToSend = {
             name: employeeData.name,
@@ -1331,34 +1328,34 @@ const steps = [
               error: data.message || 'Unknown error'
             });
           }
-          
+
         } catch (error: any) {
           failedImports.push({
             name: employeeData.name || 'Unknown',
             error: error.message || 'Unknown error'
           });
         }
-        
+
         // Update progress
         setImportProgress(Math.round(((i + 1) / excelData.length) * 100));
       }
-      
+
       // Update employees list
       if (successfulImports.length > 0) {
         setEmployees(prev => [...prev, ...successfulImports]);
         toast.success(`Successfully imported ${successfulImports.length} employees`);
       }
-      
+
       // Show errors if any
       if (failedImports.length > 0) {
         toast.error(`${failedImports.length} employees failed to import`);
         console.log('Failed imports:', failedImports);
       }
-      
+
       // Reset
       setExcelData([]);
       setShowExcelPreview(false);
-      
+
     } catch (error) {
       console.error('Bulk import error:', error);
       toast.error('Error during bulk import');
@@ -1415,7 +1412,7 @@ const steps = [
     const ws = XLSX.utils.aoa_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Template');
-    
+
     XLSX.writeFile(wb, 'Employee_Import_Template.xlsx');
     toast.success('Template downloaded successfully');
   };
@@ -1423,17 +1420,17 @@ const steps = [
   // Initialize EPF Form with employee data
   const initializeEPFForm = (employee: Employee) => {
     setCreatedEmployeeData(employee);
-    
+
     const today = new Date().toISOString().split('T')[0];
-    
+
     // Safely get salary with fallbacks
     let salaryValue = 0;
     if (employee.salary) {
-      salaryValue = typeof employee.salary === 'string' 
-        ? parseFloat(employee.salary) 
+      salaryValue = typeof employee.salary === 'string'
+        ? parseFloat(employee.salary)
         : Number(employee.salary) || 0;
     }
-    
+
     // Safely get other properties with fallbacks
     const epfData: EPFForm11Data = {
       memberName: employee.name || "",
@@ -1471,7 +1468,7 @@ const steps = [
       declarationPlace: "Mumbai",
       employerDeclarationDate: today
     };
-    
+
     setEpfFormData(epfData);
     setActiveTab("epf-form");
     toast.success("Employee created successfully! Please fill EPF Form 11.");
@@ -1493,148 +1490,148 @@ const steps = [
       'enrolledDate',
       'firstEmploymentWages'
     ];
-    
+
     return autoFilledFields.includes(fieldName);
   };
 
   // Camera functions
   const startCamera = async () => {
-  try {
-    // Stop any existing stream first
-    if (streamRef.current) {
-      stopCamera();
+    try {
+      // Stop any existing stream first
+      if (streamRef.current) {
+        stopCamera();
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: facingMode,
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      });
+
+      streamRef.current = stream;
+      setVideoReady(false);
+      videoReadyRef.current = false;
+      setShowCamera(true);
+      setCapturedImage(null);
+
+      // Attach stream after the modal is shown so the video element exists
+      requestAnimationFrame(() => {
+        if (!videoRef.current) return;
+        videoRef.current.srcObject = stream;
+
+        // Use oncanplay – it fires when the video is actually ready to render frames
+        videoRef.current.oncanplay = () => {
+          videoRef.current?.play().then(() => {
+            setVideoReady(true);
+            videoReadyRef.current = true;
+          }).catch(console.error);
+        };
+      });
+    } catch (error: any) {
+      console.error("Error accessing camera:", error);
+      if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+        toast.error("Camera permission denied. Please allow camera access and try again.");
+      } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
+        toast.error("No camera found on this device.");
+      } else if (error.name === "NotReadableError" || error.name === "TrackStartError") {
+        toast.error("Camera is already in use by another application.");
+      } else {
+        toast.error("Cannot access camera. Please check permissions and try again.");
+      }
+    }
+  };
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) {
+      toast.error("Camera not ready");
+      return;
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: facingMode,
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-      },
-    });
+    if (!videoReadyRef.current) {
+      toast.error("Camera is still starting. Please wait a moment.");
+      return;
+    }
 
-    streamRef.current = stream;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      toast.error("Camera stream not ready yet. Please wait.");
+      return;
+    }
+
+    const context = canvas.getContext("2d");
+    if (context) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = canvas.toDataURL("image/jpeg", 0.9);
+      setCapturedImage(imageData);
+      stopCamera();
+      toast.success("Photo captured successfully!");
+    } else {
+      toast.error("Failed to capture photo");
+    }
+  };
+
+  const retakePhoto = () => {
+    setCapturedImage(null);
+    // Restart camera
+    startCamera();
+  };
+
+  const useCapturedPhoto = () => {
+    if (capturedImage) {
+      // Convert data URL to blob
+      fetch(capturedImage)
+        .then(res => res.blob())
+        .then(blob => {
+          // Create a file from the blob
+          const file = new File([blob], `employee-photo-${Date.now()}.jpg`, {
+            type: 'image/jpeg'
+          });
+
+          setNewEmployee({ ...newEmployee, photo: file });
+
+          // Create preview URL
+          if (photoPreview) {
+            URL.revokeObjectURL(photoPreview);
+          }
+          const previewUrl = URL.createObjectURL(file);
+          setPhotoPreview(previewUrl);
+
+          toast.success("Photo added successfully!");
+
+          // Close camera modal
+          setShowCamera(false);
+          setCapturedImage(null);
+        })
+        .catch(error => {
+          console.error("Error converting photo:", error);
+          toast.error("Error processing photo. Please try again.");
+        });
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+      videoRef.current.oncanplay = null; // clean up event listener
+    }
     setVideoReady(false);
     videoReadyRef.current = false;
-    setShowCamera(true);
-    setCapturedImage(null);
-
-    // Attach stream after the modal is shown so the video element exists
-    requestAnimationFrame(() => {
-      if (!videoRef.current) return;
-      videoRef.current.srcObject = stream;
-
-      // Use oncanplay – it fires when the video is actually ready to render frames
-      videoRef.current.oncanplay = () => {
-        videoRef.current?.play().then(() => {
-          setVideoReady(true);
-          videoReadyRef.current = true;
-        }).catch(console.error);
-      };
-    });
-  } catch (error: any) {
-    console.error("Error accessing camera:", error);
-    if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
-      toast.error("Camera permission denied. Please allow camera access and try again.");
-    } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
-      toast.error("No camera found on this device.");
-    } else if (error.name === "NotReadableError" || error.name === "TrackStartError") {
-      toast.error("Camera is already in use by another application.");
-    } else {
-      toast.error("Cannot access camera. Please check permissions and try again.");
-    }
-  }
-};
-const capturePhoto = () => {
-  if (!videoRef.current || !canvasRef.current) {
-    toast.error("Camera not ready");
-    return;
-  }
-
-  if (!videoReadyRef.current) {
-    toast.error("Camera is still starting. Please wait a moment.");
-    return;
-  }
-
-  const video = videoRef.current;
-  const canvas = canvasRef.current;
-
-  if (video.videoWidth === 0 || video.videoHeight === 0) {
-    toast.error("Camera stream not ready yet. Please wait.");
-    return;
-  }
-
-  const context = canvas.getContext("2d");
-  if (context) {
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const imageData = canvas.toDataURL("image/jpeg", 0.9);
-    setCapturedImage(imageData);
-    stopCamera();
-    toast.success("Photo captured successfully!");
-  } else {
-    toast.error("Failed to capture photo");
-  }
-};
-
-const retakePhoto = () => {
-  setCapturedImage(null);
-  // Restart camera
-  startCamera();
-};
-
-const useCapturedPhoto = () => {
-  if (capturedImage) {
-    // Convert data URL to blob
-    fetch(capturedImage)
-      .then(res => res.blob())
-      .then(blob => {
-        // Create a file from the blob
-        const file = new File([blob], `employee-photo-${Date.now()}.jpg`, { 
-          type: 'image/jpeg' 
-        });
-        
-        setNewEmployee({...newEmployee, photo: file});
-        
-        // Create preview URL
-        if (photoPreview) {
-          URL.revokeObjectURL(photoPreview);
-        }
-        const previewUrl = URL.createObjectURL(file);
-        setPhotoPreview(previewUrl);
-        
-        toast.success("Photo added successfully!");
-        
-        // Close camera modal
-        setShowCamera(false);
-        setCapturedImage(null);
-      })
-      .catch(error => {
-        console.error("Error converting photo:", error);
-        toast.error("Error processing photo. Please try again.");
-      });
-  }
-};
-
-const stopCamera = () => {
-  if (streamRef.current) {
-    streamRef.current.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-  }
-  if (videoRef.current) {
-    videoRef.current.srcObject = null;
-    videoRef.current.oncanplay = null; // clean up event listener
-  }
-  setVideoReady(false);
-  videoReadyRef.current = false;
-};
-// Clean up camera on component unmount
-useEffect(() => {
-  return () => {
-    stopCamera();
   };
-}, []);
+  // Clean up camera on component unmount
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
 
   // Handle file upload
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1648,10 +1645,10 @@ useEffect(() => {
       // Create preview URL
       const previewUrl = URL.createObjectURL(file);
       setPhotoPreview(previewUrl);
-      setNewEmployee({...newEmployee, photo: file});
-      
+      setNewEmployee({ ...newEmployee, photo: file });
+
       toast.success("Photo selected successfully!");
-      
+
       // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -1660,7 +1657,7 @@ useEffect(() => {
   };
 
   const handleRemovePhoto = () => {
-    setNewEmployee({...newEmployee, photo: null});
+    setNewEmployee({ ...newEmployee, photo: null });
     if (photoPreview) {
       URL.revokeObjectURL(photoPreview);
       setPhotoPreview(null);
@@ -1670,14 +1667,14 @@ useEffect(() => {
   // Handle add employee
   const handleAddEmployee = async () => {
     // Validate required fields (email is optional but we'll generate if empty for backend)
-   const requiredFields = [
-  { field: newEmployee.name, name: 'Name' },
-  { field: newEmployee.aadharNumber, name: 'Aadhar Number' },
-  { field: newEmployee.dateOfBirth, name: 'Date of Birth' },  // ✅ Added
-  { field: newEmployee.department, name: 'Department' },
-  { field: newEmployee.siteName, name: 'Site Name' },
-  
-];
+    const requiredFields = [
+      { field: newEmployee.name, name: 'Name' },
+      { field: newEmployee.aadharNumber, name: 'Aadhar Number' },
+      { field: newEmployee.dateOfBirth, name: 'Date of Birth' },  // ✅ Added
+      { field: newEmployee.department, name: 'Department' },
+      { field: newEmployee.siteName, name: 'Site Name' },
+
+    ];
 
     const missingFields = requiredFields
       .filter(item => !item.field || item.field.trim() === '')
@@ -1689,18 +1686,18 @@ useEffect(() => {
     }
 
     if (newEmployee.dateOfBirth) {
-  const birthDate = new Date(newEmployee.dateOfBirth);
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  if (age < 18) {
-    toast.error("Employee must be at least 18 years old");
-    return;
-  }
-}
+      const birthDate = new Date(newEmployee.dateOfBirth);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      if (age < 18) {
+        toast.error("Employee must be at least 18 years old");
+        return;
+      }
+    }
     // Generate email if not provided (to satisfy backend requirement)
     let finalEmail = newEmployee.email?.trim() || '';
     if (!finalEmail && newEmployee.name) {
@@ -1740,25 +1737,25 @@ useEffect(() => {
     }
 
     // Salary is optional – default to 0 if empty/invalid
-let salaryValue = 0;
-if (newEmployee.salary && newEmployee.salary.trim() !== "") {
-  const parsed = parseFloat(newEmployee.salary);
-  if (!isNaN(parsed) && parsed > 0) {
-    salaryValue = parsed;
-  } else {
-    toast.error("Please enter a valid salary amount (positive number)");
-    return;
-  }
-}
+    let salaryValue = 0;
+    if (newEmployee.salary && newEmployee.salary.trim() !== "") {
+      const parsed = parseFloat(newEmployee.salary);
+      if (!isNaN(parsed) && parsed > 0) {
+        salaryValue = parsed;
+      } else {
+        toast.error("Please enter a valid salary amount (positive number)");
+        return;
+      }
+    }
 
     // Validate site capacity
     if (selectedSiteDetails) {
       const regularStaffCount = calculateRegularStaffCount(selectedSiteDetails);
-      const siteEmployees = employees.filter(emp => 
-        emp.siteName === selectedSiteDetails.name && 
+      const siteEmployees = employees.filter(emp =>
+        emp.siteName === selectedSiteDetails.name &&
         emp.status === "active"
       );
-      
+
       if (siteEmployees.length >= regularStaffCount) {
         toast.error(`Cannot onboard employee: Site "${selectedSiteDetails.name}" has reached its regular staff capacity (${regularStaffCount} staff).`);
         return;
@@ -1855,18 +1852,18 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
 
       toast.success("Employee created successfully!");
 
-      
-      
+
+
       // The backend returns the employee data with Cloudinary URLs
       const createdEmployee = data.employee || data.data || data;
-      
+
       // Debug: Log the created employee data
       console.log('Created employee data:', createdEmployee);
-      
+
       if (!createdEmployee) {
         throw new Error('No employee data returned from server');
       }
-      
+
       // Ensure the employee object has all required properties
       const processedEmployee: Employee = {
         _id: createdEmployee._id,
@@ -1920,10 +1917,10 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
         createdAt: createdEmployee.createdAt,
         updatedAt: createdEmployee.updatedAt
       };
-      
-      
+
+
       setEmployees(prev => [...prev, processedEmployee]);
-      
+
       // Reset form
       setNewEmployee(resetNewEmployeeForm());
       setUploadedDocuments([]);
@@ -1932,23 +1929,23 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
         setPhotoPreview(null);
       }
       if (newEmployee.photo instanceof File) {
-  try {
-    const faceFormData = new FormData();
-    faceFormData.append('photo', newEmployee.photo);
-    await axios.post(`${API_URL}/attendance/register-face/${processedEmployee._id}`, faceFormData);
-    toast.success("Face registered successfully for attendance");
-  } catch (faceErr) {
-    console.error("Face registration failed:", faceErr);
-    toast.warning("Employee created but face registration failed. You can register face later.");
-  }
-}
-      
+        try {
+          const faceFormData = new FormData();
+          faceFormData.append('photo', newEmployee.photo);
+          await axios.post(`${API_URL}/attendance/register-face/${processedEmployee._id}`, faceFormData);
+          toast.success("Face registered successfully for attendance");
+        } catch (faceErr) {
+          console.error("Face registration failed:", faceErr);
+          toast.warning("Employee created but face registration failed. You can register face later.");
+        }
+      }
+
       // Then initialize EPF Form and switch tabs
       initializeEPFForm(processedEmployee);
 
     } catch (error: any) {
       console.error("Error creating employee:", error);
-      
+
       // Show more specific error message
       if (error.message.includes('500')) {
         toast.error("Server error. Please check if the backend server is running and try again.");
@@ -1981,9 +1978,9 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
     const file = event.target.files?.[0];
     if (file) {
       if (type === 'employee') {
-        setNewEmployee({...newEmployee, employeeSignature: file});
+        setNewEmployee({ ...newEmployee, employeeSignature: file });
       } else {
-        setNewEmployee({...newEmployee, authorizedSignature: file});
+        setNewEmployee({ ...newEmployee, authorizedSignature: file });
       }
       toast.success(`${type === 'employee' ? 'Employee' : 'Authorized'} signature uploaded successfully!`);
     }
@@ -2018,17 +2015,17 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
 
     try {
       setIsSavingEPF(true);
-      
+
       // Use _id (MongoDB ObjectId) as employeeId
       const employeeId = createdEmployeeData._id;
-      
+
       if (!employeeId) {
         toast.error("Invalid employee data - missing ID");
         return;
       }
-      
+
       console.log('Saving EPF Form for employee:', employeeId);
-      
+
       const response = await fetch(`${API_URL}/epf-forms`, {
         method: "POST",
         headers: {
@@ -2055,7 +2052,7 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
         toast.success("EPF Form saved successfully!");
         setActiveTab("onboarding");
         setCreatedEmployeeData(null);
-        
+
         // Reset EPF form data
         setEpfFormData({
           memberName: "",
@@ -2103,6 +2100,179 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
       setIsSavingEPF(false);
     }
   };
+  // ─── Print Joining Form ──────────────────────────────────────────────
+  const printJoiningForm = (employee: Employee) => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      toast.error("Please allow popups to print the form");
+      return;
+    }
+
+    const photoUrl = employee.photo || '';
+
+    const formContent = `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <title>Joining Form - ${employee.name}</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { font-family: 'Times New Roman', Georgia, serif; margin: 0; padding: 20px; background: #fff; color:#000; }
+      .page { max-width: 800px; margin: 0 auto 30px auto; padding: 20px 30px; background:#fff; page-break-after: always; }
+      .page:last-child { page-break-after: auto; }
+
+      /* ---------- PAGE 1: JOINING FORM ---------- */
+      .header { position: relative; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 10px; }
+      .header h1 { margin:0; font-size: 30px; letter-spacing: 3px; font-weight: bold; }
+      .header .subtitle { font-size: 12px; margin-top: 2px; }
+      .header .form-title { font-size: 17px; font-weight: bold; text-align:center; margin-top: 6px; text-decoration: underline; }
+      .photo-box { position: absolute; top: 0; right: 0; width: 95px; height: 110px; border: 1px solid #000; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:10px; color:#999; }
+      .photo-box img { width:100%; height:100%; object-fit:cover; }
+
+      .field-row { display:flex; align-items:baseline; border-bottom:1px solid #000; padding: 5px 0; min-height: 24px; }
+      .field-row .label { font-size: 13px; width: 150px; flex-shrink:0; }
+      .field-row .colon { width: 14px; flex-shrink:0; }
+      .field-row .value { font-size: 13px; flex:1; }
+      .field-row .pin { display:flex; align-items:baseline; margin-left: 20px; flex-shrink:0; }
+      .field-row .pin .plabel { font-size:13px; margin-right:4px; }
+      .field-row .pin .pvalue { font-size:13px; min-width: 90px; border-bottom:1px solid #000; }
+      .cont-row { border-bottom: 1px solid #000; min-height: 22px; }
+
+      .uniform-row { border-bottom: 1px solid #000; padding: 6px 0; font-size: 13px; }
+      .uniform-row .label { display:inline-block; width:150px; }
+      .uniform-row .issued { font-weight: bold; text-decoration: underline; }
+
+      .signature-section { display:flex; justify-content:space-between; margin-top: 45px; }
+      .signature-box { text-align:center; width:45%; font-size: 13px; font-weight:bold; }
+      .signature-box .line { border-top: 1px solid #000; margin-top: 4px; padding-top: 4px; }
+
+      .footer { text-align:center; font-size: 9px; color:#666; margin-top: 15px; }
+
+      /* ---------- PAGE 2: DECLARATION (BACKSIDE) ---------- */
+      .declaration-title { text-align:center; font-size:20px; font-weight:bold; margin-bottom: 22px; }
+      .declaration-intro { font-size: 13.5px; line-height: 1.9; margin-bottom: 10px; }
+      .declaration-name-line { border-bottom: 1px solid #000; display:inline-block; min-width: 320px; }
+      .declaration-list { font-size: 13.5px; line-height: 1.9; margin: 0; padding-left: 0; list-style: none; }
+      .declaration-list li { margin-bottom: 14px; display:flex; }
+      .declaration-list .num { flex-shrink:0; width: 26px; }
+      .declaration-list .txt { flex:1; text-align: justify; }
+      .declaration-closing { font-size: 13.5px; line-height: 1.9; margin-top: 20px; text-align: justify; }
+      .declaration-sign { margin-top: 50px; display:flex; justify-content:space-between; font-size:13.5px; }
+
+      @media print {
+        body { padding: 0; }
+        .page { margin: 0 auto; padding: 15mm; }
+      }
+    </style>
+  </head>
+  <body>
+
+    <!-- PAGE 1: JOINING FORM -->
+    <div class="page">
+      <div class="header">
+        <h1>SK ENTERPRISES</h1>
+        <div class="subtitle">▪ Housekeeping &nbsp;▪ Parking &nbsp;▪ Waste Management</div>
+        <div class="form-title">Employee Joining Form</div>
+        <div class="photo-box">
+          ${photoUrl ? `<img src="${photoUrl}" alt="Photo" />` : 'Photo'}
+        </div>
+      </div>
+
+      <div class="field-row"><span class="label">Site Name</span><span class="colon">:</span><span class="value">${employee.siteName || ''}</span></div>
+      <div class="field-row"><span class="label">Name</span><span class="colon">:</span><span class="value">${employee.name || ''}</span></div>
+      <div class="field-row"><span class="label">Date of Birth</span><span class="colon">:</span><span class="value">${employee.dateOfBirth || ''}</span></div>
+      <div class="field-row"><span class="label">Date of Joining</span><span class="colon">:</span><span class="value">${employee.joinDate || employee.dateOfJoining || ''}</span></div>
+      <div class="field-row"><span class="label">Contact No.</span><span class="colon">:</span><span class="value">${employee.phone || ''}</span></div>
+      <div class="field-row"><span class="label">Blood Group</span><span class="colon">:</span><span class="value">${employee.bloodGroup || ''}</span></div>
+
+      <div class="field-row">
+        <span class="label">Permanent Address</span><span class="colon">:</span><span class="value">${employee.permanentAddress || ''}</span>
+        <span class="pin"><span class="plabel">Pin Code:</span><span class="pvalue">${employee.permanentPincode || ''}</span></span>
+      </div>
+      <div class="cont-row"></div>
+
+      <div class="field-row">
+        <span class="label">Local Address</span><span class="colon">:</span><span class="value">${employee.localAddress || ''}</span>
+        <span class="pin"><span class="plabel">Pin Code:</span><span class="pvalue">${employee.localPincode || ''}</span></span>
+      </div>
+      <div class="cont-row"></div>
+
+      <div class="field-row"><span class="label">Nominee Name</span><span class="colon">:</span><span class="value">${employee.nomineeName || ''}</span></div>
+      <div class="field-row"><span class="label">Employee Relation</span><span class="colon">:</span><span class="value">${employee.nomineeRelation || ''}</span></div>
+      <div class="field-row"><span class="label">Aadhaar Card No.</span><span class="colon">:</span><span class="value">${employee.aadharNumber || ''}</span></div>
+      <div class="field-row"><span class="label">ID No.</span><span class="colon">(&nbsp;&nbsp;)</span><span class="value">${employee.employeeId || ''}</span></div>
+      <div class="field-row"><span class="label">Emergency Cont. No.</span><span class="colon">:</span><span class="value">1) ${employee.emergencyContactPhone || ''}&nbsp;&nbsp;&nbsp;&nbsp;2)</span></div>
+
+      <div class="field-row">
+        <span class="label">Bank Name</span><span class="colon">:</span><span class="value">${employee.bankName || ''}</span>
+        <span class="pin"><span class="plabel">IFSC Code:</span><span class="pvalue">${employee.ifscCode || ''}</span></span>
+      </div>
+      <div class="field-row"><span class="label">Branch</span><span class="colon">:</span><span class="value">${employee.branchName || ''}</span></div>
+      <div class="field-row"><span class="label">Account No.</span><span class="colon">:</span><span class="value">${employee.accountNumber || ''}</span></div>
+
+      <div class="uniform-row">
+        <span class="label">Uniform</span>:
+        <span class="${employee.pantSize ? 'issued' : ''}">Pant</span> /
+        <span class="${employee.shirtSize ? 'issued' : ''}">Shirt</span> /
+        <span class="${employee.capSize ? 'issued' : ''}">Cap</span> /
+        <span class="${employee.idCardIssued ? 'issued' : ''}">ID</span> /
+        <span class="${employee.westcoatIssued ? 'issued' : ''}">Westcoat</span> /
+        <span class="${employee.apronIssued ? 'issued' : ''}">Apron</span>
+      </div>
+
+      <div class="signature-section">
+        <div class="signature-box"><div class="line">Authorized Signature</div></div>
+        <div class="signature-box"><div class="line">Employee Signature</div></div>
+      </div>
+
+      <div class="footer">This is a computer-generated form. Printed on ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+    </div>
+
+    <!-- PAGE 2: DECLARATION (BACKSIDE) -->
+    <div class="page">
+      <div class="declaration-title">प्रतिज्ञापत्र</div>
+
+      <div class="declaration-intro">
+        मी <span class="declaration-name-line">&nbsp;${employee.name || ''}&nbsp;</span><br/><br/>
+        खालील लिहिलेल्या अटी व सूचना पूर्णपणे समजून घेतल्या आहेत व मी त्यांना मनापासून मान्य करतो. खालील अटी मी न पाळल्यास त्याचा माझ्यावर आकारण्यात आल्यास माझी हरकत नाही.
+      </div>
+
+      <ol class="declaration-list">
+        <li><span class="num">१)</span><span class="txt">मी काम सोडण्याआधी एस.के. एंटरप्रायझेस यांना लिखितमध्ये १ महिना (३० दिवस) / ३ महिने (९० दिवस) पूर्वी सूचना देणे माझ्यावर बंधनकारक आहे. अन्यथा मी कुठलाही पगार मागणार नाही/घेण्यास पात्र नाही.</span></li>
+        <li><span class="num">२)</span><span class="txt">मी सुट्टी घेण्याआधी सुट्टीचा अर्ज मी लिखित देईल, अर्ज न दिल्यास, न कळवता सुट्टी घेतल्यास आकारलेला दंड मला मान्य आहे.</span></li>
+        <li><span class="num">३)</span><span class="txt">मी माझ्या कामाचे पुढील महिन्यातले १० दिवस भरल्याशिवाय माझ्या महिन्याचा पगार मला देऊ नये.</span></li>
+        <li><span class="num">४)</span><span class="txt">मला दिलेला युनिफॉर्म मी नीट व स्वच्छ ठेवेल. युनिफॉर्म फाटल्यास किंवा खराब झाल्यास नवीन युनिफॉर्म घ्यावा लागेल किंवा कंपनीने तो दिल्यास त्याचे शुल्क माझ्या पगारातून कपावे.</span></li>
+        <li><span class="num">५)</span><span class="txt">कंपनीमध्ये काम करत असताना जर असे दिसून आले की, तुम्ही कंपनीच्या विरोधात किंवा कंपनीच्या नियमांच्याविरुद्ध काम करत आहात, तर तुम्हाला कामावरून कमी करण्याचा अधिकार कंपनीला राहील. (कोणतीही पूर्वसूचना न देता)</span></li>
+        <li><span class="num">६)</span><span class="txt">मी माझे आधार कार्ड, पॅन कार्ड, ४ फोटो, बँक पासबुक व राहत असलेले लाईट बिल याच्या झेरॉक्स प्रती कंपनीला देणे माझ्यावर बंधनकारक आहे.</span></li>
+        <li><span class="num">७)</span><span class="txt">मी कामाला लागल्यापासून ७ दिवसांच्या आत काम सोडले तर मी पगार घेण्यास पात्र राहणार नाही.</span></li>
+      </ol>
+
+      <div class="declaration-closing">
+        वरील सर्व माहिती मी वाचली असून त्याच्या सत्यतेसाठी मी आज रोजी पुणे मुक्कामी माझी सही केली आहे.
+      </div>
+
+      <div class="declaration-sign">
+        <span>दिनांक : __________________</span>
+        <span>अर्जदाराची सही __________________</span>
+      </div>
+    </div>
+
+  </body>
+  </html>
+  `;
+
+    printWindow.document.write(formContent);
+    printWindow.document.close();
+
+    // Wait for both pages (and photo, if any) to render, then print once for both pages
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.print();
+        setTimeout(() => printWindow.close(), 1000);
+      }, 300);
+    };
+  };
+
 
   // Handle print EPF form
   const handlePrintEPFForm = () => {
@@ -2543,8 +2713,8 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
 
   // FIXED: Function to update employee site from parent component
   const updateEmployeeSite = (employeeId: string, newSiteName: string) => {
-    setEmployees(prevEmployees => 
-      prevEmployees.map(emp => 
+    setEmployees(prevEmployees =>
+      prevEmployees.map(emp =>
         emp._id === employeeId ? { ...emp, siteName: newSiteName } : emp
       )
     );
@@ -2552,8 +2722,8 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
 
   // FIXED: Function to bulk update employee sites from parent component
   const bulkUpdateEmployeeSites = (employeeIds: string[], newSiteName: string) => {
-    setEmployees(prevEmployees => 
-      prevEmployees.map(emp => 
+    setEmployees(prevEmployees =>
+      prevEmployees.map(emp =>
         employeeIds.includes(emp._id) ? { ...emp, siteName: newSiteName } : emp
       )
     );
@@ -2569,106 +2739,106 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
 
   return (
     <div className="space-y-6">
-{showCamera && (
-  <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-    <div className="bg-white rounded-lg max-w-md w-full">
-      <div className="flex justify-between items-center p-4 border-b">
-        <h3 className="text-lg font-semibold">Capture Employee Photo</h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            setShowCamera(false);
-            stopCamera();
-            setCapturedImage(null);
-          }}
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-
-      <div className="p-4">
-        {!capturedImage ? (
-          <>
-            <div className="relative bg-gray-100 rounded-lg overflow-hidden">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-64 object-cover"
-              />
-              <div className="absolute bottom-2 left-0 right-0 text-center">
-                <div className="inline-block bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-                  {videoReadyRef.current ? "Camera ready" : "Starting camera..."}
-                </div>
-              </div>
-            </div>
-            <canvas ref={canvasRef} className="hidden" />
-            <div className="flex gap-2 mt-4">
+      {showCamera && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full">
+            <div className="flex justify-between items-center p-4 border-b">
+              <h3 className="text-lg font-semibold">Capture Employee Photo</h3>
               <Button
-                onClick={capturePhoto}
-                disabled={!videoReadyRef.current}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-              >
-                {!videoReadyRef.current ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Starting...
-                  </>
-                ) : (
-                  <>
-                    <Camera className="h-4 w-4 mr-2" />
-                    Capture Photo
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="outline"
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   setShowCamera(false);
                   stopCamera();
+                  setCapturedImage(null);
                 }}
               >
-                Cancel
+                <X className="h-4 w-4" />
               </Button>
             </div>
-          </>
-        ) : (
-          <>
-            <div className="bg-gray-100 rounded-lg overflow-hidden">
-              <img
-                src={capturedImage}
-                alt="Captured"
-                className="w-full h-64 object-contain"
-              />
-            </div>
-            <div className="flex gap-2 mt-4">
-              <Button
-                onClick={useCapturedPhoto}
-                className="flex-1 bg-green-600 hover:bg-green-700"
-              >
-                <Check className="h-4 w-4 mr-2" />
-                Use This Photo
-              </Button>
-              <Button variant="outline" onClick={retakePhoto}>
-                <Camera className="h-4 w-4 mr-2" />
-                Retake
-              </Button>
-            </div>
-          </>
-        )}
-      </div>
 
-      <div className="p-4 bg-gray-50 border-t rounded-b-lg">
-        <p className="text-xs text-gray-600">
-          <span className="font-semibold">Tips:</span> Ensure good lighting and face the camera directly.
-          The photo should be clear and well-lit.
-        </p>
-      </div>
-    </div>
-  </div>
-)}
+            <div className="p-4">
+              {!capturedImage ? (
+                <>
+                  <div className="relative bg-gray-100 rounded-lg overflow-hidden">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-64 object-cover"
+                    />
+                    <div className="absolute bottom-2 left-0 right-0 text-center">
+                      <div className="inline-block bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                        {videoReadyRef.current ? "Camera ready" : "Starting camera..."}
+                      </div>
+                    </div>
+                  </div>
+                  <canvas ref={canvasRef} className="hidden" />
+                  <div className="flex gap-2 mt-4">
+                    <Button
+                      onClick={capturePhoto}
+                      disabled={!videoReadyRef.current}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {!videoReadyRef.current ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Starting...
+                        </>
+                      ) : (
+                        <>
+                          <Camera className="h-4 w-4 mr-2" />
+                          Capture Photo
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowCamera(false);
+                        stopCamera();
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="bg-gray-100 rounded-lg overflow-hidden">
+                    <img
+                      src={capturedImage}
+                      alt="Captured"
+                      className="w-full h-64 object-contain"
+                    />
+                  </div>
+                  <div className="flex gap-2 mt-4">
+                    <Button
+                      onClick={useCapturedPhoto}
+                      className="flex-1 bg-green-600 hover:bg-green-700"
+                    >
+                      <Check className="h-4 w-4 mr-2" />
+                      Use This Photo
+                    </Button>
+                    <Button variant="outline" onClick={retakePhoto}>
+                      <Camera className="h-4 w-4 mr-2" />
+                      Retake
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="p-4 bg-gray-50 border-t rounded-b-lg">
+              <p className="text-xs text-gray-600">
+                <span className="font-semibold">Tips:</span> Ensure good lighting and face the camera directly.
+                The photo should be clear and well-lit.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Excel Import Preview Modal */}
       {showExcelPreview && (
@@ -2679,8 +2849,8 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
                 Excel Import Preview ({excelData.length} employees)
               </h3>
               <div className="flex gap-2">
-                <Button 
-                  onClick={handleBulkImport} 
+                <Button
+                  onClick={handleBulkImport}
                   disabled={importing || excelData.length === 0}
                   className="flex items-center gap-2"
                 >
@@ -2704,7 +2874,7 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
                 </Button>
               </div>
             </div>
-            
+
             <div className="p-4 overflow-auto max-h-[70vh]">
               <Table>
                 <TableHeader>
@@ -2734,11 +2904,10 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
                       <TableCell>₹{employee.salary || '0'}</TableCell>
                       <TableCell>{employee.dateOfJoining || '-'}</TableCell>
                       <TableCell>
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          employee.dateOfExit && employee.dateOfExit.trim() !== '' 
-                            ? 'bg-red-100 text-red-800' 
-                            : 'bg-green-100 text-green-800'
-                        }`}>
+                        <span className={`px-2 py-1 rounded text-xs ${employee.dateOfExit && employee.dateOfExit.trim() !== ''
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-green-100 text-green-800'
+                          }`}>
                           {employee.dateOfExit && employee.dateOfExit.trim() !== '' ? 'Left' : 'Active'}
                         </span>
                       </TableCell>
@@ -2746,14 +2915,14 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
                   ))}
                 </TableBody>
               </Table>
-              
+
               {excelData.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   No data to preview
                 </div>
               )}
             </div>
-            
+
             <div className="p-4 border-t bg-gray-50">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
@@ -2800,9 +2969,9 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
             <CardHeader>
               <CardTitle className="flex justify-between items-center">
                 <span>Digital Onboarding & Document Verification</span>
-                <Button 
-                  onClick={downloadExcelTemplate} 
-                  variant="outline" 
+                <Button
+                  onClick={downloadExcelTemplate}
+                  variant="outline"
                   size="sm"
                   className="h-8 text-xs"
                 >
@@ -2811,328 +2980,328 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
                 </Button>
               </CardTitle>
             </CardHeader>
-           
-                  
-<CardContent>
-  {/* Company header - keep as is */}
-  <div className="border-2 border-gray-300 p-4 md:p-6 mb-6">
-    <div className="flex justify-between items-start">
-      <div className="flex-1">
-        <div className="text-center mb-4">
-          <div className="text-xl md:text-2xl font-bold">SK ENTERPRISES</div>
-          <div className="text-xs md:text-sm text-muted-foreground">Housekeeping • Parking • Waste Management</div>
-          <div className="text-lg font-semibold mt-2">Employee Joining Form</div>
-        </div>
-       <div className="flex justify-between items-start flex-col md:flex-row gap-4">
-  {/* Photo Box – now interactive */}
-  <div className="relative w-20 h-24 md:w-24 md:h-32 mx-auto md:mx-0 flex-shrink-0">
-    <div 
-      className="w-full h-full border-2 border-dashed border-gray-400 rounded-lg flex items-center justify-center text-xs text-muted-foreground text-center p-2 cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors duration-200 overflow-hidden bg-white"
-      onClick={() => fileInputRef.current?.click()}
-    >
-      {photoPreview ? (
-        <img src={photoPreview} alt="Employee" className="w-full h-full object-cover rounded-lg" />
-      ) : newEmployee.photo instanceof File ? (
-        <img src={URL.createObjectURL(newEmployee.photo)} alt="Employee" className="w-full h-full object-cover rounded-lg" />
-      ) : (
-        <div className="flex flex-col items-center justify-center">
-          <User className="h-6 w-6 text-gray-400" />
-          <span className="text-[10px] mt-1">Click to add photo</span>
-        </div>
-      )}
-    </div>
-    {/* Camera icon overlay */}
-    <button
-      type="button"
-      className="absolute bottom-1 right-1 bg-primary text-white rounded-full p-1 shadow-md hover:bg-primary/80 transition-colors"
-      onClick={(e) => { e.stopPropagation(); startCamera(); }}
-      title="Take photo with camera"
-    >
-      <Camera className="h-3 w-3" />
-    </button>
-    <input
-      ref={fileInputRef}
-      type="file"
-      accept="image/*"
-      className="hidden"
-      onChange={handleFileUpload}
-    />
-  </div>
 
-  <div className="text-center md:text-right space-y-2 w-full md:w-auto">
-    <div className="text-sm font-semibold">New Joining</div>
-    <div className="text-sm">
-      Code No. / Ref No.: <span className="border-b border-gray-400 inline-block min-w-[100px]">Auto-generated</span>
-    </div>
-    {photoPreview && (
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={handleRemovePhoto}
-        className="text-xs text-red-500 hover:text-red-700"
-      >
-        <Trash2 className="h-3 w-3 mr-1" /> Remove photo
-      </Button>
-    )}
-  </div>
-</div>
-      </div>
-    </div>
-  </div>
 
-  {/* Step indicator (progress bar) */}
-  <div className="mb-6 flex justify-between items-center">
-    <div className="flex space-x-2 flex-1">
-      {steps.map((_, idx) => (
-        <div key={idx} className={`h-2 flex-1 rounded-full ${idx <= currentStep ? 'bg-blue-600' : 'bg-gray-200'}`} />
-      ))}
-    </div>
-    <span className="ml-4 text-sm text-muted-foreground">{currentStep + 1} / {steps.length}</span>
-  </div>
-
-  {/* Step content */}
-  <div className="space-y-6">
-    {currentStep === 0 && (
-      <div className="space-y-6">
-        <h3 className="text-lg font-semibold border-b pb-2">Personal Information</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField label="Site Name" required>
-            <SiteDropdown />
-          </FormField>
-          <FormField label="Name" required>
-            <Input value={newEmployee.name} onChange={(e) => setNewEmployee({...newEmployee, name: e.target.value})} />
-          </FormField>
-         <FormField label="Date of Birth" required>
-  <Input 
-    type="date" 
-    value={newEmployee.dateOfBirth} 
-    onChange={(e) => setNewEmployee({...newEmployee, dateOfBirth: e.target.value})} 
-    max={new Date(Date.now() - 18 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
-  />
-  <p className="text-xs text-muted-foreground mt-1">Must be at least 18 years old</p>
-</FormField>
-          <FormField label="Gender" required>
-            <Select value={newEmployee.gender} onValueChange={(v) => setNewEmployee({...newEmployee, gender: v})}>
-              <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
-              <SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem><SelectItem value="Transgender">Transgender</SelectItem></SelectContent>
-            </Select>
-          </FormField>
-          <FormField label="Marital Status">
-            <Select value={newEmployee.maritalStatus} onValueChange={(v) => setNewEmployee({...newEmployee, maritalStatus: v})}>
-              <SelectTrigger><SelectValue placeholder="Select marital status" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Single">Single</SelectItem><SelectItem value="Married">Married</SelectItem>
-                <SelectItem value="Widow">Widow</SelectItem><SelectItem value="Widower">Widower</SelectItem><SelectItem value="Divorcee">Divorcee</SelectItem>
-              </SelectContent>
-            </Select>
-          </FormField>
-          
-   
-        </div>
-      </div>
-    )}
-
-    {currentStep === 1 && (
-      <div className="space-y-6">
-        <h3 className="text-lg font-semibold border-b pb-2">Contact & Address</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField label="Contact No." required>
-            <Input value={newEmployee.phone} onChange={(e) => setNewEmployee({...newEmployee, phone: e.target.value})} maxLength={10} />
-          </FormField>
-          <FormField label="Email">
-            <Input type="email" value={newEmployee.email} onChange={(e) => setNewEmployee({...newEmployee, email: e.target.value})} />
-          </FormField>
-          <FormField label="Aadhar Number" required>
-            <Input value={newEmployee.aadharNumber} onChange={(e) => setNewEmployee({...newEmployee, aadharNumber: e.target.value})} maxLength={12} />
-          </FormField>
-          <FormField label="PAN Number">
-            <Input value={newEmployee.panNumber} onChange={(e) => setNewEmployee({...newEmployee, panNumber: e.target.value.toUpperCase()})} maxLength={10} className="uppercase" />
-          </FormField>
-          <FormField label="ESIC Number">
-            <Input value={newEmployee.esicNumber} onChange={(e) => setNewEmployee({...newEmployee, esicNumber: e.target.value})} />
-          </FormField>
-          <FormField label="PF / UAN Number">
-            <Input value={newEmployee.uanNumber} onChange={(e) => setNewEmployee({...newEmployee, uanNumber: e.target.value})} />
-          </FormField>
-          <FormField label="Permanent Address">
-            <Textarea rows={2} value={newEmployee.permanentAddress} onChange={(e) => setNewEmployee({...newEmployee, permanentAddress: e.target.value})} />
-          </FormField>
-          <FormField label="Permanent Pin Code">
-            <Input value={newEmployee.permanentPincode} onChange={(e) => setNewEmployee({...newEmployee, permanentPincode: e.target.value})} maxLength={6} />
-          </FormField>
-          <FormField label="Local Address">
-            <Textarea rows={2} value={newEmployee.localAddress} onChange={(e) => setNewEmployee({...newEmployee, localAddress: e.target.value})} />
-          </FormField>
-          <FormField label="Local Pin Code">
-            <Input value={newEmployee.localPincode} onChange={(e) => setNewEmployee({...newEmployee, localPincode: e.target.value})} maxLength={6} />
-          </FormField>
-        </div>
-      </div>
-    )}
-
-    {currentStep === 2 && (
-      <div className="space-y-6">
-        <h3 className="text-lg font-semibold border-b pb-2">Employment & Bank Details</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField label="Department" required>
-            <Select value={newEmployee.department} onValueChange={(v) => setNewEmployee({...newEmployee, department: v})}>
-              <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
-              <SelectContent>
-                {departments.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </FormField>
-          <FormField label="Position">
-  <Input value={newEmployee.position} onChange={(e) => setNewEmployee({...newEmployee, position: e.target.value})} placeholder="Optional - Enter position" />
-</FormField>
-          <FormField label="Monthly Salary (₹)">
-            <Input type="number" min="0" step="0.01" value={newEmployee.salary} onChange={(e) => setNewEmployee({...newEmployee, salary: e.target.value})} />
-          </FormField>
-          <FormField label="Bank Name">
-            <Input value={newEmployee.bankName} onChange={(e) => setNewEmployee({...newEmployee, bankName: e.target.value})} />
-          </FormField>
-          <FormField label="Account Number">
-            <Input value={newEmployee.accountNumber} onChange={(e) => setNewEmployee({...newEmployee, accountNumber: e.target.value})} />
-          </FormField>
-          <FormField label="IFSC Code">
-            <Input value={newEmployee.ifscCode} onChange={(e) => setNewEmployee({...newEmployee, ifscCode: e.target.value.toUpperCase()})} className="uppercase" />
-          </FormField>
-          <FormField label="Branch Name">
-            <Input value={newEmployee.branchName} onChange={(e) => setNewEmployee({...newEmployee, branchName: e.target.value})} />
-          </FormField>
-        </div>
-      </div>
-    )}
-
-    {currentStep === 3 && (
-      <div className="space-y-6">
-        <h3 className="text-lg font-semibold border-b pb-2">Family & Emergency Contact</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField label="Father's Name">
-            <Input value={newEmployee.fatherName} onChange={(e) => setNewEmployee({...newEmployee, fatherName: e.target.value})} />
-          </FormField>
-          <FormField label="Mother's Name">
-            <Input value={newEmployee.motherName} onChange={(e) => setNewEmployee({...newEmployee, motherName: e.target.value})} />
-          </FormField>
-          <FormField label="Spouse Name">
-            <Input value={newEmployee.spouseName} onChange={(e) => setNewEmployee({...newEmployee, spouseName: e.target.value})} />
-          </FormField>
-          <FormField label="Number of Children">
-            <Input type="number" min="0" value={newEmployee.numberOfChildren} onChange={(e) => setNewEmployee({...newEmployee, numberOfChildren: e.target.value})} />
-          </FormField>
-          <FormField label="Emergency Contact Name">
-            <Input value={newEmployee.emergencyContactName} onChange={(e) => setNewEmployee({...newEmployee, emergencyContactName: e.target.value})} />
-          </FormField>
-          <FormField label="Emergency Contact Phone">
-            <Input value={newEmployee.emergencyContactPhone} onChange={(e) => setNewEmployee({...newEmployee, emergencyContactPhone: e.target.value})} maxLength={10} />
-          </FormField>
-          <FormField label="Relation">
-            <Input value={newEmployee.emergencyContactRelation} onChange={(e) => setNewEmployee({...newEmployee, emergencyContactRelation: e.target.value})} />
-          </FormField>
-          <FormField label="Nominee Name">
-            <Input value={newEmployee.nomineeName} onChange={(e) => setNewEmployee({...newEmployee, nomineeName: e.target.value})} />
-          </FormField>
-          <FormField label="Nominee Relation">
-            <Input value={newEmployee.nomineeRelation} onChange={(e) => setNewEmployee({...newEmployee, nomineeRelation: e.target.value})} />
-          </FormField>
-        </div>
-      </div>
-    )}
-
-    {currentStep === 4 && (
-      <div className="space-y-6">
-        <h3 className="text-lg font-semibold border-b pb-2">Uniform & Documents</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField label="Pant Size">
-            <Select value={newEmployee.pantSize} onValueChange={(v) => setNewEmployee({...newEmployee, pantSize: v})}>
-              <SelectTrigger><SelectValue placeholder="Select pant size" /></SelectTrigger>
-              <SelectContent><SelectItem value="28">28</SelectItem><SelectItem value="30">30</SelectItem><SelectItem value="32">32</SelectItem><SelectItem value="34">34</SelectItem><SelectItem value="36">36</SelectItem><SelectItem value="38">38</SelectItem><SelectItem value="40">40</SelectItem></SelectContent>
-            </Select>
-          </FormField>
-          <FormField label="Shirt Size">
-            <Select value={newEmployee.shirtSize} onValueChange={(v) => setNewEmployee({...newEmployee, shirtSize: v})}>
-              <SelectTrigger><SelectValue placeholder="Select shirt size" /></SelectTrigger>
-              <SelectContent><SelectItem value="S">S</SelectItem><SelectItem value="M">M</SelectItem><SelectItem value="L">L</SelectItem><SelectItem value="XL">XL</SelectItem><SelectItem value="XXL">XXL</SelectItem></SelectContent>
-            </Select>
-          </FormField>
-          <FormField label="Cap Size">
-            <Select value={newEmployee.capSize} onValueChange={(v) => setNewEmployee({...newEmployee, capSize: v})}>
-              <SelectTrigger><SelectValue placeholder="Select cap size" /></SelectTrigger>
-              <SelectContent><SelectItem value="S">S</SelectItem><SelectItem value="M">M</SelectItem><SelectItem value="L">L</SelectItem><SelectItem value="XL">XL</SelectItem></SelectContent>
-            </Select>
-          </FormField>
-          <div className="flex items-center space-x-2">
-            <input type="checkbox" id="idCardIssued" checked={newEmployee.idCardIssued} onChange={(e) => setNewEmployee({...newEmployee, idCardIssued: e.target.checked})} className="rounded border-gray-300" />
-            <Label htmlFor="idCardIssued">ID Card Issued</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <input type="checkbox" id="westcoatIssued" checked={newEmployee.westcoatIssued} onChange={(e) => setNewEmployee({...newEmployee, westcoatIssued: e.target.checked})} className="rounded border-gray-300" />
-            <Label htmlFor="westcoatIssued">Westcoat Issued</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <input type="checkbox" id="apronIssued" checked={newEmployee.apronIssued} onChange={(e) => setNewEmployee({...newEmployee, apronIssued: e.target.checked})} className="rounded border-gray-300" />
-            <Label htmlFor="apronIssued">Apron Issued</Label>
-          </div>
-          <div className="col-span-2">
-            <FormField label="Employee Signature">
-              <div className="border-2 border-dashed rounded-lg p-4 text-center">
-                <Button variant="outline" onClick={() => signatureEmployeeRef.current?.click()}>Upload Signature</Button>
-                {newEmployee.employeeSignature && <p className="mt-2 text-sm text-green-600">Signature uploaded</p>}
-              </div>
-            </FormField>
-            <Input ref={signatureEmployeeRef} type="file" accept="image/*" onChange={(e) => handleSignatureUpload('employee', e)} className="hidden" />
-          </div>
-          <div className="col-span-2">
-            <FormField label="Authorized Signature">
-              <div className="border-2 border-dashed rounded-lg p-4 text-center">
-                <Button variant="outline" onClick={() => signatureAuthorizedRef.current?.click()}>Upload Signature</Button>
-                {newEmployee.authorizedSignature && <p className="mt-2 text-sm text-green-600">Signature uploaded</p>}
-              </div>
-            </FormField>
-            <Input ref={signatureAuthorizedRef} type="file" accept="image/*" onChange={(e) => handleSignatureUpload('authorized', e)} className="hidden" />
-          </div>
-          <div className="col-span-2">
-            <FormField label="Document Upload">
-              <div className="border-2 border-dashed rounded-lg p-6 text-center">
-                <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
-                <Button variant="outline" className="mt-4" onClick={() => documentUploadRef.current?.click()}>Browse Files</Button>
-                {uploadedDocuments.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    {uploadedDocuments.map((doc, idx) => (
-                      <div key={idx} className="flex justify-between items-center p-2 border rounded">
-                        <span className="text-sm">{doc.name}</span>
-                        <Button size="sm" variant="destructive" onClick={() => handleRemoveDocument(idx)}><Trash2 className="h-3 w-3" /></Button>
+            <CardContent>
+              {/* Company header - keep as is */}
+              <div className="border-2 border-gray-300 p-4 md:p-6 mb-6">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="text-center mb-4">
+                      <div className="text-xl md:text-2xl font-bold">SK ENTERPRISES</div>
+                      <div className="text-xs md:text-sm text-muted-foreground">Housekeeping • Parking • Waste Management</div>
+                      <div className="text-lg font-semibold mt-2">Employee Joining Form</div>
+                    </div>
+                    <div className="flex justify-between items-start flex-col md:flex-row gap-4">
+                      {/* Photo Box – now interactive */}
+                      <div className="relative w-20 h-24 md:w-24 md:h-32 mx-auto md:mx-0 flex-shrink-0">
+                        <div
+                          className="w-full h-full border-2 border-dashed border-gray-400 rounded-lg flex items-center justify-center text-xs text-muted-foreground text-center p-2 cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors duration-200 overflow-hidden bg-white"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          {photoPreview ? (
+                            <img src={photoPreview} alt="Employee" className="w-full h-full object-cover rounded-lg" />
+                          ) : newEmployee.photo instanceof File ? (
+                            <img src={URL.createObjectURL(newEmployee.photo)} alt="Employee" className="w-full h-full object-cover rounded-lg" />
+                          ) : (
+                            <div className="flex flex-col items-center justify-center">
+                              <User className="h-6 w-6 text-gray-400" />
+                              <span className="text-[10px] mt-1">Click to add photo</span>
+                            </div>
+                          )}
+                        </div>
+                        {/* Camera icon overlay */}
+                        <button
+                          type="button"
+                          className="absolute bottom-1 right-1 bg-primary text-white rounded-full p-1 shadow-md hover:bg-primary/80 transition-colors"
+                          onClick={(e) => { e.stopPropagation(); startCamera(); }}
+                          title="Take photo with camera"
+                        >
+                          <Camera className="h-3 w-3" />
+                        </button>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleFileUpload}
+                        />
                       </div>
-                    ))}
+
+                      <div className="text-center md:text-right space-y-2 w-full md:w-auto">
+                        <div className="text-sm font-semibold">New Joining</div>
+                        <div className="text-sm">
+                          Code No. / Ref No.: <span className="border-b border-gray-400 inline-block min-w-[100px]">Auto-generated</span>
+                        </div>
+                        {photoPreview && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleRemovePhoto}
+                            className="text-xs text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" /> Remove photo
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step indicator (progress bar) */}
+              <div className="mb-6 flex justify-between items-center">
+                <div className="flex space-x-2 flex-1">
+                  {steps.map((_, idx) => (
+                    <div key={idx} className={`h-2 flex-1 rounded-full ${idx <= currentStep ? 'bg-blue-600' : 'bg-gray-200'}`} />
+                  ))}
+                </div>
+                <span className="ml-4 text-sm text-muted-foreground">{currentStep + 1} / {steps.length}</span>
+              </div>
+
+              {/* Step content */}
+              <div className="space-y-6">
+                {currentStep === 0 && (
+                  <div className="space-y-6">
+                    <h3 className="text-lg font-semibold border-b pb-2">Personal Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField label="Site Name" required>
+                        <SiteDropdown />
+                      </FormField>
+                      <FormField label="Name" required>
+                        <Input value={newEmployee.name} onChange={(e) => setNewEmployee({ ...newEmployee, name: e.target.value })} />
+                      </FormField>
+                      <FormField label="Date of Birth" required>
+                        <Input
+                          type="date"
+                          value={newEmployee.dateOfBirth}
+                          onChange={(e) => setNewEmployee({ ...newEmployee, dateOfBirth: e.target.value })}
+                          max={new Date(Date.now() - 18 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Must be at least 18 years old</p>
+                      </FormField>
+                      <FormField label="Gender" required>
+                        <Select value={newEmployee.gender} onValueChange={(v) => setNewEmployee({ ...newEmployee, gender: v })}>
+                          <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
+                          <SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem><SelectItem value="Transgender">Transgender</SelectItem></SelectContent>
+                        </Select>
+                      </FormField>
+                      <FormField label="Marital Status">
+                        <Select value={newEmployee.maritalStatus} onValueChange={(v) => setNewEmployee({ ...newEmployee, maritalStatus: v })}>
+                          <SelectTrigger><SelectValue placeholder="Select marital status" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Single">Single</SelectItem><SelectItem value="Married">Married</SelectItem>
+                            <SelectItem value="Widow">Widow</SelectItem><SelectItem value="Widower">Widower</SelectItem><SelectItem value="Divorcee">Divorcee</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormField>
+
+
+                    </div>
+                  </div>
+                )}
+
+                {currentStep === 1 && (
+                  <div className="space-y-6">
+                    <h3 className="text-lg font-semibold border-b pb-2">Contact & Address</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField label="Contact No." required>
+                        <Input value={newEmployee.phone} onChange={(e) => setNewEmployee({ ...newEmployee, phone: e.target.value })} maxLength={10} />
+                      </FormField>
+                      <FormField label="Email">
+                        <Input type="email" value={newEmployee.email} onChange={(e) => setNewEmployee({ ...newEmployee, email: e.target.value })} />
+                      </FormField>
+                      <FormField label="Aadhar Number" required>
+                        <Input value={newEmployee.aadharNumber} onChange={(e) => setNewEmployee({ ...newEmployee, aadharNumber: e.target.value })} maxLength={12} />
+                      </FormField>
+                      <FormField label="PAN Number">
+                        <Input value={newEmployee.panNumber} onChange={(e) => setNewEmployee({ ...newEmployee, panNumber: e.target.value.toUpperCase() })} maxLength={10} className="uppercase" />
+                      </FormField>
+                      <FormField label="ESIC Number">
+                        <Input value={newEmployee.esicNumber} onChange={(e) => setNewEmployee({ ...newEmployee, esicNumber: e.target.value })} />
+                      </FormField>
+                      <FormField label="PF / UAN Number">
+                        <Input value={newEmployee.uanNumber} onChange={(e) => setNewEmployee({ ...newEmployee, uanNumber: e.target.value })} />
+                      </FormField>
+                      <FormField label="Permanent Address">
+                        <Textarea rows={2} value={newEmployee.permanentAddress} onChange={(e) => setNewEmployee({ ...newEmployee, permanentAddress: e.target.value })} />
+                      </FormField>
+                      <FormField label="Permanent Pin Code">
+                        <Input value={newEmployee.permanentPincode} onChange={(e) => setNewEmployee({ ...newEmployee, permanentPincode: e.target.value })} maxLength={6} />
+                      </FormField>
+                      <FormField label="Local Address">
+                        <Textarea rows={2} value={newEmployee.localAddress} onChange={(e) => setNewEmployee({ ...newEmployee, localAddress: e.target.value })} />
+                      </FormField>
+                      <FormField label="Local Pin Code">
+                        <Input value={newEmployee.localPincode} onChange={(e) => setNewEmployee({ ...newEmployee, localPincode: e.target.value })} maxLength={6} />
+                      </FormField>
+                    </div>
+                  </div>
+                )}
+
+                {currentStep === 2 && (
+                  <div className="space-y-6">
+                    <h3 className="text-lg font-semibold border-b pb-2">Employment & Bank Details</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField label="Department" required>
+                        <Select value={newEmployee.department} onValueChange={(v) => setNewEmployee({ ...newEmployee, department: v })}>
+                          <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                          <SelectContent>
+                            {departments.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </FormField>
+                      <FormField label="Position">
+                        <Input value={newEmployee.position} onChange={(e) => setNewEmployee({ ...newEmployee, position: e.target.value })} placeholder="Optional - Enter position" />
+                      </FormField>
+                      <FormField label="Monthly Salary (₹)">
+                        <Input type="number" min="0" step="0.01" value={newEmployee.salary} onChange={(e) => setNewEmployee({ ...newEmployee, salary: e.target.value })} />
+                      </FormField>
+                      <FormField label="Bank Name">
+                        <Input value={newEmployee.bankName} onChange={(e) => setNewEmployee({ ...newEmployee, bankName: e.target.value })} />
+                      </FormField>
+                      <FormField label="Account Number">
+                        <Input value={newEmployee.accountNumber} onChange={(e) => setNewEmployee({ ...newEmployee, accountNumber: e.target.value })} />
+                      </FormField>
+                      <FormField label="IFSC Code">
+                        <Input value={newEmployee.ifscCode} onChange={(e) => setNewEmployee({ ...newEmployee, ifscCode: e.target.value.toUpperCase() })} className="uppercase" />
+                      </FormField>
+                      <FormField label="Branch Name">
+                        <Input value={newEmployee.branchName} onChange={(e) => setNewEmployee({ ...newEmployee, branchName: e.target.value })} />
+                      </FormField>
+                    </div>
+                  </div>
+                )}
+
+                {currentStep === 3 && (
+                  <div className="space-y-6">
+                    <h3 className="text-lg font-semibold border-b pb-2">Family & Emergency Contact</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField label="Father's Name">
+                        <Input value={newEmployee.fatherName} onChange={(e) => setNewEmployee({ ...newEmployee, fatherName: e.target.value })} />
+                      </FormField>
+                      <FormField label="Mother's Name">
+                        <Input value={newEmployee.motherName} onChange={(e) => setNewEmployee({ ...newEmployee, motherName: e.target.value })} />
+                      </FormField>
+                      <FormField label="Spouse Name">
+                        <Input value={newEmployee.spouseName} onChange={(e) => setNewEmployee({ ...newEmployee, spouseName: e.target.value })} />
+                      </FormField>
+                      <FormField label="Number of Children">
+                        <Input type="number" min="0" value={newEmployee.numberOfChildren} onChange={(e) => setNewEmployee({ ...newEmployee, numberOfChildren: e.target.value })} />
+                      </FormField>
+                      <FormField label="Emergency Contact Name">
+                        <Input value={newEmployee.emergencyContactName} onChange={(e) => setNewEmployee({ ...newEmployee, emergencyContactName: e.target.value })} />
+                      </FormField>
+                      <FormField label="Emergency Contact Phone">
+                        <Input value={newEmployee.emergencyContactPhone} onChange={(e) => setNewEmployee({ ...newEmployee, emergencyContactPhone: e.target.value })} maxLength={10} />
+                      </FormField>
+                      <FormField label="Relation">
+                        <Input value={newEmployee.emergencyContactRelation} onChange={(e) => setNewEmployee({ ...newEmployee, emergencyContactRelation: e.target.value })} />
+                      </FormField>
+                      <FormField label="Nominee Name">
+                        <Input value={newEmployee.nomineeName} onChange={(e) => setNewEmployee({ ...newEmployee, nomineeName: e.target.value })} />
+                      </FormField>
+                      <FormField label="Nominee Relation">
+                        <Input value={newEmployee.nomineeRelation} onChange={(e) => setNewEmployee({ ...newEmployee, nomineeRelation: e.target.value })} />
+                      </FormField>
+                    </div>
+                  </div>
+                )}
+
+                {currentStep === 4 && (
+                  <div className="space-y-6">
+                    <h3 className="text-lg font-semibold border-b pb-2">Uniform & Documents</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField label="Pant Size">
+                        <Select value={newEmployee.pantSize} onValueChange={(v) => setNewEmployee({ ...newEmployee, pantSize: v })}>
+                          <SelectTrigger><SelectValue placeholder="Select pant size" /></SelectTrigger>
+                          <SelectContent><SelectItem value="28">28</SelectItem><SelectItem value="30">30</SelectItem><SelectItem value="32">32</SelectItem><SelectItem value="34">34</SelectItem><SelectItem value="36">36</SelectItem><SelectItem value="38">38</SelectItem><SelectItem value="40">40</SelectItem></SelectContent>
+                        </Select>
+                      </FormField>
+                      <FormField label="Shirt Size">
+                        <Select value={newEmployee.shirtSize} onValueChange={(v) => setNewEmployee({ ...newEmployee, shirtSize: v })}>
+                          <SelectTrigger><SelectValue placeholder="Select shirt size" /></SelectTrigger>
+                          <SelectContent><SelectItem value="S">S</SelectItem><SelectItem value="M">M</SelectItem><SelectItem value="L">L</SelectItem><SelectItem value="XL">XL</SelectItem><SelectItem value="XXL">XXL</SelectItem></SelectContent>
+                        </Select>
+                      </FormField>
+                      <FormField label="Cap Size">
+                        <Select value={newEmployee.capSize} onValueChange={(v) => setNewEmployee({ ...newEmployee, capSize: v })}>
+                          <SelectTrigger><SelectValue placeholder="Select cap size" /></SelectTrigger>
+                          <SelectContent><SelectItem value="S">S</SelectItem><SelectItem value="M">M</SelectItem><SelectItem value="L">L</SelectItem><SelectItem value="XL">XL</SelectItem></SelectContent>
+                        </Select>
+                      </FormField>
+                      <div className="flex items-center space-x-2">
+                        <input type="checkbox" id="idCardIssued" checked={newEmployee.idCardIssued} onChange={(e) => setNewEmployee({ ...newEmployee, idCardIssued: e.target.checked })} className="rounded border-gray-300" />
+                        <Label htmlFor="idCardIssued">ID Card Issued</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input type="checkbox" id="westcoatIssued" checked={newEmployee.westcoatIssued} onChange={(e) => setNewEmployee({ ...newEmployee, westcoatIssued: e.target.checked })} className="rounded border-gray-300" />
+                        <Label htmlFor="westcoatIssued">Westcoat Issued</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input type="checkbox" id="apronIssued" checked={newEmployee.apronIssued} onChange={(e) => setNewEmployee({ ...newEmployee, apronIssued: e.target.checked })} className="rounded border-gray-300" />
+                        <Label htmlFor="apronIssued">Apron Issued</Label>
+                      </div>
+                      <div className="col-span-2">
+                        <FormField label="Employee Signature">
+                          <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                            <Button variant="outline" onClick={() => signatureEmployeeRef.current?.click()}>Upload Signature</Button>
+                            {newEmployee.employeeSignature && <p className="mt-2 text-sm text-green-600">Signature uploaded</p>}
+                          </div>
+                        </FormField>
+                        <Input ref={signatureEmployeeRef} type="file" accept="image/*" onChange={(e) => handleSignatureUpload('employee', e)} className="hidden" />
+                      </div>
+                      <div className="col-span-2">
+                        <FormField label="Authorized Signature">
+                          <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                            <Button variant="outline" onClick={() => signatureAuthorizedRef.current?.click()}>Upload Signature</Button>
+                            {newEmployee.authorizedSignature && <p className="mt-2 text-sm text-green-600">Signature uploaded</p>}
+                          </div>
+                        </FormField>
+                        <Input ref={signatureAuthorizedRef} type="file" accept="image/*" onChange={(e) => handleSignatureUpload('authorized', e)} className="hidden" />
+                      </div>
+                      <div className="col-span-2">
+                        <FormField label="Document Upload">
+                          <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                            <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
+                            <Button variant="outline" className="mt-4" onClick={() => documentUploadRef.current?.click()}>Browse Files</Button>
+                            {uploadedDocuments.length > 0 && (
+                              <div className="mt-4 space-y-2">
+                                {uploadedDocuments.map((doc, idx) => (
+                                  <div key={idx} className="flex justify-between items-center p-2 border rounded">
+                                    <span className="text-sm">{doc.name}</span>
+                                    <Button size="sm" variant="destructive" onClick={() => handleRemoveDocument(idx)}><Trash2 className="h-3 w-3" /></Button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </FormField>
+                        <Input ref={documentUploadRef} type="file" multiple onChange={handleDocumentUpload} className="hidden" />
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
-            </FormField>
-            <Input ref={documentUploadRef} type="file" multiple onChange={handleDocumentUpload} className="hidden" />
-          </div>
-        </div>
-      </div>
-    )}
-  </div>
 
-  {/* Navigation buttons */}
-  <div className="flex justify-between gap-4 mt-8">
-    <Button variant="outline" onClick={() => setCurrentStep(prev => prev - 1)} disabled={currentStep === 0}>
-      Previous
-    </Button>
-    {currentStep < steps.length - 1 ? (
-      <Button onClick={() => setCurrentStep(prev => prev + 1)}>Next</Button>
-    ) : (
-      <Button onClick={handleAddEmployee} disabled={loading}>
-        {loading ? <Loader2 className="animate-spin mr-2" /> : <Plus className="mr-2" />}
-        Create Employee
-      </Button>
-    )}
-  </div>
-</CardContent>
-             
-            
+              {/* Navigation buttons */}
+              <div className="flex justify-between gap-4 mt-8">
+                <Button variant="outline" onClick={() => setCurrentStep(prev => prev - 1)} disabled={currentStep === 0}>
+                  Previous
+                </Button>
+                {currentStep < steps.length - 1 ? (
+                  <Button onClick={() => setCurrentStep(prev => prev + 1)}>Next</Button>
+                ) : (
+                  <Button onClick={handleAddEmployee} disabled={loading}>
+                    {loading ? <Loader2 className="animate-spin mr-2" /> : <Plus className="mr-2" />}
+                    Create Employee
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+
+
           </Card>
         </TabsContent>
 
@@ -3146,7 +3315,7 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
                   EPF Form 11 - Declaration Form
                 </CardTitle>
                 <div className="text-sm text-muted-foreground">
-                  For Employee: <span className="font-semibold">{createdEmployeeData.name}</span> 
+                  For Employee: <span className="font-semibold">{createdEmployeeData.name}</span>
                   | Employee ID: <span className="font-semibold">{createdEmployeeData.employeeId}</span>
                   | Department: <span className="font-semibold">{createdEmployeeData.department}</span>
                 </div>
@@ -3263,7 +3432,7 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
                       </div>
                     </FormField>
 
-                   
+
                     <FormField label="5. Marital Status">
                       <div className="relative">
                         <Select value={epfFormData.maritalStatus} onValueChange={(value) => handleEPFFormChange('maritalStatus', value)}>
@@ -3317,7 +3486,7 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
                   {/* Previous Membership Section */}
                   <div className="border rounded-lg p-4 space-y-4">
                     <h4 className="font-semibold border-b pb-2">Previous Membership Details</h4>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>7. Whether earlier member of the Employee's Provident Fund Scheme, 1952 ?</Label>
@@ -3421,7 +3590,7 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
                   {/* International Worker Section */}
                   <div className="border rounded-lg p-4 space-y-4">
                     <h4 className="font-semibold border-b pb-2">10. International Worker Details</h4>
-                    
+
                     <div className="space-y-2">
                       <Label>a) International Worker</Label>
                       <div className="flex gap-4">
@@ -3489,7 +3658,7 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
                   {/* KYC Details Section */}
                   <div className="border rounded-lg p-4 space-y-4">
                     <h4 className="font-semibold border-b pb-2">11. KYC Details : (attach self attested copies of following KYC's)</h4>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="bankAccountNumber">a) Bank Account No. & IFS Code</Label>
@@ -3560,7 +3729,7 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
                   {/* Declaration Details Section */}
                   <div className="border rounded-lg p-4 space-y-4">
                     <h4 className="font-semibold border-b pb-2">12. Declaration Details</h4>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label>First EPF Member</Label>
@@ -3721,7 +3890,7 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
                   {/* Employee Declaration */}
                   <div className="border rounded-lg p-4 space-y-4">
                     <h4 className="font-semibold">Employee Declaration</h4>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="declarationDate">Date</Label>
@@ -3742,7 +3911,7 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
                         />
                       </div>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label>Signature of Member</Label>
                       <div className="border-2 border-dashed rounded-lg p-4 text-center h-20 flex items-center justify-center">
@@ -3754,7 +3923,7 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
                   {/* Employer Declaration */}
                   <div className="border rounded-lg p-4 space-y-4">
                     <div className="section-title">DECLARATION BY PRESENT EMPLOYER</div>
-                    
+
                     <div className="space-y-2">
                       <Label>A. The member Mr./Ms./Mrs. {epfFormData.memberName} has joined on {epfFormData.enrolledDate} and has been allotted PF Number ${createdEmployeeData?.uanNumber || createdEmployeeData?.uan || "Pending"}</Label>
                     </div>
@@ -3822,7 +3991,7 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
                         />
                       </div>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label>Signature of Employer with Seal of Establishment</Label>
                       <div className="border-2 border-dashed rounded-lg p-4 text-center h-20 flex items-center justify-center">
@@ -3834,16 +4003,19 @@ if (newEmployee.salary && newEmployee.salary.trim() !== "") {
                   {/* Action Buttons */}
                   <div className="flex gap-4 justify-end pt-4 border-t">
                     <Button onClick={handleSaveEPFForm} className="flex items-center gap-2" disabled={isSavingEPF}>
-                      {isSavingEPF ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Save className="h-4 w-4" />
-                      )}
+                      {isSavingEPF ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                       {isSavingEPF ? "Saving..." : "Save Form"}
                     </Button>
                     <Button onClick={handlePrintEPFForm} variant="outline" className="flex items-center gap-2">
-                      <Download className="h-4 w-4" />
-                      Print Form
+                      <Download className="h-4 w-4" /> Print Form
+                    </Button>
+                    {/* ✅ NEW BUTTON – Print Joining Form */}
+                    <Button
+                      onClick={() => createdEmployeeData && printJoiningForm(createdEmployeeData)}
+                      variant="outline"
+                      className="flex items-center gap-2"
+                    >
+                      <FileText className="h-4 w-4" /> Print Joining Form
                     </Button>
                   </div>
                 </div>

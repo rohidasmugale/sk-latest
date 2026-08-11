@@ -51,7 +51,7 @@ import {
   BarChart3,
   X,
   MapPin,
-  Plus
+  Plus, Settings
 } from 'lucide-react';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 // Recharts for charts
@@ -236,7 +236,7 @@ interface AttendanceRecord {
   siteName?: string;
   department?: string;
   shift?: string;
-  shiftId?: string; 
+  shiftId?: string;
 
   overtimeHours?: number;
   lateMinutes?: number;
@@ -763,48 +763,50 @@ const MobilePayrollCard = ({ item, formatCurrency, index }: any) => {
 const SuperAdminDashboard = () => {
   const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
   const [employees, setEmployees] = useState<Employee[]>([]);
-    const [sites, setSites] = useState<Site[]>([]);
+  const [sites, setSites] = useState<Site[]>([]);
   const departmentData = useMemo(() => {
-  // Define allowed departments with icons/colors
-  const allowedDepartments = [
-    { name: 'Housekeeping', icon: Home, color: 'from-blue-50 to-blue-100 border-blue-200' },
-    { name: 'Security', icon: Shield, color: 'from-green-50 to-green-100 border-green-200' },
-    { name: 'Waste Management', icon: Trash2, color: 'from-gray-50 to-gray-100 border-gray-200' },
-    { name: 'Parking Management', icon: Car, color: 'from-purple-50 to-purple-100 border-purple-200' },
-    { name: 'Consumables', icon: ShoppingCart, color: 'from-orange-50 to-orange-100 border-orange-200' },
-    { name: 'Other', icon: Droplets, color: 'from-cyan-50 to-cyan-100 border-cyan-200' }
-  ];
+    // Define allowed departments with icons/colors
+    const allowedDepartments = [
+      { name: 'Housekeeping', icon: Home, color: 'from-blue-50 to-blue-100 border-blue-200' },
+      { name: 'Security', icon: Shield, color: 'from-green-50 to-green-100 border-green-200' },
+      { name: 'Waste Management', icon: Trash2, color: 'from-gray-50 to-gray-100 border-gray-200' },
+      { name: 'Parking Management', icon: Car, color: 'from-purple-50 to-purple-100 border-purple-200' },
+      { name: 'Consumables', icon: ShoppingCart, color: 'from-orange-50 to-orange-100 border-orange-200' },
+      { name: 'Technician', icon: Settings, color: 'from-slate-50 to-slate-100 border-slate-300' },
+      { name: 'Other', icon: Droplets, color: 'from-cyan-50 to-cyan-100 border-cyan-200' }
 
-  // Count sites per service
-  const deptSiteCounts = new Map<string, Set<string>>();
-  sites.forEach(site => {
-    const services = site.services || [];
-    services.forEach(service => {
-      // Match service to allowed department name (case‑insensitive)
-      const matchedDept = allowedDepartments.find(d => 
-        d.name.toLowerCase() === service.toLowerCase().trim()
-      );
-      const deptName = matchedDept ? matchedDept.name : service;
-      if (!deptSiteCounts.has(deptName)) {
-        deptSiteCounts.set(deptName, new Set());
-      }
-      deptSiteCounts.get(deptName)!.add(site._id);
+    ];
+
+    // Count sites per service
+    const deptSiteCounts = new Map<string, Set<string>>();
+    sites.forEach(site => {
+      const services = site.services || [];
+      services.forEach(service => {
+        // Match service to allowed department name (case‑insensitive)
+        const matchedDept = allowedDepartments.find(d =>
+          d.name.toLowerCase() === service.toLowerCase().trim()
+        );
+        const deptName = matchedDept ? matchedDept.name : service;
+        if (!deptSiteCounts.has(deptName)) {
+          deptSiteCounts.set(deptName, new Set());
+        }
+        deptSiteCounts.get(deptName)!.add(site._id);
+      });
     });
-  });
 
-  // Build final array in allowed order
-  return allowedDepartments.map(dept => {
-    const siteIds = deptSiteCounts.get(dept.name) || new Set();
-    return {
-      department: dept.name,
-      total: siteIds.size,
-      present: siteIds.size, // keep for compatibility
-      icon: dept.icon,
-      color: dept.color,
-      siteNames: Array.from(siteIds)
-    };
-  });
-}, [sites]);
+    // Build final array in allowed order
+    return allowedDepartments.map(dept => {
+      const siteIds = deptSiteCounts.get(dept.name) || new Set();
+      return {
+        department: dept.name,
+        total: siteIds.size,
+        present: siteIds.size, // keep for compatibility
+        icon: dept.icon,
+        color: dept.color,
+        siteNames: Array.from(siteIds)
+      };
+    });
+  }, [sites]);
 
   const navigate = useNavigate();
 
@@ -1098,10 +1100,10 @@ const SuperAdminDashboard = () => {
     navigate(`/superadmin/attendaceview?view=site&date=${dayData.date}`);
   };
 
- const handleDepartmentCardClick = (department: string) => {
-  const todayStr = new Date().toISOString().split('T')[0];
-  navigate(`/superadmin/attendaceview?view=service&service=${encodeURIComponent(department)}&date=${todayStr}`);
-};
+  const handleDepartmentCardClick = (department: string) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    navigate(`/superadmin/attendaceview?view=service&service=${encodeURIComponent(department)}&date=${todayStr}`);
+  };
   // Custom tooltips
   // ✅ Replace the CustomPieTooltip
   const CustomPieTooltip = ({ active, payload }: any) => {
@@ -1386,7 +1388,7 @@ const SuperAdminDashboard = () => {
           </Card>
         </motion.div>
 
-        {/* Department Performance Cards – compact */}
+       
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1406,34 +1408,35 @@ const SuperAdminDashboard = () => {
               {departmentData.length === 0 ? (
                 <div className="text-center py-4 text-xs">No departments found.</div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5">
-                  {departmentData.map((dept, idx) => {
-                    const IconComp = dept.icon;
-                    return (
-                      <motion.div
-                        key={dept.department}
-                        variants={itemVariants}
-                        custom={idx}
-                        whileHover={{ scale: 1.02 }}
-                      >
-                        <Card
-                          className={`text-center cursor-pointer hover:shadow-md border-2 hover:border-blue-300 bg-gradient-to-b ${dept.color}`}
-                          onClick={() => handleDepartmentCardClick(dept.department)}
+                <div className="w-full overflow-x-auto">
+                  <div className="flex flex-nowrap gap-2 min-w-[500px]">
+                    {departmentData.map((dept, idx) => {
+                      const IconComp = dept.icon;
+                      return (
+                        <motion.div
+                          key={dept.department}
+                          variants={itemVariants}
+                          custom={idx}
+                          whileHover={{ scale: 1.02 }}
+                          className="flex-1 min-w-[80px]"
                         >
-                          <CardContent className="p-1.5">
-                            <div className="bg-white/50 rounded-full w-8 h-8 mx-auto mb-1 flex items-center justify-center">
-                              <IconComp className="h-4 w-4 text-gray-700" />
-                            </div>
-                            <p className="text-[10px] font-medium truncate">{dept.department}</p>
-                            <p className="text-sm font-bold mt-1">{dept.total}</p>
-                            <p className="text-[9px] text-muted-foreground">
-  site{dept.total !== 1 ? 's' : ''}
-</p>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    );
-                  })}
+                          <Card
+                            className={`text-center cursor-pointer hover:shadow-md border-2 hover:border-blue-300 bg-gradient-to-b ${dept.color} h-full`}
+                            onClick={() => handleDepartmentCardClick(dept.department)}
+                          >
+                            <CardContent className="p-2">
+                              <div className="bg-white/50 rounded-full w-8 h-8 mx-auto mb-1 flex items-center justify-center">
+                                <IconComp className="h-4 w-4 text-gray-700" />
+                              </div>
+                              <p className="text-[10px] font-medium truncate">{dept.department}</p>
+                              <p className="text-sm font-bold mt-1">{dept.total}</p>
+                              <p className="text-[8px] text-muted-foreground">site{dept.total !== 1 ? 's' : ''}</p>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </CardContent>

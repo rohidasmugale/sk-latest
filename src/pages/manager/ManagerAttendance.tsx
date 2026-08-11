@@ -997,9 +997,9 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
     const status = employee.status;
     const checkInTime = employee.checkInTime;
     if (employee.isManual) {
-    // Keep the status as is, but force isLate = false
-    return { status, isLate: false };
-  }
+      // Keep the status as is, but force isLate = false
+      return { status, isLate: false };
+    }
     if (status === 'weekly-off' || status === 'leave') {
       return { status, isLate: false };
     }
@@ -1534,6 +1534,217 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
       console.error(error);
     } finally {
       setRefreshing(false);
+    }
+  };
+
+
+  const handlePrintFullMonth = async () => {
+    try {
+      const currentDate = new Date(selectedDate);
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const monthEnd = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+      toast.loading('Generating printable monthly grid...');
+      const fullMonthEmployees = await generateEmployeeData(siteName, monthStart, monthEnd);
+
+      let filtered = fullMonthEmployees;
+      if (viewType === 'department' && department) {
+        const targetDept = department.trim().toLowerCase();
+        filtered = fullMonthEmployees.filter(emp =>
+          (emp.department || '').trim().toLowerCase() === targetDept
+        );
+      }
+
+      if (filtered.length === 0) {
+        toast.dismiss();
+        toast.error('No data found for the selected month/department.');
+        return;
+      }
+
+      // Build employee map
+      const employeeMap = new Map<string, { name: string; data: Map<string, string> }>();
+      filtered.forEach(emp => {
+        const key = emp.employeeId || emp.id || emp.name;
+        if (!employeeMap.has(key)) {
+          employeeMap.set(key, { name: emp.name, data: new Map() });
+        }
+        employeeMap.get(key)!.data.set(emp.date, emp.status);
+      });
+
+      const sortedEmployees = Array.from(employeeMap.entries())
+        .map(([id, info]) => ({ id, ...info }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      const daysArray = Array.from({ length: lastDay }, (_, i) => String(i + 1).padStart(2, '0'));
+      const dateKeys = daysArray.map(d => `${year}-${String(month + 1).padStart(2, '0')}-${d}`);
+      const numDays = daysArray.length;
+
+      // Build HTML table
+      let html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Attendance - ${siteName} - ${monthStart}</title>
+        <meta charset="UTF-8" />
+        <style>
+          body { font-family: Arial, sans-serif; margin: 10px; }
+          h1 { text-align: center; color: #0E2568; font-size: 18px; }
+          table { border-collapse: collapse; width: 100%; font-size: 10px; table-layout: auto; }
+          th, td { border: 1px solid #ccc; padding: 3px 4px; text-align: center; }
+          th { background: #0E2568; color: white; font-weight: bold; }
+          .wo { background: #e9e9e9; color: #333; font-weight: bold; }
+          .absent { background: #f3c7c7; color: #8B0000; font-weight: bold; }
+          .present { background: #d4edda; }
+          .summary-row { background: #f8f9fa; font-weight: bold; }
+          .total-row { background: #ffff00; font-weight: bold; }
+          .day-names { background: #f0f0f0; color: #0E2568; font-weight: bold; }
+          .no-print { display: none; }
+          @media print {
+            body { margin: 10px; }
+            .no-print { display: none; }
+            table { font-size: 9px; }
+            th, td { padding: 2px 3px; }
+          }
+          @page {
+            size: landscape;
+            margin: 10mm;
+          }
+        </style>
+      </head>
+      <body>
+        <h1>Attendance Grid - ${siteName} (${monthStart})</h1>
+        <table>
+          <thead>
+            <tr>
+              <th>SR NO</th>
+              <th>NAME</th>
+              ${daysArray.map(d => `<th>${d}</th>`).join('')}
+              <th>Total Duty</th>
+              <th>W/O</th>
+              <th>PH</th>
+              <th>Total</th>
+            </tr>
+            <tr class="day-names">
+              <td></td>
+              <td></td>
+              ${daysArray.map(d => {
+        const dateObj = new Date(year, month, Number(d));
+        return `<td>${dateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}</td>`;
+      }).join('')}
+              <td></td><td></td><td></td><td></td>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+      let grandTotalDuty = 0;
+      let grandTotalWO = 0;
+
+      sortedEmployees.forEach((emp, idx) => {
+        let totalDuty = 0, totalWO = 0;
+        html += `<tr>`;
+        html += `<td>${idx + 1}</td>`;
+        html += `<td style="text-align:left;">${emp.name}</td>`;
+        dateKeys.forEach(dateKey => {
+          const status = emp.data.get(dateKey) || 'absent';
+          if (status === 'present' || status === 'half-day') {
+            html += `<td class="present">1</td>`;
+            totalDuty++;
+          } else if (status === 'weekly-off') {
+            html += `<td class="wo">WO</td>`;
+            totalWO++;
+          } else {
+            html += `<td class="absent">A</td>`;
+          }
+        });
+        html += `<td>${totalDuty}</td>`;
+        html += `<td>${totalWO}</td>`;
+        html += `<td>0</td>`;
+        html += `<td>${totalDuty + totalWO}</td>`;
+        html += `</tr>`;
+        grandTotalDuty += totalDuty;
+        grandTotalWO += totalWO;
+      });
+
+      // Daily summary arrays
+      const dailyPresent = Array(numDays).fill(0);
+      const dailyWO = Array(numDays).fill(0);
+      sortedEmployees.forEach(emp => {
+        dateKeys.forEach((dateKey, idx) => {
+          const status = emp.data.get(dateKey) || 'absent';
+          if (status === 'present' || status === 'half-day') dailyPresent[idx]++;
+          else if (status === 'weekly-off') dailyWO[idx]++;
+        });
+      });
+
+      const dailyRequirement = siteData?.dailyRequirement || 0;
+
+      // Helper to build a summary row
+      const summaryRow = (label: string, values: number[], total: number) => {
+        let row = `<tr class="summary-row"><td colspan="2">${label}</td>`;
+        values.forEach(v => row += `<td>${v}</td>`);
+        row += `<td>${total}</td>`;
+        row += `<td></td><td></td><td>${total}</td>`; // Set Total column to same as total
+        row += `</tr>`;
+        return row;
+      };
+
+      html += summaryRow('PRESENT', dailyPresent, dailyPresent.reduce((a, b) => a + b, 0));
+      html += summaryRow('WEEKLY OFF', dailyWO, dailyWO.reduce((a, b) => a + b, 0));
+
+      // DEPLOYMENT row
+      const deploymentTotal = dailyRequirement * numDays;
+      let depRow = `<tr class="summary-row"><td colspan="2">DEPLOYMENT</td>`;
+      for (let i = 0; i < numDays; i++) depRow += `<td>${dailyRequirement}</td>`;
+      depRow += `<td>${deploymentTotal}</td><td></td><td></td><td>${deploymentTotal}</td></tr>`;
+      html += depRow;
+
+      // EXTRAS row (present - deployment)
+      const extrasTotal = dailyPresent.reduce((a, b) => a + b, 0) - deploymentTotal;
+      let extRow = `<tr class="summary-row"><td colspan="2">EXTRAS</td>`;
+      for (let i = 0; i < numDays; i++) extRow += `<td>${dailyPresent[i] - dailyRequirement}</td>`;
+      extRow += `<td>${extrasTotal}</td><td></td><td></td><td>${extrasTotal}</td></tr>`;
+      html += extRow;
+
+      // Grand total row
+      html += `<tr class="total-row"><td colspan="2">TOTAL</td>`;
+      // empty cells for days
+      for (let i = 0; i < numDays; i++) html += `<td></td>`;
+      html += `<td>${grandTotalDuty}</td><td>${grandTotalWO}</td><td>0</td><td>${grandTotalDuty + grandTotalWO}</td></tr>`;
+
+      html += `
+          </tbody>
+        </table>
+        <p style="margin-top:20px; text-align:center; font-size:11px; color:#666;">
+          Generated on ${new Date().toLocaleString()}
+        </p>
+        <div class="no-print" style="text-align:center; margin-top:20px;">
+          <button onclick="window.print()" style="padding:8px 20px; background:#0E2568; color:white; border:none; border-radius:4px; cursor:pointer;">Print</button>
+        </div>
+        <script>
+          window.onload = function() { window.print(); };
+        </script>
+      </body>
+      </html>
+    `;
+
+      const printWindow = window.open('', '_blank', 'width=1200,height=800');
+      if (!printWindow) {
+        toast.dismiss();
+        toast.error('Please allow popups to print.');
+        return;
+      }
+      printWindow.document.write(html);
+      printWindow.document.close();
+      toast.dismiss();
+      toast.success('Print dialog opened.');
+    } catch (error) {
+      toast.dismiss();
+      toast.error('Failed to generate printable grid');
+      console.error(error);
     }
   };
 
@@ -2239,9 +2450,16 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
             <FileSpreadsheet className="h-4 w-4" />
             Export Full Month
           </Button>
-          <Badge variant="outline" className="bg-yellow-50 ml-auto">
-            Grooming issues: {groomingCount}
-          </Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePrintFullMonth}
+            disabled={employees.length === 0}
+            className="flex items-center gap-2"
+          >
+            <FileText className="h-4 w-4" />
+            Print Full Month
+          </Button>
         </div>
       </div>
       {/* Feature Blocks (like supervisor dashboard) */}
@@ -2465,6 +2683,7 @@ const ManagerAttendanceView = () => {
         'Waste Management',
         'Parking',
         'Consumables',
+        'Technician',
         'Other',
       ];
       const stats = desiredDepts.map(dept => ({
@@ -3055,12 +3274,35 @@ const ManagerAttendanceView = () => {
       >
         <Card>
           <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <CardTitle>
-                {viewType === 'department'
-                  ? `${selectedService} Sites Attendance - Cumulative Totals (${daysInPeriod} days)`
-                  : `All Sites Attendance - Cumulative Totals (${daysInPeriod} days)`}
-              </CardTitle>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <CardTitle>
+                  {viewType === 'department'
+                    ? `${selectedService} Sites Attendance - Cumulative Totals (${daysInPeriod} days)`
+                    : `All Sites Attendance - Cumulative Totals (${daysInPeriod} days)`}
+                </CardTitle>
+                <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+                  <div className="relative w-full sm:w-64">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search sites..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-8"
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRefreshAll}
+                    disabled={refreshing || loading}
+                    className="w-full sm:w-auto"
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                    Refresh Data
+                  </Button>
+                </div>
+              </div>
             </div>
           </CardHeader>
           <CardContent>

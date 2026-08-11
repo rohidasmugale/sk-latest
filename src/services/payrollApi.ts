@@ -95,6 +95,9 @@ export const salaryStructureApi = {
 
   getEmployeesWithoutStructure: (params?: any) =>
     api.get("/salary-structures/employees/without", { params }).then((res) => res.data),
+
+  import: (data: any) =>
+    api.post("/salary-structures/import", data).then((res) => res.data),
 };
 
 // Payroll API

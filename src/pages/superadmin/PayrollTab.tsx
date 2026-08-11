@@ -43,8 +43,9 @@ import {
   AlertCircle,
   RefreshCw,
   Building,
+  Upload,
 } from "lucide-react";
-
+import * as XLSX from "xlsx";
 // Dialog Components
 import {
   Dialog,
@@ -372,7 +373,17 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
   });
   const [payrollItemsPerPage, setPayrollItemsPerPage] = useState(10);
   const [payrollPage, setPayrollPage] = useState(1);
-
+  // Import structure dialog
+  const [importStructureDialogOpen, setImportStructureDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importPreview, setImportPreview] = useState<any[]>([]);
+  const [importValidationResults, setImportValidationResults] = useState<{
+    valid: any[];
+    invalid: any[];
+    missingEmployees: string[];
+  }>({ valid: [], invalid: [], missingEmployees: [] });
+  const [importErrors, setImportErrors] = useState<string[]>([]);
   // ----- SITE FILTERING -----
   // Filter employees based on selected site
   const siteFilteredEmployees = useMemo(() => {
@@ -1273,6 +1284,33 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
     }
   };
 
+  const handleExportClientReport = async () => {
+    try {
+      const response = await payrollApi.export({
+        month: selectedMonth,
+        format: 'client-template',
+        site: selectedSite !== 'all' ? selectedSite : undefined,
+      });
+
+      // The response is a Blob (Excel file)
+      const blob = new Blob([response], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `client-payroll-${selectedMonth}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success('Client report exported successfully');
+    } catch (error: any) {
+      console.error('Error exporting client report:', error);
+      toast.error(error.response?.data?.message || 'Failed to export client report');
+    }
+  };
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, {
       label: string;
@@ -1403,7 +1441,146 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
   const handleRefreshData = () => {
     fetchAllData();
   };
+  // ========== IMPORT STRUCTURES ==========
+  const downloadStructureTemplate = () => {
+    const headers = [
+      'Employee ID*', 'Employee Name', 'Basic Salary', 'HRA', 'DA',
+      'Special Allowance', 'Conveyance', 'Medical Allowance', 'Other Allowances',
+      'Provident Fund', 'Professional Tax', 'Income Tax', 'Other Deductions',
+      'Leave Encashment', 'Arrears', 'ESIC', 'Advance', 'MLWF'
+    ];
+    const sample = [
+      'EMP001', 'John Doe', '25000', '5000', '3000', '2000', '1000', '1500', '0',
+      '1800', '200', '0', '0', '0', '0', '0', '0', '0'
+    ];
+    const wsData = [headers, sample];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Salary Structures');
+    XLSX.writeFile(wb, 'Salary_Structure_Template.xlsx');
+  };
 
+  const readStructureFile = (file: File): Promise<any[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = e.target?.result;
+          const workbook = XLSX.read(data, { type: 'binary' });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+          resolve(json);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      reader.readAsBinaryString(file);
+    });
+  };
+
+  const validateStructureRows = (rows: any[]) => {
+    const valid: any[] = [];
+    const invalid: any[] = [];
+    const missingEmployees: string[] = [];
+    const errors: string[] = [];
+
+    const employeeMap = new Map(siteFilteredEmployees.map(e => [e.employeeId, e]));
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNum = i + 2;
+      const empId = row['Employee ID']?.toString().trim();
+      if (!empId) {
+        errors.push(`Row ${rowNum}: Missing Employee ID`);
+        invalid.push(row);
+        continue;
+      }
+      const employee = employeeMap.get(empId);
+      if (!employee) {
+        missingEmployees.push(`${empId} (Row ${rowNum})`);
+        invalid.push(row);
+        continue;
+      }
+
+      const structure = {
+        employeeId: empId,
+        basicSalary: parseFloat(row['Basic Salary']) || 0,
+        hra: parseFloat(row['HRA']) || 0,
+        da: parseFloat(row['DA']) || 0,
+        specialAllowance: parseFloat(row['Special Allowance']) || 0,
+        conveyance: parseFloat(row['Conveyance']) || 0,
+        medicalAllowance: parseFloat(row['Medical Allowance']) || 0,
+        otherAllowances: parseFloat(row['Other Allowances']) || 0,
+        providentFund: parseFloat(row['Provident Fund']) || 0,
+        professionalTax: parseFloat(row['Professional Tax']) || 0,
+        incomeTax: parseFloat(row['Income Tax']) || 0,
+        otherDeductions: parseFloat(row['Other Deductions']) || 0,
+        leaveEncashment: parseFloat(row['Leave Encashment']) || 0,
+        arrears: parseFloat(row['Arrears']) || 0,
+        esic: parseFloat(row['ESIC']) || 0,
+        advance: parseFloat(row['Advance']) || 0,
+        mlwf: parseFloat(row['MLWF']) || 0,
+      };
+      valid.push(structure);
+    }
+
+    setImportErrors(errors);
+    return { valid, invalid, missingEmployees };
+  };
+
+  const handleStructureFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportFile(file);
+    setImportLoading(true);
+    try {
+      const data = await readStructureFile(file);
+      setImportPreview(data);
+      const results = validateStructureRows(data);
+      setImportValidationResults(results);
+      if (results.valid.length > 0) {
+        toast.success(`${results.valid.length} valid structures ready for import`);
+      }
+      if (results.missingEmployees.length > 0) {
+        toast.warning(`${results.missingEmployees.length} employees not found in the selected site`);
+      }
+    } catch (error) {
+      toast.error('Failed to read file');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const handleImportStructures = async () => {
+    if (importValidationResults.valid.length === 0) {
+      toast.error('No valid structures to import');
+      return;
+    }
+
+    setImportLoading(true);
+    try {
+      const response = await salaryStructureApi.import(importValidationResults.valid);
+      if (response.success) {
+        toast.success(`Imported ${response.data?.length || importValidationResults.valid.length} structures`);
+        setImportStructureDialogOpen(false);
+        resetImport();
+        fetchAllData(); // refresh structures
+      } else {
+        toast.error(response.message || 'Import failed');
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Import failed');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const resetImport = () => {
+    setImportFile(null);
+    setImportPreview([]);
+    setImportValidationResults({ valid: [], invalid: [], missingEmployees: [] });
+    setImportErrors([]);
+  };
   if (loading.employees && loading.payroll && loading.structures && loading.slips) {
     return (
       <div className="flex flex-col justify-center items-center h-96 space-y-4">
@@ -1678,7 +1855,136 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* Import Salary Structures Dialog */}
+      <Dialog open={importStructureDialogOpen} onOpenChange={(open) => {
+        setImportStructureDialogOpen(open);
+        if (!open) resetImport();
+      }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import Salary Structures</DialogTitle>
+            <DialogDescription>
+              Upload an Excel file with employee salary structures. Employee IDs must exist in the currently selected site.
+            </DialogDescription>
+          </DialogHeader>
 
+          <div className="space-y-4">
+            {/* File Upload */}
+            <div className="space-y-2">
+              <Label>Upload Excel File</Label>
+              <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors bg-gray-50">
+                <Input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleStructureFileSelect}
+                  className="hidden"
+                  disabled={importLoading}
+                  id="structure-import-file"
+                />
+                <Label htmlFor="structure-import-file" className="cursor-pointer">
+                  <Upload className="h-10 w-10 mx-auto mb-2 text-gray-400" />
+                  <p className="text-sm font-medium text-gray-700">
+                    {importLoading ? 'Processing...' : 'Click to upload or drag & drop'}
+                  </p>
+                  <p className="text-xs text-gray-500">Supports .xlsx, .xls, .csv</p>
+                </Label>
+                {importFile && (
+                  <div className="mt-3 p-2 bg-blue-50 rounded-lg border border-blue-100">
+                    <p className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-blue-500" />
+                      <span className="truncate">{importFile.name}</span>
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Download Template */}
+            <div className="flex justify-center">
+              <Button onClick={downloadStructureTemplate} variant="outline" size="sm">
+                <Download className="mr-2 h-4 w-4" /> Download Template
+              </Button>
+            </div>
+
+            {/* Preview & Validation */}
+            {importValidationResults.valid.length > 0 && (
+              <div className="border rounded-lg p-3 bg-green-50">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <h3 className="font-semibold text-green-800 text-sm">Valid Structures ({importValidationResults.valid.length})</h3>
+                </div>
+                <div className="max-h-32 overflow-y-auto text-xs">
+                  {importValidationResults.valid.map((s, idx) => (
+                    <div key={idx} className="py-1 border-b border-green-200 last:border-0">
+                      {s.employeeId} – ₹{s.basicSalary.toLocaleString()}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {importValidationResults.missingEmployees.length > 0 && (
+              <div className="border rounded-lg p-3 bg-yellow-50">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="h-4 w-4 text-yellow-600" />
+                  <h3 className="font-semibold text-yellow-800 text-sm">Employees Not Found ({importValidationResults.missingEmployees.length})</h3>
+                </div>
+                <div className="max-h-32 overflow-y-auto text-xs">
+                  {importValidationResults.missingEmployees.map((m, idx) => (
+                    <div key={idx} className="py-1 border-b border-yellow-200 last:border-0">
+                      {m}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {importErrors.length > 0 && (
+              <div className="border rounded-lg p-3 bg-red-50">
+                <div className="flex items-center gap-2 mb-2">
+                  <XCircle className="h-4 w-4 text-red-600" />
+                  <h3 className="font-semibold text-red-800 text-sm">Errors ({importErrors.length})</h3>
+                </div>
+                <div className="max-h-32 overflow-y-auto text-xs">
+                  {importErrors.map((err, idx) => (
+                    <div key={idx} className="py-1 border-b border-red-200 last:border-0 text-red-700">
+                      {err}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button
+                onClick={handleImportStructures}
+                disabled={importValidationResults.valid.length === 0 || importLoading}
+                className="flex-1 bg-blue-600 hover:bg-blue-700"
+              >
+                {importLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Importing...
+                  </>
+                ) : (
+                  `Import ${importValidationResults.valid.length} Structures`
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setImportStructureDialogOpen(false);
+                  resetImport();
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       {/* Header */}
       <div className="space-y-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
@@ -1719,6 +2025,15 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
 
               <Button variant="outline" onClick={handleExportPayrollExcel} disabled={filteredPayroll.length === 0} className="gap-2">
                 <FileSpreadsheet className="h-4 w-4" /> Export
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleExportClientReport}
+                disabled={filteredPayroll.length === 0}
+                className="gap-2"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                Export excel
               </Button>
             </div>
           </div>
@@ -1984,7 +2299,12 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <h3 className="text-lg font-semibold">Salary Structures</h3>
                   <div className="flex gap-2 w-full sm:w-auto">
-                    <Button onClick={() => setIsAddingStructure(true)} className="w-full sm:w-auto"><Plus className="mr-2 h-4 w-4" /> Add Structure</Button>
+                    <Button onClick={() => setIsAddingStructure(true)} className="w-full sm:w-auto">
+                      <Plus className="mr-2 h-4 w-4" /> Add Structure
+                    </Button>
+                    <Button variant="outline" onClick={() => setImportStructureDialogOpen(true)} className="w-full sm:w-auto">
+                      <Upload className="mr-2 h-4 w-4" /> Import
+                    </Button>
                   </div>
                 </div>
 

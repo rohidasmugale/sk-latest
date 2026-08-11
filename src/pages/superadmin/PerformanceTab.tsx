@@ -479,7 +479,7 @@ const DeductionListTab = ({ }: DeductionListTabProps) => {
         console.log("API params:", params);
 
         const response = await fetch(
-          `${API_URL}/deductions/deductions?${new URLSearchParams(params).toString()}`
+          `${API_URL}/deductions?${new URLSearchParams(params).toString()}`
         );
 
         if (!response.ok) {
@@ -546,6 +546,7 @@ const DeductionListTab = ({ }: DeductionListTabProps) => {
   );
 
   // Fetch advances from API
+  // Fetch advances from API
   const fetchAdvances = useCallback(async () => {
     console.log("Fetching advances...");
 
@@ -553,8 +554,17 @@ const DeductionListTab = ({ }: DeductionListTabProps) => {
     try {
       let url = `${API_URL}/deductions/advances?limit=1000`;
       if (filterSiteId) url += `&siteId=${filterSiteId}`;
+
       const response = await fetch(url);
+
+      // ✅ Handle 400 gracefully – API may require additional parameters
       if (!response.ok) {
+        if (response.status === 400) {
+          console.warn('Advance endpoint returned 400 – skipping (missing params or no data).');
+          setAdvances([]);
+          setTotalAdvancesCount(0);
+          return;
+        }
         throw new Error(`API Error: ${response.status}`);
       }
 
@@ -725,7 +735,7 @@ const DeductionListTab = ({ }: DeductionListTabProps) => {
   // Fetch deduction statistics
   const fetchDeductionStats = useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/deductions/deductions/stats`);
+      const response = await fetch(`${API_URL}/deductions/stats`);
 
       if (response.ok) {
         const data = await response.json();
@@ -1852,8 +1862,8 @@ const DeductionListTab = ({ }: DeductionListTabProps) => {
             <AlertDialogAction
               onClick={confirmationDialog.onConfirm}
               className={`flex-1 sm:flex-none ${confirmationDialog.type === 'advance'
-                  ? 'bg-green-600 hover:bg-green-700'
-                  : 'bg-blue-600 hover:bg-blue-700'
+                ? 'bg-green-600 hover:bg-green-700'
+                : 'bg-blue-600 hover:bg-blue-700'
                 }`}
             >
               <CheckCircle2 className="h-4 w-4 mr-2" />

@@ -53,7 +53,7 @@ import {
   X,
   MapPin,
   Plus,
-  Coffee, Timer, LogIn, LogOut, Camera,Cpu, Shirt, Images, Factory, GraduationCap, Megaphone 
+  Coffee, Timer, LogIn, LogOut, Camera, Cpu, Shirt, Images, Factory, GraduationCap, Megaphone, Settings
 } from 'lucide-react';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 // Recharts for charts
@@ -150,7 +150,7 @@ interface SalaryStructure {
 }
 
 // API URL
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 // Chart color constants
@@ -159,7 +159,7 @@ const CHART_COLORS = {
   absent: '#ef4444',
   late: '#f59e0b',
   weeklyOff: '#94a3b8',
-  payroll: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b4d6', '#ef4444']
+ 
 };
 
 // Animation variants
@@ -239,7 +239,7 @@ interface AttendanceRecord {
   siteName?: string;
   department?: string;
   shift?: string;
-  shiftId?: string; 
+  shiftId?: string;
 
   overtimeHours?: number;
   lateMinutes?: number;
@@ -405,26 +405,26 @@ const fetchAttendanceData = async (days: number = 30): Promise<DailyAttendanceSu
     const employeesWithCounts = await fetchEmployeesAssignedToSites();
     const siteAssignedEmployees = employeesWithCounts.employees;
 
-   const staffEmployees = siteAssignedEmployees; // include everyone
-const totalStaffAssignedToSites = staffEmployees.length;
+    const staffEmployees = siteAssignedEmployees; // include everyone
+    const totalStaffAssignedToSites = staffEmployees.length;
     // Build lookup: MongoDB _id → employee (for matching attendance records)
     const staffById = new Map<string, Employee>();
     staffEmployees.forEach(emp => {
       if (emp._id) staffById.set(emp._id, emp);
       if (emp.id) staffById.set(emp.id, emp);
     });
-// Also build lookup by name (fallback)
-const staffByName = new Map<string, Employee>();
-staffEmployees.forEach(emp => {
-  if (emp.name) staffByName.set(emp.name, emp);
-});
+    // Also build lookup by name (fallback)
+    const staffByName = new Map<string, Employee>();
+    staffEmployees.forEach(emp => {
+      if (emp.name) staffByName.set(emp.name, emp);
+    });
     // Build employee ID → siteName map for backfilling missing siteName on records
-   // Build employee ID → siteName map from ALL employees (not just staff)
-const empIdToSite = new Map<string, string>();
-siteAssignedEmployees.forEach(emp => {
-  const mongoId = emp._id || emp.id;
-  if (mongoId) empIdToSite.set(mongoId, emp.site || emp.siteName || '');
-});
+    // Build employee ID → siteName map from ALL employees (not just staff)
+    const empIdToSite = new Map<string, string>();
+    siteAssignedEmployees.forEach(emp => {
+      const mongoId = emp._id || emp.id;
+      if (mongoId) empIdToSite.set(mongoId, emp.site || emp.siteName || '');
+    });
 
     // Fetch attendance records
     let allRecords: AttendanceRecord[] = [];
@@ -461,9 +461,9 @@ siteAssignedEmployees.forEach(emp => {
 
     // Keep only staff records
     const staffRecords = allRecords.filter(r =>
-  staffById.has(r.employeeId) ||
-  (r.employeeName && staffByName.has(r.employeeName))
-);
+      staffById.has(r.employeeId) ||
+      (r.employeeName && staffByName.has(r.employeeName))
+    );
 
     // Build per-site staff counts
     const staffSiteCounts: { [site: string]: number } = {};
@@ -482,7 +482,7 @@ siteAssignedEmployees.forEach(emp => {
         date: dateStr,
         day: dateStr === formatDate(new Date()) ? 'Today'
           : dateStr === formatDate(new Date(Date.now() - 86400000)) ? 'Yesterday'
-          : dayName,
+            : dayName,
         present: 0, absent: 0, weeklyOff: 0, leave: 0,
         total: 0, rate: '0.0%', index: 0,
         totalEmployees: totalStaffAssignedToSites,
@@ -733,104 +733,53 @@ const MobileStatCard = ({ title, value, icon: Icon, color = "primary", subtitle 
   );
 };
 
-// Mobile Payroll Card Component
-const MobilePayrollCard = ({ item, formatCurrency, index }: any) => {
-  const [expanded, setExpanded] = useState(false);
-  const difference = item.billingAmount - item.totalPaid + item.holdSalary;
 
-  return (
-    <Card className="mb-3 rounded-xl border-0 shadow-sm">
-      <CardContent className="p-3">
-        <div className="flex items-start justify-between">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-sm truncate">{item.siteName.split(',')[0]}</h3>
-              <Badge variant={item.status === 'Paid' ? 'default' : 'secondary'} className="text-[9px] px-1.5">{item.status}</Badge>
-            </div>
-            <p className="text-xs font-bold text-blue-600 mt-1">{formatCurrency(item.billingAmount)}</p>
-          </div>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpanded(!expanded)}>
-            {expanded ? <ChevronLeft className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-          </Button>
-        </div>
-
-        {expanded && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            className="mt-3 pt-3 border-t space-y-2"
-          >
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <p className="text-muted-foreground">Total Paid</p>
-                <p className="font-medium text-green-600">{formatCurrency(item.totalPaid)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Hold Salary</p>
-                <p className="font-medium text-orange-600">{formatCurrency(item.holdSalary)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Difference</p>
-                <p className={`font-medium ${difference > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                  {formatCurrency(difference)}
-                </p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Remark</p>
-                <p className="font-medium text-xs">{item.remark}</p>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </CardContent>
-    </Card>
-  );
-};
 const ManagerDashboard = () => {
   const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
   const [employees, setEmployees] = useState<Employee[]>([]);
-    const [sites, setSites] = useState<Site[]>([]);
-const departmentData = useMemo(() => {
-  // Define allowed departments (same as services in sites)
-  const allowedDepartments = [
-    { name: 'Housekeeping', icon: Home, color: 'from-blue-50 to-blue-100 border-blue-200' },
-    { name: 'Security', icon: Shield, color: 'from-green-50 to-green-100 border-green-200' },
-    { name: 'Waste Management', icon: Trash2, color: 'from-gray-50 to-gray-100 border-gray-200' },
-    { name: 'Parking Management', icon: Car, color: 'from-purple-50 to-purple-100 border-purple-200' },
-    { name: 'Consumables', icon: ShoppingCart, color: 'from-orange-50 to-orange-100 border-orange-200' },
-    { name: 'Other', icon: Droplets, color: 'from-cyan-50 to-cyan-100 border-cyan-200' }
-  ];
+  const [sites, setSites] = useState<Site[]>([]);
+  const departmentData = useMemo(() => {
+    // Define allowed departments (same as services in sites)
+    const allowedDepartments = [
+      { name: 'Housekeeping', icon: Home, color: 'from-blue-50 to-blue-100 border-blue-200' },
+      { name: 'Security', icon: Shield, color: 'from-green-50 to-green-100 border-green-200' },
+      { name: 'Waste Management', icon: Trash2, color: 'from-gray-50 to-gray-100 border-gray-200' },
+      { name: 'Parking Management', icon: Car, color: 'from-purple-50 to-purple-100 border-purple-200' },
+      { name: 'Consumables', icon: ShoppingCart, color: 'from-orange-50 to-orange-100 border-orange-200' },
+      { name: 'Technician', icon: Settings, color: 'from-slate-50 to-slate-100 border-slate-300' },
+      { name: 'Other', icon: Droplets, color: 'from-cyan-50 to-cyan-100 border-cyan-200' }
+    ];
 
-  // Count sites per service
-  const deptSiteCounts = new Map<string, Set<string>>();
-  sites.forEach(site => {
-    const services = site.services || [];
-    services.forEach(service => {
-      // Match service to allowed department name (case‑insensitive)
-      const matchedDept = allowedDepartments.find(d =>
-        d.name.toLowerCase() === service.toLowerCase().trim()
-      );
-      const deptName = matchedDept ? matchedDept.name : service;
-      if (!deptSiteCounts.has(deptName)) {
-        deptSiteCounts.set(deptName, new Set());
-      }
-      deptSiteCounts.get(deptName)!.add(site._id);
+    // Count sites per service
+    const deptSiteCounts = new Map<string, Set<string>>();
+    sites.forEach(site => {
+      const services = site.services || [];
+      services.forEach(service => {
+        // Match service to allowed department name (case‑insensitive)
+        const matchedDept = allowedDepartments.find(d =>
+          d.name.toLowerCase() === service.toLowerCase().trim()
+        );
+        const deptName = matchedDept ? matchedDept.name : service;
+        if (!deptSiteCounts.has(deptName)) {
+          deptSiteCounts.set(deptName, new Set());
+        }
+        deptSiteCounts.get(deptName)!.add(site._id);
+      });
     });
-  });
 
-  // Build final array in allowed order
-  return allowedDepartments.map(dept => {
-    const siteIds = deptSiteCounts.get(dept.name) || new Set();
-    return {
-      department: dept.name,
-      total: siteIds.size,
-      present: siteIds.size, // keep for compatibility
-      icon: dept.icon,
-      color: dept.color,
-      siteNames: Array.from(siteIds)
-    };
-  });
-}, [sites]);   // ✅ depends on sites, not employees
+    // Build final array in allowed order
+    return allowedDepartments.map(dept => {
+      const siteIds = deptSiteCounts.get(dept.name) || new Set();
+      return {
+        department: dept.name,
+        total: siteIds.size,
+        present: siteIds.size, // keep for compatibility
+        icon: dept.icon,
+        color: dept.color,
+        siteNames: Array.from(siteIds)
+      };
+    });
+  }, [sites]);   // ✅ depends on sites, not employees
 
   const navigate = useNavigate();
 
@@ -841,28 +790,28 @@ const departmentData = useMemo(() => {
   const [totalEmployeesAssignedToSites, setTotalEmployeesAssignedToSites] = useState(0);
 
   const [siteEmployeeCounts, setSiteEmployeeCounts] = useState<SiteEmployeeCount[]>([]);
-// Attendance marking state
-const [attendance, setAttendance] = useState<AttendanceStatus>({
-  isCheckedIn: false,
-  isOnBreak: false,
-  checkInTime: null,
-  checkOutTime: null,
-  checkInPhoto: null,
-  checkOutPhoto: null,
-  breakStartTime: null,
-  breakEndTime: null,
-  totalHours: 0,
-  breakTime: 0,
-  lastCheckInDate: null,
-  hasCheckedInToday: false,
-  hasCheckedOutToday: false,
-});
-const [cameraOpen, setCameraOpen] = useState(false);
-const [cameraAction, setCameraAction] = useState<'checkin' | 'checkout' | 'recognize' | null>(null);
-const [uploadingPhoto, setUploadingPhoto] = useState(false);
-const [weeklyOffDialogOpen, setWeeklyOffDialogOpen] = useState(false);
-const [selectedEmployeeForWeeklyOff, setSelectedEmployeeForWeeklyOff] = useState<Employee | null>(null);
-const [weeklyOffLoading, setWeeklyOffLoading] = useState(false);
+  // Attendance marking state
+  const [attendance, setAttendance] = useState<AttendanceStatus>({
+    isCheckedIn: false,
+    isOnBreak: false,
+    checkInTime: null,
+    checkOutTime: null,
+    checkInPhoto: null,
+    checkOutPhoto: null,
+    breakStartTime: null,
+    breakEndTime: null,
+    totalHours: 0,
+    breakTime: 0,
+    lastCheckInDate: null,
+    hasCheckedInToday: false,
+    hasCheckedOutToday: false,
+  });
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraAction, setCameraAction] = useState<'checkin' | 'checkout' | 'recognize' | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [weeklyOffDialogOpen, setWeeklyOffDialogOpen] = useState(false);
+  const [selectedEmployeeForWeeklyOff, setSelectedEmployeeForWeeklyOff] = useState<Employee | null>(null);
+  const [weeklyOffLoading, setWeeklyOffLoading] = useState(false);
   // State for UI navigation
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const [sixDaysStartIndex, setSixDaysStartIndex] = useState(1);
@@ -873,178 +822,178 @@ const [weeklyOffLoading, setWeeklyOffLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [showSiteBreakdown, setShowSiteBreakdown] = useState(false);
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
-const recentMatchesRef = useRef<Map<string, number>>(new Map());
-const MATCH_COOLDOWN_MS = 12000; // 12 seconds
+  const recentMatchesRef = useRef<Map<string, number>>(new Map());
+  const MATCH_COOLDOWN_MS = 12000; // 12 seconds
   // Load attendance status for the logged‑in admin
-const loadMyAttendanceStatus = async () => {
-  try {
-    const storedUser = localStorage.getItem("sk_user");
-    const userId = storedUser ? JSON.parse(storedUser)._id : null;
-    if (!userId) return;
-    const response = await axios.get(`${API_URL}/attendance/status/${userId}`);
-    if (response.data.success && response.data.data) {
-      const api = response.data.data;
-      const today = new Date().toDateString();
-      const lastCheckInDate = api.lastCheckInDate ? new Date(api.lastCheckInDate).toDateString() : null;
-      setAttendance({
-        isCheckedIn: api.isCheckedIn || false,
-        isOnBreak: api.isOnBreak || false,
-        checkInTime: api.checkInTime || null,
-        checkOutTime: api.checkOutTime || null,
-        checkInPhoto: api.checkInPhoto || null,
-        checkOutPhoto: api.checkOutPhoto || null,
-        breakStartTime: api.breakStartTime || null,
-        breakEndTime: api.breakEndTime || null,
-        totalHours: Number(api.totalHours) || 0,
-        breakTime: Number(api.breakTime) || 0,
-        lastCheckInDate: api.lastCheckInDate || null,
-        hasCheckedInToday: lastCheckInDate === today,
-        hasCheckedOutToday: api.checkOutTime && new Date(api.checkOutTime).toDateString() === today,
-      });
-    }
-  } catch (error) {
-    console.error("Failed to load admin attendance", error);
-  }
-};
-
-// Break handlers
-const handleBreakIn = async () => {
-  if (!attendance.isCheckedIn) return toast.error("Check in first");
-  if (attendance.isOnBreak) return toast.error("Already on break");
-  try {
-    await axios.post(`${API_URL}/attendance/breakin`, { employeeId: getCurrentAdminId() });
-    setAttendance({ ...attendance, isOnBreak: true, breakStartTime: new Date().toISOString() });
-    toast.success("Break started");
-  } catch (error: any) {
-    toast.error(error.response?.data?.message || "Break failed");
-  }
-};
-
-const handleBreakOut = async () => {
-  if (!attendance.isOnBreak) return toast.error("Not on break");
-  try {
-    await axios.post(`${API_URL}/attendance/breakout`, { employeeId: getCurrentAdminId() });
-    const breakTime = calculateBreakTime(attendance.breakStartTime, new Date().toISOString());
-    setAttendance({
-      ...attendance,
-      isOnBreak: false,
-      breakEndTime: new Date().toISOString(),
-      breakTime: attendance.breakTime + breakTime,
-    });
-    toast.success("Break ended");
-  } catch (error: any) {
-    toast.error(error.response?.data?.message || "Break end failed");
-  }
-};
-// Add this function
-const handleAttendanceCamera = () => {
-  setCameraAction('recognize');
-  setCameraOpen(true);
-};
-// Camera capture handler (same as supervisor)
-const handlePhotoCapture = async (photoFile: File) => {
-  if (!cameraAction) return;
-  setUploadingPhoto(true);
-  try {
-    // Face recognition path using auto-attendance
-    if (cameraAction === 'recognize') {
-      const photoClone = new File([photoFile], photoFile.name, { type: photoFile.type });
-      const formData = new FormData();
-      formData.append('photo', photoClone);
-      formData.append('supervisorId', getCurrentAdminId());
-      formData.append('siteName', '');
-
-      try {
-        const response = await axios.post(`${API_URL}/attendance/auto-attendance`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          timeout: 15000
+  const loadMyAttendanceStatus = async () => {
+    try {
+      const storedUser = localStorage.getItem("sk_user");
+      const userId = storedUser ? JSON.parse(storedUser)._id : null;
+      if (!userId) return;
+      const response = await axios.get(`${API_URL}/attendance/status/${userId}`);
+      if (response.data.success && response.data.data) {
+        const api = response.data.data;
+        const today = new Date().toDateString();
+        const lastCheckInDate = api.lastCheckInDate ? new Date(api.lastCheckInDate).toDateString() : null;
+        setAttendance({
+          isCheckedIn: api.isCheckedIn || false,
+          isOnBreak: api.isOnBreak || false,
+          checkInTime: api.checkInTime || null,
+          checkOutTime: api.checkOutTime || null,
+          checkInPhoto: api.checkInPhoto || null,
+          checkOutPhoto: api.checkOutPhoto || null,
+          breakStartTime: api.breakStartTime || null,
+          breakEndTime: api.breakEndTime || null,
+          totalHours: Number(api.totalHours) || 0,
+          breakTime: Number(api.breakTime) || 0,
+          lastCheckInDate: api.lastCheckInDate || null,
+          hasCheckedInToday: lastCheckInDate === today,
+          hasCheckedOutToday: api.checkOutTime && new Date(api.checkOutTime).toDateString() === today,
         });
+      }
+    } catch (error) {
+      console.error("Failed to load admin attendance", error);
+    }
+  };
 
-        if (response.data.success) {
-          const { employeeId, employeeName, action, alreadyCheckedIn } = response.data.data;
+  // Break handlers
+  const handleBreakIn = async () => {
+    if (!attendance.isCheckedIn) return toast.error("Check in first");
+    if (attendance.isOnBreak) return toast.error("Already on break");
+    try {
+      await axios.post(`${API_URL}/attendance/breakin`, { employeeId: getCurrentAdminId() });
+      setAttendance({ ...attendance, isOnBreak: true, breakStartTime: new Date().toISOString() });
+      toast.success("Break started");
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Break failed");
+    }
+  };
 
-          // PER-EMPLOYEE COOLDOWN - prevent duplicate toasts
-          const now = Date.now();
-          const lastSeen = recentMatchesRef.current.get(employeeId);
-          if (lastSeen && now - lastSeen < MATCH_COOLDOWN_MS) {
-            // Same person still in frame — skip toast/UI update
-            setCameraOpen(false);
-            return;
-          }
-          recentMatchesRef.current.set(employeeId, now);
+  const handleBreakOut = async () => {
+    if (!attendance.isOnBreak) return toast.error("Not on break");
+    try {
+      await axios.post(`${API_URL}/attendance/breakout`, { employeeId: getCurrentAdminId() });
+      const breakTime = calculateBreakTime(attendance.breakStartTime, new Date().toISOString());
+      setAttendance({
+        ...attendance,
+        isOnBreak: false,
+        breakEndTime: new Date().toISOString(),
+        breakTime: attendance.breakTime + breakTime,
+      });
+      toast.success("Break ended");
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Break end failed");
+    }
+  };
+  // Add this function
+  const handleAttendanceCamera = () => {
+    setCameraAction('recognize');
+    setCameraOpen(true);
+  };
+  // Camera capture handler (same as supervisor)
+  const handlePhotoCapture = async (photoFile: File) => {
+    if (!cameraAction) return;
+    setUploadingPhoto(true);
+    try {
+      // Face recognition path using auto-attendance
+      if (cameraAction === 'recognize') {
+        const photoClone = new File([photoFile], photoFile.name, { type: photoFile.type });
+        const formData = new FormData();
+        formData.append('photo', photoClone);
+        formData.append('supervisorId', getCurrentAdminId());
+        formData.append('siteName', '');
 
-          if (alreadyCheckedIn) {
-            toast.info(`${employeeName} already checked in`);
+        try {
+          const response = await axios.post(`${API_URL}/attendance/auto-attendance`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 15000
+          });
+
+          if (response.data.success) {
+            const { employeeId, employeeName, action, alreadyCheckedIn } = response.data.data;
+
+            // PER-EMPLOYEE COOLDOWN - prevent duplicate toasts
+            const now = Date.now();
+            const lastSeen = recentMatchesRef.current.get(employeeId);
+            if (lastSeen && now - lastSeen < MATCH_COOLDOWN_MS) {
+              // Same person still in frame — skip toast/UI update
+              setCameraOpen(false);
+              return;
+            }
+            recentMatchesRef.current.set(employeeId, now);
+
+            if (alreadyCheckedIn) {
+              toast.info(`${employeeName} already checked in`);
+            } else {
+              const actionDisplay = action === 'checkin' ? 'checked in' : 'checked out';
+              toast.success(`${employeeName} ${actionDisplay}!`);
+              loadAttendanceData(true);
+              loadMyAttendanceStatus();
+            }
           } else {
-            const actionDisplay = action === 'checkin' ? 'checked in' : 'checked out';
-            toast.success(`${employeeName} ${actionDisplay}!`);
-            loadAttendanceData(true);
-            loadMyAttendanceStatus();
+            toast.error(response.data.message || 'Attendance failed');
           }
-        } else {
-          toast.error(response.data.message || 'Attendance failed');
+        } catch (error: any) {
+          console.error('Auto-attendance error:', error);
+          toast.error(error.response?.data?.message || 'Failed to process attendance');
         }
-      } catch (error: any) {
-        console.error('Auto-attendance error:', error);
-        toast.error(error.response?.data?.message || 'Failed to process attendance');
+
+        setCameraOpen(false);
+        return;
       }
 
+      // Fallback for manual checkin/checkout (kept for compatibility)
+      const formData = new FormData();
+      formData.append('photo', photoFile);
+      formData.append('employeeId', getCurrentAdminId());
+      const endpoint = cameraAction === 'checkin'
+        ? `${API_URL}/attendance/checkin-with-photo`
+        : `${API_URL}/attendance/checkout-with-photo`;
+      const response = await axios.post(endpoint, formData);
+      if (response.data.success) {
+        toast.success(`Admin ${cameraAction === 'checkin' ? 'checked in' : 'checked out'}`);
+        loadMyAttendanceStatus();
+      }
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setUploadingPhoto(false);
       setCameraOpen(false);
-      return;
+      setCameraAction(null);
     }
+  };
 
-    // Fallback for manual checkin/checkout (kept for compatibility)
-    const formData = new FormData();
-    formData.append('photo', photoFile);
-    formData.append('employeeId', getCurrentAdminId());
-    const endpoint = cameraAction === 'checkin'
-      ? `${API_URL}/attendance/checkin-with-photo`
-      : `${API_URL}/attendance/checkout-with-photo`;
-    const response = await axios.post(endpoint, formData);
-    if (response.data.success) {
-      toast.success(`Admin ${cameraAction === 'checkin' ? 'checked in' : 'checked out'}`);
-      loadMyAttendanceStatus();
+  // Weekly off marking (for any employee – admin has full access)
+  const handleMarkWeeklyOff = async () => {
+    if (!selectedEmployeeForWeeklyOff) return;
+    setWeeklyOffLoading(true);
+    try {
+      await axios.post(`${API_URL}/attendance/update-status`, {
+        employeeId: selectedEmployeeForWeeklyOff._id,
+        date: new Date().toISOString().split('T')[0],
+        status: 'weekly-off',
+        remarks: 'Marked by admin',
+      });
+      toast.success(`Weekly off marked for ${selectedEmployeeForWeeklyOff.name}`);
+      setWeeklyOffDialogOpen(false);
+      // Optionally refresh attendance data
+      loadAttendanceData(true);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed");
+    } finally {
+      setWeeklyOffLoading(false);
     }
-  } catch (error: any) {
-    toast.error(error.message);
-  } finally {
-    setUploadingPhoto(false);
-    setCameraOpen(false);
-    setCameraAction(null);
-  }
-};  
+  };
 
-// Weekly off marking (for any employee – admin has full access)
-const handleMarkWeeklyOff = async () => {
-  if (!selectedEmployeeForWeeklyOff) return;
-  setWeeklyOffLoading(true);
-  try {
-    await axios.post(`${API_URL}/attendance/update-status`, {
-      employeeId: selectedEmployeeForWeeklyOff._id,
-      date: new Date().toISOString().split('T')[0],
-      status: 'weekly-off',
-      remarks: 'Marked by admin',
-    });
-    toast.success(`Weekly off marked for ${selectedEmployeeForWeeklyOff.name}`);
-    setWeeklyOffDialogOpen(false);
-    // Optionally refresh attendance data
-    loadAttendanceData(true);
-  } catch (error: any) {
-    toast.error(error.response?.data?.message || "Failed");
-  } finally {
-    setWeeklyOffLoading(false);
-  }
-};
-
-const getCurrentAdminId = () => {
-  const stored = localStorage.getItem("sk_user");
-  if (stored) return JSON.parse(stored)._id;
-  return "admin-demo";
-};
-const calculateBreakTime = (start: string | null, end: string | null): number => {
-  if (!start || !end) return 0;
-  return (new Date(end).getTime() - new Date(start).getTime()) / (1000 * 60 * 60);
-};
+  const getCurrentAdminId = () => {
+    const stored = localStorage.getItem("sk_user");
+    if (stored) return JSON.parse(stored)._id;
+    return "admin-demo";
+  };
+  const calculateBreakTime = (start: string | null, end: string | null): number => {
+    if (!start || !end) return 0;
+    return (new Date(end).getTime() - new Date(start).getTime()) / (1000 * 60 * 60);
+  };
   const itemsPerPage = 5;
   const fetchEmployeesData = async () => {
     try {
@@ -1167,43 +1116,8 @@ const calculateBreakTime = (start: string | null, end: string | null): number =>
     { name: 'Absent', value: currentDayData.absent, color: CHART_COLORS.absent }
   ].filter(item => item.value > 0);
 
-  // Payroll summary
-  const payrollSummary = useMemo(() => {
-    const totalBilling = payrollData.reduce((sum, item) => sum + item.billingAmount, 0);
-    const totalPaid = payrollData.reduce((sum, item) => sum + item.totalPaid, 0);
-    const totalHold = payrollData.reduce((sum, item) => sum + item.holdSalary, 0);
-    const totalDifference = payrollData.reduce((sum, item) => sum + (item.billingAmount - item.totalPaid + item.holdSalary), 0);
 
-    return {
-      totalBilling,
-      totalPaid,
-      totalHold,
-      totalDifference,
-      completionRate: ((totalPaid / totalBilling) * 100).toFixed(1)
-    };
-  }, [payrollData]);
 
-  // Filtered payroll data
-  const filteredPayrollData = useMemo(() => {
-    return payrollData.filter(item =>
-      item.siteName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [payrollData, searchTerm]);
-
-  // Paginated payroll data
-  const paginatedPayrollData = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredPayrollData.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredPayrollData, currentPage, itemsPerPage]);
-
-  const totalPages = Math.ceil(filteredPayrollData.length / itemsPerPage);
-  const selectedSiteData = payrollData.find(item => item.siteName === selectedSite);
-
-  // Site pie chart data
-  const sitePieChartData = selectedSiteData ? [
-    { name: 'Total Paid', value: selectedSiteData.totalPaid, color: CHART_COLORS.payroll[1] },
-    { name: 'Hold Salary', value: selectedSiteData.holdSalary, color: CHART_COLORS.payroll[5] }
-  ] : [];
 
   // Navigation handlers
   const handlePreviousDay = () => {
@@ -1248,7 +1162,7 @@ const calculateBreakTime = (start: string | null, end: string | null): number =>
     return `${formatDate(firstDate)} - ${formatDate(lastDate)}`;
   };
 
- 
+
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -1256,22 +1170,22 @@ const calculateBreakTime = (start: string | null, end: string | null): number =>
 
 
 
- const handlePieChartClick = (date?: string) => {
-  const selectedDate = date || currentDayData.date;
-  navigate(`/manager/managerattendance?view=site&startDate=${selectedDate}&endDate=${selectedDate}`);
-};
+  const handlePieChartClick = (date?: string) => {
+    const selectedDate = date || currentDayData.date;
+    navigate(`/manager/managerattendance?view=site&startDate=${selectedDate}&endDate=${selectedDate}`);
+  };
 
- const handleSmallPieChartClick = (dayData: any) => {
-  navigate(`/manager/managerattendance?view=site&startDate=${dayData.date}&endDate=${dayData.date}`);
-};
+  const handleSmallPieChartClick = (dayData: any) => {
+    navigate(`/manager/managerattendance?view=site&startDate=${dayData.date}&endDate=${dayData.date}`);
+  };
   const handleDepartmentCardClick = (department: string) => {
-  const today = new Date().toISOString().split('T')[0];
-  navigate(`/manager/managerattendance?view=department&department=${department}&startDate=${today}&endDate=${today}`);
-};
+    const today = new Date().toISOString().split('T')[0];
+    navigate(`/manager/managerattendance?view=department&department=${department}&startDate=${today}&endDate=${today}`);
+  };
   // Custom tooltips
- 
-   
-  
+
+
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -1286,100 +1200,82 @@ const calculateBreakTime = (start: string | null, end: string | null): number =>
   };
 
   // Custom tooltip for attendance pie chart
-const CustomPieTooltip = ({ active, payload }: any) => {
-  if (active && payload && payload.length) {
-    const data = payload[0];
-    return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white p-3 border rounded-lg shadow-lg"
-      >
-        <p className="font-semibold text-sm">{data.name}</p>
-        <p className="text-sm" style={{ color: data.payload.fill }}>
-          {data.value} employees ({((data.value / currentDayData.totalEmployees) * 100).toFixed(1)}%)
-        </p>
-      </motion.div>
-    );
-  }
-  return null;
-};
+  const CustomPieTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0];
+      return (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white p-3 border rounded-lg shadow-lg"
+        >
+          <p className="font-semibold text-sm">{data.name}</p>
+          <p className="text-sm" style={{ color: data.payload.fill }}>
+            {data.value} employees ({((data.value / currentDayData.totalEmployees) * 100).toFixed(1)}%)
+          </p>
+        </motion.div>
+      );
+    }
+    return null;
+  };
 
-// Custom tooltip for payroll pie chart (if you keep payroll section)
-const CustomPayrollTooltip = ({ active, payload }: any) => {
-  if (active && payload && payload.length) {
-    const data = payload[0];
-    return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white p-3 border rounded-lg shadow-lg"
-      >
-        <p className="font-semibold text-sm">{data.name}</p>
-        <p className="text-sm" style={{ color: data.payload.fill }}>
-          {formatCurrency(data.value)} ({((data.value / (selectedSiteData?.billingAmount || 1)) * 100).toFixed(1)}%)
-        </p>
-      </motion.div>
-    );
-  }
-  return null;
-};
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-gray-50/50">
       <DashboardHeader
         title={
           <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent text-base sm:text-lg">
-             Manager Dashboard
+            Manager Dashboard
           </span>
         }
         onMenuClick={onMenuClick}
       />
-{/* Attendance row – exactly like supervisor dashboard */}
-<div className="px-3 sm:px-4 mt-2 flex flex-wrap items-center gap-2">
-  <Button onClick={handleAttendanceCamera} variant="default" size="sm" className="flex items-center gap-1">
-    <Camera className="h-4 w-4" /> Attendance
-  </Button>
-  <Button onClick={handleBreakIn} disabled={!attendance.isCheckedIn || attendance.isOnBreak} variant="outline" size="sm">
-    <Coffee className="h-4 w-4 mr-1" /> Break In
-  </Button>
-  <Button onClick={handleBreakOut} disabled={!attendance.isOnBreak} variant="outline" size="sm">
-    <Timer className="h-4 w-4 mr-1" /> Break Out
-  </Button>
-  <div className="flex items-center gap-2 ml-auto sm:ml-0">
-    <Badge 
-      variant={attendance.hasCheckedOutToday ? "default" : attendance.hasCheckedInToday ? "secondary" : "outline"} 
-      className="text-xs"
-    >
-      {attendance.hasCheckedOutToday ? "Completed" : attendance.hasCheckedInToday ? "In Progress" : "Not Started"}
-    </Badge>
-    <span className="text-xs text-muted-foreground whitespace-nowrap">
-      Hours: {attendance.totalHours.toFixed(1)}h
-    </span>
-  </div>
-  <Button onClick={handleRefreshAttendance} variant="ghost" size="sm" className="ml-auto">
-    <RefreshCw className={`h-4 w-4 ${refreshingAttendance ? "animate-spin" : ""}`} />
-  </Button>
-   <Button
+      {/* Attendance row – exactly like supervisor dashboard */}
+      <div className="px-3 sm:px-4 mt-2 flex flex-wrap items-center gap-2">
+        <Button onClick={handleAttendanceCamera} variant="default" size="sm" className="flex items-center gap-1">
+          <Camera className="h-4 w-4" /> Attendance
+        </Button>
+        <Button onClick={handleBreakIn} disabled={!attendance.isCheckedIn || attendance.isOnBreak} variant="outline" size="sm">
+          <Coffee className="h-4 w-4 mr-1" /> Break In
+        </Button>
+        <Button onClick={handleBreakOut} disabled={!attendance.isOnBreak} variant="outline" size="sm">
+          <Timer className="h-4 w-4 mr-1" /> Break Out
+        </Button>
+        <div className="flex items-center gap-2 ml-auto sm:ml-0">
+          <Badge
+            variant={attendance.hasCheckedOutToday ? "default" : attendance.hasCheckedInToday ? "secondary" : "outline"}
+            className="text-xs"
+          >
+            {attendance.hasCheckedOutToday ? "Completed" : attendance.hasCheckedInToday ? "In Progress" : "Not Started"}
+          </Badge>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            Hours: {attendance.totalHours.toFixed(1)}h
+          </span>
+        </div>
+        <Button onClick={handleRefreshAttendance} variant="ghost" size="sm" className="ml-auto">
+          <RefreshCw className={`h-4 w-4 ${refreshingAttendance ? "animate-spin" : ""}`} />
+        </Button>
+        <Button
           onClick={() => setQuickCreateOpen(true)}
           className="rounded-full h-10 w-10 shadow-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
         >
           <Plus className="h-5 w-5" />
         </Button>
-</div>
-    
-    
-<UnifiedCreateModal
-  open={quickCreateOpen}
-  onOpenChange={setQuickCreateOpen}
-  employees={employees as any}
-  setEmployees={setEmployees as any}
-  onSuccess={() => {
-    loadAttendanceData();
-    loadSites();
-    fetchEmployeesData();
-  }}
-  allowedTabs={['employee', 'supervisor']}   // ✅ no 'admin'
-/>
+      </div>
+
+
+      <UnifiedCreateModal
+        open={quickCreateOpen}
+        onOpenChange={setQuickCreateOpen}
+        employees={employees as any}
+        setEmployees={setEmployees as any}
+        onSuccess={() => {
+          loadAttendanceData();
+          loadSites();
+          fetchEmployeesData();
+        }}
+        allowedTabs={['employee', 'supervisor']}   // ✅ no 'admin'
+      />
 
       <div className="p-3 space-y-3">
         {/* Attendance Card – compact */}
@@ -1554,6 +1450,7 @@ const CustomPayrollTooltip = ({ active, payload }: any) => {
         </motion.div>
 
         {/* Department Performance Cards – compact */}
+        {/* Department Performance Cards – compact */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1573,41 +1470,42 @@ const CustomPayrollTooltip = ({ active, payload }: any) => {
               {departmentData.length === 0 ? (
                 <div className="text-center py-4 text-xs">No departments found.</div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-                  {departmentData.map((dept, idx) => {
-                    const IconComp = dept.icon;
-                    return (
-                      <motion.div
-                        key={dept.department}
-                        variants={itemVariants}
-                        custom={idx}
-                        whileHover={{ scale: 1.02 }}
-                      >
-                        <Card
-                          className={`text-center cursor-pointer hover:shadow-md border-2 hover:border-blue-300 bg-gradient-to-b ${dept.color}`}
-                          onClick={() => handleDepartmentCardClick(dept.department)}
+                <div className="w-full overflow-x-auto">
+                  <div className="flex flex-nowrap gap-2 min-w-[500px]">
+                    {departmentData.map((dept, idx) => {
+                      const IconComp = dept.icon;
+                      return (
+                        <motion.div
+                          key={dept.department}
+                          variants={itemVariants}
+                          custom={idx}
+                          whileHover={{ scale: 1.02 }}
+                          className="flex-1 min-w-[80px]"
                         >
-                          <CardContent className="p-2">
-                            <div className="bg-white/50 rounded-full w-8 h-8 mx-auto mb-1 flex items-center justify-center">
-                              <IconComp className="h-4 w-4 text-gray-700" />
-                            </div>
-                            <p className="text-[10px] font-medium truncate">{dept.department}</p>
-                            <p className="text-sm font-bold mt-1">{dept.total}</p>
-                            <p className="text-[9px] text-muted-foreground">
-  site{dept.total !== 1 ? 's' : ''}
-</p>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    );
-                  })}
+                          <Card
+                            className={`text-center cursor-pointer hover:shadow-md border-2 hover:border-blue-300 bg-gradient-to-b ${dept.color} h-full`}
+                            onClick={() => handleDepartmentCardClick(dept.department)}
+                          >
+                            <CardContent className="p-2">
+                              <div className="bg-white/50 rounded-full w-8 h-8 mx-auto mb-1 flex items-center justify-center">
+                                <IconComp className="h-4 w-4 text-gray-700" />
+                              </div>
+                              <p className="text-[10px] font-medium truncate">{dept.department}</p>
+                              <p className="text-sm font-bold mt-1">{dept.total}</p>
+                              <p className="text-[8px] text-muted-foreground">site{dept.total !== 1 ? 's' : ''}</p>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </CardContent>
           </Card>
         </motion.div>
 
-                {/* Feature Blocks – Machine Status, Grooming, Incidents, Cleaning, Shift, Training, Briefing */}
+        {/* Feature Blocks – Machine Status, Grooming, Incidents, Cleaning, Shift, Training, Briefing */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 mt-4">
           <Card className="cursor-pointer hover:shadow-md transition-all hover:scale-105" onClick={() => navigate('/manager/machine-status')}>
             <CardContent className="p-3 flex flex-col items-center text-center">
@@ -1639,54 +1537,54 @@ const CustomPayrollTooltip = ({ active, payload }: any) => {
               <span className="text-xs font-medium">Shift Deployment</span>
             </CardContent>
           </Card>
-         </div>
-</div>
+        </div>
+      </div>
 
       {/* Camera capture for check‑in/out */}
-<CameraCapture
-  open={cameraOpen}
-  onOpenChange={setCameraOpen}
-  onCapture={handlePhotoCapture}
-  title={`${cameraAction === 'checkin' ? 'Check-in' : 'Check-out'} with Camera`}
-  actionLabel="Confirm"
-/>
+      <CameraCapture
+        open={cameraOpen}
+        onOpenChange={setCameraOpen}
+        onCapture={handlePhotoCapture}
+        title={`${cameraAction === 'checkin' ? 'Check-in' : 'Check-out'} with Camera`}
+        actionLabel="Confirm"
+      />
 
-{/* Weekly off dialog for employees */}
-<Dialog open={weeklyOffDialogOpen} onOpenChange={setWeeklyOffDialogOpen}>
-  <DialogContent>
-    <DialogHeader>
-      <DialogTitle>Mark Weekly Off</DialogTitle>
-      <DialogDescription>Select an employee to mark as weekly off for today.</DialogDescription>
-    </DialogHeader>
-    <div className="space-y-4 py-4">
-      <Select
-        value={selectedEmployeeForWeeklyOff?._id || ""}
-        onValueChange={(value) => {
-          const emp = employees.find(e => e._id === value);
-          setSelectedEmployeeForWeeklyOff(emp || null);
-        }}
-      >
-        <SelectTrigger>
-          <SelectValue placeholder="Select Employee" />
-        </SelectTrigger>
-        <SelectContent>
-          {employees.map(emp => (
-            <SelectItem key={emp._id} value={emp._id}>
-              {emp.name} ({emp.employeeId})
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-    <DialogFooter>
-      <Button variant="outline" onClick={() => setWeeklyOffDialogOpen(false)}>Cancel</Button>
-      <Button onClick={handleMarkWeeklyOff} disabled={weeklyOffLoading}>
-        {weeklyOffLoading && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
-        Confirm
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
+      {/* Weekly off dialog for employees */}
+      <Dialog open={weeklyOffDialogOpen} onOpenChange={setWeeklyOffDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark Weekly Off</DialogTitle>
+            <DialogDescription>Select an employee to mark as weekly off for today.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Select
+              value={selectedEmployeeForWeeklyOff?._id || ""}
+              onValueChange={(value) => {
+                const emp = employees.find(e => e._id === value);
+                setSelectedEmployeeForWeeklyOff(emp || null);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select Employee" />
+              </SelectTrigger>
+              <SelectContent>
+                {employees.map(emp => (
+                  <SelectItem key={emp._id} value={emp._id}>
+                    {emp.name} ({emp.employeeId})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWeeklyOffDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleMarkWeeklyOff} disabled={weeklyOffLoading}>
+              {weeklyOffLoading && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

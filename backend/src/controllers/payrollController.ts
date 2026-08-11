@@ -4,7 +4,7 @@ import Payroll, { IPayroll } from '../models/Payroll';
 import SalaryStructure from '../models/SalaryStructure';
 import SalarySlip from '../models/SalarySlip';
 import Employee, { IEmployee } from '../models/Employee';
-
+import * as XLSX from 'xlsx';
 // Helper function to populate employee data
 const populateEmployeeData = async (payrollRecords: any[]) => {
   try {
@@ -928,10 +928,11 @@ export const getPayrollSummary = async (req: Request, res: Response) => {
   }
 };
 
-// Export payroll to Excel/CSV
+// src/controllers/payrollController.ts
+
 export const exportPayroll = async (req: Request, res: Response) => {
   try {
-    const { month, format = 'csv' } = req.query;
+    const { month, format = 'csv', site } = req.query;
 
     if (!month) {
       return res.status(400).json({
@@ -940,21 +941,36 @@ export const exportPayroll = async (req: Request, res: Response) => {
       });
     }
 
-    const payrollRecords = await Payroll.find({ month });
+    // Build query with optional site filter
+    const query: any = { month };
+    if (site && site !== 'all') {
+      const siteEmployees = await Employee.find({ siteName: site }).select('employeeId').lean();
+      const employeeIds = siteEmployees.map(emp => (emp as any).employeeId);
+      if (employeeIds.length > 0) {
+        query.employeeId = { $in: employeeIds };
+      } else {
+        return res.status(200).json({
+          success: true,
+          data: [],
+          message: 'No employees found for this site'
+        });
+      }
+    }
+
+    const payrollRecords = await Payroll.find(query);
 
     if (payrollRecords.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'No payroll records found for this month'
+        message: 'No payroll records found for this month' + (site ? ' and site' : '')
       });
     }
 
-    // Get all employee data in one query
+    // Get employee data
     const employeeIds = payrollRecords.map(p => p.employeeId);
     const employees = await Employee.find({ employeeId: { $in: employeeIds } })
-      .select('name employeeId department position gender accountNumber ifscCode bankBranch bankName aadharNumber panNumber esicNumber uanNumber')
+      .select('name employeeId department position gender accountNumber ifscCode bankBranch bankName aadharNumber panNumber esicNumber uanNumber siteName')
       .lean();
-
     const employeeMap = new Map();
     employees.forEach(emp => {
       const employeeObj = emp as any;
@@ -971,15 +987,90 @@ export const exportPayroll = async (req: Request, res: Response) => {
         aadharNumber: employeeObj.aadharNumber,
         panNumber: employeeObj.panNumber,
         esicNumber: employeeObj.esicNumber,
-        uanNumber: employeeObj.uanNumber
+        uanNumber: employeeObj.uanNumber,
+        siteName: employeeObj.siteName
       });
     });
 
-    // Transform data for export
+    // Get salary structures for basic salary
+    const salaryStructures = await SalaryStructure.find({ employeeId: { $in: employeeIds }, isActive: true })
+      .select('employeeId basicSalary')
+      .lean();
+    const salaryStructureMap = new Map();
+    salaryStructures.forEach(struct => {
+      salaryStructureMap.set(struct.employeeId, struct);
+    });
+
+    // ─── 1. CLIENT TEMPLATE FORMAT (Excel) ──────────────────────────────
+    if (format === 'client-template') {
+      const exportData = payrollRecords.map((record, index) => {
+        const employee = employeeMap.get(record.employeeId) || {};
+        const structure = salaryStructureMap.get(record.employeeId) || {};
+
+        return {
+          SR: index + 1,
+          'BANK AC': employee.accountNumber || '',
+          BRANCH: employee.bankBranch || '',
+          'IFSC CODE': employee.ifscCode || '',
+          NAMES: employee.name || '',
+          SITE: employee.siteName || '',
+          DEP: employee.department || '',
+          STATUS: record.status || '',
+          PM_SAL: structure.basicSalary || 0,
+          G: employee.gender ? employee.gender.charAt(0).toUpperCase() : '',
+          DESG: employee.position || '',
+          DAYS: record.presentDays || 0,
+          GROSS: (record.basicSalary || 0) + (record.allowances || 0),
+          ADVANCE: record.advance || 0,
+          'UNIFORM ID': record.uniformAndId || 0,
+          FINE: record.fine || 0,
+          DED: record.deductions || 0,
+          OTHER: record.otherDeductions || 0,
+          NET: record.netSalary || 0,
+          REMARK: record.notes || ''
+        };
+      });
+
+      // Totals row
+      const totals: any = {
+        SR: 'TOTAL',
+        'BANK AC': '',
+        BRANCH: '',
+        'IFSC CODE': '',
+        NAMES: '',
+        SITE: '',
+        DEP: '',
+        STATUS: '',
+        PM_SAL: exportData.reduce((sum, row) => sum + (row.PM_SAL || 0), 0),
+        G: '',
+        DESG: '',
+        DAYS: exportData.reduce((sum, row) => sum + (row.DAYS || 0), 0),
+        GROSS: exportData.reduce((sum, row) => sum + (row.GROSS || 0), 0),
+        ADVANCE: exportData.reduce((sum, row) => sum + (row.ADVANCE || 0), 0),
+        'UNIFORM ID': exportData.reduce((sum, row) => sum + (row['UNIFORM ID'] || 0), 0),
+        FINE: exportData.reduce((sum, row) => sum + (row.FINE || 0), 0),
+        DED: exportData.reduce((sum, row) => sum + (row.DED || 0), 0),
+        OTHER: exportData.reduce((sum, row) => sum + (row.OTHER || 0), 0),
+        NET: exportData.reduce((sum, row) => sum + (row.NET || 0), 0),
+        REMARK: ''
+      };
+      const finalData = [...exportData, totals];
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(finalData);
+      XLSX.utils.book_append_sheet(wb, ws, 'Payroll');
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=client-payroll-${month}.xlsx`);
+      return res.send(buffer);
+    }
+
+    // ─── 2. DEFAULT FORMAT (CSV / JSON) ──────────────────────────────────
+    // Build export data with original columns
     const exportData = payrollRecords.map((record, index) => {
       const employee = employeeMap.get(record.employeeId) || {};
-      
-      const row: Record<string, any> = {
+      return {
         SR: index + 1,
         'BANK AC': employee.accountNumber || 'N/A',
         'BANK NAME': employee.bankName || 'N/A',
@@ -989,7 +1080,7 @@ export const exportPayroll = async (req: Request, res: Response) => {
         G: employee.gender?.charAt(0) || 'N/A',
         MONTH: record.month,
         DEP: employee.department || 'N/A',
-        STATUS: record.status.toUpperCase(),
+        STATUS: record.status?.toUpperCase() || 'N/A',
         'IN HAND': record.paidAmount || 0,
         DESG: employee.position || 'N/A',
         DAYS: record.presentDays || 0,
@@ -1017,11 +1108,10 @@ export const exportPayroll = async (req: Request, res: Response) => {
         'ESIC NO': employee.esicNumber || 'N/A',
         'UAN': employee.uanNumber || 'N/A'
       };
-      return row;
     });
 
-    // Add totals row
-    const totals: Record<string, any> = {
+    // Totals row
+    const totals: any = {
       SR: 'TOTAL',
       'BANK AC': '',
       'BANK NAME': '',
@@ -1059,7 +1149,6 @@ export const exportPayroll = async (req: Request, res: Response) => {
       'ESIC NO': '',
       'UAN': ''
     };
-
     const finalData = [...exportData, totals];
 
     if (format === 'json') {
@@ -1070,7 +1159,7 @@ export const exportPayroll = async (req: Request, res: Response) => {
         month
       });
     } else {
-      // Convert to CSV
+      // CSV export
       const csvRows = [];
       const headers = Object.keys(finalData[0]);
       csvRows.push(headers.join(','));
@@ -1078,11 +1167,8 @@ export const exportPayroll = async (req: Request, res: Response) => {
       for (const row of finalData) {
         const values = headers.map(header => {
           const value = row[header];
-          // Handle special characters in strings
           if (typeof value === 'string') {
-            // Escape quotes and wrap in quotes
-            const escapedValue = value.replace(/"/g, '""');
-            return `"${escapedValue}"`;
+            return `"${value.replace(/"/g, '""')}"`;
           }
           return value;
         });
@@ -1090,7 +1176,6 @@ export const exportPayroll = async (req: Request, res: Response) => {
       }
 
       const csvContent = csvRows.join('\n');
-      
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename=payroll-${month}.csv`);
       res.send(csvContent);

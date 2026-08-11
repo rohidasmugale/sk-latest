@@ -24,6 +24,7 @@ const ServicesList = [
   "Parking",
   "Waste Management",
   "Consumables",
+  "Technician",
   "Other"
 ];
 
@@ -126,7 +127,7 @@ const SitesSection = () => {
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [clientSearch, setClientSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
-
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   // Import states – now properly typed
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importLoading, setImportLoading] = useState(false);
@@ -803,109 +804,96 @@ const SitesSection = () => {
     XLSX.writeFile(wb, 'Site_Import_Template.xlsx');
   };
 
-  // Render clients dropdown with CRM data
+  // Render clients dropdown – simple, only name + company
   const renderClientsDropdown = () => {
     if (isLoadingClients) {
       return (
         <div className="flex items-center space-x-2 p-2">
           <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-sm">Loading clients from CRM...</span>
+          <span className="text-sm">Loading clients...</span>
         </div>
       );
     }
 
     const safeClients = clients || [];
+    const filteredClients = safeClients.filter(client =>
+      client.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+      client.company.toLowerCase().includes(clientSearch.toLowerCase())
+    );
 
     return (
-      <>
+      <div className="space-y-2">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search clients in CRM..."
+            placeholder="Search clients..."
             value={clientSearch}
             onChange={(e) => {
               setClientSearch(e.target.value);
-              if (e.target.value.length >= 2) {
-                searchClients(e.target.value);
-              } else if (e.target.value.length === 0) {
-                fetchClients();
-              }
+              setIsClientDropdownOpen(true);
             }}
-            className="pl-10 mb-2"
+            onFocus={() => setIsClientDropdownOpen(true)}
+            onBlur={() => {
+              // Delay to allow click on list item
+              setTimeout(() => setIsClientDropdownOpen(false), 200);
+            }}
+            className="pl-10"
           />
         </div>
 
-        <div className="border rounded-md max-h-60 overflow-y-auto">
-          {safeClients.length === 0 ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">
-              No clients found in CRM.
-              <br />
-              <Button
-                variant="link"
-                size="sm"
-                className="mt-1"
-                onClick={() => {
-                  toast.info("Please add clients in the CRM section first");
-                }}
-              >
-                Add clients in CRM
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-1 p-1">
-              {safeClients.map((client) => (
-                <div
-                  key={client._id}
-                  className={`p-2 rounded cursor-pointer hover:bg-gray-100 ${selectedClient === client._id ? 'bg-blue-50 border border-blue-200' : ''}`}
-                  onClick={() => setSelectedClient(client._id)}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="font-medium">{client.name}</div>
-                      <div className="text-xs text-muted-foreground">{client.company}</div>
+        {/* List – shown only when dropdown is open AND there is a search term */}
+        {isClientDropdownOpen && clientSearch.trim().length > 0 && (
+          <div className="border rounded-md max-h-60 overflow-y-auto">
+            {filteredClients.length === 0 ? (
+              <div className="p-4 text-center text-sm text-muted-foreground">
+                No clients found.
+              </div>
+            ) : (
+              <div className="space-y-1 p-1">
+                {filteredClients.map((client) => (
+                  <div
+                    key={client._id}
+                    className={`p-2 rounded cursor-pointer hover:bg-gray-100 ${selectedClient === client._id ? 'bg-blue-50 border border-blue-200' : ''
+                      }`}
+                    onClick={() => {
+                      setSelectedClient(client._id);
+                      setClientSearch(client.name);
+                      setIsClientDropdownOpen(false);
+                    }}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="font-medium text-sm">{client.name}</div>
+                        <div className="text-xs text-muted-foreground">{client.company}</div>
+                      </div>
+                      {selectedClient === client._id && (
+                        <Badge variant="outline" className="text-xs">Selected</Badge>
+                      )}
                     </div>
-                    {selectedClient === client._id && (
-                      <Badge variant="outline" className="text-xs">Selected</Badge>
-                    )}
                   </div>
-                  <div className="mt-1 flex items-center space-x-2 text-xs text-muted-foreground">
-                    {client.email && <div className="flex items-center"><Mail className="h-3 w-3 mr-1" /> {client.email}</div>}
-                    {client.phone && <div className="flex items-center"><Phone className="h-3 w-3 mr-1" /> {client.phone}</div>}
-                    {client.city && <div className="flex items-center"><MapPin className="h-3 w-3 mr-1" /> {client.city}</div>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-        {selectedClient && safeClients.length > 0 && (
-          <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
-            <div className="flex justify-between items-start">
+        {/* Selected client summary (only when a client is selected) */}
+        {selectedClient && !isClientDropdownOpen && (
+          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
+            <div className="flex justify-between items-center">
               <div>
-                <div className="font-medium">Selected Client:</div>
-                <div className="text-sm">
-                  {(() => {
-                    const client = safeClients.find(c => c._id === selectedClient);
-                    if (!client) return null;
-
-                    return (
-                      <>
-                        <div className="font-semibold">{client.name} - {client.company}</div>
-                        <div className="mt-1 space-y-1">
-                          {client.email && <div className="flex items-center"><Mail className="h-3 w-3 mr-1" /> {client.email}</div>}
-                          {client.phone && <div className="flex items-center"><Phone className="h-3 w-3 mr-1" /> {client.phone}</div>}
-                          {client.city && <div className="flex items-center"><MapPin className="h-3 w-3 mr-1" /> {client.city}</div>}
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
+                <span className="text-xs font-medium text-muted-foreground">Selected:</span>
+                <span className="ml-2 text-sm font-medium">
+                  {safeClients.find(c => c._id === selectedClient)?.name}
+                </span>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setSelectedClient("")}
+                onClick={() => {
+                  setSelectedClient("");
+                  setClientSearch("");
+                }}
                 className="h-6 text-xs"
               >
                 Clear
@@ -913,10 +901,10 @@ const SitesSection = () => {
             </div>
           </div>
         )}
-      </>
+      </div>
     );
   };
-
+  
   return (
     <div className="space-y-6 px-2 sm:px-4 md:px-6">
       {/* Error Display */}
@@ -1245,7 +1233,7 @@ const SitesSection = () => {
 
                   <div className="space-y-2">
                     <Label className="text-xs sm:text-sm font-medium">
-                      Select Client from CRM <span className="text-muted-foreground">(Optional)</span>
+                      Client Name <span className="text-muted-foreground">(Optional)</span>
                     </Label>
 
                     {renderClientsDropdown()}

@@ -1352,7 +1352,7 @@ const EmployeesTab = ({
       if (employeesResponse.data && employeesResponse.data.success) {
         existingEmployees = employeesResponse.data.data || employeesResponse.data.employees || [];
       }
-
+      const existingAadharSet = new Set(existingEmployees.map(emp => emp.aadharNumber).filter(Boolean));
       const siteCapacityMap = new Map<string, {
         name: string;
         managerRequirement: number;
@@ -1485,7 +1485,9 @@ const EmployeesTab = ({
 
       const employeesToImport = [];
       let processedCount = 0;
+
       let skippedCount = 0;
+      let duplicateCount = 0;
       const skippedReasons: string[] = [];
       const invalidSiteNames: Set<string> = new Set();
       const capacityViolations: Array<{ site: string; role: string; count: number; available: number }> = [];
@@ -1571,9 +1573,7 @@ const EmployeesTab = ({
         const dojRaw = row[dojIndex];
         const dateOfExitRaw = row[dateOfExitIndex];
         const aadhar = safeNumericString(row[aadharIndex]).replace(/\s/g, '');
-        const paddedAadhar = aadhar.length < 12 && /^\d+$/.test(aadhar)
-          ? aadhar.padStart(12, '0')
-          : aadhar;
+        const paddedAadhar = aadhar.length < 12 && /^\d+$/.test(aadhar) ? aadhar.padStart(12, '0') : aadhar;
         const contact = safeNumericString(row[contactIndex]);
         const pan = safeNumericString(row[panIndex]).toUpperCase();
         const bloodGroup = row[bloodGroupIndex] ? String(row[bloodGroupIndex]).trim() : '';
@@ -1604,15 +1604,23 @@ const EmployeesTab = ({
           continue;
         }
 
-        if (!name || !aadhar) {
+
+        if (!name || !paddedAadhar) {
           skippedCount++;
           skippedReasons.push(`Row ${rowIndex}: Missing name or aadhar`);
           continue;
         }
-
-        if (!/^\d{12}$/.test(aadhar)) {
+        if (!/^\d{12}$/.test(paddedAadhar)) {
           skippedCount++;
-          skippedReasons.push(`Row ${rowIndex}: Invalid Aadhar format (${aadhar.length} digits)`);
+          skippedReasons.push(`Row ${rowIndex}: Invalid Aadhar format (${paddedAadhar.length} digits)`);
+          continue;
+        }
+
+        // ✅ DUPLICATE CHECK – add this block:
+        if (existingAadharSet.has(paddedAadhar)) {
+          skippedCount++;
+          duplicateCount++;  // will be used in final summary
+          skippedReasons.push(`Row ${rowIndex}: Employee with Aadhar ${paddedAadhar} already exists.`);
           continue;
         }
 
@@ -1782,7 +1790,7 @@ const EmployeesTab = ({
           name: name,
           email: finalEmail,
           phone: finalPhone,
-          aadharNumber: aadhar,
+          aadharNumber: paddedAadhar,
           employeeId: employeeCode || undefined,
           dateOfJoining: dateOfJoining,
           dateOfExit: dateOfExitRaw ? (typeof dateOfExitRaw === 'number' ? excelSerialToDate(dateOfExitRaw) : parseDateString(String(dateOfExitRaw))) : null,
@@ -1909,7 +1917,6 @@ const EmployeesTab = ({
       );
 
       let successCount = 0;
-      let duplicateCount = 0;
       let errorCount = 0;
       const errorMessages: string[] = [];
       const importedSites: Set<string> = new Set();
@@ -2237,6 +2244,186 @@ const EmployeesTab = ({
       setIsSavingEPF(false);
     }
   };
+  // ─── Print Joining Form ──────────────────────────────────────────────
+  const printJoiningForm = (employee: Employee) => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      toast.error("Please allow popups to print the form");
+      return;
+    }
+
+    const photoUrl = employee.photo || '';
+
+    const formContent = `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <title>Joining Form - ${employee.name}</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { font-family: 'Times New Roman', Georgia, serif; margin: 0; padding: 20px; background: #fff; color:#000; }
+      .page { max-width: 800px; margin: 0 auto 30px auto; padding: 20px 30px; background:#fff; page-break-after: always; }
+      .page:last-child { page-break-after: auto; }
+
+      /* ---------- PAGE 1: JOINING FORM ---------- */
+      .header { position: relative; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 10px; }
+      .header h1 { margin:0; font-size: 30px; letter-spacing: 3px; font-weight: bold; }
+      .header .subtitle { font-size: 12px; margin-top: 2px; }
+      .header .form-title { font-size: 17px; font-weight: bold; text-align:center; margin-top: 6px; text-decoration: underline; }
+      .photo-box { position: absolute; top: 0; right: 0; width: 95px; height: 110px; border: 1px solid #000; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:10px; color:#999; }
+      .photo-box img { width:100%; height:100%; object-fit:cover; }
+
+      .field-row { display:flex; align-items:baseline; border-bottom:1px solid #000; padding: 5px 0; min-height: 24px; }
+      .field-row .label { font-size: 13px; width: 150px; flex-shrink:0; }
+      .field-row .colon { width: 14px; flex-shrink:0; }
+      .field-row .value { font-size: 13px; flex:1; }
+      .field-row .pin { display:flex; align-items:baseline; margin-left: 20px; flex-shrink:0; }
+      .field-row .pin .plabel { font-size:13px; margin-right:4px; }
+      .field-row .pin .pvalue { font-size:13px; min-width: 90px; border-bottom:1px solid #000; }
+      .cont-row { border-bottom: 1px solid #000; min-height: 22px; }
+
+      .uniform-row { border-bottom: 1px solid #000; padding: 6px 0; font-size: 13px; }
+      .uniform-row .label { display:inline-block; width:150px; }
+      .uniform-row .issued { font-weight: bold; text-decoration: underline; }
+
+      .signature-section { display:flex; justify-content:space-between; margin-top: 45px; }
+      .signature-box { text-align:center; width:45%; font-size: 13px; font-weight:bold; }
+      .signature-box .line { border-top: 1px solid #000; margin-top: 4px; padding-top: 4px; }
+
+      .footer { text-align:center; font-size: 9px; color:#666; margin-top: 15px; }
+
+      /* ---------- PAGE 2: DECLARATION (BACKSIDE) ---------- */
+      .declaration-title { text-align:center; font-size:20px; font-weight:bold; margin-bottom: 22px; }
+      .declaration-intro { font-size: 13.5px; line-height: 1.9; margin-bottom: 10px; }
+      .declaration-name-line { border-bottom: 1px solid #000; display:inline-block; min-width: 320px; }
+      .declaration-list { font-size: 13.5px; line-height: 1.9; margin: 0; padding-left: 0; list-style: none; }
+      .declaration-list li { margin-bottom: 14px; display:flex; }
+      .declaration-list .num { flex-shrink:0; width: 26px; }
+      .declaration-list .txt { flex:1; text-align: justify; }
+      .declaration-closing { font-size: 13.5px; line-height: 1.9; margin-top: 20px; text-align: justify; }
+      .declaration-sign { margin-top: 50px; display:flex; justify-content:space-between; font-size:13.5px; }
+
+      @media print {
+        body { padding: 0; }
+        .page { margin: 0 auto; padding: 15mm; }
+      }
+    </style>
+  </head>
+  <body>
+
+    <!-- PAGE 1: JOINING FORM -->
+    <div class="page">
+      <div class="header">
+        <h1>SK ENTERPRISES</h1>
+        <div class="subtitle">▪ Housekeeping &nbsp;▪ Parking &nbsp;▪ Waste Management</div>
+        <div class="form-title">Employee Joining Form</div>
+        <div class="photo-box">
+          ${photoUrl ? `<img src="${photoUrl}" alt="Photo" />` : 'Photo'}
+        </div>
+      </div>
+
+      <div class="field-row"><span class="label">Site Name</span><span class="colon">:</span><span class="value">${employee.siteName || ''}</span></div>
+      <div class="field-row"><span class="label">Name</span><span class="colon">:</span><span class="value">${employee.name || ''}</span></div>
+      <div class="field-row"><span class="label">Date of Birth</span><span class="colon">:</span><span class="value">${employee.dateOfBirth || ''}</span></div>
+      <div class="field-row"><span class="label">Date of Joining</span><span class="colon">:</span><span class="value">${employee.joinDate || employee.dateOfJoining || ''}</span></div>
+      <div class="field-row"><span class="label">Contact No.</span><span class="colon">:</span><span class="value">${employee.phone || ''}</span></div>
+      <div class="field-row"><span class="label">Blood Group</span><span class="colon">:</span><span class="value">${employee.bloodGroup || ''}</span></div>
+
+      <div class="field-row">
+        <span class="label">Permanent Address</span><span class="colon">:</span><span class="value">${employee.permanentAddress || ''}</span>
+        <span class="pin"><span class="plabel">Pin Code:</span><span class="pvalue">${employee.permanentPincode || ''}</span></span>
+      </div>
+      <div class="cont-row"></div>
+
+      <div class="field-row">
+        <span class="label">Local Address</span><span class="colon">:</span><span class="value">${employee.localAddress || ''}</span>
+        <span class="pin"><span class="plabel">Pin Code:</span><span class="pvalue">${employee.localPincode || ''}</span></span>
+      </div>
+      <div class="cont-row"></div>
+
+      <div class="field-row"><span class="label">Nominee Name</span><span class="colon">:</span><span class="value">${employee.nomineeName || ''}</span></div>
+      <div class="field-row"><span class="label">Employee Relation</span><span class="colon">:</span><span class="value">${employee.nomineeRelation || ''}</span></div>
+      <div class="field-row"><span class="label">Aadhaar Card No.</span><span class="colon">:</span><span class="value">${employee.aadharNumber || ''}</span></div>
+      <div class="field-row"><span class="label">ID No.</span><span class="colon">:</span><span class="value">${employee.employeeId || ''}</span></div>
+<div class="field-row">
+  <span class="label">Emergency Cont. No.</span><span class="colon">:</span>
+  <span class="value">
+    1)&nbsp;<span class="underline-fill">${employee.emergencyContactPhone || ''}</span>
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    2)&nbsp;<span class="underline-fill"></span>
+  </span>
+</div>
+      <div class="field-row">
+        <span class="label">Bank Name</span><span class="colon">:</span><span class="value">${employee.bankName || ''}</span>
+        <span class="pin"><span class="plabel">IFSC Code:</span><span class="pvalue">${employee.ifscCode || ''}</span></span>
+      </div>
+      <div class="field-row"><span class="label">Branch</span><span class="colon">:</span><span class="value">${employee.branchName || ''}</span></div>
+      <div class="field-row"><span class="label">Account No.</span><span class="colon">:</span><span class="value">${employee.accountNumber || ''}</span></div>
+
+      <div class="uniform-row">
+        <span class="label">Uniform</span>:
+        <span class="${employee.pantSize ? 'issued' : ''}">Pant</span> /
+        <span class="${employee.shirtSize ? 'issued' : ''}">Shirt</span> /
+        <span class="${employee.capSize ? 'issued' : ''}">Cap</span> /
+        <span class="${employee.idCardIssued ? 'issued' : ''}">ID</span> /
+        <span class="${employee.westcoatIssued ? 'issued' : ''}">Westcoat</span> /
+        <span class="${employee.apronIssued ? 'issued' : ''}">Apron</span>
+      </div>
+
+      <div class="signature-section">
+        <div class="signature-box"><div class="line">Authorized Signature</div></div>
+        <div class="signature-box"><div class="line">Employee Signature</div></div>
+      </div>
+
+      <div class="footer">This is a computer-generated form. Printed on ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+    </div>
+
+    <!-- PAGE 2: DECLARATION (BACKSIDE) -->
+    <div class="page">
+      <div class="declaration-title">प्रतिज्ञापत्र</div>
+
+      <div class="declaration-intro">
+        मी <span class="declaration-name-line">&nbsp;${employee.name || ''}&nbsp;</span><br/><br/>
+        खालील लिहिलेल्या अटी व सूचना पूर्णपणे समजून घेतल्या आहेत व मी त्यांना मनापासून मान्य करतो. खालील अटी मी न पाळल्यास त्याचा माझ्यावर आकारण्यात आल्यास माझी हरकत नाही.
+      </div>
+
+      <ol class="declaration-list">
+        <li><span class="num">१)</span><span class="txt">मी काम सोडण्याआधी एस.के. एंटरप्रायझेस यांना लिखितमध्ये १ महिना (३० दिवस) / ३ महिने (९० दिवस) पूर्वी सूचना देणे माझ्यावर बंधनकारक आहे. अन्यथा मी कुठलाही पगार मागणार नाही/घेण्यास पात्र नाही.</span></li>
+        <li><span class="num">२)</span><span class="txt">मी सुट्टी घेण्याआधी सुट्टीचा अर्ज मी लिखित देईल, अर्ज न दिल्यास, न कळवता सुट्टी घेतल्यास आकारलेला दंड मला मान्य आहे.</span></li>
+        <li><span class="num">३)</span><span class="txt">मी माझ्या कामाचे पुढील महिन्यातले १० दिवस भरल्याशिवाय माझ्या महिन्याचा पगार मला देऊ नये.</span></li>
+        <li><span class="num">४)</span><span class="txt">मला दिलेला युनिफॉर्म मी नीट व स्वच्छ ठेवेल. युनिफॉर्म फाटल्यास किंवा खराब झाल्यास नवीन युनिफॉर्म घ्यावा लागेल किंवा कंपनीने तो दिल्यास त्याचे शुल्क माझ्या पगारातून कपावे.</span></li>
+        <li><span class="num">५)</span><span class="txt">कंपनीमध्ये काम करत असताना जर असे दिसून आले की, तुम्ही कंपनीच्या विरोधात किंवा कंपनीच्या नियमांच्याविरुद्ध काम करत आहात, तर तुम्हाला कामावरून कमी करण्याचा अधिकार कंपनीला राहील. (कोणतीही पूर्वसूचना न देता)</span></li>
+        <li><span class="num">६)</span><span class="txt">मी माझे आधार कार्ड, पॅन कार्ड, ४ फोटो, बँक पासबुक व राहत असलेले लाईट बिल याच्या झेरॉक्स प्रती कंपनीला देणे माझ्यावर बंधनकारक आहे.</span></li>
+        <li><span class="num">७)</span><span class="txt">मी कामाला लागल्यापासून ७ दिवसांच्या आत काम सोडले तर मी पगार घेण्यास पात्र राहणार नाही.</span></li>
+      </ol>
+
+      <div class="declaration-closing">
+        वरील सर्व माहिती मी वाचली असून त्याच्या सत्यतेसाठी मी आज रोजी पुणे मुक्कामी माझी सही केली आहे.
+      </div>
+
+      <div class="declaration-sign">
+        <span>दिनांक : __________________</span>
+        <span>अर्जदाराची सही __________________</span>
+      </div>
+    </div>
+
+  </body>
+  </html>
+  `;
+
+    printWindow.document.write(formContent);
+    printWindow.document.close();
+
+    // Wait for both pages (and photo, if any) to render, then print once for both pages
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.print();
+        setTimeout(() => printWindow.close(), 1000);
+      }, 300);
+    };
+  };
+
+
 
   const handlePrintEPFForm = () => {
     if (!selectedEmployeeForEPF) {
@@ -2667,12 +2854,13 @@ const EmployeesTab = ({
   // ─── Mobile Employee Card Component ────────────────────────────────────
 
 
-  const MobileEmployeeCard = ({ employee, selected, onSelect, onEdit, onViewHistory, onUpload, onViewDocs, onEPF, onMarkLeft, onDelete, onViewID, onDownloadID }: any) => {
+  const MobileEmployeeCard = ({
+    employee, selected, onSelect, onEdit, onViewHistory, onUpload, onViewDocs, onEPF, onMarkLeft, onDelete, onViewID, onDownloadID, onPrintJoiningForm }: any) => {
     const [expanded, setExpanded] = useState(false);
     const photoUrl = getPhotoUrl(employee);
 
     return (
-      <div className="border rounded-lg p-3 mb-2 bg-white shadow-sm">
+      <div className="border rounded-lg p-3 mb-2 bg-white shadow-sm" >
         <div className="flex items-start gap-2">
           <input
             type="checkbox"
@@ -2780,10 +2968,15 @@ const EmployeesTab = ({
               <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => onDelete(employee.id || employee._id)}>
                 <Trash2 className="h-3 w-3 mr-1" />Delete
               </Button>
+              <div className="grid grid-cols-1 gap-1 mb-1">
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onPrintJoiningForm && onPrintJoiningForm(employee)}>
+                  <FileText className="h-3 w-3 mr-1" /> Joining Form
+                </Button>
+              </div>
             </div>
           </div>
         )}
-      </div>
+      </div >
     );
   };
   // ─── ID Card Functions ──────────────────────────────────────────────────
@@ -5171,6 +5364,7 @@ const EmployeesTab = ({
                   onDelete={handleDeleteEmployee}
                   onViewID={generateIDCard}
                   onDownloadID={downloadIDCard}
+                  onPrintJoiningForm={printJoiningForm}   // ✅ ADD THIS
                 />
               ))}
               {sortedEmployees.length === 0 && !loading && (
@@ -5394,7 +5588,15 @@ const EmployeesTab = ({
                         <Eye className="h-3 w-3 mr-1" />
                         View ID
                       </Button>
-
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => printJoiningForm(employee)}
+                        className="flex-1 sm:flex-none"
+                      >
+                        <FileText className="h-3 w-3 mr-1" />
+                        Joining Form
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"

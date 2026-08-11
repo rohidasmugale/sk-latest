@@ -383,6 +383,7 @@ const SiteForm = ({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: ()
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [staffDeployment, setStaffDeployment] = useState<Array<{ role: string; count: number }>>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   // Shift Management State
   const [siteShifts, setSiteShifts] = useState<ShiftDefinition[]>([]);
   const SHIFT_COLORS = [
@@ -432,6 +433,7 @@ const SiteForm = ({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: ()
     "Parking",
     "Waste Management",
     "Consumables",
+    "Technician",
     "Other"
   ];
   const StaffRoles = [
@@ -565,63 +567,82 @@ const SiteForm = ({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: ()
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search clients in CRM..."
+                placeholder="Search clients..."
                 value={clientSearch}
                 onChange={(e) => {
                   setClientSearch(e.target.value);
+                  setIsClientDropdownOpen(true);
                   if (e.target.value.length >= 2) {
                     clientService.searchClients(e.target.value).then(setClients);
                   } else if (e.target.value.length === 0) {
                     clientService.getAllClients().then(setClients);
                   }
                 }}
-                className="pl-10 mb-2"
+                onFocus={() => setIsClientDropdownOpen(true)}
+                onBlur={() => {
+                  // Delay to allow click on list item
+                  setTimeout(() => setIsClientDropdownOpen(false), 200);
+                }}
+                className="pl-10"
               />
             </div>
-            <div className="border rounded-md max-h-60 overflow-y-auto">
-              {clients.length === 0 ? (
-                <div className="p-4 text-center text-sm text-muted-foreground">
-                  No clients found in CRM.
-                  <br />
-                  <Button
-                    variant="link"
-                    size="sm"
-                    className="mt-1"
-                    onClick={() => {
-                      toast.info("Please add clients in the CRM section first");
-                    }}
-                  >
-                    Add clients in CRM
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-1 p-1">
-                  {clients.map((client) => (
-                    <div
-                      key={client._id}
-                      className={`p-2 rounded cursor-pointer hover:bg-gray-100 ${selectedClientId === client._id ? "bg-blue-50 border border-blue-200" : ""
-                        }`}
-                      onClick={() => setSelectedClientId(client._id)}
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="font-medium">{client.name}</div>
-                          <div className="text-xs text-muted-foreground">{client.company}</div>
+
+            {/* Dropdown list – visible only when open AND has search term */}
+            {isClientDropdownOpen && clientSearch.trim().length > 0 && (
+              <div className="border rounded-md max-h-60 overflow-y-auto">
+                {clients.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    No clients found.
+                  </div>
+                ) : (
+                  <div className="space-y-1 p-1">
+                    {clients.map((client) => (
+                      <div
+                        key={client._id}
+                        className={`p-2 rounded cursor-pointer hover:bg-gray-100 ${selectedClientId === client._id ? 'bg-blue-50 border border-blue-200' : ''
+                          }`}
+                        onClick={() => {
+                          setSelectedClientId(client._id);
+                          setClientSearch(client.name);
+                          setIsClientDropdownOpen(false);
+                          // Optionally update the clients list to reflect selection (optional)
+                        }}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="font-medium text-sm">{client.name}</div>
+                            <div className="text-xs text-muted-foreground">{client.company}</div>
+                          </div>
+                          {selectedClientId === client._id && (
+                            <Badge variant="outline" className="text-xs">Selected</Badge>
+                          )}
                         </div>
-                        {selectedClientId === client._id && (
-                          <Badge variant="outline" className="text-xs">Selected</Badge>
-                        )}
                       </div>
-                      <div className="mt-1 flex items-center space-x-2 text-xs text-muted-foreground">
-                        {client.email && <div className="flex items-center"><Mail className="h-3 w-3 mr-1" /> {client.email}</div>}
-                        {client.phone && <div className="flex items-center"><Phone className="h-3 w-3 mr-1" /> {client.phone}</div>}
-                        {client.city && <div className="flex items-center"><MapPin className="h-3 w-3 mr-1" /> {client.city}</div>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Show selected client name (compact) */}
+            {selectedClientId && !isClientDropdownOpen && (
+              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md flex justify-between items-center">
+                <span className="text-sm font-medium">
+                  Selected: {clients.find(c => c._id === selectedClientId)?.name}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedClientId("");
+                    setClientSearch("");
+                  }}
+                  className="h-6 text-xs"
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
           </>
         )}
       </div>

@@ -13,7 +13,7 @@ import * as XLSX from 'xlsx';
 import { Badge } from "@/components/ui/badge";
 
 // Define the API Base URL
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 // Types
@@ -128,7 +128,7 @@ interface NewEmployeeForm {
   panNumber: string;
   esicNumber: string;
   uanNumber: string;
-  
+
   // Personal Details
   siteName: string;
   dateOfBirth: string;
@@ -137,49 +137,49 @@ interface NewEmployeeForm {
   bloodGroup: string;
   gender?: string;
   maritalStatus?: string;
-  
+
   // Address
   permanentAddress: string;
   permanentPincode: string;
   localAddress: string;
   localPincode: string;
-  
+
   // Bank Details
   bankName: string;
   accountNumber: string;
   ifscCode: string;
   branchName: string;
-  
+
   // Family Details
   fatherName: string;
   motherName: string;
   spouseName: string;
   numberOfChildren: string;
-  
+
   // Emergency Contact
   emergencyContactName: string;
   emergencyContactPhone: string;
   emergencyContactRelation: string;
-  
+
   // Nominee Details
   nomineeName: string;
   nomineeRelation: string;
-  
+
   // Uniform Details
   pantSize: string;
   shirtSize: string;
   capSize: string;
-  
+
   // Issued Items
   idCardIssued: boolean;
   westcoatIssued: boolean;
   apronIssued: boolean;
-  
+
   // Employment Details
   department: string;
   position: string;
   salary: string;
-  
+
   // Documents
   photo: File | string | null;
   employeeSignature: File | null;
@@ -195,27 +195,27 @@ interface EPFForm11Data {
   maritalStatus: string;
   email: string;
   mobileNumber: string;
-  
+
   previousEPFMember: boolean;
   previousPensionMember: boolean;
-  
+
   previousUAN: string;
   previousPFAccountNumber: string;
   dateOfExit: string;
   schemeCertificateNumber: string;
   pensionPaymentOrder: string;
-  
+
   internationalWorker: boolean;
   countryOfOrigin: string;
   passportNumber: string;
   passportValidityFrom: string;
   passportValidityTo: string;
-  
+
   bankAccountNumber: string;
   ifscCode: string;
   aadharNumber: string;
   panNumber: string;
-  
+
   firstEPFMember: boolean;
   enrolledDate: string;
   firstEmploymentWages: string;
@@ -223,11 +223,11 @@ interface EPFForm11Data {
   epfAmountWithdrawn: boolean;
   epsAmountWithdrawn: boolean;
   epsAmountWithdrawnAfterSep2014: boolean;
-  
+
   declarationDate: string;
   declarationPlace: string;
   employerDeclarationDate: string;
-  
+
   // Additional fields for employer declaration
   kycStatus?: "not_uploaded" | "uploaded_not_approved" | "uploaded_approved";
   transferRequestGenerated?: boolean;
@@ -250,11 +250,11 @@ interface OnboardingTabProps {
 
 // Departments array
 const departments = [
-  "Housekeeping Management", 
-  "Security Management", 
-  "Parking Management", 
-  "Waste Management", 
-  "STP Tank Cleaning", 
+  "Housekeeping Management",
+  "Security Management",
+  "Parking Management",
+  "Waste Management",
+  "STP Tank Cleaning",
   "Consumables Management",
   "Administration",
   "HR",
@@ -265,15 +265,15 @@ const departments = [
 ];
 
 // FormField Component
-const FormField = ({ 
-  label, 
-  id, 
-  children, 
-  required = false 
-}: { 
-  label: string; 
-  id?: string; 
-  children: React.ReactNode; 
+const FormField = ({
+  label,
+  id,
+  children,
+  required = false
+}: {
+  label: string;
+  id?: string;
+  children: React.ReactNode;
   required?: boolean;
 }) => (
   <div className="space-y-2">
@@ -330,10 +330,10 @@ const resetNewEmployeeForm = () => ({
   authorizedSignature: null
 });
 
-const OnboardingTab = ({ 
-  employees, 
-  setEmployees, 
-  salaryStructures, 
+const OnboardingTab = ({
+  employees,
+  setEmployees,
+  salaryStructures,
   setSalaryStructures,
   newJoinees = [],
   setNewJoinees,
@@ -397,7 +397,7 @@ const OnboardingTab = ({
   const [showExcelPreview, setShowExcelPreview] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
-  
+
   // New states for Site dropdown
   const [sites, setSites] = useState<Site[]>([]);
   const [loadingSites, setLoadingSites] = useState(false);
@@ -433,7 +433,7 @@ const OnboardingTab = ({
       setLoadingSites(true);
       const response = await fetch(`${API_URL}/sites`);
       const data = await response.json();
-      
+
       if (response.ok) {
         const sitesData = data.sites || data.data || data || [];
         setSites(sitesData);
@@ -464,7 +464,7 @@ const OnboardingTab = ({
     }
 
     const searchTerm = siteSearch.toLowerCase();
-    const filtered = sites.filter(site => 
+    const filtered = sites.filter(site =>
       site.name.toLowerCase().includes(searchTerm) ||
       site.clientName.toLowerCase().includes(searchTerm) ||
       site.location.toLowerCase().includes(searchTerm) ||
@@ -478,15 +478,15 @@ const OnboardingTab = ({
     if (newEmployee.siteName && sites.length > 0) {
       const site = sites.find(s => s.name === newEmployee.siteName);
       setSelectedSiteDetails(site || null);
-      
+
       if (site) {
         // Count current employees at this site (active employees only)
-        const siteEmployees = employees.filter(emp => 
-          emp.siteName === site.name && 
+        const siteEmployees = employees.filter(emp =>
+          emp.siteName === site.name &&
           emp.status === "active"
         );
         setCurrentSiteStaffCount(siteEmployees.length);
-        
+
         // Calculate regular staff count (excluding managers and supervisors)
         const regularStaffCount = calculateRegularStaffCount(site);
         setAvailableStaffPositions(regularStaffCount);
@@ -519,33 +519,33 @@ const OnboardingTab = ({
   // Calculate regular staff count (excluding managers and supervisors)
   const calculateRegularStaffCount = (site: Site | null) => {
     if (!site) return 0;
-    
+
     if (site.staffDeployment && Array.isArray(site.staffDeployment)) {
       // Sum all staff counts
       const totalStaff = site.staffDeployment.reduce((sum, item) => sum + (item.count || 0), 0);
-      
+
       // Subtract manager and supervisor counts if they exist in staffDeployment
       const managerCount = site.staffDeployment.find(item => item.role?.toLowerCase() === "manager")?.count || 0;
       const supervisorCount = site.staffDeployment.find(item => item.role?.toLowerCase() === "supervisor")?.count || 0;
-      
+
       return totalStaff - managerCount - supervisorCount;
     }
-    
+
     // If staffDeployment doesn't exist, use totalStaff and subtract managerCount and supervisorCount
     const totalStaff = site.totalStaff || 0;
     const managerCount = site.managerCount || 0;
     const supervisorCount = site.supervisorCount || 0;
-    
+
     return totalStaff - managerCount - supervisorCount;
   };
 
   // Check if site has available positions
   const hasAvailablePositions = (site: Site | null): boolean => {
     if (!site) return false;
-    
+
     const regularStaffCount = calculateRegularStaffCount(site);
-    const siteEmployees = employees.filter(emp => 
-      emp.siteName === site.name && 
+    const siteEmployees = employees.filter(emp =>
+      emp.siteName === site.name &&
       emp.status === "active"
     );
     return siteEmployees.length < regularStaffCount;
@@ -554,10 +554,10 @@ const OnboardingTab = ({
   // Get available positions count
   const getAvailablePositions = (site: Site | null): number => {
     if (!site) return 0;
-    
+
     const regularStaffCount = calculateRegularStaffCount(site);
-    const siteEmployees = employees.filter(emp => 
-      emp.siteName === site.name && 
+    const siteEmployees = employees.filter(emp =>
+      emp.siteName === site.name &&
       emp.status === "active"
     );
     return Math.max(0, regularStaffCount - siteEmployees.length);
@@ -576,10 +576,9 @@ const OnboardingTab = ({
   const SiteDropdown = () => (
     <div className="relative w-full">
       <div className="relative">
-        <div 
-          className={`flex items-center justify-between w-full px-3 py-2.5 text-sm border rounded-md cursor-pointer hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${
-            newEmployee.siteName && selectedSiteDetails && !hasAvailablePositions(selectedSiteDetails) ? 'border-amber-300 bg-amber-50' : 'border-gray-300'
-          }`}
+        <div
+          className={`flex items-center justify-between w-full px-3 py-2.5 text-sm border rounded-md cursor-pointer hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${newEmployee.siteName && selectedSiteDetails && !hasAvailablePositions(selectedSiteDetails) ? 'border-amber-300 bg-amber-50' : 'border-gray-300'
+            }`}
           onClick={() => {
             setShowSiteDropdown(!showSiteDropdown);
             if (!showSiteDropdown) {
@@ -617,7 +616,7 @@ const OnboardingTab = ({
             <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${showSiteDropdown ? 'rotate-180' : ''}`} />
           </div>
         </div>
-        
+
         {showSiteDropdown && (
           <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-80 overflow-hidden">
             {/* Search Header */}
@@ -649,7 +648,7 @@ const OnboardingTab = ({
                 Type to search {sites.length} sites
               </div>
             </div>
-            
+
             {/* Loading State */}
             {loadingSites ? (
               <div className="p-6 text-center">
@@ -679,19 +678,18 @@ const OnboardingTab = ({
               <div className="overflow-y-auto max-h-64">
                 {filteredSites.map((site) => {
                   const regularStaffCount = calculateRegularStaffCount(site);
-                  const siteEmployees = employees.filter(emp => 
-                    emp.siteName === site.name && 
+                  const siteEmployees = employees.filter(emp =>
+                    emp.siteName === site.name &&
                     emp.status === "active"
                   );
                   const availablePositions = regularStaffCount - siteEmployees.length;
                   const isFull = availablePositions <= 0;
-                  
+
                   return (
                     <div
                       key={site._id}
-                      className={`px-3 py-3 text-sm cursor-pointer transition-colors hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
-                        newEmployee.siteName === site.name ? "bg-blue-50 border-l-4 border-l-blue-500" : ""
-                      } ${isFull ? 'opacity-60' : ''}`}
+                      className={`px-3 py-3 text-sm cursor-pointer transition-colors hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${newEmployee.siteName === site.name ? "bg-blue-50 border-l-4 border-l-blue-500" : ""
+                        } ${isFull ? 'opacity-60' : ''}`}
                       onClick={() => !isFull && handleSiteSelect(site)}
                     >
                       <div className="flex items-start justify-between">
@@ -705,18 +703,18 @@ const OnboardingTab = ({
                               <Check className="h-3 w-3 text-blue-600 flex-shrink-0" />
                             )}
                           </div>
-                          
+
                           <div className="mt-2 space-y-1.5">
                             <div className="flex items-center gap-2 text-xs text-gray-600">
                               <Building className="h-3 w-3" />
                               <span className="truncate">Client: {site.clientName}</span>
                             </div>
-                            
+
                             <div className="flex items-center gap-2 text-xs text-gray-600">
                               <MapPin className="h-3 w-3" />
                               <span className="truncate">{site.location}</span>
                             </div>
-                            
+
                             <div className="flex items-center gap-2 text-xs text-gray-600">
                               <Users className="h-3 w-3" />
                               <span>Regular Staff: {regularStaffCount}</span>
@@ -725,18 +723,18 @@ const OnboardingTab = ({
                                 Available: {availablePositions}
                               </span>
                             </div>
-                            
+
                             {site.managerCount && site.managerCount > 0 && (
                               <div className="text-xs text-gray-500">
                                 Managers: {site.managerCount} | Supervisors: {site.supervisorCount || 0}
                               </div>
                             )}
-                            
+
                             {site.services && site.services.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {site.services.slice(0, 2).map((service, idx) => (
-                                  <Badge 
-                                    key={idx} 
+                                  <Badge
+                                    key={idx}
                                     variant="outline"
                                     className="text-[10px] px-1.5 py-0 h-4"
                                   >
@@ -744,7 +742,7 @@ const OnboardingTab = ({
                                   </Badge>
                                 ))}
                                 {site.services.length > 2 && (
-                                  <Badge 
+                                  <Badge
                                     variant="outline"
                                     className="text-[10px] px-1.5 py-0 h-4"
                                   >
@@ -753,7 +751,7 @@ const OnboardingTab = ({
                                 )}
                               </div>
                             )}
-                            
+
                             {site.manager && (
                               <div className="text-xs text-gray-500 mt-1">
                                 Manager: <span className="font-medium">{site.manager}</span>
@@ -761,15 +759,15 @@ const OnboardingTab = ({
                             )}
                           </div>
                         </div>
-                        
+
                         <div className="ml-2 flex-shrink-0 space-y-1">
-                          <Badge 
+                          <Badge
                             variant={site.status === 'active' ? "default" : "secondary"}
                             className={`text-xs ${site.status === 'active' ? 'bg-green-100 text-green-800 hover:bg-green-100' : 'bg-gray-100 text-gray-800'}`}
                           >
                             {site.status === 'active' ? 'Active' : 'Inactive'}
                           </Badge>
-                          
+
                           {isFull && (
                             <Badge variant="destructive" className="text-xs">
                               Full
@@ -777,7 +775,7 @@ const OnboardingTab = ({
                           )}
                         </div>
                       </div>
-                      
+
                       {site.contractEndDate && (
                         <div className="mt-2 text-xs">
                           <span className="text-gray-500">Contract ends: </span>
@@ -790,7 +788,7 @@ const OnboardingTab = ({
                           </span>
                         </div>
                       )}
-                      
+
                       {isFull && (
                         <div className="mt-2 text-xs text-red-600 bg-red-50 p-1 rounded">
                           No regular staff positions available
@@ -801,7 +799,7 @@ const OnboardingTab = ({
                 })}
               </div>
             )}
-            
+
             {/* Footer with count */}
             <div className="sticky bottom-0 bg-gray-50 border-t px-3 py-2">
               <div className="flex justify-between items-center text-xs text-gray-600">
@@ -823,23 +821,22 @@ const OnboardingTab = ({
           </div>
         )}
       </div>
-      
+
       {/* Click outside to close dropdown */}
       {showSiteDropdown && (
-        <div 
-          className="fixed inset-0 z-40" 
+        <div
+          className="fixed inset-0 z-40"
           onClick={() => setShowSiteDropdown(false)}
         />
       )}
-      
+
       {/* Site Status Display */}
       {newEmployee.siteName && selectedSiteDetails && (
         <div className="mt-2 space-y-2">
-          <div className={`p-3 rounded-md ${
-            currentSiteStaffCount >= availableStaffPositions 
-              ? 'bg-red-50 border border-red-200' 
-              : 'bg-green-50 border border-green-200'
-          }`}>
+          <div className={`p-3 rounded-md ${currentSiteStaffCount >= availableStaffPositions
+            ? 'bg-red-50 border border-red-200'
+            : 'bg-green-50 border border-green-200'
+            }`}>
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Staff Status:</span>
               <Badge variant={currentSiteStaffCount >= availableStaffPositions ? "destructive" : "default"}>
@@ -863,7 +860,7 @@ const OnboardingTab = ({
               </div>
             </div>
           </div>
-          
+
           {currentSiteStaffCount >= availableStaffPositions && (
             <div className="text-sm text-red-600 bg-red-50 p-2 rounded border border-red-200">
               ⚠️ This site has reached its regular staff capacity. No more regular staff can be onboarded.
@@ -871,7 +868,7 @@ const OnboardingTab = ({
           )}
         </div>
       )}
-      
+
       {/* Validation message */}
       {!newEmployee.siteName && (
         <div className="text-xs text-amber-600 mt-1">
@@ -884,25 +881,25 @@ const OnboardingTab = ({
   // Helper functions for Excel import
   const parseExcelDate = (excelDate: any): string => {
     if (!excelDate) return '';
-    
+
     try {
       // If it's already a date string with time (like "2023-09-04 00:00:00")
       if (typeof excelDate === 'string') {
         const datePart = excelDate.split(' ')[0];
         return datePart;
       }
-      
+
       // If it's an Excel serial number
       if (typeof excelDate === 'number') {
         const date = new Date(Math.round((excelDate - 25569) * 86400 * 1000));
         return date.toISOString().split('T')[0];
       }
-      
+
       // If it's a Date object
       if (excelDate instanceof Date) {
         return excelDate.toISOString().split('T')[0];
       }
-      
+
       return '';
     } catch (error) {
       console.error('Error parsing date:', error, excelDate);
@@ -912,27 +909,27 @@ const OnboardingTab = ({
 
   const parseBooleanField = (value: any): boolean => {
     if (value === null || value === undefined) return false;
-    
+
     const stringValue = String(value).toLowerCase().trim();
-    
+
     if (stringValue === 'yes' || stringValue === 'true' || stringValue === '1') {
       return true;
     }
-    
+
     if (stringValue === 'no' || stringValue === 'false' || stringValue === '0') {
       return false;
     }
-    
+
     // Check for checkboxes or marks
     if (stringValue === '✓' || stringValue === '✔' || stringValue === 'x') {
       return true;
     }
-    
+
     // If it's just text but not empty, assume true
     if (stringValue !== '') {
       return true;
     }
-    
+
     return false;
   };
 
@@ -943,46 +940,46 @@ const OnboardingTab = ({
 
     try {
       setImporting(true);
-      
+
       // Read the Excel file
       const reader = new FileReader();
-      
+
       reader.onload = (e) => {
         try {
           const data = e.target?.result;
           const workbook = XLSX.read(data, { type: 'binary' });
-          
+
           // Get the first sheet
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-          
+
           // Convert to JSON
           const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-          
+
           if (jsonData.length < 2) {
             toast.error("Excel file is empty or has no data");
             setImporting(false);
             return;
           }
-          
+
           // Get headers (first row)
           const headers = jsonData[0] as string[];
-          
+
           // Process data rows
           const processedData: NewEmployeeForm[] = [];
-          
+
           for (let i = 1; i < jsonData.length; i++) {
             const row = jsonData[i] as any[];
             if (!row || row.every(cell => cell === null || cell === undefined || cell === '')) {
               continue; // Skip empty rows
             }
-            
+
             const employeeData: any = resetNewEmployeeForm();
-            
+
             // Map Excel columns to form fields
             headers.forEach((header, index) => {
               const cellValue = row[index];
-              
+
               if (cellValue !== null && cellValue !== undefined && cellValue !== '') {
                 switch (header.trim()) {
                   case 'Site Name':
@@ -1102,17 +1099,17 @@ const OnboardingTab = ({
                 }
               }
             });
-            
+
             // Only add if there's at least a name
             if (employeeData.name && employeeData.name.trim() !== '') {
               processedData.push(employeeData);
             }
           }
-          
+
           setExcelData(processedData);
           setShowExcelPreview(true);
           toast.success(`Loaded ${processedData.length} employees from Excel`);
-          
+
         } catch (error) {
           console.error('Error processing Excel:', error);
           toast.error('Error reading Excel file. Please check the format.');
@@ -1120,14 +1117,14 @@ const OnboardingTab = ({
           setImporting(false);
         }
       };
-      
+
       reader.onerror = () => {
         toast.error('Error reading file');
         setImporting(false);
       };
-      
+
       reader.readAsBinaryString(file);
-      
+
     } catch (error) {
       console.error('Excel import error:', error);
       toast.error('Failed to import Excel file');
@@ -1145,13 +1142,13 @@ const OnboardingTab = ({
     // Validate site capacities first
     const siteCounts: { [key: string]: number } = {};
     const siteDetails: { [key: string]: Site } = {};
-    
+
     sites.forEach(site => {
       siteDetails[site.name] = site;
     });
-    
+
     const employeesBySite: { [key: string]: NewEmployeeForm[] } = {};
-    
+
     excelData.forEach(emp => {
       if (emp.siteName) {
         if (!employeesBySite[emp.siteName]) {
@@ -1160,33 +1157,33 @@ const OnboardingTab = ({
         employeesBySite[emp.siteName].push(emp);
       }
     });
-    
+
     // Check each site's capacity
     const sitesExceedingCapacity: string[] = [];
-    
+
     for (const siteName in employeesBySite) {
       const site = siteDetails[siteName];
       if (!site) {
         sitesExceedingCapacity.push(`${siteName} (Site not found)`);
         continue;
       }
-      
+
       const regularStaffCount = calculateRegularStaffCount(site);
-      const currentStaff = employees.filter(emp => 
-        emp.siteName === siteName && 
+      const currentStaff = employees.filter(emp =>
+        emp.siteName === siteName &&
         emp.status === "active"
       ).length;
-      
+
       const importCount = employeesBySite[siteName].length;
       const totalAfterImport = currentStaff + importCount;
-      
+
       if (totalAfterImport > regularStaffCount) {
         sitesExceedingCapacity.push(
           `${siteName}: Would exceed capacity (Current: ${currentStaff}, Importing: ${importCount}, Capacity: ${regularStaffCount})`
         );
       }
     }
-    
+
     if (sitesExceedingCapacity.length > 0) {
       toast.error(
         <div>
@@ -1204,14 +1201,14 @@ const OnboardingTab = ({
 
     setImporting(true);
     setImportProgress(0);
-    
+
     const successfulImports: Employee[] = [];
     const failedImports: { name: string; error: string }[] = [];
-    
+
     try {
       for (let i = 0; i < excelData.length; i++) {
         const employeeData = excelData[i];
-        
+
         try {
           // Skip if essential fields are missing
           if (!employeeData.name || !employeeData.email || !employeeData.aadharNumber) {
@@ -1224,7 +1221,7 @@ const OnboardingTab = ({
 
           // Create FormData for each employee
           const formData = new FormData();
-          
+
           // Add employee data
           const employeeDataToSend = {
             name: employeeData.name,
@@ -1292,34 +1289,34 @@ const OnboardingTab = ({
               error: data.message || 'Unknown error'
             });
           }
-          
+
         } catch (error: any) {
           failedImports.push({
             name: employeeData.name || 'Unknown',
             error: error.message || 'Unknown error'
           });
         }
-        
+
         // Update progress
         setImportProgress(Math.round(((i + 1) / excelData.length) * 100));
       }
-      
+
       // Update employees list
       if (successfulImports.length > 0) {
         setEmployees(prev => [...prev, ...successfulImports]);
         toast.success(`Successfully imported ${successfulImports.length} employees`);
       }
-      
+
       // Show errors if any
       if (failedImports.length > 0) {
         toast.error(`${failedImports.length} employees failed to import`);
         console.log('Failed imports:', failedImports);
       }
-      
+
       // Reset
       setExcelData([]);
       setShowExcelPreview(false);
-      
+
     } catch (error) {
       console.error('Bulk import error:', error);
       toast.error('Error during bulk import');
@@ -1376,7 +1373,7 @@ const OnboardingTab = ({
     const ws = XLSX.utils.aoa_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Template');
-    
+
     XLSX.writeFile(wb, 'Employee_Import_Template.xlsx');
     toast.success('Template downloaded successfully');
   };
@@ -1384,17 +1381,17 @@ const OnboardingTab = ({
   // Initialize EPF Form with employee data
   const initializeEPFForm = (employee: Employee) => {
     setCreatedEmployeeData(employee);
-    
+
     const today = new Date().toISOString().split('T')[0];
-    
+
     // Safely get salary with fallbacks
     let salaryValue = 0;
     if (employee.salary) {
-      salaryValue = typeof employee.salary === 'string' 
-        ? parseFloat(employee.salary) 
+      salaryValue = typeof employee.salary === 'string'
+        ? parseFloat(employee.salary)
         : Number(employee.salary) || 0;
     }
-    
+
     // Safely get other properties with fallbacks
     const epfData: EPFForm11Data = {
       memberName: employee.name || "",
@@ -1432,7 +1429,7 @@ const OnboardingTab = ({
       declarationPlace: "Mumbai",
       employerDeclarationDate: today
     };
-    
+
     setEpfFormData(epfData);
     setActiveTab("epf-form");
     toast.success("Employee created successfully! Please fill EPF Form 11.");
@@ -1454,19 +1451,19 @@ const OnboardingTab = ({
       'enrolledDate',
       'firstEmploymentWages'
     ];
-    
+
     return autoFilledFields.includes(fieldName);
   };
 
   // Camera functions
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
           facingMode: 'user',
           width: { ideal: 1280 },
           height: { ideal: 720 }
-        } 
+        }
       });
       streamRef.current = stream;
       if (videoRef.current) {
@@ -1487,13 +1484,13 @@ const OnboardingTab = ({
       const video = videoRef.current;
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
-      
+
       if (context) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        
+
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
+
         const imageData = canvas.toDataURL('image/jpeg', 0.8);
         setCapturedImage(imageData);
       }
@@ -1511,12 +1508,12 @@ const OnboardingTab = ({
         .then(res => res.blob())
         .then(blob => {
           const file = new File([blob], 'employee-photo.jpg', { type: 'image/jpeg' });
-          setNewEmployee({...newEmployee, photo: file});
-          
+          setNewEmployee({ ...newEmployee, photo: file });
+
           // Create preview URL
           const previewUrl = URL.createObjectURL(file);
           setPhotoPreview(previewUrl);
-          
+
           toast.success("Photo captured successfully!");
         })
         .catch(error => {
@@ -1556,10 +1553,10 @@ const OnboardingTab = ({
       // Create preview URL
       const previewUrl = URL.createObjectURL(file);
       setPhotoPreview(previewUrl);
-      setNewEmployee({...newEmployee, photo: file});
-      
+      setNewEmployee({ ...newEmployee, photo: file });
+
       toast.success("Photo selected successfully!");
-      
+
       // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -1568,7 +1565,7 @@ const OnboardingTab = ({
   };
 
   const handleRemovePhoto = () => {
-    setNewEmployee({...newEmployee, photo: null});
+    setNewEmployee({ ...newEmployee, photo: null });
     if (photoPreview) {
       URL.revokeObjectURL(photoPreview);
       setPhotoPreview(null);
@@ -1632,11 +1629,11 @@ const OnboardingTab = ({
     // Validate site capacity
     if (selectedSiteDetails) {
       const regularStaffCount = calculateRegularStaffCount(selectedSiteDetails);
-      const siteEmployees = employees.filter(emp => 
-        emp.siteName === selectedSiteDetails.name && 
+      const siteEmployees = employees.filter(emp =>
+        emp.siteName === selectedSiteDetails.name &&
         emp.status === "active"
       );
-      
+
       if (siteEmployees.length >= regularStaffCount) {
         toast.error(`Cannot onboard employee: Site "${selectedSiteDetails.name}" has reached its regular staff capacity (${regularStaffCount} staff).`);
         return;
@@ -1732,17 +1729,17 @@ const OnboardingTab = ({
       }
 
       toast.success("Employee created successfully!");
-      
+
       // The backend returns the employee data with Cloudinary URLs
       const createdEmployee = data.employee || data.data || data;
-      
+
       // Debug: Log the created employee data
       console.log('Created employee data:', createdEmployee);
-      
+
       if (!createdEmployee) {
         throw new Error('No employee data returned from server');
       }
-      
+
       // Ensure the employee object has all required properties
       const processedEmployee: Employee = {
         _id: createdEmployee._id,
@@ -1796,10 +1793,10 @@ const OnboardingTab = ({
         createdAt: createdEmployee.createdAt,
         updatedAt: createdEmployee.updatedAt
       };
-      
+
       // Update employees list with the new employee
       setEmployees(prev => [...prev, processedEmployee]);
-      
+
       // Reset form
       setNewEmployee(resetNewEmployeeForm());
       setUploadedDocuments([]);
@@ -1807,13 +1804,13 @@ const OnboardingTab = ({
         URL.revokeObjectURL(photoPreview);
         setPhotoPreview(null);
       }
-      
+
       // Then initialize EPF Form and switch tabs
       initializeEPFForm(processedEmployee);
 
     } catch (error: any) {
       console.error("Error creating employee:", error);
-      
+
       // Show more specific error message
       if (error.message.includes('500')) {
         toast.error("Server error. Please check if the backend server is running and try again.");
@@ -1846,9 +1843,9 @@ const OnboardingTab = ({
     const file = event.target.files?.[0];
     if (file) {
       if (type === 'employee') {
-        setNewEmployee({...newEmployee, employeeSignature: file});
+        setNewEmployee({ ...newEmployee, employeeSignature: file });
       } else {
-        setNewEmployee({...newEmployee, authorizedSignature: file});
+        setNewEmployee({ ...newEmployee, authorizedSignature: file });
       }
       toast.success(`${type === 'employee' ? 'Employee' : 'Authorized'} signature uploaded successfully!`);
     }
@@ -1883,17 +1880,17 @@ const OnboardingTab = ({
 
     try {
       setIsSavingEPF(true);
-      
+
       // Use _id (MongoDB ObjectId) as employeeId
       const employeeId = createdEmployeeData._id;
-      
+
       if (!employeeId) {
         toast.error("Invalid employee data - missing ID");
         return;
       }
-      
+
       console.log('Saving EPF Form for employee:', employeeId);
-      
+
       const response = await fetch(`${API_URL}/epf-forms`, {
         method: "POST",
         headers: {
@@ -1920,7 +1917,7 @@ const OnboardingTab = ({
         toast.success("EPF Form saved successfully!");
         setActiveTab("onboarding");
         setCreatedEmployeeData(null);
-        
+
         // Reset EPF form data
         setEpfFormData({
           memberName: "",
@@ -1969,6 +1966,186 @@ const OnboardingTab = ({
     }
   };
 
+
+  const printJoiningForm = (employee: Employee) => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      toast.error("Please allow popups to print the form");
+      return;
+    }
+
+    const photoUrl = employee.photo || '';
+
+    const formContent = `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <title>Joining Form - ${employee.name}</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { font-family: 'Times New Roman', Georgia, serif; margin: 0; padding: 20px; background: #fff; color:#000; }
+      .page { max-width: 800px; margin: 0 auto 30px auto; padding: 20px 30px; background:#fff; page-break-after: always; }
+      .page:last-child { page-break-after: auto; }
+
+      /* ---------- PAGE 1: JOINING FORM ---------- */
+      .header { position: relative; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 10px; }
+      .header h1 { margin:0; font-size: 30px; letter-spacing: 3px; font-weight: bold; }
+      .header .subtitle { font-size: 12px; margin-top: 2px; }
+      .header .form-title { font-size: 17px; font-weight: bold; text-align:center; margin-top: 6px; text-decoration: underline; }
+      .photo-box { position: absolute; top: 0; right: 0; width: 95px; height: 110px; border: 1px solid #000; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:10px; color:#999; }
+      .photo-box img { width:100%; height:100%; object-fit:cover; }
+
+      .field-row { display:flex; align-items:baseline; border-bottom:1px solid #000; padding: 5px 0; min-height: 24px; }
+      .field-row .label { font-size: 13px; width: 150px; flex-shrink:0; }
+      .field-row .colon { width: 14px; flex-shrink:0; }
+      .field-row .value { font-size: 13px; flex:1; }
+      .field-row .pin { display:flex; align-items:baseline; margin-left: 20px; flex-shrink:0; }
+      .field-row .pin .plabel { font-size:13px; margin-right:4px; }
+      .field-row .pin .pvalue { font-size:13px; min-width: 90px; border-bottom:1px solid #000; }
+      .underline-fill { display:inline-block; min-width: 150px; border-bottom: 1px solid #000; padding-bottom: 1px; }
+      .cont-row { border-bottom: 1px solid #000; min-height: 22px; }
+
+      .uniform-row { border-bottom: 1px solid #000; padding: 6px 0; font-size: 13px; }
+      .uniform-row .label { display:inline-block; width:150px; }
+      .uniform-row .issued { font-weight: bold; text-decoration: underline; }
+
+      .signature-section { display:flex; justify-content:space-between; margin-top: 45px; }
+      .signature-box { text-align:center; width:45%; font-size: 13px; font-weight:bold; }
+      .signature-box .line { border-top: 1px solid #000; margin-top: 4px; padding-top: 4px; }
+
+      .footer { text-align:center; font-size: 9px; color:#666; margin-top: 15px; }
+
+      /* ---------- PAGE 2: DECLARATION (BACKSIDE) ---------- */
+      .declaration-title { text-align:center; font-size:20px; font-weight:bold; margin-bottom: 22px; }
+      .declaration-intro { font-size: 13.5px; line-height: 1.9; margin-bottom: 10px; }
+      .declaration-name-line { border-bottom: 1px solid #000; display:inline-block; min-width: 320px; }
+      .declaration-list { font-size: 13.5px; line-height: 1.9; margin: 0; padding-left: 0; list-style: none; }
+      .declaration-list li { margin-bottom: 14px; display:flex; }
+      .declaration-list .num { flex-shrink:0; width: 26px; }
+      .declaration-list .txt { flex:1; text-align: justify; }
+      .declaration-closing { font-size: 13.5px; line-height: 1.9; margin-top: 20px; text-align: justify; }
+      .declaration-sign { margin-top: 50px; display:flex; justify-content:space-between; font-size:13.5px; }
+
+      @media print {
+        body { padding: 0; }
+        .page { margin: 0 auto; padding: 15mm; }
+      }
+    </style>
+  </head>
+  <body>
+
+    <!-- PAGE 1: JOINING FORM -->
+    <div class="page">
+      <div class="header">
+        <h1>SK ENTERPRISES</h1>
+        <div class="subtitle">▪ Housekeeping &nbsp;▪ Parking &nbsp;▪ Waste Management</div>
+        <div class="form-title">Employee Joining Form</div>
+        <div class="photo-box">
+          ${photoUrl ? `<img src="${photoUrl}" alt="Photo" />` : 'Photo'}
+        </div>
+      </div>
+
+      <div class="field-row"><span class="label">Site Name</span><span class="colon">:</span><span class="value">${employee.siteName || ''}</span></div>
+      <div class="field-row"><span class="label">Name</span><span class="colon">:</span><span class="value">${employee.name || ''}</span></div>
+      <div class="field-row"><span class="label">Date of Birth</span><span class="colon">:</span><span class="value">${employee.dateOfBirth || ''}</span></div>
+      <div class="field-row"><span class="label">Date of Joining</span><span class="colon">:</span><span class="value">${employee.joinDate || employee.dateOfJoining || ''}</span></div>
+      <div class="field-row"><span class="label">Contact No.</span><span class="colon">:</span><span class="value">${employee.phone || ''}</span></div>
+      <div class="field-row"><span class="label">Blood Group</span><span class="colon">:</span><span class="value">${employee.bloodGroup || ''}</span></div>
+
+      <div class="field-row">
+        <span class="label">Permanent Address</span><span class="colon">:</span><span class="value">${employee.permanentAddress || ''}</span>
+        <span class="pin"><span class="plabel">Pin Code:</span><span class="pvalue">${employee.permanentPincode || ''}</span></span>
+      </div>
+      <div class="cont-row"></div>
+
+      <div class="field-row">
+        <span class="label">Local Address</span><span class="colon">:</span><span class="value">${employee.localAddress || ''}</span>
+        <span class="pin"><span class="plabel">Pin Code:</span><span class="pvalue">${employee.localPincode || ''}</span></span>
+      </div>
+      <div class="cont-row"></div>
+
+      <div class="field-row"><span class="label">Nominee Name</span><span class="colon">:</span><span class="value">${employee.nomineeName || ''}</span></div>
+      <div class="field-row"><span class="label">Employee Relation</span><span class="colon">:</span><span class="value">${employee.nomineeRelation || ''}</span></div>
+      <div class="field-row"><span class="label">Aadhaar Card No.</span><span class="colon">:</span><span class="value">${employee.aadharNumber || ''}</span></div>
+     <div class="field-row"><span class="label">ID No.</span><span class="colon">:</span><span class="value">${employee.employeeId || ''}</span></div>
+<div class="field-row">
+  <span class="label">Emergency Cont. No.</span><span class="colon">:</span>
+  <span class="value">
+    1)&nbsp;<span class="underline-fill">${employee.emergencyContactPhone || ''}</span>
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    2)&nbsp;<span class="underline-fill"></span>
+  </span>
+</div>
+
+      <div class="field-row">
+        <span class="label">Bank Name</span><span class="colon">:</span><span class="value">${employee.bankName || ''}</span>
+        <span class="pin"><span class="plabel">IFSC Code:</span><span class="pvalue">${employee.ifscCode || ''}</span></span>
+      </div>
+      <div class="field-row"><span class="label">Branch</span><span class="colon">:</span><span class="value">${employee.branchName || ''}</span></div>
+      <div class="field-row"><span class="label">Account No.</span><span class="colon">:</span><span class="value">${employee.accountNumber || ''}</span></div>
+
+      <div class="uniform-row">
+        <span class="label">Uniform</span>:
+        <span class="${employee.pantSize ? 'issued' : ''}">Pant</span> /
+        <span class="${employee.shirtSize ? 'issued' : ''}">Shirt</span> /
+        <span class="${employee.capSize ? 'issued' : ''}">Cap</span> /
+        <span class="${employee.idCardIssued ? 'issued' : ''}">ID</span> /
+        <span class="${employee.westcoatIssued ? 'issued' : ''}">Westcoat</span> /
+        <span class="${employee.apronIssued ? 'issued' : ''}">Apron</span>
+      </div>
+
+      <div class="signature-section">
+        <div class="signature-box"><div class="line">Authorized Signature</div></div>
+        <div class="signature-box"><div class="line">Employee Signature</div></div>
+      </div>
+
+      <div class="footer">This is a computer-generated form. Printed on ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+    </div>
+
+    <!-- PAGE 2: DECLARATION (BACKSIDE) -->
+    <div class="page">
+      <div class="declaration-title">प्रतिज्ञापत्र</div>
+
+      <div class="declaration-intro">
+        मी <span class="declaration-name-line">&nbsp;${employee.name || ''}&nbsp;</span><br/><br/>
+        खालील लिहिलेल्या अटी व सूचना पूर्णपणे समजून घेतल्या आहेत व मी त्यांना मनापासून मान्य करतो. खालील अटी मी न पाळल्यास त्याचा माझ्यावर आकारण्यात आल्यास माझी हरकत नाही.
+      </div>
+
+      <ol class="declaration-list">
+        <li><span class="num">१)</span><span class="txt">मी काम सोडण्याआधी एस.के. एंटरप्रायझेस यांना लिखितमध्ये १ महिना (३० दिवस) / ३ महिने (९० दिवस) पूर्वी सूचना देणे माझ्यावर बंधनकारक आहे. अन्यथा मी कुठलाही पगार मागणार नाही/घेण्यास पात्र नाही.</span></li>
+        <li><span class="num">२)</span><span class="txt">मी सुट्टी घेण्याआधी सुट्टीचा अर्ज मी लिखित देईल, अर्ज न दिल्यास, न कळवता सुट्टी घेतल्यास आकारलेला दंड मला मान्य आहे.</span></li>
+        <li><span class="num">३)</span><span class="txt">मी माझ्या कामाचे पुढील महिन्यातले १० दिवस भरल्याशिवाय माझ्या महिन्याचा पगार मला देऊ नये.</span></li>
+        <li><span class="num">४)</span><span class="txt">मला दिलेला युनिफॉर्म मी नीट व स्वच्छ ठेवेल. युनिफॉर्म फाटल्यास किंवा खराब झाल्यास नवीन युनिफॉर्म घ्यावा लागेल किंवा कंपनीने तो दिल्यास त्याचे शुल्क माझ्या पगारातून कपावे.</span></li>
+        <li><span class="num">५)</span><span class="txt">कंपनीमध्ये काम करत असताना जर असे दिसून आले की, तुम्ही कंपनीच्या विरोधात किंवा कंपनीच्या नियमांच्याविरुद्ध काम करत आहात, तर तुम्हाला कामावरून कमी करण्याचा अधिकार कंपनीला राहील. (कोणतीही पूर्वसूचना न देता)</span></li>
+        <li><span class="num">६)</span><span class="txt">मी माझे आधार कार्ड, पॅन कार्ड, ४ फोटो, बँक पासबुक व राहत असलेले लाईट बिल याच्या झेरॉक्स प्रती कंपनीला देणे माझ्यावर बंधनकारक आहे.</span></li>
+        <li><span class="num">७)</span><span class="txt">मी कामाला लागल्यापासून ७ दिवसांच्या आत काम सोडले तर मी पगार घेण्यास पात्र राहणार नाही.</span></li>
+      </ol>
+
+      <div class="declaration-closing">
+        वरील सर्व माहिती मी वाचली असून त्याच्या सत्यतेसाठी मी आज रोजी पुणे मुक्कामी माझी सही केली आहे.
+      </div>
+
+      <div class="declaration-sign">
+        <span>दिनांक : __________________</span>
+        <span>अर्जदाराची सही __________________</span>
+      </div>
+    </div>
+
+  </body>
+  </html>
+  `;
+
+    printWindow.document.write(formContent);
+    printWindow.document.close();
+
+    // Wait for both pages (and photo, if any) to render, then print once for both pages
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.print();
+        setTimeout(() => printWindow.close(), 1000);
+      }, 300);
+    };
+  };
   // Handle print EPF form
   const handlePrintEPFForm = () => {
     const printWindow = window.open('', '_blank');
@@ -2408,8 +2585,8 @@ const OnboardingTab = ({
 
   // FIXED: Function to update employee site from parent component
   const updateEmployeeSite = (employeeId: string, newSiteName: string) => {
-    setEmployees(prevEmployees => 
-      prevEmployees.map(emp => 
+    setEmployees(prevEmployees =>
+      prevEmployees.map(emp =>
         emp._id === employeeId ? { ...emp, siteName: newSiteName } : emp
       )
     );
@@ -2417,8 +2594,8 @@ const OnboardingTab = ({
 
   // FIXED: Function to bulk update employee sites from parent component
   const bulkUpdateEmployeeSites = (employeeIds: string[], newSiteName: string) => {
-    setEmployees(prevEmployees => 
-      prevEmployees.map(emp => 
+    setEmployees(prevEmployees =>
+      prevEmployees.map(emp =>
         employeeIds.includes(emp._id) ? { ...emp, siteName: newSiteName } : emp
       )
     );
@@ -2443,14 +2620,14 @@ const OnboardingTab = ({
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            
+
             <div className="p-4">
               {!capturedImage ? (
                 <>
-                  <video 
-                    ref={videoRef} 
-                    autoPlay 
-                    playsInline 
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
                     muted
                     className="w-full h-64 bg-gray-100 rounded-lg"
                   />
@@ -2467,9 +2644,9 @@ const OnboardingTab = ({
                 </>
               ) : (
                 <>
-                  <img 
-                    src={capturedImage} 
-                    alt="Captured" 
+                  <img
+                    src={capturedImage}
+                    alt="Captured"
                     className="w-full h-64 object-cover rounded-lg"
                   />
                   <div className="flex gap-2 mt-4">
@@ -2496,8 +2673,8 @@ const OnboardingTab = ({
                 Excel Import Preview ({excelData.length} employees)
               </h3>
               <div className="flex gap-2">
-                <Button 
-                  onClick={handleBulkImport} 
+                <Button
+                  onClick={handleBulkImport}
                   disabled={importing || excelData.length === 0}
                   className="flex items-center gap-2"
                 >
@@ -2521,7 +2698,7 @@ const OnboardingTab = ({
                 </Button>
               </div>
             </div>
-            
+
             <div className="p-4 overflow-auto max-h-[70vh]">
               <Table>
                 <TableHeader>
@@ -2551,11 +2728,10 @@ const OnboardingTab = ({
                       <TableCell>₹{employee.salary || '0'}</TableCell>
                       <TableCell>{employee.dateOfJoining || '-'}</TableCell>
                       <TableCell>
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          employee.dateOfExit && employee.dateOfExit.trim() !== '' 
-                            ? 'bg-red-100 text-red-800' 
-                            : 'bg-green-100 text-green-800'
-                        }`}>
+                        <span className={`px-2 py-1 rounded text-xs ${employee.dateOfExit && employee.dateOfExit.trim() !== ''
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-green-100 text-green-800'
+                          }`}>
                           {employee.dateOfExit && employee.dateOfExit.trim() !== '' ? 'Left' : 'Active'}
                         </span>
                       </TableCell>
@@ -2563,14 +2739,14 @@ const OnboardingTab = ({
                   ))}
                 </TableBody>
               </Table>
-              
+
               {excelData.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   No data to preview
                 </div>
               )}
             </div>
-            
+
             <div className="p-4 border-t bg-gray-50">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
@@ -2617,9 +2793,9 @@ const OnboardingTab = ({
             <CardHeader>
               <CardTitle className="flex justify-between items-center">
                 <span>Digital Onboarding & Document Verification</span>
-                <Button 
-                  onClick={downloadExcelTemplate} 
-                  variant="outline" 
+                <Button
+                  onClick={downloadExcelTemplate}
+                  variant="outline"
                   size="sm"
                   className="h-8 text-xs"
                 >
@@ -2637,26 +2813,26 @@ const OnboardingTab = ({
                       <div className="text-xs md:text-sm text-muted-foreground">Housekeeping • Parking • Waste Management</div>
                       <div className="text-lg font-semibold mt-2">Employee Joining Form</div>
                     </div>
-                    
+
                     <div className="flex justify-between items-start flex-col md:flex-row gap-4">
                       <div className="border-2 border-dashed border-gray-400 w-20 h-24 md:w-24 md:h-32 flex items-center justify-center text-xs text-muted-foreground text-center p-2 mx-auto md:mx-0">
                         {photoPreview || (newEmployee.photo && typeof newEmployee.photo === 'string') ? (
-                          <img 
-                            src={photoPreview || newEmployee.photo as string} 
-                            alt="Employee" 
+                          <img
+                            src={photoPreview || newEmployee.photo as string}
+                            alt="Employee"
                             className="w-full h-full object-cover"
                           />
                         ) : newEmployee.photo instanceof File ? (
-                          <img 
-                            src={URL.createObjectURL(newEmployee.photo)} 
-                            alt="Employee" 
+                          <img
+                            src={URL.createObjectURL(newEmployee.photo)}
+                            alt="Employee"
                             className="w-full h-full object-cover"
                           />
                         ) : (
                           "Photo"
                         )}
                       </div>
-                      
+
                       <div className="text-center md:text-right space-y-2 w-full md:w-auto">
                         <div className="text-sm font-semibold">New Joining</div>
                         <div className="text-sm">
@@ -2671,30 +2847,30 @@ const OnboardingTab = ({
               <div className="grid gap-6 md:gap-8">
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold border-b pb-2">Employee Details</h3>
-                  
+
                   <div className="space-y-4">
                     <Label>Employee Photo</Label>
                     <div className="flex flex-col sm:flex-row gap-3">
-                      <Button 
-                        type="button" 
-                        variant="outline" 
+                      <Button
+                        type="button"
+                        variant="outline"
                         onClick={startCamera}
                         className="flex items-center gap-2"
                       >
                         <Camera className="h-4 w-4" />
                         Take Photo
                       </Button>
-                      
-                      <Button 
-                        type="button" 
-                        variant="outline" 
+
+                      <Button
+                        type="button"
+                        variant="outline"
                         onClick={() => fileInputRef.current?.click()}
                         className="flex items-center gap-2"
                       >
                         <Upload className="h-4 w-4" />
                         Upload Photo
                       </Button>
-                      
+
                       <Input
                         ref={fileInputRef}
                         type="file"
@@ -2703,7 +2879,7 @@ const OnboardingTab = ({
                         className="hidden"
                       />
                     </div>
-                    
+
                     {newEmployee.photo && (
                       <div className="flex items-center gap-2 mt-2">
                         <span className="text-sm text-green-600">Photo selected</span>
@@ -2718,7 +2894,7 @@ const OnboardingTab = ({
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                     <FormField label="Site Name" id="siteName" required>
                       <SiteDropdown />
@@ -2734,60 +2910,60 @@ const OnboardingTab = ({
                         </div>
                       )}
                     </FormField>
-                    
+
                     <FormField label="Name" id="name" required>
                       <Input
                         id="name"
                         value={newEmployee.name}
-                        onChange={(e) => setNewEmployee({...newEmployee, name: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, name: e.target.value })}
                         placeholder="Enter full name"
                         required
                       />
                     </FormField>
-                    
+
                     <FormField label="Date of Birth" id="dateOfBirth">
                       <Input
                         id="dateOfBirth"
                         type="date"
                         value={newEmployee.dateOfBirth}
-                        onChange={(e) => setNewEmployee({...newEmployee, dateOfBirth: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, dateOfBirth: e.target.value })}
                       />
                     </FormField>
-                    
+
                     <FormField label="Date of Joining" id="dateOfJoining">
                       <Input
                         id="dateOfJoining"
                         type="date"
                         value={newEmployee.dateOfJoining}
-                        onChange={(e) => setNewEmployee({...newEmployee, dateOfJoining: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, dateOfJoining: e.target.value })}
                       />
                     </FormField>
-                    
+
                     <FormField label="Date of Exit" id="dateOfExit">
                       <Input
                         id="dateOfExit"
                         type="date"
                         value={newEmployee.dateOfExit}
-                        onChange={(e) => setNewEmployee({...newEmployee, dateOfExit: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, dateOfExit: e.target.value })}
                       />
                     </FormField>
-                    
+
                     <FormField label="Contact No." id="phone" required>
                       <Input
                         id="phone"
                         value={newEmployee.phone}
-                        onChange={(e) => setNewEmployee({...newEmployee, phone: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, phone: e.target.value })}
                         placeholder="Enter 10-digit phone number"
                         required
                         pattern="[0-9]{10}"
                         maxLength={10}
                       />
                     </FormField>
-        
+
                     <FormField label="Blood Group" id="bloodGroup">
-                      <Select 
-                        value={newEmployee.bloodGroup || ""} 
-                        onValueChange={(value) => setNewEmployee({...newEmployee, bloodGroup: value === "" ? null : value})}
+                      <Select
+                        value={newEmployee.bloodGroup || ""}
+                        onValueChange={(value) => setNewEmployee({ ...newEmployee, bloodGroup: value === "" ? null : value })}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select blood group (optional)" />
@@ -2804,30 +2980,30 @@ const OnboardingTab = ({
                         </SelectContent>
                       </Select>
                     </FormField>
-                    
+
                     <FormField label="Email" id="email" required>
                       <Input
                         id="email"
                         type="email"
                         value={newEmployee.email}
-                        onChange={(e) => setNewEmployee({...newEmployee, email: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, email: e.target.value })}
                         placeholder="Enter email address"
                         required
                       />
                     </FormField>
-                    
+
                     <FormField label="Aadhar Number" id="aadharNumber" required>
                       <Input
                         id="aadharNumber"
                         value={newEmployee.aadharNumber}
-                        onChange={(e) => setNewEmployee({...newEmployee, aadharNumber: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, aadharNumber: e.target.value })}
                         placeholder="Enter 12-digit Aadhar number"
                         required
                         pattern="[0-9]{12}"
                         maxLength={12}
                       />
                     </FormField>
-                    
+
                     <FormField label="PAN Number" id="panNumber">
                       <Input
                         id="panNumber"
@@ -2838,12 +3014,12 @@ const OnboardingTab = ({
                         className="uppercase"
                       />
                     </FormField>
-                    
+
                     <FormField label="ESIC Number" id="esicNumber">
                       <Input
                         id="esicNumber"
                         value={newEmployee.esicNumber}
-                        onChange={(e) => setNewEmployee({...newEmployee, esicNumber: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, esicNumber: e.target.value })}
                         placeholder="Enter ESIC number"
                       />
                     </FormField>
@@ -2852,15 +3028,15 @@ const OnboardingTab = ({
                       <Input
                         id="uanNumber"
                         value={newEmployee.uanNumber}
-                        onChange={(e) => setNewEmployee({...newEmployee, uanNumber: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, uanNumber: e.target.value })}
                         placeholder="Enter PF number or UAN"
                       />
                     </FormField>
 
                     <FormField label="Gender" id="gender">
-                      <Select 
-                        value={newEmployee.gender} 
-                        onValueChange={(value) => setNewEmployee({...newEmployee, gender: value})}
+                      <Select
+                        value={newEmployee.gender}
+                        onValueChange={(value) => setNewEmployee({ ...newEmployee, gender: value })}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select gender" />
@@ -2874,9 +3050,9 @@ const OnboardingTab = ({
                     </FormField>
 
                     <FormField label="Marital Status" id="maritalStatus">
-                      <Select 
-                        value={newEmployee.maritalStatus} 
-                        onValueChange={(value) => setNewEmployee({...newEmployee, maritalStatus: value})}
+                      <Select
+                        value={newEmployee.maritalStatus}
+                        onValueChange={(value) => setNewEmployee({ ...newEmployee, maritalStatus: value })}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select marital status" />
@@ -2891,45 +3067,45 @@ const OnboardingTab = ({
                       </Select>
                     </FormField>
                   </div>
-                  
+
                   <FormField label="Permanent Address" id="permanentAddress">
                     <Textarea
                       id="permanentAddress"
                       value={newEmployee.permanentAddress}
-                      onChange={(e) => setNewEmployee({...newEmployee, permanentAddress: e.target.value})}
+                      onChange={(e) => setNewEmployee({ ...newEmployee, permanentAddress: e.target.value })}
                       placeholder="Enter permanent address"
                       rows={3}
                     />
                   </FormField>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                     <FormField label="Pin Code" id="permanentPincode">
                       <Input
                         id="permanentPincode"
                         value={newEmployee.permanentPincode}
-                        onChange={(e) => setNewEmployee({...newEmployee, permanentPincode: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, permanentPincode: e.target.value })}
                         placeholder="Enter pin code"
                         maxLength={6}
                       />
                     </FormField>
                   </div>
-                  
+
                   <FormField label="Local Address" id="localAddress">
                     <Textarea
                       id="localAddress"
                       value={newEmployee.localAddress}
-                      onChange={(e) => setNewEmployee({...newEmployee, localAddress: e.target.value})}
+                      onChange={(e) => setNewEmployee({ ...newEmployee, localAddress: e.target.value })}
                       placeholder="Enter local address"
                       rows={3}
                     />
                   </FormField>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                     <FormField label="Pin Code" id="localPincode">
                       <Input
                         id="localPincode"
                         value={newEmployee.localPincode}
-                        onChange={(e) => setNewEmployee({...newEmployee, localPincode: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, localPincode: e.target.value })}
                         placeholder="Enter pin code"
                         maxLength={6}
                       />
@@ -2939,26 +3115,26 @@ const OnboardingTab = ({
 
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold border-b pb-2">Bank Details</h3>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                     <FormField label="Bank Name" id="bankName">
                       <Input
                         id="bankName"
                         value={newEmployee.bankName}
-                        onChange={(e) => setNewEmployee({...newEmployee, bankName: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, bankName: e.target.value })}
                         placeholder="Enter bank name"
                       />
                     </FormField>
-                    
+
                     <FormField label="Account Number" id="accountNumber">
                       <Input
                         id="accountNumber"
                         value={newEmployee.accountNumber}
-                        onChange={(e) => setNewEmployee({...newEmployee, accountNumber: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, accountNumber: e.target.value })}
                         placeholder="Enter account number"
                       />
                     </FormField>
-                    
+
                     <FormField label="IFSC Code" id="ifscCode">
                       <Input
                         id="ifscCode"
@@ -2968,12 +3144,12 @@ const OnboardingTab = ({
                         className="uppercase"
                       />
                     </FormField>
-                    
+
                     <FormField label="Branch Name" id="branchName">
                       <Input
                         id="branchName"
                         value={newEmployee.branchName}
-                        onChange={(e) => setNewEmployee({...newEmployee, branchName: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, branchName: e.target.value })}
                         placeholder="Enter branch name"
                       />
                     </FormField>
@@ -2982,41 +3158,41 @@ const OnboardingTab = ({
 
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold border-b pb-2">Family Details for ESIC</h3>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                     <FormField label="Father's Name" id="fatherName">
                       <Input
                         id="fatherName"
                         value={newEmployee.fatherName}
-                        onChange={(e) => setNewEmployee({...newEmployee, fatherName: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, fatherName: e.target.value })}
                         placeholder="Enter father's name"
                       />
                     </FormField>
-                    
+
                     <FormField label="Mother's Name" id="motherName">
                       <Input
                         id="motherName"
                         value={newEmployee.motherName}
-                        onChange={(e) => setNewEmployee({...newEmployee, motherName: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, motherName: e.target.value })}
                         placeholder="Enter mother's name"
                       />
                     </FormField>
-                    
+
                     <FormField label="Spouse Name" id="spouseName">
                       <Input
                         id="spouseName"
                         value={newEmployee.spouseName}
-                        onChange={(e) => setNewEmployee({...newEmployee, spouseName: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, spouseName: e.target.value })}
                         placeholder="Enter spouse name"
                       />
                     </FormField>
-                    
+
                     <FormField label="Number of Children" id="numberOfChildren">
                       <Input
                         id="numberOfChildren"
                         type="number"
                         value={newEmployee.numberOfChildren}
-                        onChange={(e) => setNewEmployee({...newEmployee, numberOfChildren: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, numberOfChildren: e.target.value })}
                         placeholder="Enter number of children"
                         min="0"
                       />
@@ -3026,33 +3202,33 @@ const OnboardingTab = ({
 
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold border-b pb-2">Emergency Contact</h3>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                     <FormField label="Emergency Contact Name" id="emergencyContactName">
                       <Input
                         id="emergencyContactName"
                         value={newEmployee.emergencyContactName}
-                        onChange={(e) => setNewEmployee({...newEmployee, emergencyContactName: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, emergencyContactName: e.target.value })}
                         placeholder="Enter emergency contact name"
                       />
                     </FormField>
-                    
+
                     <FormField label="Emergency Contact Phone" id="emergencyContactPhone">
                       <Input
                         id="emergencyContactPhone"
                         value={newEmployee.emergencyContactPhone}
-                        onChange={(e) => setNewEmployee({...newEmployee, emergencyContactPhone: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, emergencyContactPhone: e.target.value })}
                         placeholder="Enter emergency contact phone"
                         pattern="[0-9]{10}"
                         maxLength={10}
                       />
                     </FormField>
-                    
+
                     <FormField label="Relation" id="emergencyContactRelation">
                       <Input
                         id="emergencyContactRelation"
                         value={newEmployee.emergencyContactRelation}
-                        onChange={(e) => setNewEmployee({...newEmployee, emergencyContactRelation: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, emergencyContactRelation: e.target.value })}
                         placeholder="Enter relation"
                       />
                     </FormField>
@@ -3061,22 +3237,22 @@ const OnboardingTab = ({
 
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold border-b pb-2">Nominee Details</h3>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                     <FormField label="Nominee Name" id="nomineeName">
                       <Input
                         id="nomineeName"
                         value={newEmployee.nomineeName}
-                        onChange={(e) => setNewEmployee({...newEmployee, nomineeName: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, nomineeName: e.target.value })}
                         placeholder="Enter nominee name"
                       />
                     </FormField>
-                    
+
                     <FormField label="Nominee Relation" id="nomineeRelation">
                       <Input
                         id="nomineeRelation"
                         value={newEmployee.nomineeRelation}
-                        onChange={(e) => setNewEmployee({...newEmployee, nomineeRelation: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, nomineeRelation: e.target.value })}
                         placeholder="Enter nominee relation"
                       />
                     </FormField>
@@ -3085,10 +3261,10 @@ const OnboardingTab = ({
 
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold border-b pb-2">Uniform Details</h3>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                     <FormField label="Pant Size" id="pantSize">
-                      <Select value={newEmployee.pantSize} onValueChange={(value) => setNewEmployee({...newEmployee, pantSize: value})}>
+                      <Select value={newEmployee.pantSize} onValueChange={(value) => setNewEmployee({ ...newEmployee, pantSize: value })}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select pant size" />
                         </SelectTrigger>
@@ -3103,9 +3279,9 @@ const OnboardingTab = ({
                         </SelectContent>
                       </Select>
                     </FormField>
-                    
+
                     <FormField label="Shirt Size" id="shirtSize">
-                      <Select value={newEmployee.shirtSize} onValueChange={(value) => setNewEmployee({...newEmployee, shirtSize: value})}>
+                      <Select value={newEmployee.shirtSize} onValueChange={(value) => setNewEmployee({ ...newEmployee, shirtSize: value })}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select shirt size" />
                         </SelectTrigger>
@@ -3118,9 +3294,9 @@ const OnboardingTab = ({
                         </SelectContent>
                       </Select>
                     </FormField>
-                    
+
                     <FormField label="Cap Size" id="capSize">
-                      <Select value={newEmployee.capSize} onValueChange={(value) => setNewEmployee({...newEmployee, capSize: value})}>
+                      <Select value={newEmployee.capSize} onValueChange={(value) => setNewEmployee({ ...newEmployee, capSize: value })}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select cap size" />
                         </SelectTrigger>
@@ -3133,36 +3309,36 @@ const OnboardingTab = ({
                       </Select>
                     </FormField>
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
                     <div className="flex items-center space-x-2">
                       <input
                         type="checkbox"
                         id="idCardIssued"
                         checked={newEmployee.idCardIssued}
-                        onChange={(e) => setNewEmployee({...newEmployee, idCardIssued: e.target.checked})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, idCardIssued: e.target.checked })}
                         className="rounded border-gray-300"
                       />
                       <Label htmlFor="idCardIssued">ID Card Issued</Label>
                     </div>
-                    
+
                     <div className="flex items-center space-x-2">
                       <input
                         type="checkbox"
                         id="westcoatIssued"
                         checked={newEmployee.westcoatIssued}
-                        onChange={(e) => setNewEmployee({...newEmployee, westcoatIssued: e.target.checked})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, westcoatIssued: e.target.checked })}
                         className="rounded border-gray-300"
                       />
                       <Label htmlFor="westcoatIssued">Westcoat Issued</Label>
                     </div>
-                    
+
                     <div className="flex items-center space-x-2">
                       <input
                         type="checkbox"
                         id="apronIssued"
                         checked={newEmployee.apronIssued}
-                        onChange={(e) => setNewEmployee({...newEmployee, apronIssued: e.target.checked})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, apronIssued: e.target.checked })}
                         className="rounded border-gray-300"
                       />
                       <Label htmlFor="apronIssued">Apron Issued</Label>
@@ -3172,12 +3348,12 @@ const OnboardingTab = ({
 
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold border-b pb-2">Employment Details</h3>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                     <FormField label="Department" id="department" required>
-                      <Select 
-                        value={newEmployee.department} 
-                        onValueChange={(value) => setNewEmployee({...newEmployee, department: value})}
+                      <Select
+                        value={newEmployee.department}
+                        onValueChange={(value) => setNewEmployee({ ...newEmployee, department: value })}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select department" />
@@ -3189,23 +3365,23 @@ const OnboardingTab = ({
                         </SelectContent>
                       </Select>
                     </FormField>
-                    
+
                     <FormField label="Position" id="position" required>
                       <Input
                         id="position"
                         value={newEmployee.position}
-                        onChange={(e) => setNewEmployee({...newEmployee, position: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, position: e.target.value })}
                         placeholder="Enter position"
                         required
                       />
                     </FormField>
-                    
+
                     <FormField label="Monthly Salary (₹)" id="salary" required>
                       <Input
                         id="salary"
                         type="number"
                         value={newEmployee.salary}
-                        onChange={(e) => setNewEmployee({...newEmployee, salary: e.target.value})}
+                        onChange={(e) => setNewEmployee({ ...newEmployee, salary: e.target.value })}
                         placeholder="Enter monthly salary"
                         required
                         min="0"
@@ -3217,7 +3393,7 @@ const OnboardingTab = ({
 
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold border-b pb-2">Signatures</h3>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                     <div className="space-y-4">
                       <FormField label="Employee Signature" id="employeeSignature">
@@ -3235,9 +3411,9 @@ const OnboardingTab = ({
                             id="employee-signature-upload"
                           />
                           <Label htmlFor="employee-signature-upload">
-                            <Button 
-                              variant="outline" 
-                              className="mt-4" 
+                            <Button
+                              variant="outline"
+                              className="mt-4"
                               onClick={() => signatureEmployeeRef.current?.click()}
                             >
                               Upload Signature
@@ -3251,8 +3427,8 @@ const OnboardingTab = ({
                         </div>
                       </FormField>
                     </div>
-                    
-                    
+
+
                     <div className="space-y-4">
                       <FormField label="Authorized Signature" id="authorizedSignature">
                         <div className="border-2 border-dashed rounded-lg p-4 md:p-6 text-center">
@@ -3269,9 +3445,9 @@ const OnboardingTab = ({
                             id="authorized-signature-upload"
                           />
                           <Label htmlFor="authorized-signature-upload">
-                            <Button 
-                              variant="outline" 
-                              className="mt-4" 
+                            <Button
+                              variant="outline"
+                              className="mt-4"
                               onClick={() => signatureAuthorizedRef.current?.click()}
                             >
                               Upload Signature
@@ -3290,7 +3466,7 @@ const OnboardingTab = ({
 
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold border-b pb-2">Document Upload</h3>
-                  
+
                   <div className="border-2 border-dashed rounded-lg p-4 md:p-6 text-center">
                     <Upload className="mx-auto h-6 w-6 md:h-8 md:w-8 text-muted-foreground" />
                     <p className="mt-2 text-sm text-muted-foreground">
@@ -3305,16 +3481,16 @@ const OnboardingTab = ({
                       id="document-upload"
                     />
                     <Label htmlFor="document-upload">
-                      <Button 
-                        variant="outline" 
-                        className="mt-4" 
+                      <Button
+                        variant="outline"
+                        className="mt-4"
                         onClick={() => documentUploadRef.current?.click()}
                       >
                         Browse Files
                       </Button>
                     </Label>
                   </div>
-                  
+
                   {uploadedDocuments.length > 0 && (
                     <div className="space-y-2">
                       <Label>Uploaded Documents</Label>
@@ -3337,7 +3513,7 @@ const OnboardingTab = ({
                       </div>
                     </div>
                   )}
-                  
+
                   <div className="space-y-2">
                     <Label>Required Documents</Label>
                     <div className="text-sm text-muted-foreground space-y-1 grid grid-cols-1 md:grid-cols-2 gap-1">
@@ -3367,11 +3543,11 @@ const OnboardingTab = ({
                       </>
                     )}
                   </Button>
-                  
+
                   <div className="relative">
-                    <Button 
-                      onClick={() => excelImportRef.current?.click()} 
-                      variant="outline" 
+                    <Button
+                      onClick={() => excelImportRef.current?.click()}
+                      variant="outline"
                       className="w-full sm:w-auto"
                       disabled={importing}
                     >
@@ -3387,7 +3563,7 @@ const OnboardingTab = ({
                         </>
                       )}
                     </Button>
-                    
+
                     <Input
                       ref={excelImportRef}
                       type="file"
@@ -3417,7 +3593,7 @@ const OnboardingTab = ({
                   EPF Form 11 - Declaration Form
                 </CardTitle>
                 <div className="text-sm text-muted-foreground">
-                  For Employee: <span className="font-semibold">{createdEmployeeData.name}</span> 
+                  For Employee: <span className="font-semibold">{createdEmployeeData.name}</span>
                   | Employee ID: <span className="font-semibold">{createdEmployeeData.employeeId}</span>
                   | Department: <span className="font-semibold">{createdEmployeeData.department}</span>
                 </div>
@@ -3534,7 +3710,7 @@ const OnboardingTab = ({
                       </div>
                     </FormField>
 
-                   
+
                     <FormField label="5. Marital Status">
                       <div className="relative">
                         <Select value={epfFormData.maritalStatus} onValueChange={(value) => handleEPFFormChange('maritalStatus', value)}>
@@ -3588,7 +3764,7 @@ const OnboardingTab = ({
                   {/* Previous Membership Section */}
                   <div className="border rounded-lg p-4 space-y-4">
                     <h4 className="font-semibold border-b pb-2">Previous Membership Details</h4>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>7. Whether earlier member of the Employee's Provident Fund Scheme, 1952 ?</Label>
@@ -3692,7 +3868,7 @@ const OnboardingTab = ({
                   {/* International Worker Section */}
                   <div className="border rounded-lg p-4 space-y-4">
                     <h4 className="font-semibold border-b pb-2">10. International Worker Details</h4>
-                    
+
                     <div className="space-y-2">
                       <Label>a) International Worker</Label>
                       <div className="flex gap-4">
@@ -3760,7 +3936,7 @@ const OnboardingTab = ({
                   {/* KYC Details Section */}
                   <div className="border rounded-lg p-4 space-y-4">
                     <h4 className="font-semibold border-b pb-2">11. KYC Details : (attach self attested copies of following KYC's)</h4>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="bankAccountNumber">a) Bank Account No. & IFS Code</Label>
@@ -3831,7 +4007,7 @@ const OnboardingTab = ({
                   {/* Declaration Details Section */}
                   <div className="border rounded-lg p-4 space-y-4">
                     <h4 className="font-semibold border-b pb-2">12. Declaration Details</h4>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label>First EPF Member</Label>
@@ -3992,7 +4168,7 @@ const OnboardingTab = ({
                   {/* Employee Declaration */}
                   <div className="border rounded-lg p-4 space-y-4">
                     <h4 className="font-semibold">Employee Declaration</h4>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="declarationDate">Date</Label>
@@ -4013,7 +4189,7 @@ const OnboardingTab = ({
                         />
                       </div>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label>Signature of Member</Label>
                       <div className="border-2 border-dashed rounded-lg p-4 text-center h-20 flex items-center justify-center">
@@ -4025,7 +4201,7 @@ const OnboardingTab = ({
                   {/* Employer Declaration */}
                   <div className="border rounded-lg p-4 space-y-4">
                     <div className="section-title">DECLARATION BY PRESENT EMPLOYER</div>
-                    
+
                     <div className="space-y-2">
                       <Label>A. The member Mr./Ms./Mrs. {epfFormData.memberName} has joined on {epfFormData.enrolledDate} and has been allotted PF Number {createdEmployeeData?.uanNumber || createdEmployeeData?.uan || "Pending"}</Label>
                     </div>
@@ -4093,7 +4269,7 @@ const OnboardingTab = ({
                         />
                       </div>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label>Signature of Employer with Seal of Establishment</Label>
                       <div className="border-2 border-dashed rounded-lg p-4 text-center h-20 flex items-center justify-center">
@@ -4105,16 +4281,19 @@ const OnboardingTab = ({
                   {/* Action Buttons */}
                   <div className="flex gap-4 justify-end pt-4 border-t">
                     <Button onClick={handleSaveEPFForm} className="flex items-center gap-2" disabled={isSavingEPF}>
-                      {isSavingEPF ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Save className="h-4 w-4" />
-                      )}
+                      {isSavingEPF ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                       {isSavingEPF ? "Saving..." : "Save Form"}
                     </Button>
                     <Button onClick={handlePrintEPFForm} variant="outline" className="flex items-center gap-2">
-                      <Download className="h-4 w-4" />
-                      Print Form
+                      <Download className="h-4 w-4" /> Print Form
+                    </Button>
+                    {/* ✅ NEW BUTTON – Print Joining Form */}
+                    <Button
+                      onClick={() => createdEmployeeData && printJoiningForm(createdEmployeeData)}
+                      variant="outline"
+                      className="flex items-center gap-2"
+                    >
+                      <FileText className="h-4 w-4" /> Print Joining Form
                     </Button>
                   </div>
                 </div>
@@ -4138,7 +4317,7 @@ const OnboardingTab = ({
           )}
         </TabsContent>
       </Tabs>
-    </div>
+    </div >
   );
 };
 

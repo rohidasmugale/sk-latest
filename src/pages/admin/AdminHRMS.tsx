@@ -361,6 +361,7 @@ const HRMS = () => {
             <TabsTrigger value="payroll" className="flex-1 min-w-[100px] text-sm py-2">
               <DollarSign className="h-4 w-4 mr-2" /> Payroll
             </TabsTrigger>
+               <TabsTrigger value="performance" className="flex-1 min-w-[120px]">Deduction</TabsTrigger>
           </TabsList>
 
           {/* Employees Tab - Pass site filter */}
