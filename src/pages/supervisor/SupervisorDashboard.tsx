@@ -110,6 +110,7 @@ interface Employee {
   phone?: string;
   checkInPhoto?: string;
   checkOutPhoto?: string;
+  profileStatus?: "complete" | "incomplete";   // ✅ ADD THIS
 }
 
 interface AttendanceRecord {

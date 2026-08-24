@@ -28,17 +28,17 @@ interface InvoicesTabProps {
   invoices?: Invoice[];
   onInvoiceCreate?: (invoice: Invoice) => void;
   onMarkAsPaid?: (invoiceId: string) => void;
+  onRefreshInvoices?: () => void;   // ← new
   userId?: string;
   userRole?: string;
 }
-
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 const getStatusColor = (status: string): "default" | "secondary" | "destructive" | "outline" => {
   switch (status.toLowerCase()) {
-    case "paid":    return "default";
+    case "paid": return "default";
     case "pending": return "secondary";
     case "overdue": return "destructive";
-    default:        return "secondary";
+    default: return "secondary";
   }
 };
 
@@ -47,33 +47,34 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
   invoices: propInvoices,
   onInvoiceCreate,
   onMarkAsPaid,
+  onRefreshInvoices,   // ← new
   userId,
   userRole = "superadmin",
 }) => {
   const invoiceService = new InvoiceService(userId, userRole);
 
-  const [localInvoices,   setLocalInvoices]   = useState<Invoice[]>([]);
-  const [loading,         setLoading]         = useState(true);
-  const [error,           setError]           = useState<string | null>(null);
+  const [localInvoices, setLocalInvoices] = useState<Invoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Dialogs
-  const [performOpen,     setPerformOpen]     = useState(false);
-  const [taxOpen,         setTaxOpen]         = useState(false);
-  const [previewOpen,     setPreviewOpen]     = useState(false);
-  const [shareOpen,       setShareOpen]       = useState(false);
+  const [performOpen, setPerformOpen] = useState(false);
+  const [taxOpen, setTaxOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-  const [printInvoice,    setPrintInvoice]    = useState<Invoice | null>(null);
-  const [viewMode,        setViewMode]        = useState<"table" | "card">("table");
-  const [searchTerm,      setSearchTerm]      = useState("");
-  const [currentPage,     setCurrentPage]     = useState(1);
+  const [printInvoice, setPrintInvoice] = useState<Invoice | null>(null);
+  const [viewMode, setViewMode] = useState<"table" | "card">("table");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
   // Loading states
-  const [deletingId,      setDeletingId]      = useState<string | null>(null);
-  const [markingPaidId,   setMarkingPaidId]   = useState<string | null>(null);
-  const [sharingId,       setSharingId]       = useState<string | null>(null);
-  const [shareUserId,     setShareUserId]     = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
+  const [sharingId, setSharingId] = useState<string | null>(null);
+  const [shareUserId, setShareUserId] = useState("");
 
   // Controlled vs standalone
   const isControlled = propInvoices !== undefined;
@@ -85,7 +86,7 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
     } else if (!isControlled) {
       fetchInvoices();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [propInvoices]);
 
   const fetchInvoices = async () => {
@@ -107,13 +108,13 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
     try {
       const created = await invoiceService.createInvoice(invoice);
       if (onInvoiceCreate) {
-        onInvoiceCreate(created as Invoice);
+        onInvoiceCreate(created as Invoice);  // ← passes the saved invoice to Billing
       } else {
         setLocalInvoices(prev => [created as Invoice, ...prev]);
       }
       toast.success("Invoice created!");
       return true;
-    } catch (err: unknown) {
+    } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create invoice");
       return false;
     }
@@ -123,17 +124,27 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
     try {
       setMarkingPaidId(invoiceId);
       const updated = await invoiceService.markAsPaid(invoiceId);
+      // Update local state and notify parent
       setLocalInvoices(prev => prev.map(i => i.id === invoiceId ? updated as Invoice : i));
       if (onMarkAsPaid) onMarkAsPaid(invoiceId);
       if (previewOpen) setPreviewOpen(false);
       toast.success("Invoice marked as paid!");
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to mark as paid");
+      const msg = err instanceof Error ? err.message : "Failed to mark as paid";
+      if (msg.includes("not found")) {
+        toast.warning("Invoice not found – refreshing list...");
+        if (onRefreshInvoices) {
+          await onRefreshInvoices();   // ← parent refresh
+        } else {
+          await fetchInvoices();       // fallback (if no parent refresh)
+        }
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setMarkingPaidId(null);
     }
   };
-
   const handleDeleteInvoice = async (invoiceId: string) => {
     if (!window.confirm("Delete this invoice? This cannot be undone.")) return;
     try {
@@ -175,15 +186,15 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
   // ── PDF generation ────────────────────────────────────────────────────────────
   const generateSalesOrderPDF = (invoice: Invoice): boolean => {
     try {
-      const doc  = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const pw   = 210;
-      const ph   = 297;
-      const lm   = 15;
-      const cw   = pw - lm * 2;
-      let y      = 15;
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pw = 210;
+      const ph = 297;
+      const lm = 15;
+      const cw = pw - lm * 2;
+      let y = 15;
 
       const line = (yy: number) => { doc.setDrawColor(0); doc.setLineWidth(0.1); doc.line(lm, yy, lm + cw, yy); };
-      const txt  = (t: string, x: number, yy: number, opts: { size?: number; style?: string; align?: "left" | "center" | "right"; color?: number } = {}) => {
+      const txt = (t: string, x: number, yy: number, opts: { size?: number; style?: string; align?: "left" | "center" | "right"; color?: number } = {}) => {
         doc.setFontSize(opts.size ?? 10);
         doc.setFont("helvetica", opts.style ?? "normal");
         doc.setTextColor(opts.color ?? 0, 0, 0);
@@ -218,39 +229,39 @@ const InvoicesTab: React.FC<InvoicesTabProps> = ({
       const c2 = lm + cw * 0.6;
       const orderY = y;
       [
-        ["Voucher No.",           invoice.voucherNo ?? invoice.id ?? ""],
-        ["Buyer's Ref.",          invoice.buyerRef ?? ""],
-        ["Dispatched through",    invoice.dispatchedThrough ?? ""],
-        ["Dated",                 invoice.date ?? ""],
+        ["Voucher No.", invoice.voucherNo ?? invoice.id ?? ""],
+        ["Buyer's Ref.", invoice.buyerRef ?? ""],
+        ["Dispatched through", invoice.dispatchedThrough ?? ""],
+        ["Dated", invoice.date ?? ""],
       ].forEach(([l, v], i) => { txt(l, lm, orderY + i * 6, { size: 9 }); txt(v, lm + 42, orderY + i * 6, { size: 9 }); });
       [
-        ["Payment Terms",   invoice.paymentTerms ?? ""],
-        ["Other Refs",      invoice.notes ?? ""],
-        ["Destination",     invoice.site ?? invoice.destination ?? ""],
-        ["Delivery Terms",  invoice.deliveryTerms ?? ""],
+        ["Payment Terms", invoice.paymentTerms ?? ""],
+        ["Other Refs", invoice.notes ?? ""],
+        ["Destination", invoice.site ?? invoice.destination ?? ""],
+        ["Delivery Terms", invoice.deliveryTerms ?? ""],
       ].forEach(([l, v], i) => { txt(l, c2, orderY + i * 6, { size: 9 }); txt(v, c2 + 38, orderY + i * 6, { size: 9 }); });
       y = orderY + 28;
 
       // Items table
       const cols = { slNo: lm + 5, desc: lm + 20, qty: lm + 130, rate: lm + 155, amt: lm + 180 };
       line(y); y += 8;
-      txt("Sl No.",                 cols.slNo,  y, { size: 9, style: "bold", align: "center" });
-      txt("Description of Goods",   cols.desc,  y, { size: 9, style: "bold" });
-      txt("Quantity",               cols.qty,   y, { size: 9, style: "bold", align: "right" });
-      txt("Rate per",               cols.rate,  y, { size: 9, style: "bold", align: "right" });
-      txt("Amount",                 cols.amt,   y, { size: 9, style: "bold", align: "right" });
+      txt("Sl No.", cols.slNo, y, { size: 9, style: "bold", align: "center" });
+      txt("Description of Goods", cols.desc, y, { size: 9, style: "bold" });
+      txt("Quantity", cols.qty, y, { size: 9, style: "bold", align: "right" });
+      txt("Rate per", cols.rate, y, { size: 9, style: "bold", align: "right" });
+      txt("Amount", cols.amt, y, { size: 9, style: "bold", align: "right" });
       y += 3; line(y); y += 6;
 
       invoice.items.forEach((item, idx) => {
         if (y > ph - 50) { doc.addPage(); y = 20; }
-        txt(`${idx + 1}`,            cols.slNo,  y, { size: 9, align: "center" });
-        txt(item.description ?? "",  cols.desc,  y, { size: 9 });
-        txt(`${item.quantity}`,      cols.qty,   y, { size: 9, align: "right" });
-        txt(formatCurrency(item.rate),  cols.rate, y, { size: 9, align: "right" });
-        txt(formatCurrency(item.amount),cols.amt, y, { size: 9, align: "right" });
+        txt(`${idx + 1}`, cols.slNo, y, { size: 9, align: "center" });
+        txt(item.description ?? "", cols.desc, y, { size: 9 });
+        txt(`${item.quantity}`, cols.qty, y, { size: 9, align: "right" });
+        txt(formatCurrency(item.rate), cols.rate, y, { size: 9, align: "right" });
+        txt(formatCurrency(item.amount), cols.amt, y, { size: 9, align: "right" });
         y += 4;
         const unit = item.unit ?? "No";
-txt(unit, cols.qty, y, { size: 8, align: "right", style: "italic" });
+        txt(unit, cols.qty, y, { size: 8, align: "right", style: "italic" });
         y += 6;
       });
 
@@ -278,7 +289,7 @@ txt(unit, cols.qty, y, { size: 8, align: "right", style: "italic" });
       // Signature & footer
       const sigY = ph - 40;
       line(sigY - 10);
-      txt("for S K Enterprises",  lm + cw * 0.25, sigY,     { size: 9, align: "center" });
+      txt("for S K Enterprises", lm + cw * 0.25, sigY, { size: 9, align: "center" });
       txt("Authorised Signatory", lm + cw * 0.25, sigY + 6, { size: 8, align: "center" });
       line(ph - 20);
       txt("This is a Computer Generated Document", pw / 2, ph - 14, { size: 8, style: "italic", align: "center" });
@@ -303,7 +314,7 @@ txt(unit, cols.qty, y, { size: 8, align: "right", style: "italic" });
 
   // ── Filtering / pagination ────────────────────────────────────────────────────
   const performInvoices = localInvoices.filter(i => i.invoiceType === "perform");
-  const taxInvoices     = localInvoices.filter(i => i.invoiceType === "tax");
+  const taxInvoices = localInvoices.filter(i => i.invoiceType === "tax");
 
   const filterInvoices = (list: Invoice[]) =>
     list.filter(inv =>
@@ -319,7 +330,7 @@ txt(unit, cols.qty, y, { size: 8, align: "right", style: "italic" });
   const totalPages = (list: Invoice[]) => Math.ceil(list.length / ITEMS_PER_PAGE);
 
   const filteredPerform = filterInvoices(performInvoices);
-  const filteredTax     = filterInvoices(taxInvoices);
+  const filteredTax = filterInvoices(taxInvoices);
 
   // ── Row action buttons ────────────────────────────────────────────────────────
   const ActionButtons = ({ invoice }: { invoice: Invoice }) => (
@@ -607,8 +618,8 @@ txt(unit, cols.qty, y, { size: 8, align: "right", style: "italic" });
                 </div>
                 <div className="space-y-1 text-xs">
                   {[
-                    ["Date",    formatDate(selectedInvoice.date)],
-                    ["Due",     selectedInvoice.dueDate ? formatDate(selectedInvoice.dueDate) : "N/A"],
+                    ["Date", formatDate(selectedInvoice.date)],
+                    ["Due", selectedInvoice.dueDate ? formatDate(selectedInvoice.dueDate) : "N/A"],
                     ["Service", selectedInvoice.serviceType ?? "N/A"],
                     ...(selectedInvoice.buyerRef ? [["Buyer Ref", selectedInvoice.buyerRef]] : []),
                   ].map(([l, v]) => (

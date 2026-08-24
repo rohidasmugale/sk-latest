@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
   CardDescription,
   CardFooter
 } from "@/components/ui/card";
@@ -12,14 +12,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from "@/components/ui/select";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -29,27 +29,27 @@ import {
   DialogFooter,
   DialogClose
 } from "@/components/ui/dialog";
-import { 
+import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger
 } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { 
-  Calendar, 
-  Clock, 
-  Users, 
-  FileText, 
-  Image as ImageIcon, 
-  Video, 
-  File, 
-  CheckCircle, 
-  XCircle, 
-  Plus, 
-  Search, 
-  Filter, 
-  Download, 
+import {
+  Calendar,
+  Clock,
+  Users,
+  FileText,
+  Image as ImageIcon,
+  Video,
+  File,
+  CheckCircle,
+  XCircle,
+  Plus,
+  Search,
+  Filter,
+  Download,
   Eye,
   Edit,
   Trash2,
@@ -87,7 +87,7 @@ import assignTaskService, { AssignTask } from '@/services/assignTaskService';
 import axios from "axios";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 // Types
 interface TrainingSession {
@@ -201,6 +201,7 @@ interface Employee {
   status: "active" | "inactive" | "left";
   siteName?: string;
   assignedSites?: string[];
+  profileStatus?: "complete" | "incomplete";   // ✅ ADD THIS
 }
 
 interface ExistingAttachment {
@@ -292,7 +293,7 @@ const TrainingDetailDialog = memo(({ training, open, onClose, onEdit, onUpdateSt
               Training Session Details
             </DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-6 mt-4">
             <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4">
               <div className="flex flex-col md:flex-row justify-between items-start gap-3">
@@ -423,8 +424,8 @@ const TrainingDetailDialog = memo(({ training, open, onClose, onEdit, onUpdateSt
                     <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100" onClick={() => setSelectedAttachment(att)}>
                       <div className="flex items-center gap-2">
                         {att.type === 'image' ? <ImageIcon className="h-4 w-4 text-blue-500" /> :
-                         att.type === 'video' ? <Video className="h-4 w-4 text-red-500" /> :
-                         <File className="h-4 w-4 text-gray-500" />}
+                          att.type === 'video' ? <Video className="h-4 w-4 text-red-500" /> :
+                            <File className="h-4 w-4 text-gray-500" />}
                         <span className="text-sm truncate max-w-[150px]">{att.name}</span>
                       </div>
                       <Eye className="h-4 w-4 text-gray-400" />
@@ -509,7 +510,7 @@ const BriefingDetailDialog = memo(({ briefing, open, onClose, onEdit, onUpdateAc
               Staff Briefing Details
             </DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-6 mt-4">
             <div className="bg-gradient-to-r from-green-50 to-teal-50 rounded-lg p-4">
               <div className="flex flex-col md:flex-row justify-between items-start gap-3">
@@ -654,8 +655,8 @@ const BriefingDetailDialog = memo(({ briefing, open, onClose, onEdit, onUpdateAc
                     <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100" onClick={() => setSelectedAttachment(att)}>
                       <div className="flex items-center gap-2">
                         {att.type === 'image' ? <ImageIcon className="h-4 w-4 text-blue-500" /> :
-                         att.type === 'video' ? <Video className="h-4 w-4 text-red-500" /> :
-                         <File className="h-4 w-4 text-gray-500" />}
+                          att.type === 'video' ? <Video className="h-4 w-4 text-red-500" /> :
+                            <File className="h-4 w-4 text-gray-500" />}
                         <span className="text-sm truncate max-w-[150px]">{att.name}</span>
                       </div>
                       <Eye className="h-4 w-4 text-gray-400" />
@@ -760,7 +761,7 @@ MobileEmployeeCard.displayName = 'MobileEmployeeCard';
 const MobileTrainingCard = memo(({ session, onView, onUpdateStatus, onDelete, getTypeColor, getStatusBadge, formatDate, trainingTypes, loading }: any) => {
   const [expanded, setExpanded] = useState(false);
   const canEdit = session.createdBy === session.currentManagerId;
-  
+
   return (
     <Card className="mb-3 overflow-hidden">
       <CardContent className="p-4">
@@ -831,7 +832,7 @@ MobileTrainingCard.displayName = 'MobileTrainingCard';
 const MobileBriefingCard = memo(({ briefing, onView, onDelete, onUpdateAction, getShiftBadge, getPriorityBadge, formatDate, loading }: any) => {
   const [expanded, setExpanded] = useState(false);
   const canEdit = briefing.createdBy === briefing.currentManagerId;
-  
+
   return (
     <Card className="mb-3 overflow-hidden">
       <CardContent className="p-4">
@@ -914,7 +915,7 @@ const AddTrainingFormComponent = memo(({ trainingForm, setTrainingForm, addObjec
           className="w-full"
         />
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Training Type</label>
         <Select
@@ -933,7 +934,7 @@ const AddTrainingFormComponent = memo(({ trainingForm, setTrainingForm, addObjec
           </SelectContent>
         </Select>
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Date *</label>
         <Input
@@ -943,7 +944,7 @@ const AddTrainingFormComponent = memo(({ trainingForm, setTrainingForm, addObjec
           className="w-full"
         />
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Time</label>
         <Input
@@ -953,7 +954,7 @@ const AddTrainingFormComponent = memo(({ trainingForm, setTrainingForm, addObjec
           className="w-full"
         />
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Duration</label>
         <Input
@@ -963,7 +964,7 @@ const AddTrainingFormComponent = memo(({ trainingForm, setTrainingForm, addObjec
           className="w-full"
         />
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Trainer *</label>
         <Input
@@ -974,7 +975,7 @@ const AddTrainingFormComponent = memo(({ trainingForm, setTrainingForm, addObjec
         />
       </div>
     </div>
-    
+
     <div className="space-y-4">
       <div>
         <label className="text-sm font-medium mb-2 block">Site *</label>
@@ -994,7 +995,7 @@ const AddTrainingFormComponent = memo(({ trainingForm, setTrainingForm, addObjec
           </SelectContent>
         </Select>
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Department</label>
         <Select
@@ -1013,7 +1014,7 @@ const AddTrainingFormComponent = memo(({ trainingForm, setTrainingForm, addObjec
           </SelectContent>
         </Select>
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Max Attendees</label>
         <Input
@@ -1024,7 +1025,7 @@ const AddTrainingFormComponent = memo(({ trainingForm, setTrainingForm, addObjec
           className="w-full"
         />
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Location</label>
         <Input
@@ -1034,7 +1035,7 @@ const AddTrainingFormComponent = memo(({ trainingForm, setTrainingForm, addObjec
           className="w-full"
         />
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Training Objectives</label>
         <div className="space-y-2">
@@ -1071,7 +1072,7 @@ const AddTrainingFormComponent = memo(({ trainingForm, setTrainingForm, addObjec
           </Button>
         </div>
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Description</label>
         <Textarea
@@ -1101,7 +1102,7 @@ const AddBriefingFormComponent = memo(({ briefingForm, setBriefingForm, addTopic
           className="w-full"
         />
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Time</label>
         <Input
@@ -1111,7 +1112,7 @@ const AddBriefingFormComponent = memo(({ briefingForm, setBriefingForm, addTopic
           className="w-full"
         />
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Shift</label>
         <Select
@@ -1130,7 +1131,7 @@ const AddBriefingFormComponent = memo(({ briefingForm, setBriefingForm, addTopic
           </SelectContent>
         </Select>
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Conducted By *</label>
         <Input
@@ -1140,7 +1141,7 @@ const AddBriefingFormComponent = memo(({ briefingForm, setBriefingForm, addTopic
           className="w-full"
         />
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Site *</label>
         <Select
@@ -1159,7 +1160,7 @@ const AddBriefingFormComponent = memo(({ briefingForm, setBriefingForm, addTopic
           </SelectContent>
         </Select>
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Department</label>
         <Select
@@ -1178,7 +1179,7 @@ const AddBriefingFormComponent = memo(({ briefingForm, setBriefingForm, addTopic
           </SelectContent>
         </Select>
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Number of Attendees</label>
         <Input
@@ -1190,7 +1191,7 @@ const AddBriefingFormComponent = memo(({ briefingForm, setBriefingForm, addTopic
         />
       </div>
     </div>
-    
+
     <div className="space-y-4">
       <div>
         <label className="text-sm font-medium mb-2 block">Topics Discussed</label>
@@ -1228,7 +1229,7 @@ const AddBriefingFormComponent = memo(({ briefingForm, setBriefingForm, addTopic
           </Button>
         </div>
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Key Points</label>
         <div className="space-y-2">
@@ -1265,7 +1266,7 @@ const AddBriefingFormComponent = memo(({ briefingForm, setBriefingForm, addTopic
           </Button>
         </div>
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Notes</label>
         <Textarea
@@ -1295,7 +1296,7 @@ const EditTrainingFormComponent = memo(({ editTrainingForm, setEditTrainingForm,
           className="w-full"
         />
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Training Type</label>
         <Select
@@ -1314,7 +1315,7 @@ const EditTrainingFormComponent = memo(({ editTrainingForm, setEditTrainingForm,
           </SelectContent>
         </Select>
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Date *</label>
         <Input
@@ -1324,7 +1325,7 @@ const EditTrainingFormComponent = memo(({ editTrainingForm, setEditTrainingForm,
           className="w-full"
         />
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Time</label>
         <Input
@@ -1334,7 +1335,7 @@ const EditTrainingFormComponent = memo(({ editTrainingForm, setEditTrainingForm,
           className="w-full"
         />
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Duration</label>
         <Input
@@ -1344,7 +1345,7 @@ const EditTrainingFormComponent = memo(({ editTrainingForm, setEditTrainingForm,
           className="w-full"
         />
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Trainer *</label>
         <Input
@@ -1355,7 +1356,7 @@ const EditTrainingFormComponent = memo(({ editTrainingForm, setEditTrainingForm,
         />
       </div>
     </div>
-    
+
     <div className="space-y-4">
       <div>
         <label className="text-sm font-medium mb-2 block">Site *</label>
@@ -1375,7 +1376,7 @@ const EditTrainingFormComponent = memo(({ editTrainingForm, setEditTrainingForm,
           </SelectContent>
         </Select>
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Department</label>
         <Select
@@ -1394,7 +1395,7 @@ const EditTrainingFormComponent = memo(({ editTrainingForm, setEditTrainingForm,
           </SelectContent>
         </Select>
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Max Attendees</label>
         <Input
@@ -1405,7 +1406,7 @@ const EditTrainingFormComponent = memo(({ editTrainingForm, setEditTrainingForm,
           className="w-full"
         />
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Location</label>
         <Input
@@ -1415,7 +1416,7 @@ const EditTrainingFormComponent = memo(({ editTrainingForm, setEditTrainingForm,
           className="w-full"
         />
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Training Objectives</label>
         <div className="space-y-2">
@@ -1452,7 +1453,7 @@ const EditTrainingFormComponent = memo(({ editTrainingForm, setEditTrainingForm,
           </Button>
         </div>
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Description</label>
         <Textarea
@@ -1482,7 +1483,7 @@ const EditBriefingFormComponent = memo(({ editBriefingForm, setEditBriefingForm,
           className="w-full"
         />
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Time</label>
         <Input
@@ -1492,7 +1493,7 @@ const EditBriefingFormComponent = memo(({ editBriefingForm, setEditBriefingForm,
           className="w-full"
         />
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Shift</label>
         <Select
@@ -1511,7 +1512,7 @@ const EditBriefingFormComponent = memo(({ editBriefingForm, setEditBriefingForm,
           </SelectContent>
         </Select>
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Conducted By *</label>
         <Input
@@ -1521,7 +1522,7 @@ const EditBriefingFormComponent = memo(({ editBriefingForm, setEditBriefingForm,
           className="w-full"
         />
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Site *</label>
         <Select
@@ -1540,7 +1541,7 @@ const EditBriefingFormComponent = memo(({ editBriefingForm, setEditBriefingForm,
           </SelectContent>
         </Select>
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Department</label>
         <Select
@@ -1559,7 +1560,7 @@ const EditBriefingFormComponent = memo(({ editBriefingForm, setEditBriefingForm,
           </SelectContent>
         </Select>
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Number of Attendees</label>
         <Input
@@ -1571,7 +1572,7 @@ const EditBriefingFormComponent = memo(({ editBriefingForm, setEditBriefingForm,
         />
       </div>
     </div>
-    
+
     <div className="space-y-4">
       <div>
         <label className="text-sm font-medium mb-2 block">Topics Discussed</label>
@@ -1609,7 +1610,7 @@ const EditBriefingFormComponent = memo(({ editBriefingForm, setEditBriefingForm,
           </Button>
         </div>
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Key Points</label>
         <div className="space-y-2">
@@ -1646,7 +1647,7 @@ const EditBriefingFormComponent = memo(({ editBriefingForm, setEditBriefingForm,
           </Button>
         </div>
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Notes</label>
         <Textarea
@@ -1693,7 +1694,7 @@ const AttachmentsSection = memo(({ attachments, onUpload, onRemove, fileInputRef
         </Button>
       </div>
     </div>
-    
+
     {attachments.length > 0 && (
       <div className="space-y-2 max-h-40 overflow-y-auto">
         {attachments.map((file: any, index: number) => (
@@ -1765,14 +1766,12 @@ const SupervisorsMultiSelect = memo(({ selected, onToggle, searchQuery, setSearc
             <div
               key={sup._id}
               onClick={() => onToggle(sup._id)}
-              className={`p-3 border rounded-lg mb-2 cursor-pointer transition-colors ${
-                selected.includes(sup._id) ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/20'
-              }`}
+              className={`p-3 border rounded-lg mb-2 cursor-pointer transition-colors ${selected.includes(sup._id) ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/20'
+                }`}
             >
               <div className="flex items-center gap-3">
-                <div className={`flex items-center justify-center h-5 w-5 rounded border ${
-                  selected.includes(sup._id) ? 'bg-primary border-primary' : 'border-gray-300'
-                }`}>
+                <div className={`flex items-center justify-center h-5 w-5 rounded border ${selected.includes(sup._id) ? 'bg-primary border-primary' : 'border-gray-300'
+                  }`}>
                   {selected.includes(sup._id) && <Check className="h-3 w-3 text-primary-foreground" />}
                 </div>
                 <div className="flex-1">
@@ -1835,14 +1834,12 @@ const ManagersMultiSelect = memo(({ selected, onToggle, searchQuery, setSearchQu
             <div
               key={mgr._id}
               onClick={() => onToggle(mgr._id)}
-              className={`p-3 border rounded-lg mb-2 cursor-pointer transition-colors ${
-                selected.includes(mgr._id) ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/20'
-              }`}
+              className={`p-3 border rounded-lg mb-2 cursor-pointer transition-colors ${selected.includes(mgr._id) ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/20'
+                }`}
             >
               <div className="flex items-center gap-3">
-                <div className={`flex items-center justify-center h-5 w-5 rounded border ${
-                  selected.includes(mgr._id) ? 'bg-primary border-primary' : 'border-gray-300'
-                }`}>
+                <div className={`flex items-center justify-center h-5 w-5 rounded border ${selected.includes(mgr._id) ? 'bg-primary border-primary' : 'border-gray-300'
+                  }`}>
                   {selected.includes(mgr._id) && <Check className="h-3 w-3 text-primary-foreground" />}
                 </div>
                 <div className="flex-1">
@@ -1905,14 +1902,12 @@ const EmployeesMultiSelect = memo(({ selected, onToggle, searchQuery, setSearchQ
             <div
               key={emp._id}
               onClick={() => onToggle(emp._id)}
-              className={`p-3 border rounded-lg mb-2 cursor-pointer transition-colors ${
-                selected.includes(emp._id) ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/20'
-              }`}
+              className={`p-3 border rounded-lg mb-2 cursor-pointer transition-colors ${selected.includes(emp._id) ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/20'
+                }`}
             >
               <div className="flex items-center gap-3">
-                <div className={`flex items-center justify-center h-5 w-5 rounded border ${
-                  selected.includes(emp._id) ? 'bg-primary border-primary' : 'border-gray-300'
-                }`}>
+                <div className={`flex items-center justify-center h-5 w-5 rounded border ${selected.includes(emp._id) ? 'bg-primary border-primary' : 'border-gray-300'
+                  }`}>
                   {selected.includes(emp._id) && <Check className="h-3 w-3 text-primary-foreground" />}
                 </div>
                 <div className="flex-1">
@@ -1970,7 +1965,7 @@ const ActionItemsSection = memo(({ actionItems, onAdd, onRemove, onUpdate }: any
         Add Action Item
       </Button>
     </div>
-    
+
     {actionItems.map((item: any, index: number) => (
       <div key={index} className="grid grid-cols-1 sm:grid-cols-4 gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg mb-3">
         <div className="sm:col-span-2">
@@ -2067,7 +2062,7 @@ const TrainingBriefingSectionManager: React.FC = () => {
     trainings: true,
     briefings: true
   });
-  
+
   // Edit mode attachments
   const [editTrainingAttachments, setEditTrainingAttachments] = useState<ExistingAttachment[]>([]);
   const [editBriefingAttachments, setEditBriefingAttachments] = useState<ExistingAttachment[]>([]);
@@ -2075,36 +2070,41 @@ const TrainingBriefingSectionManager: React.FC = () => {
   const [editBriefingNewFiles, setEditBriefingNewFiles] = useState<File[]>([]);
   const editTrainingFileInputRef = useRef<HTMLInputElement>(null);
   const editBriefingFileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Data states
   const [sites, setSites] = useState<Site[]>([]);
   const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
   const [managers, setManagers] = useState<Manager[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  
+
   // Manager's assigned sites
   const managerId = authUser?._id || authUser?.id || "";
   const managerName = authUser?.name || "Manager";
   const [managerAssignedSites, setManagerAssignedSites] = useState<string[]>([]);
   const [managerAssignedSiteNames, setManagerAssignedSiteNames] = useState<string[]>([]);
-  
+
   // Filtered states based on selected site
   const [filteredSupervisors, setFilteredSupervisors] = useState<Supervisor[]>([]);
   const [filteredManagers, setFilteredManagers] = useState<Manager[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
-  
+
   // Multi-select states
- 
+
+
+  // Multi-select states
+  const [selectedSupervisors, setSelectedSupervisors] = useState<string[]>([]);
+  const [selectedManagers, setSelectedManagers] = useState<string[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
   const [supervisorSearchQuery, setSupervisorSearchQuery] = useState("");
   const [managerSearchQuery, setManagerSearchQuery] = useState("");
-  
+
   // Edit mode multi-select states
   const [editSelectedSupervisors, setEditSelectedSupervisors] = useState<string[]>([]);
-  
+  const [editSelectedManagers, setEditSelectedManagers] = useState<string[]>([]);
+  const [editSupervisorSearchQuery, setEditSupervisorSearchQuery] = useState("");
   const [editManagerSearchQuery, setEditManagerSearchQuery] = useState("");
-  
+
   // Form states for training
   const [trainingForm, setTrainingForm] = useState({
     title: '',
@@ -2120,7 +2120,7 @@ const TrainingBriefingSectionManager: React.FC = () => {
     location: '',
     objectives: [] as string[]
   });
-  
+
   // Edit training form state
   const [editTrainingForm, setEditTrainingForm] = useState({
     title: '',
@@ -2136,7 +2136,7 @@ const TrainingBriefingSectionManager: React.FC = () => {
     location: '',
     objectives: [] as string[]
   });
-  
+
   // Form states for briefing
   const [briefingForm, setBriefingForm] = useState({
     date: '',
@@ -2151,7 +2151,7 @@ const TrainingBriefingSectionManager: React.FC = () => {
     notes: '',
     shift: 'morning' as const
   });
-  
+
   // Edit briefing form state
   const [editBriefingForm, setEditBriefingForm] = useState({
     date: '',
@@ -2166,11 +2166,11 @@ const TrainingBriefingSectionManager: React.FC = () => {
     notes: '',
     shift: 'morning' as const
   });
-  
+
   // Mobile responsive state
   const [isMobileView, setIsMobileView] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-  
+
   // Check for mobile view
   useEffect(() => {
     const checkMobile = () => setIsMobileView(window.innerWidth < 768);
@@ -2178,24 +2178,36 @@ const TrainingBriefingSectionManager: React.FC = () => {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-  
+
   // Get manager's assigned sites from tasks
 
   // Get ALL sites - no filtering (single manager sees everything)
-const fetchManagerAssignedSites = useCallback(async () => {
-  try {
-    console.log('🔍 Fetching all sites for manager...');
-    const allSites = await siteService.getAllSites();
-    const siteIds = allSites.map(s => s._id);
-    const siteNames = allSites.map(s => s.name);
-    
-    setManagerAssignedSites(siteIds);
-    setManagerAssignedSiteNames(siteNames);
-    
-    console.log(`✅ Loaded ${siteIds.length} sites`);
-    
-    // ✅ If no sites found, still stop loading
-    if (siteIds.length === 0) {
+  const fetchManagerAssignedSites = useCallback(async () => {
+    try {
+      console.log('🔍 Fetching all sites for manager...');
+      const allSites = await siteService.getAllSites();
+      const siteIds = allSites.map(s => s._id);
+      const siteNames = allSites.map(s => s.name);
+
+      setManagerAssignedSites(siteIds);
+      setManagerAssignedSiteNames(siteNames);
+
+      console.log(`✅ Loaded ${siteIds.length} sites`);
+
+      // ✅ If no sites found, still stop loading
+      if (siteIds.length === 0) {
+        setLoadingData({
+          sites: false,
+          supervisors: false,
+          managers: false,
+          employees: false,
+          trainings: false,
+          briefings: false
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching sites:", error);
+      toast.error("Failed to load sites");
       setLoadingData({
         sites: false,
         supervisors: false,
@@ -2205,44 +2217,32 @@ const fetchManagerAssignedSites = useCallback(async () => {
         briefings: false
       });
     }
-  } catch (error) {
-    console.error("Error fetching sites:", error);
-    toast.error("Failed to load sites");
-    setLoadingData({
-      sites: false,
-      supervisors: false,
-      managers: false,
-      employees: false,
-      trainings: false,
-      briefings: false
-    });
-  }
-}, []);
- // ✅ Load sites on mount (no dependency on managerId)
-useEffect(() => {
-  fetchManagerAssignedSites();
-}, []);
-  
+  }, []);
+  // ✅ Load sites on mount (no dependency on managerId)
+  useEffect(() => {
+    fetchManagerAssignedSites();
+  }, []);
+
   // Fetch data after manager assigned sites are loaded
   // Fetch data after manager assigned sites are loaded
-useEffect(() => {
-  if (managerAssignedSites.length > 0) {
-    fetchAllData();
-  } else {
-    // ✅ If no sites assigned, we already set loadingData to false in fetchManagerAssignedSites
-    // But if we get here with empty sites, make sure loading stops
-    setLoadingData(prev => ({
-      ...prev,
-      sites: false,
-      supervisors: false,
-      managers: false,
-      employees: false,
-      trainings: false,
-      briefings: false
-    }));
-  }
-}, [managerAssignedSites]);
-  
+  useEffect(() => {
+    if (managerAssignedSites.length > 0) {
+      fetchAllData();
+    } else {
+      // ✅ If no sites assigned, we already set loadingData to false in fetchManagerAssignedSites
+      // But if we get here with empty sites, make sure loading stops
+      setLoadingData(prev => ({
+        ...prev,
+        sites: false,
+        supervisors: false,
+        managers: false,
+        employees: false,
+        trainings: false,
+        briefings: false
+      }));
+    }
+  }, [managerAssignedSites]);
+
   // Fetch data when filters change
   useEffect(() => {
     if (managerAssignedSites.length > 0) {
@@ -2250,7 +2250,7 @@ useEffect(() => {
       fetchBriefings();
     }
   }, [searchTerm, filterDepartment, filterStatus, managerAssignedSites]);
-  
+
   // Filter data when site changes for forms
   useEffect(() => {
     if (trainingForm.site) {
@@ -2259,7 +2259,7 @@ useEffect(() => {
       filterDataBySite(briefingForm.site);
     }
   }, [trainingForm.site, briefingForm.site, supervisors, managers, employees]);
-  
+
   // Filter data when site changes for edit forms
   useEffect(() => {
     if (editTrainingForm.site) {
@@ -2268,7 +2268,7 @@ useEffect(() => {
       filterDataBySiteForEdit(editBriefingForm.site);
     }
   }, [editTrainingForm.site, editBriefingForm.site, supervisors, managers, employees]);
-  
+
   const filterDataBySiteForEdit = (siteName: string) => {
     const selectedSite = sites.find(site => site.name === siteName);
     if (!selectedSite) {
@@ -2277,20 +2277,20 @@ useEffect(() => {
       setFilteredEmployees([]);
       return;
     }
-    const siteSupervisors = supervisors.filter(sup => 
+    const siteSupervisors = supervisors.filter(sup =>
       sup.assignedSites?.includes(selectedSite._id) || sup.site === siteName
     );
     setFilteredSupervisors(siteSupervisors);
-    const siteManagers = managers.filter(mgr => 
+    const siteManagers = managers.filter(mgr =>
       mgr.assignedSites?.includes(selectedSite._id) || mgr.site === siteName
     );
     setFilteredManagers(siteManagers);
-    const siteEmployees = employees.filter(emp => 
+    const siteEmployees = employees.filter(emp =>
       emp.siteName === siteName || emp.assignedSites?.includes(selectedSite._id)
     );
     setFilteredEmployees(siteEmployees);
   };
-  
+
   const fetchAllData = async () => {
     try {
       setLoadingData({
@@ -2322,24 +2322,24 @@ useEffect(() => {
       });
     }
   };
-  
- const fetchSites = async () => {
-  try {
-    const data = await siteService.getAllSites();
-    setSites(data); // ✅ No filtering - show ALL sites
-    console.log("📋 All sites loaded:", data.length);
-  } catch (error) {
-    console.error("Error fetching sites:", error);
-    toast.error("Failed to load sites");
-  }
-};
-  
+
+  const fetchSites = async () => {
+    try {
+      const data = await siteService.getAllSites();
+      setSites(data); // ✅ No filtering - show ALL sites
+      console.log("📋 All sites loaded:", data.length);
+    } catch (error) {
+      console.error("Error fetching sites:", error);
+      toast.error("Failed to load sites");
+    }
+  };
+
   const fetchSupervisorsAndManagers = async () => {
     try {
       const tasksData = await assignTaskService.getAllAssignTasks();
       const supervisorMap = new Map<string, Supervisor>();
       const managerMap = new Map<string, Manager>();
-      
+
       tasksData.forEach((task: AssignTask) => {
         if (managerAssignedSites.includes(task.siteId)) {
           if (task.assignedSupervisors && Array.isArray(task.assignedSupervisors)) {
@@ -2362,7 +2362,7 @@ useEffect(() => {
               }
             });
           }
-          
+
           if (task.assignedManagers && Array.isArray(task.assignedManagers)) {
             task.assignedManagers.forEach(user => {
               if (!managerMap.has(user.userId)) {
@@ -2385,7 +2385,7 @@ useEffect(() => {
           }
         }
       });
-      
+
       setSupervisors(Array.from(supervisorMap.values()));
       setManagers(Array.from(managerMap.values()));
       console.log("Fetched supervisors:", supervisorMap.size, "managers:", managerMap.size);
@@ -2394,25 +2394,26 @@ useEffect(() => {
       toast.error("Failed to load supervisors and managers");
     }
   };
-  
- const fetchEmployees = async () => {
-  try {
-    const response = await axios.get(`${API_URL}/employees`);
-    if (response.data.success) {
-      const employeesData = response.data.data || [];
-      // ✅ No site filtering - show ALL active employees
-      const uniqueEmployees = Array.from(
-        new Map(employeesData.map((emp: Employee) => [emp._id, emp])).values()
-      ).filter(emp => emp.status === "active");
-      setEmployees(uniqueEmployees);
-      console.log("📋 All employees loaded:", uniqueEmployees.length);
+
+  const fetchEmployees = async () => {
+    try {const response = await axios.get(`${API_URL}/employees`, {
+  params: { limit: 10000 }
+});
+      if (response.data.success) {
+        const employeesData = response.data.data || [];
+        // ✅ No site filtering - show ALL active employees
+        const uniqueEmployees = Array.from(
+          new Map(employeesData.map((emp: Employee) => [emp._id, emp])).values()
+        ).filter(emp => emp.status === "active");
+        setEmployees(uniqueEmployees);
+        console.log("📋 All employees loaded:", uniqueEmployees.length);
+      }
+    } catch (error) {
+      console.error("Error fetching employees:", error);
+      toast.error("Failed to load employees");
     }
-  } catch (error) {
-    console.error("Error fetching employees:", error);
-    toast.error("Failed to load employees");
-  }
-};
-  
+  };
+
   const fetchTrainings = async () => {
     try {
       setLoadingData(prev => ({ ...prev, trainings: true }));
@@ -2423,7 +2424,7 @@ useEffect(() => {
       };
       const response = await trainingApi.getAllTrainings(params);
       if (response.success) {
-        const filteredTrainings = response.trainings.filter((training: TrainingSession) => 
+        const filteredTrainings = response.trainings.filter((training: TrainingSession) =>
           managerAssignedSiteNames.includes(training.site)
         );
         setTrainingSessions(filteredTrainings);
@@ -2436,7 +2437,7 @@ useEffect(() => {
       setLoadingData(prev => ({ ...prev, trainings: false }));
     }
   };
-  
+
   const fetchBriefings = async () => {
     try {
       setLoadingData(prev => ({ ...prev, briefings: true }));
@@ -2446,7 +2447,7 @@ useEffect(() => {
       };
       const response = await briefingApi.getAllBriefings(params);
       if (response.success) {
-        const filteredBriefings = response.briefings.filter((briefing: StaffBriefing) => 
+        const filteredBriefings = response.briefings.filter((briefing: StaffBriefing) =>
           managerAssignedSiteNames.includes(briefing.site)
         );
         setStaffBriefings(filteredBriefings);
@@ -2459,7 +2460,7 @@ useEffect(() => {
       setLoadingData(prev => ({ ...prev, briefings: false }));
     }
   };
-  
+
   const filterDataBySite = (siteName: string) => {
     const selectedSite = sites.find(site => site.name === siteName);
     if (!selectedSite) {
@@ -2468,40 +2469,40 @@ useEffect(() => {
       setFilteredEmployees([]);
       return;
     }
-    const siteSupervisors = supervisors.filter(sup => 
+    const siteSupervisors = supervisors.filter(sup =>
       sup.assignedSites?.includes(selectedSite._id) || sup.site === siteName
     );
     setFilteredSupervisors(siteSupervisors);
-    const siteManagers = managers.filter(mgr => 
+    const siteManagers = managers.filter(mgr =>
       mgr.assignedSites?.includes(selectedSite._id) || mgr.site === siteName
     );
     setFilteredManagers(siteManagers);
-    const siteEmployees = employees.filter(emp => 
+    const siteEmployees = employees.filter(emp =>
       emp.siteName === siteName || emp.assignedSites?.includes(selectedSite._id)
     );
     setFilteredEmployees(siteEmployees);
   };
-  
+
   // Handle file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     setAttachments(prev => [...prev, ...files]);
     toast.success(`${files.length} file(s) added`);
   };
-  
+
   // Remove attachment
   const removeAttachment = (index: number) => {
     setAttachments(prev => prev.filter((_, i) => i !== index));
     toast.info('File removed');
   };
-  
+
   // Edit mode file handlers
   const handleEditTrainingFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const newAttachments = files.map(file => ({
       name: file.name,
-      type: file.type.startsWith('image/') ? 'image' as const : 
-            file.type.startsWith('video/') ? 'video' as const : 'document' as const,
+      type: file.type.startsWith('image/') ? 'image' as const :
+        file.type.startsWith('video/') ? 'video' as const : 'document' as const,
       url: URL.createObjectURL(file),
       size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
       isNew: true,
@@ -2511,13 +2512,13 @@ useEffect(() => {
     setEditTrainingNewFiles(prev => [...prev, ...files]);
     toast.success(`${files.length} file(s) added to training`);
   };
-  
+
   const handleEditBriefingFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const newAttachments = files.map(file => ({
       name: file.name,
-      type: file.type.startsWith('image/') ? 'image' as const : 
-            file.type.startsWith('video/') ? 'video' as const : 'document' as const,
+      type: file.type.startsWith('image/') ? 'image' as const :
+        file.type.startsWith('video/') ? 'video' as const : 'document' as const,
       url: URL.createObjectURL(file),
       size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
       isNew: true,
@@ -2527,7 +2528,7 @@ useEffect(() => {
     setEditBriefingNewFiles(prev => [...prev, ...files]);
     toast.success(`${files.length} file(s) added to briefing`);
   };
-  
+
   const removeEditTrainingAttachment = (index: number) => {
     const attachment = editTrainingAttachments[index];
     if (attachment.isNew && attachment.url) {
@@ -2539,7 +2540,7 @@ useEffect(() => {
     }
     toast.info('File removed');
   };
-  
+
   const removeEditBriefingAttachment = (index: number) => {
     const attachment = editBriefingAttachments[index];
     if (attachment.isNew && attachment.url) {
@@ -2551,7 +2552,7 @@ useEffect(() => {
     }
     toast.info('File removed');
   };
-  
+
   // Supervisor selection handlers
   const handleSupervisorToggle = (supervisorId: string) => {
     setSelectedSupervisors(prev => {
@@ -2562,7 +2563,7 @@ useEffect(() => {
       }
     });
   };
-  
+
   // Manager selection handlers
   const handleManagerToggle = (managerId: string) => {
     setSelectedManagers(prev => {
@@ -2573,7 +2574,7 @@ useEffect(() => {
       }
     });
   };
-  
+
   // Employee selection handlers
   const handleEmployeeToggle = (employeeId: string) => {
     setSelectedEmployees(prev => {
@@ -2584,7 +2585,7 @@ useEffect(() => {
       }
     });
   };
-  
+
   // Edit mode supervisor selection handlers
   const handleEditSupervisorToggle = (supervisorId: string) => {
     setEditSelectedSupervisors(prev => {
@@ -2595,7 +2596,7 @@ useEffect(() => {
       }
     });
   };
-  
+
   // Edit mode manager selection handlers
   const handleEditManagerToggle = (managerId: string) => {
     setEditSelectedManagers(prev => {
@@ -2606,239 +2607,239 @@ useEffect(() => {
       }
     });
   };
-  
+
   // Add training session
   const handleAddTraining = async () => {
-  if (!trainingForm.title || !trainingForm.date || !trainingForm.trainer) {
-    toast.error('Please fill in all required fields');
-    return;
-  }
-  
-  // ✅ REMOVED: Supervisor and Manager validation
-  // No longer require supervisors or managers
-  
-  try {
-    setLoading(true);
-    
-    // ✅ supervisors and managers can be empty arrays
-    const supervisorsList = [];
-    const managersList = [];
-    
-    const trainingData = {
-      title: trainingForm.title,
-      description: trainingForm.description,
-      type: trainingForm.type,
-      date: trainingForm.date,
-      time: trainingForm.time,
-      duration: trainingForm.duration,
-      trainer: trainingForm.trainer,
-      site: trainingForm.site,
-      department: trainingForm.department,
-      maxAttendees: trainingForm.maxAttendees,
-      location: trainingForm.location,
-      objectives: trainingForm.objectives.filter(obj => obj.trim() !== ''),
-      supervisors: supervisorsList,
-      managers: managersList,
-      attendees: selectedEmployees
-    };
-    
-    const response = await trainingApi.createTraining(trainingData, attachments);
-    
-    if (response.success) {
-      toast.success('Training session added successfully');
-      await fetchTrainings();
-      resetTrainingForm();
-      setAttachments([]);
-      setShowAddTraining(false);
-    } else {
-      throw new Error(response.message || 'Failed to create training');
+    if (!trainingForm.title || !trainingForm.date || !trainingForm.trainer) {
+      toast.error('Please fill in all required fields');
+      return;
     }
-  } catch (error: any) {
-    console.error('Error creating training:', error);
-    toast.error(error.response?.data?.message || error.message || 'Error adding training session');
-  } finally {
-    setLoading(false);
-  }
-};
-  
+
+    // ✅ REMOVED: Supervisor and Manager validation
+    // No longer require supervisors or managers
+
+    try {
+      setLoading(true);
+
+      // ✅ supervisors and managers can be empty arrays
+      const supervisorsList = [];
+      const managersList = [];
+
+      const trainingData = {
+        title: trainingForm.title,
+        description: trainingForm.description,
+        type: trainingForm.type,
+        date: trainingForm.date,
+        time: trainingForm.time,
+        duration: trainingForm.duration,
+        trainer: trainingForm.trainer,
+        site: trainingForm.site,
+        department: trainingForm.department,
+        maxAttendees: trainingForm.maxAttendees,
+        location: trainingForm.location,
+        objectives: trainingForm.objectives.filter(obj => obj.trim() !== ''),
+        supervisors: supervisorsList,
+        managers: managersList,
+        attendees: selectedEmployees
+      };
+
+      const response = await trainingApi.createTraining(trainingData, attachments);
+
+      if (response.success) {
+        toast.success('Training session added successfully');
+        await fetchTrainings();
+        resetTrainingForm();
+        setAttachments([]);
+        setShowAddTraining(false);
+      } else {
+        throw new Error(response.message || 'Failed to create training');
+      }
+    } catch (error: any) {
+      console.error('Error creating training:', error);
+      toast.error(error.response?.data?.message || error.message || 'Error adding training session');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Add staff briefing
-const handleAddBriefing = async () => {
-  if (!briefingForm.date || !briefingForm.conductedBy || !briefingForm.site) {
-    toast.error('Please fill in all required fields');
-    return;
-  }
-  
-  // ✅ REMOVED: Supervisor and Manager validation
-  // No longer require supervisors or managers
-  
-  try {
-    setLoading(true);
-    
-    // ✅ supervisors and managers can be empty arrays
-    const supervisorsList = [];
-    const managersList = [];
-    
-    const actionItems = briefingForm.actionItems.map(item => ({ 
-      description: item.description, 
-      assignedTo: item.assignedTo, 
-      dueDate: item.dueDate, 
-      status: item.status || 'pending', 
-      priority: item.priority || 'medium' 
-    }));
-    
-    const briefingData = {
-      date: briefingForm.date,
-      time: briefingForm.time,
-      conductedBy: briefingForm.conductedBy,
-      site: briefingForm.site,
-      department: briefingForm.department,
-      attendeesCount: briefingForm.attendeesCount,
-      topics: briefingForm.topics.filter(topic => topic.trim() !== ''),
-      keyPoints: briefingForm.keyPoints.filter(point => point.trim() !== ''),
-      actionItems: actionItems,
-      notes: briefingForm.notes,
-      shift: briefingForm.shift,
-      supervisors: supervisorsList,
-      managers: managersList
-    };
-    
-    const response = await briefingApi.createBriefing(briefingData, attachments);
-    
-    if (response.success) {
-      toast.success('Staff briefing added successfully');
-      await fetchBriefings();
-      resetBriefingForm();
-      setAttachments([]);
-      setShowAddBriefing(false);
-    } else {
-      throw new Error(response.message || 'Failed to create briefing');
+  const handleAddBriefing = async () => {
+    if (!briefingForm.date || !briefingForm.conductedBy || !briefingForm.site) {
+      toast.error('Please fill in all required fields');
+      return;
     }
-  } catch (error: any) {
-    console.error('Error creating briefing:', error);
-    toast.error(error.response?.data?.message || error.message || 'Error adding staff briefing');
-  } finally {
-    setLoading(false);
-  }
-};
-  
+
+    // ✅ REMOVED: Supervisor and Manager validation
+    // No longer require supervisors or managers
+
+    try {
+      setLoading(true);
+
+      // ✅ supervisors and managers can be empty arrays
+      const supervisorsList = [];
+      const managersList = [];
+
+      const actionItems = briefingForm.actionItems.map(item => ({
+        description: item.description,
+        assignedTo: item.assignedTo,
+        dueDate: item.dueDate,
+        status: item.status || 'pending',
+        priority: item.priority || 'medium'
+      }));
+
+      const briefingData = {
+        date: briefingForm.date,
+        time: briefingForm.time,
+        conductedBy: briefingForm.conductedBy,
+        site: briefingForm.site,
+        department: briefingForm.department,
+        attendeesCount: briefingForm.attendeesCount,
+        topics: briefingForm.topics.filter(topic => topic.trim() !== ''),
+        keyPoints: briefingForm.keyPoints.filter(point => point.trim() !== ''),
+        actionItems: actionItems,
+        notes: briefingForm.notes,
+        shift: briefingForm.shift,
+        supervisors: supervisorsList,
+        managers: managersList
+      };
+
+      const response = await briefingApi.createBriefing(briefingData, attachments);
+
+      if (response.success) {
+        toast.success('Staff briefing added successfully');
+        await fetchBriefings();
+        resetBriefingForm();
+        setAttachments([]);
+        setShowAddBriefing(false);
+      } else {
+        throw new Error(response.message || 'Failed to create briefing');
+      }
+    } catch (error: any) {
+      console.error('Error creating briefing:', error);
+      toast.error(error.response?.data?.message || error.message || 'Error adding staff briefing');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Update training
- const handleUpdateTraining = async () => {
-  if (!editingTraining) return;
-  
-  try {
-    setLoading(true);
-    
-    // ✅ supervisors and managers can be empty arrays
-    const supervisorsList = [];
-    const managersList = [];
-    
-    const existingAttachments = editTrainingAttachments
-      .filter(att => !att.isNew)
-      .map(({ isNew, file, ...rest }) => rest);
-    
-    const newFiles = editTrainingNewFiles;
-    
-    const updateData = {
-      title: editTrainingForm.title,
-      description: editTrainingForm.description,
-      type: editTrainingForm.type,
-      date: editTrainingForm.date,
-      time: editTrainingForm.time,
-      duration: editTrainingForm.duration,
-      trainer: editTrainingForm.trainer,
-      site: editTrainingForm.site,
-      department: editTrainingForm.department,
-      maxAttendees: editTrainingForm.maxAttendees,
-      location: editTrainingForm.location,
-      objectives: editTrainingForm.objectives.filter(obj => obj.trim() !== ''),
-      supervisors: supervisorsList,
-      managers: managersList,
-      attachments: existingAttachments
-    };
-    
-    const response = await trainingApi.updateTraining(editingTraining._id, updateData, newFiles);
-    
-    if (response.success) {
-      toast.success('Training session updated successfully');
-      await fetchTrainings();
-      setShowEditTrainingDialog(false);
-      setEditingTraining(null);
-      resetEditTrainingForm();
-      setEditTrainingAttachments([]);
-      setEditTrainingNewFiles([]);
-    } else {
-      throw new Error(response.message || 'Failed to update training');
+  const handleUpdateTraining = async () => {
+    if (!editingTraining) return;
+
+    try {
+      setLoading(true);
+
+      // ✅ supervisors and managers can be empty arrays
+      const supervisorsList = [];
+      const managersList = [];
+
+      const existingAttachments = editTrainingAttachments
+        .filter(att => !att.isNew)
+        .map(({ isNew, file, ...rest }) => rest);
+
+      const newFiles = editTrainingNewFiles;
+
+      const updateData = {
+        title: editTrainingForm.title,
+        description: editTrainingForm.description,
+        type: editTrainingForm.type,
+        date: editTrainingForm.date,
+        time: editTrainingForm.time,
+        duration: editTrainingForm.duration,
+        trainer: editTrainingForm.trainer,
+        site: editTrainingForm.site,
+        department: editTrainingForm.department,
+        maxAttendees: editTrainingForm.maxAttendees,
+        location: editTrainingForm.location,
+        objectives: editTrainingForm.objectives.filter(obj => obj.trim() !== ''),
+        supervisors: supervisorsList,
+        managers: managersList,
+        attachments: existingAttachments
+      };
+
+      const response = await trainingApi.updateTraining(editingTraining._id, updateData, newFiles);
+
+      if (response.success) {
+        toast.success('Training session updated successfully');
+        await fetchTrainings();
+        setShowEditTrainingDialog(false);
+        setEditingTraining(null);
+        resetEditTrainingForm();
+        setEditTrainingAttachments([]);
+        setEditTrainingNewFiles([]);
+      } else {
+        throw new Error(response.message || 'Failed to update training');
+      }
+    } catch (error: any) {
+      console.error('Error updating training:', error);
+      toast.error(error.response?.data?.message || error.message || 'Error updating training session');
+    } finally {
+      setLoading(false);
     }
-  } catch (error: any) {
-    console.error('Error updating training:', error);
-    toast.error(error.response?.data?.message || error.message || 'Error updating training session');
-  } finally {
-    setLoading(false);
-  }
-};
-  
- const handleUpdateBriefing = async () => {
-  if (!editingBriefing) return;
-  
-  try {
-    setLoading(true);
-    
-    // ✅ supervisors and managers can be empty arrays
-    const supervisorsList = [];
-    const managersList = [];
-    
-    const actionItems = editBriefingForm.actionItems.map(item => ({ 
-      description: item.description, 
-      assignedTo: item.assignedTo, 
-      dueDate: item.dueDate, 
-      status: item.status || 'pending', 
-      priority: item.priority || 'medium' 
-    }));
-    
-    const existingAttachments = editBriefingAttachments
-      .filter(att => !att.isNew)
-      .map(({ isNew, file, ...rest }) => rest);
-    
-    const newFiles = editBriefingNewFiles;
-    
-    const updateData = {
-      date: editBriefingForm.date,
-      time: editBriefingForm.time,
-      conductedBy: editBriefingForm.conductedBy,
-      site: editBriefingForm.site,
-      department: editBriefingForm.department,
-      attendeesCount: editBriefingForm.attendeesCount,
-      topics: editBriefingForm.topics.filter(topic => topic.trim() !== ''),
-      keyPoints: editBriefingForm.keyPoints.filter(point => point.trim() !== ''),
-      actionItems: actionItems,
-      notes: editBriefingForm.notes,
-      shift: editBriefingForm.shift,
-      supervisors: supervisorsList,
-      managers: managersList,
-      attachments: existingAttachments
-    };
-    
-    const response = await briefingApi.updateBriefing(editingBriefing._id, updateData, newFiles);
-    
-    if (response.success) {
-      toast.success('Staff briefing updated successfully');
-      await fetchBriefings();
-      setShowEditBriefingDialog(false);
-      setEditingBriefing(null);
-      resetEditBriefingForm();
-      setEditBriefingAttachments([]);
-      setEditBriefingNewFiles([]);
-    } else {
-      throw new Error(response.message || 'Failed to update briefing');
+  };
+
+  const handleUpdateBriefing = async () => {
+    if (!editingBriefing) return;
+
+    try {
+      setLoading(true);
+
+      // ✅ supervisors and managers can be empty arrays
+      const supervisorsList = [];
+      const managersList = [];
+
+      const actionItems = editBriefingForm.actionItems.map(item => ({
+        description: item.description,
+        assignedTo: item.assignedTo,
+        dueDate: item.dueDate,
+        status: item.status || 'pending',
+        priority: item.priority || 'medium'
+      }));
+
+      const existingAttachments = editBriefingAttachments
+        .filter(att => !att.isNew)
+        .map(({ isNew, file, ...rest }) => rest);
+
+      const newFiles = editBriefingNewFiles;
+
+      const updateData = {
+        date: editBriefingForm.date,
+        time: editBriefingForm.time,
+        conductedBy: editBriefingForm.conductedBy,
+        site: editBriefingForm.site,
+        department: editBriefingForm.department,
+        attendeesCount: editBriefingForm.attendeesCount,
+        topics: editBriefingForm.topics.filter(topic => topic.trim() !== ''),
+        keyPoints: editBriefingForm.keyPoints.filter(point => point.trim() !== ''),
+        actionItems: actionItems,
+        notes: editBriefingForm.notes,
+        shift: editBriefingForm.shift,
+        supervisors: supervisorsList,
+        managers: managersList,
+        attachments: existingAttachments
+      };
+
+      const response = await briefingApi.updateBriefing(editingBriefing._id, updateData, newFiles);
+
+      if (response.success) {
+        toast.success('Staff briefing updated successfully');
+        await fetchBriefings();
+        setShowEditBriefingDialog(false);
+        setEditingBriefing(null);
+        resetEditBriefingForm();
+        setEditBriefingAttachments([]);
+        setEditBriefingNewFiles([]);
+      } else {
+        throw new Error(response.message || 'Failed to update briefing');
+      }
+    } catch (error: any) {
+      console.error('Error updating briefing:', error);
+      toast.error(error.response?.data?.message || error.message || 'Error updating staff briefing');
+    } finally {
+      setLoading(false);
     }
-  } catch (error: any) {
-    console.error('Error updating briefing:', error);
-    toast.error(error.response?.data?.message || error.message || 'Error updating staff briefing');
-  } finally {
-    setLoading(false);
-  }
-};
-  
+  };
+
   // Delete training session
   const deleteTraining = async (id: string) => {
     try {
@@ -2849,7 +2850,7 @@ const handleAddBriefing = async () => {
       toast.error(error.response?.data?.message || 'Error deleting training session');
     }
   };
-  
+
   // Delete briefing
   const deleteBriefing = async (id: string) => {
     try {
@@ -2860,7 +2861,7 @@ const handleAddBriefing = async () => {
       toast.error(error.response?.data?.message || 'Error deleting staff briefing');
     }
   };
-  
+
   // Update training status
   const updateTrainingStatus = async (id: string, status: TrainingSession['status']) => {
     try {
@@ -2871,7 +2872,7 @@ const handleAddBriefing = async () => {
       toast.error(error.response?.data?.message || 'Error updating training status');
     }
   };
-  
+
   // Update action item status
   const updateActionItemStatus = async (briefingId: string, actionItemId: string, status: ActionItem['status']) => {
     try {
@@ -2882,7 +2883,7 @@ const handleAddBriefing = async () => {
       toast.error(error.response?.data?.message || 'Error updating action item status');
     }
   };
-  
+
   // Open edit dialogs
   const openEditTrainingDialog = (training: TrainingSession) => {
     setEditingTraining(training);
@@ -2902,17 +2903,17 @@ const handleAddBriefing = async () => {
     });
     setEditSelectedSupervisors(training.supervisors?.map(s => s.id) || []);
     setEditSelectedManagers(training.managers?.map(m => m.id) || []);
-    
+
     const existingAttachments = (training.attachments || []).map(att => ({
       ...att,
       isNew: false
     }));
     setEditTrainingAttachments(existingAttachments);
     setEditTrainingNewFiles([]);
-    
+
     setShowEditTrainingDialog(true);
   };
-  
+
   const openEditBriefingDialog = (briefing: StaffBriefing) => {
     setEditingBriefing(briefing);
     setEditBriefingForm({
@@ -2930,17 +2931,17 @@ const handleAddBriefing = async () => {
     });
     setEditSelectedSupervisors(briefing.supervisors?.map(s => s.id) || []);
     setEditSelectedManagers(briefing.managers?.map(m => m.id) || []);
-    
+
     const existingAttachments = (briefing.attachments || []).map(att => ({
       ...att,
       isNew: false
     }));
     setEditBriefingAttachments(existingAttachments);
     setEditBriefingNewFiles([]);
-    
+
     setShowEditBriefingDialog(true);
   };
-  
+
   // Reset forms
   const resetTrainingForm = () => {
     setTrainingForm({
@@ -2964,7 +2965,7 @@ const handleAddBriefing = async () => {
     setManagerSearchQuery("");
     setEmployeeSearchQuery("");
   };
-  
+
   const resetBriefingForm = () => {
     setBriefingForm({
       date: '',
@@ -2984,7 +2985,7 @@ const handleAddBriefing = async () => {
     setSupervisorSearchQuery("");
     setManagerSearchQuery("");
   };
-  
+
   const resetEditTrainingForm = () => {
     setEditTrainingForm({
       title: '',
@@ -3003,7 +3004,7 @@ const handleAddBriefing = async () => {
     setEditSelectedSupervisors([]);
     setEditSelectedManagers([]);
   };
-  
+
   const resetEditBriefingForm = () => {
     setEditBriefingForm({
       date: '',
@@ -3021,7 +3022,7 @@ const handleAddBriefing = async () => {
     setEditSelectedSupervisors([]);
     setEditSelectedManagers([]);
   };
-  
+
   // Add objective field
   const addObjective = () => {
     setTrainingForm(prev => ({
@@ -3029,7 +3030,7 @@ const handleAddBriefing = async () => {
       objectives: [...prev.objectives, '']
     }));
   };
-  
+
   // Remove objective field
   const removeObjective = (index: number) => {
     setTrainingForm(prev => ({
@@ -3037,7 +3038,7 @@ const handleAddBriefing = async () => {
       objectives: prev.objectives.filter((_, i) => i !== index)
     }));
   };
-  
+
   // Update objective
   const updateObjective = (index: number, value: string) => {
     setTrainingForm(prev => {
@@ -3046,7 +3047,7 @@ const handleAddBriefing = async () => {
       return { ...prev, objectives: newObjectives };
     });
   };
-  
+
   // Edit objective handlers
   const addEditObjective = () => {
     setEditTrainingForm(prev => ({
@@ -3054,14 +3055,14 @@ const handleAddBriefing = async () => {
       objectives: [...prev.objectives, '']
     }));
   };
-  
+
   const removeEditObjective = (index: number) => {
     setEditTrainingForm(prev => ({
       ...prev,
       objectives: prev.objectives.filter((_, i) => i !== index)
     }));
   };
-  
+
   const updateEditObjective = (index: number, value: string) => {
     setEditTrainingForm(prev => {
       const newObjectives = [...prev.objectives];
@@ -3069,7 +3070,7 @@ const handleAddBriefing = async () => {
       return { ...prev, objectives: newObjectives };
     });
   };
-  
+
   // Add topic field
   const addTopic = () => {
     setBriefingForm(prev => ({
@@ -3077,7 +3078,7 @@ const handleAddBriefing = async () => {
       topics: [...prev.topics, '']
     }));
   };
-  
+
   // Remove topic field
   const removeTopic = (index: number) => {
     setBriefingForm(prev => ({
@@ -3085,7 +3086,7 @@ const handleAddBriefing = async () => {
       topics: prev.topics.filter((_, i) => i !== index)
     }));
   };
-  
+
   // Update topic
   const updateTopic = (index: number, value: string) => {
     setBriefingForm(prev => {
@@ -3094,7 +3095,7 @@ const handleAddBriefing = async () => {
       return { ...prev, topics: newTopics };
     });
   };
-  
+
   // Edit topic handlers
   const addEditTopic = () => {
     setEditBriefingForm(prev => ({
@@ -3102,14 +3103,14 @@ const handleAddBriefing = async () => {
       topics: [...prev.topics, '']
     }));
   };
-  
+
   const removeEditTopic = (index: number) => {
     setEditBriefingForm(prev => ({
       ...prev,
       topics: prev.topics.filter((_, i) => i !== index)
     }));
   };
-  
+
   const updateEditTopic = (index: number, value: string) => {
     setEditBriefingForm(prev => {
       const newTopics = [...prev.topics];
@@ -3117,7 +3118,7 @@ const handleAddBriefing = async () => {
       return { ...prev, topics: newTopics };
     });
   };
-  
+
   // Add key point field
   const addKeyPoint = () => {
     setBriefingForm(prev => ({
@@ -3125,7 +3126,7 @@ const handleAddBriefing = async () => {
       keyPoints: [...prev.keyPoints, '']
     }));
   };
-  
+
   // Remove key point field
   const removeKeyPoint = (index: number) => {
     setBriefingForm(prev => ({
@@ -3133,7 +3134,7 @@ const handleAddBriefing = async () => {
       keyPoints: prev.keyPoints.filter((_, i) => i !== index)
     }));
   };
-  
+
   // Update key point
   const updateKeyPoint = (index: number, value: string) => {
     setBriefingForm(prev => {
@@ -3142,7 +3143,7 @@ const handleAddBriefing = async () => {
       return { ...prev, keyPoints: newKeyPoints };
     });
   };
-  
+
   // Edit key point handlers
   const addEditKeyPoint = () => {
     setEditBriefingForm(prev => ({
@@ -3150,14 +3151,14 @@ const handleAddBriefing = async () => {
       keyPoints: [...prev.keyPoints, '']
     }));
   };
-  
+
   const removeEditKeyPoint = (index: number) => {
     setEditBriefingForm(prev => ({
       ...prev,
       keyPoints: prev.keyPoints.filter((_, i) => i !== index)
     }));
   };
-  
+
   const updateEditKeyPoint = (index: number, value: string) => {
     setEditBriefingForm(prev => {
       const newKeyPoints = [...prev.keyPoints];
@@ -3165,7 +3166,7 @@ const handleAddBriefing = async () => {
       return { ...prev, keyPoints: newKeyPoints };
     });
   };
-  
+
   // Add action item
   const addActionItem = () => {
     setBriefingForm(prev => ({
@@ -3182,7 +3183,7 @@ const handleAddBriefing = async () => {
       ]
     }));
   };
-  
+
   // Remove action item
   const removeActionItem = (index: number) => {
     setBriefingForm(prev => ({
@@ -3190,7 +3191,7 @@ const handleAddBriefing = async () => {
       actionItems: prev.actionItems.filter((_, i) => i !== index)
     }));
   };
-  
+
   // Update action item
   const updateActionItem = (index: number, field: string, value: string) => {
     setBriefingForm(prev => {
@@ -3199,7 +3200,7 @@ const handleAddBriefing = async () => {
       return { ...prev, actionItems: newActionItems };
     });
   };
-  
+
   // Edit action item handlers
   const addEditActionItem = () => {
     setEditBriefingForm(prev => ({
@@ -3216,14 +3217,14 @@ const handleAddBriefing = async () => {
       ]
     }));
   };
-  
+
   const removeEditActionItem = (index: number) => {
     setEditBriefingForm(prev => ({
       ...prev,
       actionItems: prev.actionItems.filter((_, i) => i !== index)
     }));
   };
-  
+
   const updateEditActionItem = (index: number, field: string, value: string) => {
     setEditBriefingForm(prev => {
       const newActionItems = [...prev.actionItems];
@@ -3231,7 +3232,7 @@ const handleAddBriefing = async () => {
       return { ...prev, actionItems: newActionItems };
     });
   };
-  
+
   // Get status badge color
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -3242,7 +3243,7 @@ const handleAddBriefing = async () => {
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
     }
   };
-  
+
   // Get priority badge color
   const getPriorityBadge = (priority: string) => {
     switch (priority) {
@@ -3252,7 +3253,7 @@ const handleAddBriefing = async () => {
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
     }
   };
-  
+
   // Get shift badge color
   const getShiftBadge = (shift: string) => {
     switch (shift) {
@@ -3262,19 +3263,19 @@ const handleAddBriefing = async () => {
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
     }
   };
-  
+
   // Get type color
   const getTypeColor = (type: string) => {
     const found = trainingTypes.find(t => t.value === type);
     return found?.color || 'bg-gray-100 text-gray-800';
   };
-  
+
   // Format date
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return dateString;
-      return date.toLocaleDateString('en-US', { 
+      return date.toLocaleDateString('en-US', {
         weekday: 'short',
         year: 'numeric',
         month: 'short',
@@ -3284,7 +3285,7 @@ const handleAddBriefing = async () => {
       return dateString;
     }
   };
-  
+
   // Calendar navigation
   const nextMonth = () => {
     setCurrentMonth(prev => {
@@ -3293,7 +3294,7 @@ const handleAddBriefing = async () => {
       return newDate;
     });
   };
-  
+
   const prevMonth = () => {
     setCurrentMonth(prev => {
       const newDate = new Date(prev);
@@ -3301,11 +3302,11 @@ const handleAddBriefing = async () => {
       return newDate;
     });
   };
-  
+
   // Get events for calendar
   const getCalendarEvents = () => {
     const events = [];
-    
+
     trainingSessions.forEach(session => {
       events.push({
         id: session._id,
@@ -3316,7 +3317,7 @@ const handleAddBriefing = async () => {
         session
       });
     });
-    
+
     staffBriefings.forEach(briefing => {
       events.push({
         id: briefing._id,
@@ -3327,41 +3328,41 @@ const handleAddBriefing = async () => {
         briefing
       });
     });
-    
+
     return events;
   };
-  
+
   const calendarEvents = getCalendarEvents();
-  
+
   // Filtered lists for multi-select
-  const filteredSupervisorsList = filteredSupervisors.filter(sup => 
+  const filteredSupervisorsList = filteredSupervisors.filter(sup =>
     sup.name.toLowerCase().includes(supervisorSearchQuery.toLowerCase()) ||
     (sup.department && sup.department.toLowerCase().includes(supervisorSearchQuery.toLowerCase()))
   );
-  const filteredManagersList = filteredManagers.filter(mgr => 
+  const filteredManagersList = filteredManagers.filter(mgr =>
     mgr.name.toLowerCase().includes(managerSearchQuery.toLowerCase()) ||
     (mgr.department && mgr.department.toLowerCase().includes(managerSearchQuery.toLowerCase()))
   );
-  const filteredEmployeesList = filteredEmployees.filter(emp => 
+  const filteredEmployeesList = filteredEmployees.filter(emp =>
     emp.name.toLowerCase().includes(employeeSearchQuery.toLowerCase()) ||
     emp.employeeId.toLowerCase().includes(employeeSearchQuery.toLowerCase()) ||
     (emp.position && emp.position.toLowerCase().includes(employeeSearchQuery.toLowerCase()))
   );
-  
-  const filteredEditSupervisorsList = filteredSupervisors.filter(sup => 
+
+  const filteredEditSupervisorsList = filteredSupervisors.filter(sup =>
     sup.name.toLowerCase().includes(editSupervisorSearchQuery.toLowerCase()) ||
     (sup.department && sup.department.toLowerCase().includes(editSupervisorSearchQuery.toLowerCase()))
   );
-  const filteredEditManagersList = filteredManagers.filter(mgr => 
+  const filteredEditManagersList = filteredManagers.filter(mgr =>
     mgr.name.toLowerCase().includes(editManagerSearchQuery.toLowerCase()) ||
     (mgr.department && mgr.department.toLowerCase().includes(editManagerSearchQuery.toLowerCase()))
   );
-  
+
   // Stats calculations
   const totalTrainings = trainingSessions.length;
   const totalBriefings = staffBriefings.length;
   const completedTrainings = trainingSessions.filter(t => t.status === 'completed').length;
-  const pendingActions = staffBriefings.reduce((acc, briefing) => 
+  const pendingActions = staffBriefings.reduce((acc, briefing) =>
     acc + briefing.actionItems.filter(a => a.status === 'pending').length, 0
   );
 
@@ -3382,25 +3383,25 @@ const handleAddBriefing = async () => {
               Manage training sessions and daily staff briefings for your assigned sites
             </p>
             <div className="flex flex-wrap gap-2 mt-2">
-             {!loadingData.sites && (
-  <Badge variant="outline" className="bg-blue-50">
-    <Building className="h-3 w-3 mr-1" />
-    Your Sites: {managerAssignedSiteNames.length > 0 
-      ? managerAssignedSiteNames.join(', ') 
-      : 'No sites assigned'}
-  </Badge>
-)}
-{loadingData.sites && (
-  <Badge variant="outline" className="bg-blue-50 animate-pulse">
-    <Building className="h-3 w-3 mr-1" />
-    Loading sites...
-  </Badge>
-)}
+              {!loadingData.sites && (
+                <Badge variant="outline" className="bg-blue-50">
+                  <Building className="h-3 w-3 mr-1" />
+                  Your Sites: {managerAssignedSiteNames.length > 0
+                    ? managerAssignedSiteNames.join(', ')
+                    : 'No sites assigned'}
+                </Badge>
+              )}
+              {loadingData.sites && (
+                <Badge variant="outline" className="bg-blue-50 animate-pulse">
+                  <Building className="h-3 w-3 mr-1" />
+                  Loading sites...
+                </Badge>
+              )}
             </div>
           </div>
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setViewMode(viewMode === 'list' ? 'calendar' : 'list')}
               className="flex-1 sm:flex-none min-w-[100px]"
               disabled={loading}
@@ -3419,7 +3420,7 @@ const handleAddBriefing = async () => {
                 </>
               )}
             </Button>
-            
+
             <Dialog open={showAddTraining} onOpenChange={setShowAddTraining}>
               <DialogTrigger asChild>
                 <Button className="flex-1 sm:flex-none min-w-[100px]" disabled={loading}>
@@ -3435,8 +3436,8 @@ const handleAddBriefing = async () => {
                     Schedule a new training session for your team.
                   </DialogDescription>
                 </DialogHeader>
-                
-                <AddTrainingFormComponent 
+
+                <AddTrainingFormComponent
                   trainingForm={trainingForm}
                   setTrainingForm={setTrainingForm}
                   addObjective={addObjective}
@@ -3444,9 +3445,9 @@ const handleAddBriefing = async () => {
                   updateObjective={updateObjective}
                   sites={sites}
                 />
-                
-               
-                <EmployeesMultiSelect 
+
+
+                <EmployeesMultiSelect
                   selected={selectedEmployees}
                   onToggle={handleEmployeeToggle}
                   searchQuery={employeeSearchQuery}
@@ -3454,13 +3455,13 @@ const handleAddBriefing = async () => {
                   disabled={!trainingForm.site}
                   filteredEmployeesList={filteredEmployeesList}
                 />
-                <AttachmentsSection 
+                <AttachmentsSection
                   attachments={attachments}
                   onUpload={handleFileUpload}
                   onRemove={removeAttachment}
                   fileInputRef={fileInputRef}
                 />
-                
+
                 <DialogFooter className="flex-col sm:flex-row gap-2">
                   <DialogClose asChild>
                     <Button variant="outline" className="w-full sm:w-auto">Cancel</Button>
@@ -3472,7 +3473,7 @@ const handleAddBriefing = async () => {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-            
+
             <Dialog open={showAddBriefing} onOpenChange={setShowAddBriefing}>
               <DialogTrigger asChild>
                 <Button variant="secondary" className="flex-1 sm:flex-none min-w-[100px]" disabled={loading}>
@@ -3488,8 +3489,8 @@ const handleAddBriefing = async () => {
                     Record daily staff briefing details and action items.
                   </DialogDescription>
                 </DialogHeader>
-                
-                <AddBriefingFormComponent 
+
+                <AddBriefingFormComponent
                   briefingForm={briefingForm}
                   setBriefingForm={setBriefingForm}
                   addTopic={addTopic}
@@ -3500,20 +3501,20 @@ const handleAddBriefing = async () => {
                   updateKeyPoint={updateKeyPoint}
                   sites={sites}
                 />
-               
-                <ActionItemsSection 
+
+                <ActionItemsSection
                   actionItems={briefingForm.actionItems}
                   onAdd={addActionItem}
                   onRemove={removeActionItem}
                   onUpdate={updateActionItem}
                 />
-                <AttachmentsSection 
+                <AttachmentsSection
                   attachments={attachments}
                   onUpload={handleFileUpload}
                   onRemove={removeAttachment}
                   fileInputRef={fileInputRef}
                 />
-                
+
                 <DialogFooter className="flex-col sm:flex-row gap-2">
                   <DialogClose asChild>
                     <Button variant="outline" className="w-full sm:w-auto">Cancel</Button>
@@ -3579,7 +3580,7 @@ const handleAddBriefing = async () => {
                       className="w-full sm:w-64 text-sm"
                     />
                   </div>
-                  
+
                   <div className="flex flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <Filter className="h-4 w-4 text-gray-400 flex-shrink-0" />
@@ -3595,7 +3596,7 @@ const handleAddBriefing = async () => {
                         </SelectContent>
                       </Select>
                     </div>
-                    
+
                     {activeTab === 'training' && (
                       <Select value={filterStatus} onValueChange={setFilterStatus}>
                         <SelectTrigger className="w-28 sm:w-32 text-sm">
@@ -3610,7 +3611,7 @@ const handleAddBriefing = async () => {
                         </SelectContent>
                       </Select>
                     )}
-                    
+
                     <Button variant="outline" size="sm" className="text-sm" disabled={loading}>
                       <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                       <span className="hidden xs:inline">Export</span>
@@ -3682,7 +3683,7 @@ const handleAddBriefing = async () => {
                                           </Badge>
                                         </div>
                                       </div>
-                                      
+
                                       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
                                         <div className="flex items-center gap-2">
                                           <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
@@ -3710,13 +3711,13 @@ const handleAddBriefing = async () => {
                                         </div>
                                       </div>
                                     </div>
-                                    
+
                                     <div className="flex flex-row lg:flex-col gap-2 lg:min-w-[200px]">
                                       <Button variant="outline" size="sm" className="flex-1 lg:w-full" onClick={() => setSelectedTraining(session)}>
                                         <Eye className="h-4 w-4 mr-2" />
                                         View Details
                                       </Button>
-                                      
+
                                       {canEdit && (
                                         <>
                                           <Button variant="outline" size="sm" className="flex-1 lg:w-full" onClick={() => openEditTrainingDialog(session)}>
@@ -3737,7 +3738,7 @@ const handleAddBriefing = async () => {
                                               <SelectItem value="cancelled">Cancelled</SelectItem>
                                             </SelectContent>
                                           </Select>
-                                          
+
                                           <Button
                                             variant="ghost"
                                             size="sm"
@@ -3759,9 +3760,9 @@ const handleAddBriefing = async () => {
                         {/* Mobile View */}
                         <div className="md:hidden space-y-3">
                           {trainingSessions.map(session => (
-                            <MobileTrainingCard 
-                              key={session._id} 
-                              session={{...session, currentManagerId: managerId}} 
+                            <MobileTrainingCard
+                              key={session._id}
+                              session={{ ...session, currentManagerId: managerId }}
                               onView={setSelectedTraining}
                               onUpdateStatus={updateTrainingStatus}
                               onDelete={deleteTraining}
@@ -3840,7 +3841,7 @@ const handleAddBriefing = async () => {
                                           <p className="text-sm text-gray-600 dark:text-gray-400">{briefing.time}</p>
                                         </div>
                                       </div>
-                                      
+
                                       <div className="grid grid-cols-2 gap-4 mt-4">
                                         <div>
                                           <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Department:</p>
@@ -3852,13 +3853,13 @@ const handleAddBriefing = async () => {
                                         </div>
                                       </div>
                                     </div>
-                                    
+
                                     <div className="flex flex-row lg:flex-col gap-2 lg:min-w-[120px]">
                                       <Button variant="outline" size="sm" className="flex-1 lg:w-full" onClick={() => setSelectedBriefing(briefing)}>
                                         <Eye className="h-4 w-4 mr-2" />
                                         View
                                       </Button>
-                                      
+
                                       {canEdit && (
                                         <>
                                           <Button variant="outline" size="sm" className="flex-1 lg:w-full" onClick={() => openEditBriefingDialog(briefing)}>
@@ -3886,9 +3887,9 @@ const handleAddBriefing = async () => {
                         {/* Mobile View */}
                         <div className="md:hidden space-y-3">
                           {staffBriefings.map(briefing => (
-                            <MobileBriefingCard 
-                              key={briefing._id} 
-                              briefing={{...briefing, currentManagerId: managerId}} 
+                            <MobileBriefingCard
+                              key={briefing._id}
+                              briefing={{ ...briefing, currentManagerId: managerId }}
                               onView={setSelectedBriefing}
                               onDelete={deleteBriefing}
                               onUpdateAction={updateActionItemStatus}
@@ -3945,7 +3946,7 @@ const handleAddBriefing = async () => {
                     <span className="sm:hidden">{day}</span>
                   </div>
                 ))}
-                
+
                 {/* Placeholder calendar days */}
                 {[...Array(35)].map((_, idx) => (
                   <div
@@ -3956,7 +3957,7 @@ const handleAddBriefing = async () => {
                   </div>
                 ))}
               </div>
-              
+
               {/* Upcoming Events */}
               <div className="space-y-3 mt-6 sm:mt-8">
                 <h4 className="text-sm sm:text-base font-semibold">Upcoming Events</h4>
@@ -3975,9 +3976,9 @@ const handleAddBriefing = async () => {
                           </p>
                         </div>
                       </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         className="text-xs sm:text-sm ml-auto sm:ml-0"
                         onClick={() => {
                           if (event.type === 'training') {
@@ -3996,12 +3997,12 @@ const handleAddBriefing = async () => {
           </Card>
         </motion.div>
       )}
-      
+
       {/* Detail Dialogs */}
-      <TrainingDetailDialog 
-        training={selectedTraining} 
-        open={!!selectedTraining} 
-        onClose={() => setSelectedTraining(null)} 
+      <TrainingDetailDialog
+        training={selectedTraining}
+        open={!!selectedTraining}
+        onClose={() => setSelectedTraining(null)}
         onEdit={openEditTrainingDialog}
         onUpdateStatus={updateTrainingStatus}
         getStatusBadge={getStatusBadge}
@@ -4009,17 +4010,17 @@ const handleAddBriefing = async () => {
         formatDate={formatDate}
         trainingTypes={trainingTypes}
       />
-      <BriefingDetailDialog 
-        briefing={selectedBriefing} 
-        open={!!selectedBriefing} 
-        onClose={() => setSelectedBriefing(null)} 
+      <BriefingDetailDialog
+        briefing={selectedBriefing}
+        open={!!selectedBriefing}
+        onClose={() => setSelectedBriefing(null)}
         onEdit={openEditBriefingDialog}
         onUpdateAction={updateActionItemStatus}
         getShiftBadge={getShiftBadge}
         getPriorityBadge={getPriorityBadge}
         formatDate={formatDate}
       />
-      
+
       {/* Edit Dialogs */}
       <Dialog open={showEditTrainingDialog} onOpenChange={setShowEditTrainingDialog}>
         <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
@@ -4027,8 +4028,8 @@ const handleAddBriefing = async () => {
             <DialogTitle className="text-lg sm:text-xl">Edit Training Session</DialogTitle>
             <DialogDescription className="text-sm">Update the training session details</DialogDescription>
           </DialogHeader>
-          
-          <EditTrainingFormComponent 
+
+          <EditTrainingFormComponent
             editTrainingForm={editTrainingForm}
             setEditTrainingForm={setEditTrainingForm}
             addEditObjective={addEditObjective}
@@ -4036,15 +4037,15 @@ const handleAddBriefing = async () => {
             updateEditObjective={updateEditObjective}
             sites={sites}
           />
-          
-            
-          <AttachmentsSection 
+
+
+          <AttachmentsSection
             attachments={editTrainingAttachments}
             onUpload={handleEditTrainingFileUpload}
             onRemove={removeEditTrainingAttachment}
             fileInputRef={editTrainingFileInputRef}
           />
-          
+
           <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button variant="outline" onClick={() => setShowEditTrainingDialog(false)}>Cancel</Button>
             <Button onClick={handleUpdateTraining} disabled={loading}>
@@ -4054,15 +4055,15 @@ const handleAddBriefing = async () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
+
       <Dialog open={showEditBriefingDialog} onOpenChange={setShowEditBriefingDialog}>
         <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl">Edit Staff Briefing</DialogTitle>
             <DialogDescription className="text-sm">Update the staff briefing details</DialogDescription>
           </DialogHeader>
-          
-          <EditBriefingFormComponent 
+
+          <EditBriefingFormComponent
             editBriefingForm={editBriefingForm}
             setEditBriefingForm={setEditBriefingForm}
             addEditTopic={addEditTopic}
@@ -4073,21 +4074,21 @@ const handleAddBriefing = async () => {
             updateEditKeyPoint={updateEditKeyPoint}
             sites={sites}
           />
-         
-        
-          <ActionItemsSection 
+
+
+          <ActionItemsSection
             actionItems={editBriefingForm.actionItems}
             onAdd={addEditActionItem}
             onRemove={removeEditActionItem}
             onUpdate={updateEditActionItem}
           />
-          <AttachmentsSection 
+          <AttachmentsSection
             attachments={editBriefingAttachments}
             onUpload={handleEditBriefingFileUpload}
             onRemove={removeEditBriefingAttachment}
             fileInputRef={editBriefingFileInputRef}
           />
-          
+
           <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button variant="outline" onClick={() => setShowEditBriefingDialog(false)}>Cancel</Button>
             <Button onClick={handleUpdateBriefing} disabled={loading}>

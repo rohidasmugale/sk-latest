@@ -26,12 +26,13 @@ import {
   ChevronDown,
   ChevronUp,
   FileSpreadsheet,
+  UserCog,
 } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
 import { useRole } from "@/context/RoleContext";
 import { useOutletContext } from "react-router-dom";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 
 // ---------- API ----------
 const API_URL = import.meta.env.VITE_API_URL ||
@@ -47,6 +48,7 @@ interface Employee {
   position: string;
   siteName?: string;
   status: "active" | "inactive" | "left";
+  profileStatus?: "complete" | "incomplete";   // ✅ ADD THIS
 }
 
 interface AttendanceRecord {
@@ -201,6 +203,11 @@ const Attendance = () => {
   const [activeShiftId, setActiveShiftId] = useState<string>("");
   const [siteShifts, setSiteShifts] = useState<any[]>([]);
   const [loadingShifts, setLoadingShifts] = useState(false);
+  // ─── Employee Status Update (active/inactive/left) ───
+  const [employeeStatusDialogOpen, setEmployeeStatusDialogOpen] = useState(false);
+
+  const [newEmployeeStatus, setNewEmployeeStatus] = useState<"active" | "inactive" | "left">("active");
+  const [updatingEmployeeStatus, setUpdatingEmployeeStatus] = useState(false);
   // Data fetching
   const fetchSupervisorSites = useCallback(async () => {
     if (!currentUser) return [];
@@ -309,6 +316,34 @@ const Attendance = () => {
     }
   }, [employees, selectedDate]);
 
+  const handleOpenEmployeeStatusDialog = (emp: Employee) => {
+    setSelectedEmployeeForStatus(emp);
+    setNewEmployeeStatus(emp.status || "active");
+    setEmployeeStatusDialogOpen(true);
+  };
+  const submitEmployeeStatusUpdate = async () => {
+    if (!selectedEmployeeForStatus) return;
+
+    setUpdatingEmployeeStatus(true);
+    try {
+      const response = await axios.patch(`${API_URL}/employees/${selectedEmployeeForStatus._id}`, {
+        status: newEmployeeStatus,
+      });
+
+      if (response.data.success) {
+        toast.success(`Employee status updated to ${newEmployeeStatus}`);
+        setEmployeeStatusDialogOpen(false);
+        // Refresh employee list
+        await fetchEmployees();
+      } else {
+        toast.error(response.data.message || "Failed to update status");
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Error updating status");
+    } finally {
+      setUpdatingEmployeeStatus(false);
+    }
+  };
   useEffect(() => {
     if (currentUser && currentUser.role === "supervisor") {
       const init = async () => {
@@ -351,7 +386,14 @@ const Attendance = () => {
       default: return "bg-gray-100 text-gray-800 border-gray-200";
     }
   };
-
+  const isEmployeeIncomplete = (emp: Employee): boolean => {
+    if (emp.profileStatus) {
+      return emp.profileStatus === 'incomplete';
+    }
+    // Fallback check
+    const requiredForBadge = [emp.employeeId, emp.name, emp.phone, emp.department, emp.position, emp.dateOfBirth];
+    return requiredForBadge.some(v => v === undefined || v === null || v === '');
+  };
   const summary = {
     total: employees.length,
     present: attendanceRecords.filter(r => r.status === 'present').length,
@@ -852,7 +894,14 @@ const Attendance = () => {
                 <Card key={emp._id} className="p-3">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h4 className="font-semibold">{emp.name}</h4>
+                      <h4 className="font-semibold flex items-center gap-1">
+                        {emp.name}
+                        {isEmployeeIncomplete(emp) && (
+                          <Badge className="bg-amber-100 text-amber-800 text-[10px] border-amber-200">
+                            Incomplete
+                          </Badge>
+                        )}
+                      </h4>
                       <p className="text-xs text-muted-foreground">ID: {emp.employeeId}</p>
                       <p className="text-xs">{emp.department} • {emp.siteName}</p>
                     </div>
@@ -912,6 +961,15 @@ const Attendance = () => {
                       {/* 4. Edit (Always visible) */}
                       <Button variant="outline" size="sm" onClick={() => handleStatusUpdate(emp)}>
                         Edit
+                      </Button>
+                      {/* Employee Status Change */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-purple-600 border-purple-600 hover:bg-purple-50"
+                        onClick={() => handleOpenEmployeeStatusDialog(emp)}
+                      >
+                        <UserCog className="h-4 w-4 mr-1" /> Status
                       </Button>
                     </div>
                   </div>
@@ -991,8 +1049,15 @@ const Attendance = () => {
                   return (
                     <TableRow key={emp._id}>
                       <TableCell>
-                        <div>{emp.name}</div>
-                        <div className="text-xs text-muted-foreground">{emp.email}</div>
+                        <div className="flex items-center gap-1">
+                          {emp.name}
+                          {isEmployeeIncomplete(emp) && (
+                            <Badge className="bg-amber-100 text-amber-800 text-[10px] border-amber-200">
+                              Incomplete
+                            </Badge>
+                          )}
+                        </div>
+
                       </TableCell>
                       <TableCell>{emp.employeeId}</TableCell>
                       <TableCell>{emp.department}</TableCell>
@@ -1088,6 +1153,14 @@ const Attendance = () => {
                           <Button variant="outline" size="sm" onClick={() => handleStatusUpdate(emp)}>
                             <Save className="h-4 w-4" />
                           </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full mt-2 text-purple-600 border-purple-600"
+                            onClick={() => handleOpenEmployeeStatusDialog(emp)}
+                          >
+                            <UserCog className="h-3 w-3 mr-1" /> Change Status
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1145,7 +1218,46 @@ const Attendance = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
+      <Dialog open={employeeStatusDialogOpen} onOpenChange={setEmployeeStatusDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Employment Status – {selectedEmployeeForStatus?.name}</DialogTitle>
+            <DialogDescription>
+              Update the employee’s overall status (Active, Inactive, or Left).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-3">
+            <div>
+              <Label>Current Status</Label>
+              <Badge className="ml-2">
+                {selectedEmployeeForStatus?.status || 'active'}
+              </Badge>
+            </div>
+            <div>
+              <Label>New Status</Label>
+              <Select
+                value={newEmployeeStatus}
+                onValueChange={(val: "active" | "inactive" | "left") => setNewEmployeeStatus(val)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="left">Left</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEmployeeStatusDialogOpen(false)}>Cancel</Button>
+            <Button onClick={submitEmployeeStatusUpdate} disabled={updatingEmployeeStatus}>
+              {updatingEmployeeStatus ? "Saving..." : "Update Status"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={photoModalOpen} onOpenChange={setPhotoModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>{selectedPhotoType === 'checkin' ? 'Check-in Photo' : 'Check-out Photo'}</DialogTitle></DialogHeader>

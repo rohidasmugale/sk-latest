@@ -79,6 +79,7 @@ export interface Employee {
   authorizedSignaturePublicId?: string;
   createdAt?: string;
   updatedAt?: string;
+  profileStatus?: "complete" | "incomplete";   // ✅ ADD THIS
 }
 
 export interface LeaveRequest {

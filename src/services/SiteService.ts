@@ -37,6 +37,10 @@ export interface Site {
   shifts?: ShiftDefinition[];  // ✅ ADD THIS
   createdAt?: string;
   updatedAt?: string;
+   supervisorId?: string;
+  supervisor?: string;
+  assignedSupervisors?: string[];
+  supervisorName?: string;
 }
 
 export interface Client {
@@ -466,7 +470,11 @@ private transformSiteData(data: any): Site | null {
       isOvernight: s.isOvernight || (s.endTime && s.startTime && s.endTime < s.startTime)
     })) : [],
     createdAt: data.createdAt || data.created || new Date().toISOString(),
-    updatedAt: data.updatedAt || data.updated || new Date().toISOString()
+    updatedAt: data.updatedAt || data.updated || new Date().toISOString(),
+    supervisorId: data.supervisorId || data.supervisorId || undefined,
+    supervisor: data.supervisor || undefined,
+    assignedSupervisors: data.assignedSupervisors || undefined,
+    supervisorName: data.supervisorName || undefined,
   };
 }
 

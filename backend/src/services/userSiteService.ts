@@ -1,7 +1,7 @@
 // backend/services/userSiteService.ts
 import AssignTask from '../models/AssignTask';
 import Employee from '../models/Employee';
-import User from '../models/User'; // ✅ Import User
+import User from '../models/User';
 
 export interface UserSiteInfo {
   siteName: string | null;
@@ -49,30 +49,45 @@ export class UserSiteService {
         siteName = siteNameSet.size > 0 ? Array.from(siteNameSet)[0] : null;
         siteIds = Array.from(siteIdSet);
         assignedSites = siteIds;
-        
         console.log(`✅ Found from AssignTask: siteName=${siteName}`);
       }
     } catch (error) {
       console.log('AssignTask lookup failed, trying Employee fallback');
     }
 
-    // 2. Fallback to Employee model
+    // 2. Fallback to Employee model – FIXED: look up by userId or email
     if (!siteName || siteIds.length === 0) {
       try {
-        const employee = await Employee.findById(userId).lean();
+        // First: find Employee by userId (if your Employee schema has a userId field)
+        let employee = await Employee.findOne({ userId: userId }).lean();
+
+        // If not found, try by email (get email from User document)
+        if (!employee) {
+          const user = await User.findById(userId).lean();
+          if (user?.email) {
+            employee = await Employee.findOne({ email: user.email }).lean();
+          }
+        }
+
         if (employee) {
-          console.log(`📋 Found Employee record`);
-          
-          // ✅ Only use siteName from Employee (assignedSites doesn't exist on Employee)
+          console.log(`📋 Found Employee record via userId/email`);
+
+          // Extract siteName from Employee
           if (employee.siteName && !siteName) {
             siteName = employee.siteName;
             console.log(`✅ Found siteName from Employee: ${siteName}`);
           }
-          
-          // Check if site is a string on the employee
+
+          // If Employee has a site (alternative field)
           if ((employee as any).site && !siteName) {
             siteName = (employee as any).site;
             console.log(`✅ Found site from Employee.site: ${siteName}`);
+          }
+
+          // Optional: if Employee has assignedSites (unlikely but keep for safety)
+          if ((employee as any).assignedSites && (employee as any).assignedSites.length > 0) {
+            assignedSites = (employee as any).assignedSites;
+            siteIds = assignedSites;
           }
         }
       } catch (error) {
@@ -80,7 +95,7 @@ export class UserSiteService {
       }
     }
 
-    // 3. Fallback to User model
+    // 3. Fallback to User model (unchanged)
     if (!siteName) {
       try {
         const user = await User.findById(userId).lean();

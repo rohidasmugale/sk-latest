@@ -61,6 +61,7 @@ interface Employee {
   siteName?: string;
   status: string;
   totalHours?: number;
+  profileStatus?: "complete" | "incomplete";   // ✅ ADD THIS
 }
 
 interface AttendanceRecord {

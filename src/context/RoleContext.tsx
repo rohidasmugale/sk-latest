@@ -16,6 +16,8 @@ export interface User {
   contactNumber?: string;
   lastLogin?: string;
   [key: string]: unknown;
+   assignedSites?: string[];   // ✅ ADD THIS
+  siteName?: string;  
 }
 
 interface RoleContextType {

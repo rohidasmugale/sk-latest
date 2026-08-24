@@ -139,7 +139,7 @@ const getSidebarItems = (role: UserRole) => {
         { name: "Assign Task", icon: ClipboardList, path: "assigntask" },
         { name: "Operations", icon: Workflow, path: "operations" },
         { name: "My Sites", icon: Building2, path: "sites" },  // ADD THIS
-
+ { name: "HRMS", icon: Users, path: "hrms" },
         { name: "Leave", icon: Calendar, path: "leave" },
 
       ];
@@ -151,8 +151,10 @@ const getSidebarItems = (role: UserRole) => {
         { name: "My Tasks", icon: ClipboardList, path: "tasks" },
         { name: "Inventory", icon: Package, path: "inventory" },
         { name: "Assigned task", icon: ClipboardList, path: "assigntask" },
-
+          { name: "HRMS", icon: Users, path: "hrms" },
         { name: "Leave", icon: Calendar, path: "leave" },
+        { name: "Work Query", icon: Workflow, path: "query" },
+         { name: "Roster", icon: RotateCwSquareIcon, path: "supervisorroster" },
         { name: "Training & Briefing", icon: User2Icon, path: "supervisortraining" },
       ];
 

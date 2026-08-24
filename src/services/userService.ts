@@ -21,6 +21,7 @@ export interface User {
   status: 'active' | 'inactive';
   joinDate: string;
   photo?: string;
+ 
 }
 
 export interface CreateUserData {

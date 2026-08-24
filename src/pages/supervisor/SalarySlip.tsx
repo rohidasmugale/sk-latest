@@ -9,7 +9,7 @@ import { salarySlipApi } from '@/services/payrollApi';
 import axios from 'axios';
 import { BackButton } from '@/components/shared/BackButton';
 import { DashboardHeader } from "@/components/shared/DashboardHeader";
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 interface Employee {
@@ -121,7 +121,6 @@ export default function SupervisorSalarySlip() {
     }
   }, [supervisorSites, fetchEmployeesBySites]);
 
-  // Print function – generates HTML and opens print dialog
   const printSlip = (slip: any) => {
     const employee = employees.find(e => e.employeeId === slip.employeeId);
     if (!employee) {
@@ -135,131 +134,138 @@ export default function SupervisorSalarySlip() {
       return;
     }
 
-    const structure = {
-      da: 0,
-      hra: 0,
-      conveyance: 0,
-      specialAllowance: 0,
-      leaveEncashment: 0,
-      medicalAllowance: 0,
-      arrears: 0,
-      otherAllowances: 0,
-      providentFund: 0,
-      esic: 0,
-      advance: 0,
-      mlwf: 0,
-      professionalTax: 0,
-      // We don't have these from the slip API, but we can default or fetch from salary structure later
-    };
-
     const printContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Salary Slip - ${employee.name}</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 20px; }
-          .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
-          .company-name { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
-          .slip-title { font-size: 20px; margin-bottom: 10px; }
-          .employee-info { display: flex; justify-content: space-between; margin-bottom: 20px; }
-          .section { margin-bottom: 20px; }
-          .section-title { font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 10px; }
-          .breakdown { width: 100%; border-collapse: collapse; }
-          .breakdown td { padding: 8px; border-bottom: 1px solid #eee; }
-          .breakdown .amount { text-align: right; }
-          .total { font-weight: bold; border-top: 2px solid #333; }
-          .attendance-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; margin-top: 20px; }
-          .attendance-item { padding: 10px; border-radius: 5px; }
-          .present { background: #d1fae5; color: #065f46; }
-          .absent { background: #fee2e2; color: #991b1b; }
-          .half-day { background: #fef3c7; color: #92400e; }
-          .leaves { background: #dbeafe; color: #1e40af; }
-          @media print { body { margin: 0; } }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="company-name">S K ENTERPRISES</div>
-          <div class="slip-title">SALARY SLIP</div>
-          <div>Period: ${slip.month}</div>
-          <div>Wages Slip Rule 27(2) Maharashtra Minimum Wages Rules, 1963</div>
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Salary Slip - ${employee.name}</title>
+      <style>
+        @page {
+          size: A4 portrait;
+          margin: 10mm;
+        }
+        * {
+          box-sizing: border-box;
+        }
+        body {
+          font-family: Arial, sans-serif;
+          margin: 0;
+          padding: 0;
+          background: #fff;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
+        .company-name { font-size: 24px; font-weight: bold; }
+        .slip-title { font-size: 20px; }
+        .employee-info { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .section { margin-bottom: 20px; }
+        .section-title { font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 10px; }
+        .breakdown { width: 100%; border-collapse: collapse; }
+        .breakdown td { padding: 8px; border-bottom: 1px solid #eee; }
+        .breakdown .amount { text-align: right; }
+        .total { font-weight: bold; border-top: 2px solid #333; }
+        .attendance-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; margin-top: 20px; }
+        .attendance-item { padding: 10px; border-radius: 5px; }
+        .present { background: #d1fae5; color: #065f46; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .absent { background: #fee2e2; color: #991b1b; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .half-day { background: #fef3c7; color: #92400e; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .leaves { background: #dbeafe; color: #1e40af; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        @media print { 
+          body { margin: 0; } 
+          .present, .absent, .half-day, .leaves { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div class="company-name">S K ENTERPRISES</div>
+        <div class="slip-title">SALARY SLIP</div>
+        <div>Period: ${slip.month}</div>
+        <div>Wages Slip Rule 27(2) Maharashtra Minimum Wages Rules, 1963</div>
+      </div>
+      
+      <div class="employee-info">
+        <div>
+          <strong>Name:</strong> ${employee.name}<br>
+          <strong>Employee ID:</strong> ${employee.employeeId}<br>
+          <strong>Department:</strong> ${employee.department || 'N/A'}<br>
+          <strong>Bank Account:</strong> ${employee.accountNumber || 'N/A'}<br>
+          <strong>Bank:</strong> ${employee.bankName || 'N/A'} - ${employee.bankBranch || 'N/A'}
         </div>
-        
-        <div class="employee-info">
-          <div>
-            <strong>Name:</strong> ${employee.name}<br>
-            <strong>Employee ID:</strong> ${employee.employeeId}<br>
-            <strong>Department:</strong> ${employee.department}<br>
-            <strong>Bank Account:</strong> ${employee.accountNumber || 'N/A'}<br>
-            <strong>Bank:</strong> ${employee.bankName || 'N/A'} - ${employee.bankBranch || 'N/A'}
-          </div>
-          <div>
-            <strong>Generated Date:</strong> ${new Date(slip.generatedDate).toLocaleDateString()}<br>
-            <strong>Slip Number:</strong> ${slip.slipNumber}<br>
-            <strong>Aadhar:</strong> ${employee.aadharNumber || 'N/A'}<br>
-            <strong>PAN:</strong> ${employee.panNumber || 'N/A'}
-          </div>
+        <div>
+          <strong>Generated Date:</strong> ${new Date(slip.generatedDate).toLocaleDateString()}<br>
+          <strong>Slip Number:</strong> ${slip.slipNumber}<br>
+          <strong>Aadhar:</strong> ${employee.aadharNumber || 'N/A'}<br>
+          <strong>PAN:</strong> ${employee.panNumber || 'N/A'}
         </div>
+      </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-          <div class="section">
-            <div class="section-title">EARNINGS</div>
-            <table class="breakdown">
-              <tr><td>BASIC</td><td class="amount">₹${slip.basicSalary.toLocaleString()}</td></tr>
-              <tr><td>DA</td><td class="amount">₹0</td></tr>
-              <tr><td>HRA</td><td class="amount">₹0</td></tr>
-              <tr><td>CCA</td><td class="amount">₹0</td></tr>
-              <tr><td>BONUS</td><td class="amount">₹0</td></tr>
-              <tr><td>LEAVE</td><td class="amount">₹0</td></tr>
-              <tr><td>MEDICAL</td><td class="amount">₹0</td></tr>
-              <tr><td>ARREARS</td><td class="amount">₹0</td></tr>
-              <tr><td>OTHER ALL</td><td class="amount">₹0</td></tr>
-              <tr class="total"><td><strong>TOTAL EARNINGS</strong></td><td class="amount"><strong>₹${slip.allowances.toLocaleString()}</strong></td></tr>
-            </table>
-          </div>
-
-          <div class="section">
-            <div class="section-title">DEDUCTIONS</div>
-            <table class="breakdown">
-              <tr><td>PF</td><td class="amount">-₹0</td></tr>
-              <tr><td>ESIC</td><td class="amount">-₹0</td></tr>
-              <tr><td>ADVANCE</td><td class="amount">-₹0</td></tr>
-              <tr><td>MLWF</td><td class="amount">-₹0</td></tr>
-              <tr><td>Profession Tax</td><td class="amount">-₹0</td></tr>
-              <tr class="total"><td><strong>TOTAL DEDUCTIONS</strong></td><td class="amount"><strong>-₹${slip.deductions.toLocaleString()}</strong></td></tr>
-            </table>
-          </div>
-        </div>
-
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
         <div class="section">
-          <div class="section-title">NET SALARY</div>
+          <div class="section-title">EARNINGS</div>
           <table class="breakdown">
-            <tr class="total"><td><strong>NET PAYABLE</strong></td><td class="amount"><strong>₹${slip.netSalary.toLocaleString()}</strong></td></tr>
+            <tr><td>BASIC</td><td class="amount">₹${slip.basicSalary.toLocaleString()}</td></tr>
+            <tr><td>DA</td><td class="amount">₹0</td></tr>
+            <tr><td>HRA</td><td class="amount">₹0</td></tr>
+            <tr><td>CCA</td><td class="amount">₹0</td></tr>
+            <tr><td>BONUS</td><td class="amount">₹0</td></tr>
+            <tr><td>LEAVE</td><td class="amount">₹0</td></tr>
+            <tr><td>MEDICAL</td><td class="amount">₹0</td></tr>
+            <tr><td>ARREARS</td><td class="amount">₹0</td></tr>
+            <tr><td>OTHER ALL</td><td class="amount">₹0</td></tr>
+            <tr class="total"><td><strong>TOTAL EARNINGS</strong></td><td class="amount"><strong>₹${slip.allowances.toLocaleString()}</strong></td></tr>
           </table>
         </div>
 
         <div class="section">
-          <div class="section-title">Attendance Summary</div>
-          <div class="attendance-grid">
-            <div class="attendance-item present"><div style="font-size:18px;font-weight:bold;">${slip.presentDays}</div><div>Present</div></div>
-            <div class="attendance-item absent"><div style="font-size:18px;font-weight:bold;">${slip.absentDays}</div><div>Absent</div></div>
-            <div class="attendance-item half-day"><div style="font-size:18px;font-weight:bold;">${slip.halfDays}</div><div>Half Days</div></div>
-            <div class="attendance-item leaves"><div style="font-size:18px;font-weight:bold;">${slip.leaves}</div><div>Leaves</div></div>
-          </div>
+          <div class="section-title">DEDUCTIONS</div>
+          <table class="breakdown">
+            <tr><td>PF</td><td class="amount">-₹0</td></tr>
+            <tr><td>ESIC</td><td class="amount">-₹0</td></tr>
+            <tr><td>ADVANCE</td><td class="amount">-₹0</td></tr>
+            <tr><td>MLWF</td><td class="amount">-₹0</td></tr>
+            <tr><td>Profession Tax</td><td class="amount">-₹0</td></tr>
+            <tr class="total"><td><strong>TOTAL DEDUCTIONS</strong></td><td class="amount"><strong>-₹${slip.deductions.toLocaleString()}</strong></td></tr>
+          </table>
         </div>
+      </div>
 
-        <div style="margin-top:30px;text-align:center;color:#666;font-size:12px;">
-          <p>Office No 505, Global Square, Deccan College Road, Yerwada, Pune 411006</p>
-          <p>THIS IS COMPUTER GENERATED SLIP NOT REQUIRED SIGNATURE & STAMP</p>
+      <div class="section">
+        <div class="section-title">NET SALARY</div>
+        <table class="breakdown">
+          <tr class="total"><td><strong>NET PAYABLE</strong></td><td class="amount"><strong>₹${slip.netSalary.toLocaleString()}</strong></td></tr>
+        </table>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Attendance Summary</div>
+        <div class="attendance-grid">
+          <div class="attendance-item present"><div style="font-size:18px;font-weight:bold;">${slip.presentDays}</div><div>Present</div></div>
+          <div class="attendance-item absent"><div style="font-size:18px;font-weight:bold;">${slip.absentDays}</div><div>Absent</div></div>
+          <div class="attendance-item half-day"><div style="font-size:18px;font-weight:bold;">${slip.halfDays}</div><div>Half Days</div></div>
+          <div class="attendance-item leaves"><div style="font-size:18px;font-weight:bold;">${slip.leaves}</div><div>Leaves</div></div>
         </div>
-      </body>
-      </html>
-    `;
+      </div>
+
+      <div style="margin-top:30px;text-align:center;color:#666;font-size:12px;">
+        <p>Office No 505, Global Square, Deccan College Road, Yerwada, Pune 411006</p>
+        <p>THIS IS COMPUTER GENERATED SLIP NOT REQUIRED SIGNATURE & STAMP</p>
+      </div>
+    </body>
+    </html>
+  `;
 
     printWindow.document.write(printContent);
     printWindow.document.close();
-    printWindow.print();
+
+    // ✅ FIX: Wait for window to load before printing
+    printWindow.onload = function () {
+      printWindow.print();
+      setTimeout(function () {
+        printWindow.close();
+      }, 1000);
+    };
   };
 
   // Download own slip
@@ -327,11 +333,11 @@ export default function SupervisorSalarySlip() {
 
   return (
     <div className="p-4 space-y-6">
-    <DashboardHeader 
-  title="Salary Slip" 
-  subtitle="Download your salary slips"
-  onMenuClick={() => {}}
-/>
+      <DashboardHeader
+        title="Salary Slip"
+        subtitle="Download your salary slips"
+        onMenuClick={() => { }}
+      />
 
       <Card>
         <CardHeader><CardTitle>My Salary Slip</CardTitle></CardHeader>

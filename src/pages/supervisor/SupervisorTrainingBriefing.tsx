@@ -575,50 +575,55 @@ const SupervisorTrainingBriefing: React.FC = () => {
   const fetchSupervisorAssignedSites = useCallback(async () => {
     if (!supervisorId) return;
     try {
-      // First try to get sites from tasks
       const allTasks = await assignTaskService.getAllAssignTasks();
       const assignedSitesSet = new Set<string>();
       const assignedSiteNamesSet = new Set<string>();
+
       allTasks.forEach((task: AssignTask) => {
-        const isSupervisorAssigned = task.assignedSupervisors?.some(sup => sup.userId === supervisorId);
+        const isSupervisorAssigned = task.assignedSupervisors?.some(
+          sup => sup.userId === supervisorId
+        );
         if (isSupervisorAssigned && task.siteId) {
           assignedSitesSet.add(task.siteId);
           if (task.siteName) assignedSiteNamesSet.add(task.siteName);
         }
       });
 
-      // If no tasks found, fallback to your employee site
+      // ✅ FALLBACK: Use the user's site from auth context
       if (assignedSitesSet.size === 0) {
-        const empRes = await axios.get(`${API_URL}/employees/${supervisorId}`);
-        if (empRes.data && empRes.data.siteName) {
-          const siteName = empRes.data.siteName;
-          assignedSiteNamesSet.add(siteName);
-          // Find site ID from the sites list (which will be fetched later)
-          // We'll store the name, and later when sites are loaded, we can get the ID
-          // For now, set a temporary placeholder
-          assignedSitesSet.add('fallback');
+        // Try to get site names from authUser
+        if (authUser?.assignedSites && Array.isArray(authUser.assignedSites)) {
+          authUser.assignedSites.forEach((site: string) => {
+            assignedSiteNamesSet.add(site);
+          });
+        } else if (authUser?.siteName) {
+          assignedSiteNamesSet.add(authUser.siteName);
+        } else {
+          // Optional: fetch user profile to get site info (but we already have it)
+          console.warn('No site info found in authUser:', authUser);
         }
       }
 
       setSupervisorAssignedSites(Array.from(assignedSitesSet));
       setSupervisorAssignedSiteNames(Array.from(assignedSiteNamesSet));
-      console.log('Assigned sites:', Array.from(assignedSiteNamesSet));
     } catch (error) {
       console.error("Error fetching supervisor assigned sites:", error);
       toast.error("Failed to load your assigned sites");
     }
-  }, [supervisorId]);
+  }, [supervisorId, authUser]);  // ← add authUser to dependency
 
   useEffect(() => {
     if (supervisorId && isAuthenticated) fetchSupervisorAssignedSites();
   }, [supervisorId, isAuthenticated, fetchSupervisorAssignedSites]);
-
   useEffect(() => {
-    if (supervisorAssignedSites.length > 0) fetchAllData();
-  }, [supervisorAssignedSites]);
-
+    // Fetch all data once we have at least one site name
+    if (supervisorAssignedSiteNames.length > 0) {
+      fetchAllData();
+    }
+  }, [supervisorAssignedSiteNames]);
   useEffect(() => {
-    if (supervisorAssignedSites.length > 0) { fetchTrainings(); fetchBriefings(); }
+    fetchTrainings();
+    fetchBriefings();
   }, [searchTerm, filterDepartment, filterStatus, supervisorAssignedSites]);
 
   useEffect(() => {
@@ -648,8 +653,17 @@ const SupervisorTrainingBriefing: React.FC = () => {
   const fetchSites = async () => {
     try {
       const data = await siteService.getAllSites();
-      setSites(data.filter(site => supervisorAssignedSites.includes(site._id)));
-    } catch (error) { console.error(error); toast.error("Failed to load sites"); }
+      let filteredSites = [];
+      if (supervisorAssignedSites.length > 0) {
+        filteredSites = data.filter(site => supervisorAssignedSites.includes(site._id));
+      } else if (supervisorAssignedSiteNames.length > 0) {
+        filteredSites = data.filter(site => supervisorAssignedSiteNames.includes(site.name));
+      }
+      setSites(filteredSites);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load sites");
+    }
   };
 
   const fetchSupervisorsAndManagers = async () => {
@@ -676,7 +690,9 @@ const SupervisorTrainingBriefing: React.FC = () => {
 
   const fetchEmployees = async () => {
     try {
-      const response = await axios.get(`${API_URL}/employees`);
+      const response = await axios.get(`${API_URL}/employees`, {
+        params: { limit: 10000 }
+      });
       if (response.data.success) {
         const employeesData = response.data.data || [];
         const filtered = employeesData.filter((emp: Employee) => (emp.siteName && supervisorAssignedSiteNames.includes(emp.siteName)) || (emp.assignedSites && emp.assignedSites.some(site => supervisorAssignedSites.includes(site))));
@@ -810,99 +826,99 @@ const SupervisorTrainingBriefing: React.FC = () => {
   const updateEditActionItem = (i: number, field: string, val: string) => setEditBriefingForm(p => ({ ...p, actionItems: p.actionItems.map((item, idx) => idx === i ? { ...item, [field]: val } : item) }));
 
   const handleAddTraining = async () => {
-  if (!trainingForm.title || !trainingForm.date || !trainingForm.trainer) { 
-    toast.error('Please fill required fields'); 
-    return; 
-  }
-  // ✅ REMOVED: Supervisor and Manager validation
-  // No longer require supervisors or managers
-  try {
-    setLoading(true);
-    // ✅ supervisors and managers can be empty arrays
-    const supervisorsList = [];
-    const managersList = [];
-    const response = await trainingApi.createTraining({
-      title: trainingForm.title, 
-      description: trainingForm.description, 
-      type: trainingForm.type, 
-      date: trainingForm.date, 
-      time: trainingForm.time,
-      duration: trainingForm.duration, 
-      trainer: trainingForm.trainer, 
-      site: trainingForm.site, 
-      department: trainingForm.department,
-      maxAttendees: trainingForm.maxAttendees, 
-      location: trainingForm.location, 
-      objectives: trainingForm.objectives.filter(o => o.trim() !== ''),
-      supervisors: supervisorsList, 
-      managers: managersList, 
-      attendees: selectedEmployees
-    }, trainingAttachments);
-    if (response.success) { 
-      toast.success('Training added'); 
-      await fetchTrainings(); 
-      resetTrainingForm(); 
-      setTrainingAttachments([]); 
-      setShowAddTraining(false); 
+    if (!trainingForm.title || !trainingForm.date || !trainingForm.trainer) {
+      toast.error('Please fill required fields');
+      return;
     }
-    else throw new Error(response.message);
-  } catch (error: any) { 
-    toast.error(error.message); 
-  }
-  finally { setLoading(false); }
-};
-const handleAddBriefing = async () => {
-  if (!briefingForm.date) { 
-    toast.error('Date is required'); 
-    return; 
-  }
-  // ✅ REMOVED: Supervisor and Manager validation
-  // No longer require supervisors or managers
-  try {
-    setLoading(true);
-    const siteName = supervisorAssignedSiteNames[0];
-    if (!siteName) { 
-      toast.error('No site assigned'); 
-      return; 
+    // ✅ REMOVED: Supervisor and Manager validation
+    // No longer require supervisors or managers
+    try {
+      setLoading(true);
+      // ✅ supervisors and managers can be empty arrays
+      const supervisorsList = [];
+      const managersList = [];
+      const response = await trainingApi.createTraining({
+        title: trainingForm.title,
+        description: trainingForm.description,
+        type: trainingForm.type,
+        date: trainingForm.date,
+        time: trainingForm.time,
+        duration: trainingForm.duration,
+        trainer: trainingForm.trainer,
+        site: trainingForm.site,
+        department: trainingForm.department,
+        maxAttendees: trainingForm.maxAttendees,
+        location: trainingForm.location,
+        objectives: trainingForm.objectives.filter(o => o.trim() !== ''),
+        supervisors: supervisorsList,
+        managers: managersList,
+        attendees: selectedEmployees
+      }, trainingAttachments);
+      if (response.success) {
+        toast.success('Training added');
+        await fetchTrainings();
+        resetTrainingForm();
+        setTrainingAttachments([]);
+        setShowAddTraining(false);
+      }
+      else throw new Error(response.message);
+    } catch (error: any) {
+      toast.error(error.message);
     }
-    // ✅ supervisors and managers can be empty arrays
-    const supervisorsList = [];
-    const managersList = [];
-    const actionItems = briefingForm.actionItems.map((item: any) => ({ 
-      description: item.description, 
-      assignedTo: item.assignedTo, 
-      dueDate: item.dueDate, 
-      status: item.status || 'pending', 
-      priority: item.priority || 'medium' 
-    }));
-    const response = await briefingApi.createBriefing({
-      date: briefingForm.date, 
-      time: briefingForm.time, 
-      conductedBy: briefingForm.conductedBy, 
-      site: siteName, 
-      department: briefingForm.department,
-      attendeesCount: briefingForm.attendeesCount, 
-      topics: briefingForm.topics.filter(t => t.trim() !== ''), 
-      keyPoints: briefingForm.keyPoints.filter(k => k.trim() !== ''),
-      actionItems: actionItems, 
-      notes: briefingForm.notes, 
-      shift: briefingForm.shift, 
-      supervisors: supervisorsList, 
-      managers: managersList
-    }, briefingAttachments);
-    if (response.success) { 
-      toast.success('Briefing added'); 
-      await fetchBriefings(); 
-      resetBriefingForm(); 
-      setBriefingAttachments([]); 
-      setShowAddBriefing(false); 
+    finally { setLoading(false); }
+  };
+  const handleAddBriefing = async () => {
+    if (!briefingForm.date) {
+      toast.error('Date is required');
+      return;
     }
-    else throw new Error(response.message);
-  } catch (error: any) { 
-    toast.error(error.message); 
-  }
-  finally { setLoading(false); }
-};
+    // ✅ REMOVED: Supervisor and Manager validation
+    // No longer require supervisors or managers
+    try {
+      setLoading(true);
+      const siteName = supervisorAssignedSiteNames[0];
+      if (!siteName) {
+        toast.error('No site assigned');
+        return;
+      }
+      // ✅ supervisors and managers can be empty arrays
+      const supervisorsList = [];
+      const managersList = [];
+      const actionItems = briefingForm.actionItems.map((item: any) => ({
+        description: item.description,
+        assignedTo: item.assignedTo,
+        dueDate: item.dueDate,
+        status: item.status || 'pending',
+        priority: item.priority || 'medium'
+      }));
+      const response = await briefingApi.createBriefing({
+        date: briefingForm.date,
+        time: briefingForm.time,
+        conductedBy: briefingForm.conductedBy,
+        site: siteName,
+        department: briefingForm.department,
+        attendeesCount: briefingForm.attendeesCount,
+        topics: briefingForm.topics.filter(t => t.trim() !== ''),
+        keyPoints: briefingForm.keyPoints.filter(k => k.trim() !== ''),
+        actionItems: actionItems,
+        notes: briefingForm.notes,
+        shift: briefingForm.shift,
+        supervisors: supervisorsList,
+        managers: managersList
+      }, briefingAttachments);
+      if (response.success) {
+        toast.success('Briefing added');
+        await fetchBriefings();
+        resetBriefingForm();
+        setBriefingAttachments([]);
+        setShowAddBriefing(false);
+      }
+      else throw new Error(response.message);
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+    finally { setLoading(false); }
+  };
 
   const handleUpdateTraining = async () => {
     if (!editingTraining) return;
@@ -1033,16 +1049,19 @@ const handleAddBriefing = async () => {
 
   return (
     <div className="min-h-screen bg-background">
-     <DashboardHeader 
-  title="Training & Staff Briefing" 
-  subtitle="Manage sessions for your assigned sites" 
-  onMenuClick={onMenuClick}
-/>
+      <DashboardHeader
+        title="Training & Staff Briefing"
+        subtitle="Manage sessions for your assigned sites"
+        onMenuClick={onMenuClick}
+      />
 
       <div className="p-3 sm:p-4 md:p-6">
         <div className="mb-6">
           <div className="flex flex-col sm:flex-row justify-between gap-4 mb-4">
-            <div><Badge variant="outline" className="bg-blue-50"><Building className="h-3 w-3 mr-1" />Site: {supervisorAssignedSiteNames[0] || 'Loading...'}</Badge></div>
+            <Badge variant="outline" className="bg-blue-50">
+              <Building className="h-3 w-3 mr-1" />
+              Site: {supervisorAssignedSiteNames[0] || 'No site assigned'}
+            </Badge>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={handleRefresh}>
                 <RefreshCw className="h-4 w-4 mr-1" />Refresh

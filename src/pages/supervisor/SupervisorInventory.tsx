@@ -1,4 +1,4 @@
-import React, { useState, useEffect ,useCallback} from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   CardHeader,
@@ -110,7 +110,7 @@ interface MachineUpdate {
 type InventoryItem = FrontendInventoryItem;
 type Machine = FrontendMachine;
 
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 const apiClient = axios.create({ baseURL: API_URL });
 apiClient.interceptors.request.use((config) => {
@@ -148,18 +148,18 @@ const CameraComponent = ({ onCapture, onClose }: { onCapture: (imageData: string
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(device => device.kind === 'videoinput');
       setDevices(videoDevices);
-      
+
       if (videoDevices.length === 0) {
         setError('No camera found on this device');
         setHasPermission(false);
         return;
       }
-      
+
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       stream.getTracks().forEach(track => track.stop());
       setHasPermission(true);
       setError(null);
-      
+
       if (videoDevices.length > 0 && !selectedDeviceId) {
         setSelectedDeviceId(videoDevices[0].deviceId);
       }
@@ -182,14 +182,14 @@ const CameraComponent = ({ onCapture, onClose }: { onCapture: (imageData: string
     try {
       setIsLoading(true);
       stopCamera();
-      
+
       const constraints: MediaStreamConstraints = {
         video: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : true
       };
-      
+
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => {
@@ -219,7 +219,7 @@ const CameraComponent = ({ onCapture, onClose }: { onCapture: (imageData: string
       const video = videoRef.current;
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
-      
+
       if (context && video.videoWidth > 0 && video.videoHeight > 0) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
@@ -280,7 +280,7 @@ const CameraComponent = ({ onCapture, onClose }: { onCapture: (imageData: string
           </Select>
         </div>
       )}
-      
+
       <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ minHeight: '320px' }}>
         <video
           ref={videoRef}
@@ -295,7 +295,7 @@ const CameraComponent = ({ onCapture, onClose }: { onCapture: (imageData: string
           </div>
         )}
       </div>
-      
+
       <div className="flex gap-2">
         <Button onClick={capturePhoto} className="flex-1 bg-blue-600 hover:bg-blue-700">
           <Camera className="h-4 w-4 mr-2" />
@@ -305,7 +305,7 @@ const CameraComponent = ({ onCapture, onClose }: { onCapture: (imageData: string
           Cancel
         </Button>
       </div>
-      
+
       <canvas ref={canvasRef} className="hidden" />
     </div>
   );
@@ -327,14 +327,14 @@ const MachineViewDialog = ({ machine, open, onClose }: { machine: Machine | null
             Machine Details: {machine.name}
           </DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-6">
           {machineImages.length > 0 && (
             <div className="space-y-3">
               <Label className="text-sm font-medium">Images</Label>
               <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ minHeight: '300px' }}>
-                <img 
-                  src={machineImages[currentImageIndex]} 
+                <img
+                  src={machineImages[currentImageIndex]}
                   alt={`${machine.name} - ${currentImageIndex + 1}`}
                   className="w-full h-80 object-contain bg-gray-50"
                   onError={(e) => {
@@ -482,13 +482,13 @@ const MachineViewDialog = ({ machine, open, onClose }: { machine: Machine | null
 };
 
 // Multiple Image Upload Component
-const MultipleImageUpload = ({ 
-  images, 
-  onImagesChange, 
-  onCaptureImage 
-}: { 
-  images: string[]; 
-  onImagesChange: (images: string[]) => void; 
+const MultipleImageUpload = ({
+  images,
+  onImagesChange,
+  onCaptureImage
+}: {
+  images: string[];
+  onImagesChange: (images: string[]) => void;
   onCaptureImage: () => void;
 }) => {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -542,12 +542,12 @@ const MultipleImageUpload = ({
                 Upload Files
               </div>
             </Button>
-            <Input 
-              type="file" 
-              accept="image/*" 
-              multiple 
-              className="hidden" 
-              onChange={handleFileUpload} 
+            <Input
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handleFileUpload}
             />
           </label>
         </div>
@@ -560,9 +560,9 @@ const MultipleImageUpload = ({
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 mt-3">
           {images.map((img, idx) => (
             <div key={idx} className="relative group">
-              <img 
-                src={img} 
-                alt={`Preview ${idx + 1}`} 
+              <img
+                src={img}
+                alt={`Preview ${idx + 1}`}
                 className="w-full h-24 object-cover rounded-lg border"
               />
               <Button
@@ -584,7 +584,7 @@ const MultipleImageUpload = ({
 const InventoryPage = () => {
   const outletContext = useOutletContext<{ onMenuClick?: () => void }>();
   const { user, role } = useRole();
-  
+
   // State
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
@@ -605,7 +605,7 @@ const InventoryPage = () => {
     lowStockItems: 0,
     totalValue: 0,
   });
-  
+
   // Machine states
   const [machineDialogOpen, setMachineDialogOpen] = useState(false);
   const [editMachine, setEditMachine] = useState<Machine | null>(null);
@@ -616,7 +616,7 @@ const InventoryPage = () => {
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
   const [selectedMachineForMaintenance, setSelectedMachineForMaintenance] = useState<string | null>(null);
   const [maintenanceLoading, setMaintenanceLoading] = useState(false);
-  
+
   // Update states with multiple images
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   const [selectedMachineForUpdate, setSelectedMachineForUpdate] = useState<Machine | null>(null);
@@ -630,20 +630,20 @@ const InventoryPage = () => {
   const [updateLoading, setUpdateLoading] = useState(false);
   const [fetchMachineLoading, setFetchMachineLoading] = useState(false);
   const [fetchMachineQuery, setFetchMachineQuery] = useState({ name: '', model: '' });
-  
+
   // Camera states
   const [showCameraDialog, setShowCameraDialog] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [tempImageForUpload, setTempImageForUpload] = useState<string | null>(null);
-  
+
   // Track active tab
   const [activeTab, setActiveTab] = useState("inventory");
-  
+
   const [usingLocalMachineStats, setUsingLocalMachineStats] = useState(false);
   const [backendConnected, setBackendConnected] = useState(true);
   const [isMobileView, setIsMobileView] = useState(false);
-  
+
   // New item form state
   const [newItem, setNewItem] = useState<Partial<InventoryItem>>({
     name: "",
@@ -702,7 +702,7 @@ const InventoryPage = () => {
 
   // Remove hardcoded sites - will fetch from database
   const managers = ["John Doe", "Jane Smith", "Robert Johnson", "Sarah Wilson", "Michael Brown"];
-  
+
   const categories = {
     cleaning: ["Tools", "Chemicals", "Equipment", "Supplies"],
     maintenance: ["Tools", "Safety", "Equipment", "Parts"],
@@ -760,7 +760,7 @@ const InventoryPage = () => {
   const fetchAssignedSites = async () => {
     try {
       const supervisorId = user?._id || user?.id;
-      
+
       if (!supervisorId) {
         console.warn('No supervisor ID found');
         setAssignedSites([]);
@@ -786,9 +786,9 @@ const InventoryPage = () => {
 
       const uniqueSiteIds = [...new Set(supervisorTasks.map(task => task.siteId).filter(Boolean))];
       const sitesWithTasks = allSites.filter(site => uniqueSiteIds.includes(site._id));
-      
+
       setAssignedSites(sitesWithTasks);
-      
+
     } catch (error) {
       console.error('Error fetching assigned sites:', error);
       setAssignedSites([]);
@@ -831,11 +831,11 @@ const InventoryPage = () => {
     const operationalMachines = machines.filter(m => m.status === 'operational').length;
     const maintenanceMachines = machines.filter(m => m.status === 'maintenance').length;
     const outOfServiceMachines = machines.filter(m => m.status === 'out-of-service').length;
-    
+
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
     const today = new Date();
-    
+
     const upcomingMaintenanceCount = machines.filter(machine => {
       if (!machine.nextMaintenanceDate) return false;
       try {
@@ -870,62 +870,62 @@ const InventoryPage = () => {
       upcomingMaintenanceCount
     };
   };
-const getSupervisorSiteNames = useCallback(async (supervisorId: string): Promise<string[]> => {
-  try {
-    const res = await apiClient.get('/tasks', { params: { limit: 1000 } });
-    let tasks = res.data?.data || res.data || [];
-    if (!Array.isArray(tasks)) tasks = [];
-    const siteSet = new Set<string>();
-    tasks.forEach((task: any) => {
-      const assigned = task.assignedUsers?.some((u: any) => u.userId === supervisorId);
-      const assignedOld = task.assignedTo === supervisorId;
-      if ((assigned || assignedOld) && task.siteName) {
-        siteSet.add(task.siteName);
-      }
-    });
-    return Array.from(siteSet);
-  } catch (error) {
-    console.error("Error fetching supervisor sites:", error);
-    return [];
-  }
-}, []);
+  const getSupervisorSiteNames = useCallback(async (supervisorId: string): Promise<string[]> => {
+    try {
+      const res = await apiClient.get('/tasks', { params: { limit: 1000 } });
+      let tasks = res.data?.data || res.data || [];
+      if (!Array.isArray(tasks)) tasks = [];
+      const siteSet = new Set<string>();
+      tasks.forEach((task: any) => {
+        const assigned = task.assignedUsers?.some((u: any) => u.userId === supervisorId);
+        const assignedOld = task.assignedTo === supervisorId;
+        if ((assigned || assignedOld) && task.siteName) {
+          siteSet.add(task.siteName);
+        }
+      });
+      return Array.from(siteSet);
+    } catch (error) {
+      console.error("Error fetching supervisor sites:", error);
+      return [];
+    }
+  }, []);
   const fetchData = async () => {
     try {
       setLoading(true);
       setUsingLocalMachineStats(false);
       setBackendConnected(true);
-      
+
       let inventoryFilters = {};
       let machineFilters = {};
-      
+
       if (role === 'supervisor' && user) {
         inventoryFilters = { assignedManager: user.name };
         machineFilters = { assignedTo: user.name };
       }
-      
+
       const itemsData = await inventoryService.getItems(inventoryFilters);
-let machinesData: FrontendMachine[] = [];
+      let machinesData: FrontendMachine[] = [];
 
-if (role === 'supervisor' && user) {
-  // Get supervisor's site names from tasks
-  const supervisorId = user._id || user.id;
-  const siteNames = await getSupervisorSiteNames(supervisorId);
-  if (siteNames.length === 0) {
-    machinesData = [];
-  } else {
-    const allMachines = await machineService.getMachines();
-    machinesData = allMachines.filter(m => 
-      m.location && siteNames.some(site => site.toLowerCase() === m.location.toLowerCase())
-    );
-  }
-} else {
-  machinesData = await machineService.getMachines(machineFilters);
-}
+      if (role === 'supervisor' && user) {
+        // Get supervisor's site names from tasks
+        const supervisorId = user._id || user.id;
+        const siteNames = await getSupervisorSiteNames(supervisorId);
+        if (siteNames.length === 0) {
+          machinesData = [];
+        } else {
+          const allMachines = await machineService.getMachines();
+          machinesData = allMachines.filter(m =>
+            m.location && siteNames.some(site => site.toLowerCase() === m.location.toLowerCase())
+          );
+        }
+      } else {
+        machinesData = await machineService.getMachines(machineFilters);
+      }
 
-setItems(itemsData || []);
-setMachines(machinesData || []);
-    
-      
+      setItems(itemsData || []);
+      setMachines(machinesData || []);
+
+
       try {
         const statsData = await machineService.getMachineStats();
         setMachineStats(statsData);
@@ -936,9 +936,9 @@ setMachines(machinesData || []);
         const localStats = calculateLocalMachineStats();
         setMachineStats(localStats);
       }
-      
+
       setStats(calculateStats(itemsData || []));
-      
+
     } catch (error) {
       console.error('Failed to fetch data:', error);
       setBackendConnected(false);
@@ -979,7 +979,7 @@ setMachines(machinesData || []);
   };
 
   const filteredItems = items.filter(item => {
-    const matchesSearch = 
+    const matchesSearch =
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.supplier.toLowerCase().includes(searchQuery.toLowerCase());
@@ -989,7 +989,7 @@ setMachines(machinesData || []);
   });
 
   const filteredMachines = machines.filter(machine => {
-    const matchesSearch = 
+    const matchesSearch =
       machine.name.toLowerCase().includes(machineSearchQuery.toLowerCase()) ||
       machine.model?.toLowerCase().includes(machineSearchQuery.toLowerCase()) ||
       machine.location?.toLowerCase().includes(machineSearchQuery.toLowerCase());
@@ -1017,7 +1017,7 @@ setMachines(machinesData || []);
 
     try {
       const assignedManager = role === 'supervisor' && user ? user.name : (newItem.assignedManager || "John Doe");
-      
+
       const itemData: Omit<InventoryItem, 'id' | '_id' | 'createdAt' | 'updatedAt'> = {
         sku: newItem.sku.toUpperCase(),
         name: newItem.name,
@@ -1126,7 +1126,7 @@ setMachines(machinesData || []);
         setUsingLocalMachineStats(true);
         setMachineStats(calculateLocalMachineStats());
       }
-      
+
       setMachineDialogOpen(false);
       resetNewMachineForm();
       setEditMachine(null);
@@ -1173,7 +1173,7 @@ setMachines(machinesData || []);
       await machineService.deleteMachine(machineId);
       const updatedMachines = machines.filter(machine => machine.id !== machineId);
       setMachines(updatedMachines);
-      
+
       try {
         const statsData = await machineService.getMachineStats();
         setMachineStats(statsData);
@@ -1182,7 +1182,7 @@ setMachines(machinesData || []);
         setUsingLocalMachineStats(true);
         setMachineStats(calculateLocalMachineStats());
       }
-      
+
       toast.success("Machine deleted successfully!");
     } catch (error) {
       console.error('Failed to delete machine:', error);
@@ -1202,12 +1202,12 @@ setMachines(machinesData || []);
         selectedMachineForMaintenance,
         maintenanceRecord
       );
-      
-      const updatedMachines = machines.map(machine => 
+
+      const updatedMachines = machines.map(machine =>
         machine.id === selectedMachineForMaintenance ? updatedMachine : machine
       );
       setMachines(updatedMachines);
-      
+
       setMaintenanceRecord({
         type: "Routine",
         description: "",
@@ -1234,7 +1234,7 @@ setMachines(machinesData || []);
     setFetchMachineLoading(true);
     try {
       const allMachines = await machineService.getMachines();
-      const foundMachine = allMachines.find(m => 
+      const foundMachine = allMachines.find(m =>
         m.name.toLowerCase().includes(fetchMachineQuery.name.toLowerCase()) ||
         m.model?.toLowerCase().includes(fetchMachineQuery.model.toLowerCase())
       );
@@ -1323,7 +1323,7 @@ setMachines(machinesData || []);
 
   const uploadMultiplePhotos = async (files: File[], type: string): Promise<string[]> => {
     const uploadedUrls: string[] = [];
-    
+
     for (const file of files) {
       const formData = new FormData();
       formData.append('image', file);
@@ -1346,7 +1346,7 @@ setMachines(machinesData || []);
         console.error('Error uploading file:', file.name, error);
       }
     }
-    
+
     return uploadedUrls;
   };
 
@@ -1387,9 +1387,9 @@ setMachines(machinesData || []);
           location: updateFormData.site,
           status: updateFormData.status,
         });
-        
-        const updatedMachines = machines.map(m => 
-          m.id === selectedMachineForUpdate.id 
+
+        const updatedMachines = machines.map(m =>
+          m.id === selectedMachineForUpdate.id
             ? { ...m, location: updateFormData.site, status: updateFormData.status }
             : m
         );
@@ -1399,9 +1399,9 @@ setMachines(machinesData || []);
           ...selectedMachineForUpdate,
           status: updateFormData.status,
         });
-        
-        const updatedMachines = machines.map(m => 
-          m.id === selectedMachineForUpdate.id 
+
+        const updatedMachines = machines.map(m =>
+          m.id === selectedMachineForUpdate.id
             ? { ...m, status: updateFormData.status }
             : m
         );
@@ -1419,7 +1419,7 @@ setMachines(machinesData || []);
         photoPreviews: [],
       });
       setFetchMachineQuery({ name: '', model: '' });
-      
+
       await fetchData();
     } catch (error) {
       console.error('Failed to submit update:', error);
@@ -1480,10 +1480,10 @@ setMachines(machinesData || []);
       const text = await file.text();
       const lines = text.split('\n');
       const dataLines = lines.slice(1);
-      
+
       let importedCount = 0;
       let failedCount = 0;
-      
+
       for (const line of dataLines) {
         if (!line.trim()) continue;
         const columns = line.split(',');
@@ -1491,10 +1491,10 @@ setMachines(machinesData || []);
           failedCount++;
           continue;
         }
-        
+
         try {
           const assignedManager = role === 'supervisor' && user ? user.name : columns[5].trim();
-          
+
           const itemData: Omit<InventoryItem, 'id' | '_id' | 'createdAt' | 'updatedAt'> = {
             sku: columns[0].trim().toUpperCase(),
             name: columns[1].trim(),
@@ -1515,7 +1515,7 @@ setMachines(machinesData || []);
               quantity: parseInt(columns[6].trim()) || 0
             }]
           };
-          
+
           await inventoryService.createItem(itemData);
           importedCount++;
         } catch (error) {
@@ -1523,7 +1523,7 @@ setMachines(machinesData || []);
           console.error('Failed to import row:', line, error);
         }
       }
-      
+
       toast.success(`Imported ${importedCount} items successfully!`);
       if (failedCount > 0) toast.error(`${failedCount} items failed to import`);
       setImportDialogOpen(false);
@@ -1635,25 +1635,22 @@ setMachines(machinesData || []);
 
   return (
     <div className="min-h-screen bg-background">
-      <DashboardHeader 
-        title="Inventory Management" 
-        subtitle="Manage and track your inventory, machinery, and site updates" 
+      <DashboardHeader
+        title="Inventory Management"
+        subtitle="Manage and track your inventory, machinery, and site updates"
         onMenuClick={outletContext?.onMenuClick}
       />
-      
+
       <div className="container mx-auto p-4 md:p-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold">Inventory Management</h1>
             <p className="text-sm text-muted-foreground">Manage and track your inventory and machinery across all sites</p>
-            
+
             {role === 'supervisor' && user && (
               <div className="flex flex-wrap items-center gap-2 mt-2">
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                  <UserCog className="h-3 w-3 mr-1" />
-                  Supervisor Dashboard
-                </Badge>
+               
                 <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
                   <UserCheck className="h-3 w-3 mr-1" />
                   {user.name}
@@ -1667,15 +1664,8 @@ setMachines(machinesData || []);
               </div>
             )}
           </div>
-          
+
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-2 mr-2">
-              <div className={`h-2 w-2 rounded-full ${backendConnected ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
-              <span className="text-xs text-muted-foreground hidden sm:inline">
-                {backendConnected ? 'Backend connected' : 'Backend offline'}
-              </span>
-            </div>
-            
             <Button variant="outline" size={isMobileView ? "icon" : "default"} onClick={refreshData} disabled={refreshing}>
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''} ${!isMobileView ? 'mr-2' : ''}`} />
               {!isMobileView && "Refresh"}
@@ -1697,7 +1687,7 @@ setMachines(machinesData || []);
               </p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Low Stock</CardTitle>
@@ -1708,7 +1698,7 @@ setMachines(machinesData || []);
               <p className="text-xs text-muted-foreground">Need reordering</p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Value</CardTitle>
@@ -1741,7 +1731,7 @@ setMachines(machinesData || []);
                 <span className="xs:hidden">Upd</span> ({machineUpdates.length})
               </TabsTrigger>
             </TabsList>
-            
+
             <div className="flex items-center gap-2">
               {activeTab === "inventory" && (
                 <Button onClick={() => { setEditItem(null); setItemDialogOpen(true); }} size={isMobileView ? "sm" : "default"}>
@@ -1750,7 +1740,7 @@ setMachines(machinesData || []);
                   {isMobileView && "Add"}
                 </Button>
               )}
-              
+
               {activeTab === "machines" && (
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   {usingLocalMachineStats && (
@@ -1772,7 +1762,7 @@ setMachines(machinesData || []);
                   </Button>
                 </div>
               )}
-              
+
               {activeTab === "updates" && (
                 <Button onClick={() => { setSelectedMachineForUpdate(null); setUpdateFormData({ site: '', description: '', status: 'operational', photoFiles: [], photoPreviews: [] }); setFetchMachineQuery({ name: '', model: '' }); setUpdateDialogOpen(true); }} size={isMobileView ? "sm" : "default"}>
                   <Plus className="mr-2 h-4 w-4" />
@@ -1793,7 +1783,7 @@ setMachines(machinesData || []);
                     <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input placeholder="Search items..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
                   </div>
-                  
+
                   <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
                     <SelectTrigger>
                       <SelectValue placeholder="All Departments" />
@@ -1810,7 +1800,7 @@ setMachines(machinesData || []);
                       })}
                     </SelectContent>
                   </Select>
-                  
+
                   <Select value={selectedCategory} onValueChange={setSelectedCategory} disabled={selectedDepartment === "all"}>
                     <SelectTrigger>
                       <SelectValue placeholder="All Categories" />
@@ -1852,7 +1842,7 @@ setMachines(machinesData || []);
                         filteredItems.map((item) => {
                           const DeptIcon = getDepartmentIcon(item.department);
                           const isLowStock = item.quantity <= item.reorderLevel;
-                          
+
                           return (
                             <TableRow key={item.id}>
                               <TableCell className="font-mono font-medium">{item.sku}</TableCell>
@@ -1957,7 +1947,7 @@ setMachines(machinesData || []);
                           const statusOption = machineStatusOptions.find(s => s.value === machine.status);
                           const StatusIcon = statusOption?.icon || CheckCircle;
                           const machineAge = calculateMachineAge(machine.purchaseDate);
-                          
+
                           return (
                             <TableRow key={machine.id}>
                               <TableCell>
@@ -2064,7 +2054,7 @@ setMachines(machinesData || []);
                           .map((update) => {
                             const statusOption = machineStatusOptions.find(s => s.value === update.status);
                             const StatusIcon = statusOption?.icon || CheckCircle;
-                            
+
                             return (
                               <TableRow key={update.id}>
                                 <TableCell><div className="flex items-center gap-2"><Cpu className="h-4 w-4 text-muted-foreground" /><span className="font-medium">{update.machineName}</span></div></TableCell>
@@ -2075,10 +2065,10 @@ setMachines(machinesData || []);
                                 <TableCell>
                                   <div className="flex -space-x-2">
                                     {update.photoUrls && update.photoUrls.slice(0, 3).map((url, idx) => (
-                                      <img 
+                                      <img
                                         key={idx}
-                                        src={url} 
-                                        alt={`Photo ${idx + 1}`} 
+                                        src={url}
+                                        alt={`Photo ${idx + 1}`}
                                         className="h-8 w-8 rounded-full object-cover border-2 border-white cursor-pointer"
                                         onClick={() => window.open(url, '_blank')}
                                       />
@@ -2113,10 +2103,10 @@ setMachines(machinesData || []);
         </Tabs>
 
         {/* Machine View Dialog */}
-        <MachineViewDialog 
-          machine={viewMachine} 
-          open={viewMachineDialogOpen} 
-          onClose={() => setViewMachineDialogOpen(false)} 
+        <MachineViewDialog
+          machine={viewMachine}
+          open={viewMachineDialogOpen}
+          onClose={() => setViewMachineDialogOpen(false)}
         />
 
         {/* ADD/EDIT ITEM DIALOG */}
@@ -2124,17 +2114,17 @@ setMachines(machinesData || []);
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>{editItem ? 'Edit Item' : 'Add New Item'}</DialogTitle></DialogHeader>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Item Name *</Label><Input value={editItem ? editItem.name : newItem.name} onChange={(e) => editItem ? setEditItem({...editItem, name: e.target.value}) : setNewItem({...newItem, name: e.target.value})} placeholder="Enter item name" required /></div>
-              <div className="space-y-2"><Label>SKU *</Label><Input value={editItem ? editItem.sku : newItem.sku} onChange={(e) => editItem ? setEditItem({...editItem, sku: e.target.value.toUpperCase()}) : setNewItem({...newItem, sku: e.target.value.toUpperCase()})} placeholder="Enter SKU (e.g., INV-001)" required /></div>
-              <div className="space-y-2"><Label>Department *</Label><Select value={editItem ? editItem.department : newItem.department} onValueChange={(value) => editItem ? setEditItem({...editItem, department: value, category: ''}) : setNewItem({...newItem, department: value, category: ''})}><SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger><SelectContent>{departments.map(dept => (<SelectItem key={dept.value} value={dept.value}><div className="flex items-center gap-2">{dept.label}</div></SelectItem>))}</SelectContent></Select></div>
-              <div className="space-y-2"><Label>Category *</Label><Select value={editItem ? editItem.category : newItem.category} onValueChange={(value) => editItem ? setEditItem({...editItem, category: value}) : setNewItem({...newItem, category: value})} disabled={!editItem?.department && !newItem.department}><SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger><SelectContent>{(editItem ? getCategoriesForDepartment(editItem.department) : getCategoriesForDepartment(newItem.department || '')).map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent></Select></div>
-              <div className="space-y-2"><Label>Assigned Manager *</Label>{role === 'supervisor' && user ? (<div className="p-2 border rounded-md bg-gray-50"><div className="flex items-center gap-2"><UserCheck className="h-4 w-4" /><span>{user.name}</span><Badge variant="secondary" className="h-5 text-xs ml-1">You</Badge></div></div>) : (<Select value={editItem ? editItem.assignedManager : newItem.assignedManager} onValueChange={(value) => editItem ? setEditItem({...editItem, assignedManager: value}) : setNewItem({...newItem, assignedManager: value})}><SelectTrigger><SelectValue placeholder="Select manager" /></SelectTrigger><SelectContent>{managers.map(manager => (<SelectItem key={manager} value={manager}>{manager}</SelectItem>))}</SelectContent></Select>)}</div>
-              <div className="space-y-2"><Label>Quantity *</Label><Input type="number" min="0" value={editItem ? editItem.quantity : newItem.quantity} onChange={(e) => editItem ? setEditItem({...editItem, quantity: parseInt(e.target.value) || 0}) : setNewItem({...newItem, quantity: parseInt(e.target.value) || 0})} placeholder="Enter quantity" required /></div>
-              <div className="space-y-2"><Label>Reorder Level *</Label><Input type="number" min="0" value={editItem ? editItem.reorderLevel : newItem.reorderLevel} onChange={(e) => editItem ? setEditItem({...editItem, reorderLevel: parseInt(e.target.value) || 0}) : setNewItem({...newItem, reorderLevel: parseInt(e.target.value) || 0})} placeholder="Enter reorder level" required /></div>
-              <div className="space-y-2"><Label>Price *</Label><Input type="number" step="0.01" min="0" value={editItem ? editItem.price : newItem.price} onChange={(e) => editItem ? setEditItem({...editItem, price: parseFloat(e.target.value) || 0}) : setNewItem({...newItem, price: parseFloat(e.target.value) || 0})} placeholder="Enter price" required /></div>
-              <div className="space-y-2"><Label>Cost Price *</Label><Input type="number" step="0.01" min="0" value={editItem ? editItem.costPrice : newItem.costPrice} onChange={(e) => editItem ? setEditItem({...editItem, costPrice: parseFloat(e.target.value) || 0}) : setNewItem({...newItem, costPrice: parseFloat(e.target.value) || 0})} placeholder="Enter cost price" required /></div>
-              <div className="space-y-2 col-span-1 md:col-span-2"><Label>Supplier *</Label><Input value={editItem ? editItem.supplier : newItem.supplier} onChange={(e) => editItem ? setEditItem({...editItem, supplier: e.target.value}) : setNewItem({...newItem, supplier: e.target.value})} placeholder="Enter supplier name" required /></div>
-              <div className="space-y-2 col-span-1 md:col-span-2"><Label>Description</Label><Textarea value={editItem ? editItem.description : newItem.description} onChange={(e) => editItem ? setEditItem({...editItem, description: e.target.value}) : setNewItem({...newItem, description: e.target.value})} placeholder="Enter item description" rows={3} /></div>
+              <div className="space-y-2"><Label>Item Name *</Label><Input value={editItem ? editItem.name : newItem.name} onChange={(e) => editItem ? setEditItem({ ...editItem, name: e.target.value }) : setNewItem({ ...newItem, name: e.target.value })} placeholder="Enter item name" required /></div>
+              <div className="space-y-2"><Label>SKU *</Label><Input value={editItem ? editItem.sku : newItem.sku} onChange={(e) => editItem ? setEditItem({ ...editItem, sku: e.target.value.toUpperCase() }) : setNewItem({ ...newItem, sku: e.target.value.toUpperCase() })} placeholder="Enter SKU (e.g., INV-001)" required /></div>
+              <div className="space-y-2"><Label>Department *</Label><Select value={editItem ? editItem.department : newItem.department} onValueChange={(value) => editItem ? setEditItem({ ...editItem, department: value, category: '' }) : setNewItem({ ...newItem, department: value, category: '' })}><SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger><SelectContent>{departments.map(dept => (<SelectItem key={dept.value} value={dept.value}><div className="flex items-center gap-2">{dept.label}</div></SelectItem>))}</SelectContent></Select></div>
+              <div className="space-y-2"><Label>Category *</Label><Select value={editItem ? editItem.category : newItem.category} onValueChange={(value) => editItem ? setEditItem({ ...editItem, category: value }) : setNewItem({ ...newItem, category: value })} disabled={!editItem?.department && !newItem.department}><SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger><SelectContent>{(editItem ? getCategoriesForDepartment(editItem.department) : getCategoriesForDepartment(newItem.department || '')).map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent></Select></div>
+              <div className="space-y-2"><Label>Assigned Manager *</Label>{role === 'supervisor' && user ? (<div className="p-2 border rounded-md bg-gray-50"><div className="flex items-center gap-2"><UserCheck className="h-4 w-4" /><span>{user.name}</span><Badge variant="secondary" className="h-5 text-xs ml-1">You</Badge></div></div>) : (<Select value={editItem ? editItem.assignedManager : newItem.assignedManager} onValueChange={(value) => editItem ? setEditItem({ ...editItem, assignedManager: value }) : setNewItem({ ...newItem, assignedManager: value })}><SelectTrigger><SelectValue placeholder="Select manager" /></SelectTrigger><SelectContent>{managers.map(manager => (<SelectItem key={manager} value={manager}>{manager}</SelectItem>))}</SelectContent></Select>)}</div>
+              <div className="space-y-2"><Label>Quantity *</Label><Input type="number" min="0" value={editItem ? editItem.quantity : newItem.quantity} onChange={(e) => editItem ? setEditItem({ ...editItem, quantity: parseInt(e.target.value) || 0 }) : setNewItem({ ...newItem, quantity: parseInt(e.target.value) || 0 })} placeholder="Enter quantity" required /></div>
+              <div className="space-y-2"><Label>Reorder Level *</Label><Input type="number" min="0" value={editItem ? editItem.reorderLevel : newItem.reorderLevel} onChange={(e) => editItem ? setEditItem({ ...editItem, reorderLevel: parseInt(e.target.value) || 0 }) : setNewItem({ ...newItem, reorderLevel: parseInt(e.target.value) || 0 })} placeholder="Enter reorder level" required /></div>
+              <div className="space-y-2"><Label>Price *</Label><Input type="number" step="0.01" min="0" value={editItem ? editItem.price : newItem.price} onChange={(e) => editItem ? setEditItem({ ...editItem, price: parseFloat(e.target.value) || 0 }) : setNewItem({ ...newItem, price: parseFloat(e.target.value) || 0 })} placeholder="Enter price" required /></div>
+              <div className="space-y-2"><Label>Cost Price *</Label><Input type="number" step="0.01" min="0" value={editItem ? editItem.costPrice : newItem.costPrice} onChange={(e) => editItem ? setEditItem({ ...editItem, costPrice: parseFloat(e.target.value) || 0 }) : setNewItem({ ...newItem, costPrice: parseFloat(e.target.value) || 0 })} placeholder="Enter cost price" required /></div>
+              <div className="space-y-2 col-span-1 md:col-span-2"><Label>Supplier *</Label><Input value={editItem ? editItem.supplier : newItem.supplier} onChange={(e) => editItem ? setEditItem({ ...editItem, supplier: e.target.value }) : setNewItem({ ...newItem, supplier: e.target.value })} placeholder="Enter supplier name" required /></div>
+              <div className="space-y-2 col-span-1 md:col-span-2"><Label>Description</Label><Textarea value={editItem ? editItem.description : newItem.description} onChange={(e) => editItem ? setEditItem({ ...editItem, description: e.target.value }) : setNewItem({ ...newItem, description: e.target.value })} placeholder="Enter item description" rows={3} /></div>
             </div>
             <DialogFooter><Button variant="outline" onClick={() => { setItemDialogOpen(false); setEditItem(null); resetNewItemForm(); }}>Cancel</Button><Button onClick={editItem ? handleEditItem : handleAddItem}>{editItem ? 'Update Item' : 'Add Item'}</Button></DialogFooter>
           </DialogContent>
@@ -2145,17 +2135,17 @@ setMachines(machinesData || []);
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>{editMachine ? 'Edit Machine' : 'Add New Machine'}</DialogTitle></DialogHeader>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Machine Name *</Label><Input value={newMachine.name} onChange={(e) => setNewMachine({...newMachine, name: e.target.value})} placeholder="Enter machine name" required /></div>
-              <div className="space-y-2"><Label>Model Number</Label><Input value={newMachine.model} onChange={(e) => setNewMachine({...newMachine, model: e.target.value})} placeholder="Enter model number" /></div>
-              <div className="space-y-2"><Label>Cost/Price *</Label><Input type="number" step="0.01" min="0" value={newMachine.cost} onChange={(e) => setNewMachine({...newMachine, cost: parseFloat(e.target.value) || 0})} placeholder="Enter cost" required /></div>
-              <div className="space-y-2"><Label>Purchase Date *</Label><Input type="date" value={newMachine.purchaseDate} onChange={(e) => setNewMachine({...newMachine, purchaseDate: e.target.value})} required /></div>
-              <div className="space-y-2"><Label>Quantity *</Label><Input type="number" min="1" value={newMachine.quantity} onChange={(e) => setNewMachine({...newMachine, quantity: parseInt(e.target.value) || 1})} placeholder="Enter quantity" required /></div>
-              <div className="space-y-2"><Label>Status *</Label><Select value={newMachine.status} onValueChange={(value: 'operational' | 'maintenance' | 'out-of-service') => setNewMachine({...newMachine, status: value})}><SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger><SelectContent>{machineStatusOptions.map(status => (<SelectItem key={status.value} value={status.value}>{status.label}</SelectItem>))}</SelectContent></Select></div>
-              <div className="space-y-2"><Label>Department</Label><Input value={newMachine.department} onChange={(e) => setNewMachine({...newMachine, department: e.target.value})} placeholder="Enter department" /></div>
+              <div className="space-y-2"><Label>Machine Name *</Label><Input value={newMachine.name} onChange={(e) => setNewMachine({ ...newMachine, name: e.target.value })} placeholder="Enter machine name" required /></div>
+              <div className="space-y-2"><Label>Model Number</Label><Input value={newMachine.model} onChange={(e) => setNewMachine({ ...newMachine, model: e.target.value })} placeholder="Enter model number" /></div>
+              <div className="space-y-2"><Label>Cost/Price *</Label><Input type="number" step="0.01" min="0" value={newMachine.cost} onChange={(e) => setNewMachine({ ...newMachine, cost: parseFloat(e.target.value) || 0 })} placeholder="Enter cost" required /></div>
+              <div className="space-y-2"><Label>Purchase Date *</Label><Input type="date" value={newMachine.purchaseDate} onChange={(e) => setNewMachine({ ...newMachine, purchaseDate: e.target.value })} required /></div>
+              <div className="space-y-2"><Label>Quantity *</Label><Input type="number" min="1" value={newMachine.quantity} onChange={(e) => setNewMachine({ ...newMachine, quantity: parseInt(e.target.value) || 1 })} placeholder="Enter quantity" required /></div>
+              <div className="space-y-2"><Label>Status *</Label><Select value={newMachine.status} onValueChange={(value: 'operational' | 'maintenance' | 'out-of-service') => setNewMachine({ ...newMachine, status: value })}><SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger><SelectContent>{machineStatusOptions.map(status => (<SelectItem key={status.value} value={status.value}>{status.label}</SelectItem>))}</SelectContent></Select></div>
+              <div className="space-y-2"><Label>Department</Label><Input value={newMachine.department} onChange={(e) => setNewMachine({ ...newMachine, department: e.target.value })} placeholder="Enter department" /></div>
               {/* Location/Site dropdown - Now fetches from database */}
               <div className="space-y-2">
                 <Label>Location/Site *</Label>
-                <Select value={newMachine.location} onValueChange={(value) => setNewMachine({...newMachine, location: value})}>
+                <Select value={newMachine.location} onValueChange={(value) => setNewMachine({ ...newMachine, location: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select site" />
                   </SelectTrigger>
@@ -2177,10 +2167,10 @@ setMachines(machinesData || []);
                 </Select>
                 <p className="text-xs text-muted-foreground">Select the site where this machine is located/working</p>
               </div>
-              <div className="space-y-2"><Label>Assigned To</Label>{role === 'supervisor' && user ? (<div className="p-2 border rounded-md bg-gray-50"><div className="flex items-center gap-2"><UserCheck className="h-4 w-4" /><span>{user.name}</span><Badge variant="secondary" className="h-5 text-xs ml-1">You</Badge></div></div>) : (<Input value={newMachine.assignedTo} onChange={(e) => setNewMachine({...newMachine, assignedTo: e.target.value})} placeholder="Enter assigned person" />)}</div>
-              <div className="space-y-2"><Label>Last Maintenance Date</Label><Input type="date" value={newMachine.lastMaintenanceDate} onChange={(e) => setNewMachine({...newMachine, lastMaintenanceDate: e.target.value})} /></div>
-              <div className="space-y-2"><Label>Next Maintenance Date</Label><Input type="date" value={newMachine.nextMaintenanceDate} onChange={(e) => setNewMachine({...newMachine, nextMaintenanceDate: e.target.value})} /></div>
-              <div className="space-y-2 col-span-1 md:col-span-2"><Label>Description</Label><Textarea value={newMachine.description} onChange={(e) => setNewMachine({...newMachine, description: e.target.value})} placeholder="Enter machine description" rows={3} /></div>
+              <div className="space-y-2"><Label>Assigned To</Label>{role === 'supervisor' && user ? (<div className="p-2 border rounded-md bg-gray-50"><div className="flex items-center gap-2"><UserCheck className="h-4 w-4" /><span>{user.name}</span><Badge variant="secondary" className="h-5 text-xs ml-1">You</Badge></div></div>) : (<Input value={newMachine.assignedTo} onChange={(e) => setNewMachine({ ...newMachine, assignedTo: e.target.value })} placeholder="Enter assigned person" />)}</div>
+              <div className="space-y-2"><Label>Last Maintenance Date</Label><Input type="date" value={newMachine.lastMaintenanceDate} onChange={(e) => setNewMachine({ ...newMachine, lastMaintenanceDate: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Next Maintenance Date</Label><Input type="date" value={newMachine.nextMaintenanceDate} onChange={(e) => setNewMachine({ ...newMachine, nextMaintenanceDate: e.target.value })} /></div>
+              <div className="space-y-2 col-span-1 md:col-span-2"><Label>Description</Label><Textarea value={newMachine.description} onChange={(e) => setNewMachine({ ...newMachine, description: e.target.value })} placeholder="Enter machine description" rows={3} /></div>
             </div>
             <DialogFooter><Button variant="outline" onClick={() => { setMachineDialogOpen(false); setEditMachine(null); resetNewMachineForm(); }}>Cancel</Button><Button onClick={handleAddMachine}>{editMachine ? 'Update Machine' : 'Add Machine'}</Button></DialogFooter>
           </DialogContent>
@@ -2190,7 +2180,7 @@ setMachines(machinesData || []);
         <Dialog open={updateDialogOpen} onOpenChange={(open) => { setUpdateDialogOpen(open); if (!open) { setSelectedMachineForUpdate(null); setUpdateFormData({ site: '', description: '', status: 'operational', photoFiles: [], photoPreviews: [] }); setFetchMachineQuery({ name: '', model: '' }); setTempImageForUpload(null); } }}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>{selectedMachineForUpdate ? 'Record Site Update' : 'Find Machine for Update'}</DialogTitle></DialogHeader>
-            
+
             {!selectedMachineForUpdate ? (
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -2216,19 +2206,19 @@ setMachines(machinesData || []);
 
                 <div className="space-y-2">
                   <Label>Select Site *</Label>
-                  <Select value={updateFormData.site} onValueChange={(value) => setUpdateFormData({...updateFormData, site: value})}>
+                  <Select value={updateFormData.site} onValueChange={(value) => setUpdateFormData({ ...updateFormData, site: value })}>
                     <SelectTrigger><SelectValue placeholder="Select site" /></SelectTrigger>
                     <SelectContent>
-                      {role === 'supervisor' 
-                        ? (assignedSites.length > 0 
-                            ? assignedSites.map(site => (
-                                <SelectItem key={site._id} value={site.name}>{site.name}</SelectItem>
-                              ))
-                            : <SelectItem value="no-sites" disabled>No sites assigned. Please contact admin.</SelectItem>
-                          )
-                        : allSites.map(site => (
+                      {role === 'supervisor'
+                        ? (assignedSites.length > 0
+                          ? assignedSites.map(site => (
                             <SelectItem key={site._id} value={site.name}>{site.name}</SelectItem>
                           ))
+                          : <SelectItem value="no-sites" disabled>No sites assigned. Please contact admin.</SelectItem>
+                        )
+                        : allSites.map(site => (
+                          <SelectItem key={site._id} value={site.name}>{site.name}</SelectItem>
+                        ))
                       }
                     </SelectContent>
                   </Select>
@@ -2241,7 +2231,7 @@ setMachines(machinesData || []);
 
                 <div className="space-y-2">
                   <Label>Status</Label>
-                  <Select value={updateFormData.status} onValueChange={(value: 'operational' | 'maintenance' | 'out-of-service') => setUpdateFormData({...updateFormData, status: value})}>
+                  <Select value={updateFormData.status} onValueChange={(value: 'operational' | 'maintenance' | 'out-of-service') => setUpdateFormData({ ...updateFormData, status: value })}>
                     <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
                     <SelectContent>
                       {machineStatusOptions.map(status => (<SelectItem key={status.value} value={status.value}>{status.label}</SelectItem>))}
@@ -2251,7 +2241,7 @@ setMachines(machinesData || []);
 
                 <div className="space-y-2">
                   <Label>Description (Optional)</Label>
-                  <Textarea value={updateFormData.description} onChange={(e) => setUpdateFormData({...updateFormData, description: e.target.value})} placeholder="Enter any additional notes about the site update..." rows={3} />
+                  <Textarea value={updateFormData.description} onChange={(e) => setUpdateFormData({ ...updateFormData, description: e.target.value })} placeholder="Enter any additional notes about the site update..." rows={3} />
                 </div>
 
                 <div className="space-y-3">
@@ -2269,12 +2259,12 @@ setMachines(machinesData || []);
                             Upload Files
                           </div>
                         </Button>
-                        <Input 
-                          type="file" 
-                          accept="image/*" 
-                          multiple 
-                          className="hidden" 
-                          onChange={handleMultiplePhotoUpload} 
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={handleMultiplePhotoUpload}
                         />
                       </label>
                     </div>
@@ -2287,9 +2277,9 @@ setMachines(machinesData || []);
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 mt-3">
                       {updateFormData.photoPreviews.map((preview, idx) => (
                         <div key={idx} className="relative group">
-                          <img 
-                            src={preview} 
-                            alt={`Preview ${idx + 1}`} 
+                          <img
+                            src={preview}
+                            alt={`Preview ${idx + 1}`}
                             className="w-full h-24 object-cover rounded-lg border"
                           />
                           <Button
@@ -2353,10 +2343,10 @@ setMachines(machinesData || []);
             <DialogHeader><DialogTitle>Add Maintenance Record</DialogTitle></DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2"><Label>Select Machine *</Label><Select value={selectedMachineForMaintenance || ""} onValueChange={setSelectedMachineForMaintenance}><SelectTrigger><SelectValue placeholder="Select machine" /></SelectTrigger><SelectContent>{machines.map(machine => (<SelectItem key={machine.id} value={machine.id}>{machine.name} {machine.model ? `(${machine.model})` : ''} - Site: {machine.location || 'Not assigned'}</SelectItem>))}</SelectContent></Select></div>
-              {selectedMachineForMaintenance && (<><div className="space-y-2"><Label>Maintenance Type *</Label><Select value={maintenanceRecord.type} onValueChange={(value) => setMaintenanceRecord({...maintenanceRecord, type: value})}><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger><SelectContent>{maintenanceTypes.map(type => (<SelectItem key={type} value={type}>{type}</SelectItem>))}</SelectContent></Select></div>
-              <div className="space-y-2"><Label>Description *</Label><Textarea value={maintenanceRecord.description} onChange={(e) => setMaintenanceRecord({...maintenanceRecord, description: e.target.value})} placeholder="Describe the maintenance performed" rows={3} /></div>
-              <div className="space-y-2"><Label>Cost</Label><Input type="number" step="0.01" min="0" value={maintenanceRecord.cost} onChange={(e) => setMaintenanceRecord({...maintenanceRecord, cost: parseFloat(e.target.value) || 0})} placeholder="Enter maintenance cost" /></div>
-              <div className="space-y-2"><Label>Performed By *</Label><Input value={maintenanceRecord.performedBy} onChange={(e) => setMaintenanceRecord({...maintenanceRecord, performedBy: e.target.value})} placeholder="Enter technician name" /></div></>)}
+              {selectedMachineForMaintenance && (<><div className="space-y-2"><Label>Maintenance Type *</Label><Select value={maintenanceRecord.type} onValueChange={(value) => setMaintenanceRecord({ ...maintenanceRecord, type: value })}><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger><SelectContent>{maintenanceTypes.map(type => (<SelectItem key={type} value={type}>{type}</SelectItem>))}</SelectContent></Select></div>
+                <div className="space-y-2"><Label>Description *</Label><Textarea value={maintenanceRecord.description} onChange={(e) => setMaintenanceRecord({ ...maintenanceRecord, description: e.target.value })} placeholder="Describe the maintenance performed" rows={3} /></div>
+                <div className="space-y-2"><Label>Cost</Label><Input type="number" step="0.01" min="0" value={maintenanceRecord.cost} onChange={(e) => setMaintenanceRecord({ ...maintenanceRecord, cost: parseFloat(e.target.value) || 0 })} placeholder="Enter maintenance cost" /></div>
+                <div className="space-y-2"><Label>Performed By *</Label><Input value={maintenanceRecord.performedBy} onChange={(e) => setMaintenanceRecord({ ...maintenanceRecord, performedBy: e.target.value })} placeholder="Enter technician name" /></div></>)}
             </div>
             <DialogFooter><Button variant="outline" onClick={() => setMaintenanceDialogOpen(false)}>Cancel</Button><Button onClick={handleAddMaintenance} disabled={!selectedMachineForMaintenance || maintenanceLoading}>{maintenanceLoading ? "Adding..." : "Add Maintenance"}</Button></DialogFooter>
           </DialogContent>

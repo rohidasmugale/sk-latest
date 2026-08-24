@@ -18,6 +18,8 @@ export interface User {
   joinDate: string;
   createdAt?: string;
   updatedAt?: string;
+   assignedSites?: string[];   // ✅ ADD THIS
+  siteName?: string;  
 }
 
 export interface CreateUserData {
@@ -31,6 +33,8 @@ export interface CreateUserData {
   site: string;
   phone: string;
   joinDate: string;
+  assignedSites?: string[];
+  siteName?: string;
 }
 
 export interface UpdateUserData {

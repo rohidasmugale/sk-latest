@@ -70,6 +70,7 @@ interface Employee {
     expiryDate: string;
     status: string;
   }>;
+  profileStatus?: "complete" | "incomplete";   // ✅ ADD THIS
 }
 
 interface Attendance {

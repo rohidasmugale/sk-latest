@@ -43,6 +43,7 @@ interface FormUserData {
   status: "active" | "inactive";
   joinDate: string;
   photoFile?: File | null;
+   assignedSites?: string[];  
 }
 
 const EnhancedUserForm = ({

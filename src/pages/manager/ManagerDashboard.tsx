@@ -127,6 +127,7 @@ interface Employee {
   updatedAt?: string;
   isManager?: boolean;
   isSupervisor?: boolean;
+  profileStatus?: "complete" | "incomplete";   // ✅ ADD THIS
 }
 
 interface SalaryStructure {
@@ -260,6 +261,7 @@ interface Employee {
   isSupervisor?: boolean;
   status?: string;
   assignedSites?: string[];
+  profileStatus?: "complete" | "incomplete";   // ✅ ADD THIS
 }
 
 // Interface for site employee count (ONLY EMPLOYEES ASSIGNED TO SITES)

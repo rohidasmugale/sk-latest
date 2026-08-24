@@ -1,5 +1,6 @@
 // frontend/src/services/employeeService.ts
 import apiClient from '@/lib/apiClient';
+import axios from 'axios';
 import { Employee } from '@/types/employee';
 
 export interface EmployeeResponse {
@@ -14,6 +15,9 @@ export interface EmployeeSingleResponse {
   employee: Employee;
   message?: string;
 }
+
+const API_URL = import.meta.env.VITE_API_URL ||
+  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 const employeeService = {
   // Get all employees with pagination
@@ -104,6 +108,27 @@ const employeeService = {
       return response.data;
     } catch (error) {
       console.error('Failed to fetch employee stats:', error);
+      throw error;
+    }
+  },
+
+  // ✅ FIXED: Get employees for the logged-in supervisor using explicit token
+  getSupervisorEmployees: async (): Promise<EmployeeResponse> => {
+    try {
+      console.log('🔵 Fetching supervisor employees from API...');
+     const token = localStorage.getItem('sk_token') || localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      const response = await axios.get(`${API_URL}/employees/supervisor`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      console.log('🟢 Supervisor employees fetched:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('🔴 Failed to fetch supervisor employees:', error);
       throw error;
     }
   },

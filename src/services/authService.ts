@@ -9,6 +9,8 @@ export interface User {
   role: string;
   createdBy?: string;
   updatedBy?: string;
+   assignedSites?: string[];   // ✅ ADD THIS
+  siteName?: string;  
 }
 
 export interface ApiResponse<T> {

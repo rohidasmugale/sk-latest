@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { DashboardHeader } from "@/components/shared/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building, ClipboardList, ChevronDown, ChevronUp, Calendar, Loader2, RefreshCw, AlertCircle } from "lucide-react";
+import { Building, ClipboardList, ChevronDown, ChevronUp, Calendar, Loader2, RefreshCw, AlertCircle, Users, Bell, Settings } from "lucide-react";
 import { motion } from "framer-motion";
 import { useOutletContext } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -17,9 +17,14 @@ import {
 import { toast } from 'sonner';
 import AssignTaskPage from "./components/AssignTaskPage";
 import SitesSection from "./components/SitesSection"; // superadmin version
-import TrainingBriefingSectionManager from "@/pages/manager/components/TrainingBriefingSectionManager";
+import TrainingAndBriefing from "./components/TrainingAndBriefing"; // superadmin version
 import { PullToRefreshWrapper } from '@/components/shared/PullToRefreshWrapper';
 import axios from "axios";
+
+// Import the new components (you'll need to create these or import from manager)
+import RosterSection from "./components/RosterSection";
+import ServicesSection from "./components/ServicesSection";
+import { WorkQueryList } from "@/components/shared/WorkQueryList";
 
 const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
@@ -82,14 +87,22 @@ const SuperAdminOperations = () => {
 
   const [isMobileView, setIsMobileView] = useState(false);
 
-  // ✅ Site filter state
+  // Site filter state
   const [selectedSite, setSelectedSite] = useState<string>("all");
   const [allSites, setAllSites] = useState<any[]>([]);
+
+  // Data states for new sections
+  const [rosterData, setRosterData] = useState<any[]>([]);
+  const [servicesData, setServicesData] = useState<any[]>([]);
+  const [alertsData, setAlertsData] = useState<any[]>([]);
 
   const tabs = [
     { value: "assign", label: "Assign Task", icon: <ClipboardList className="h-4 w-4" /> },
     { value: "sites", label: "Sites", icon: <Building className="h-4 w-4" /> },
     { value: "training", label: "Training & Briefing", icon: <Calendar className="h-4 w-4" /> },
+    { value: "roster", label: "Roster", icon: <Users className="h-4 w-4" /> },
+    { value: "services", label: "Services", icon: <Settings className="h-4 w-4" /> },
+    { value: "alerts", label: "Alerts & Issues", icon: <Bell className="h-4 w-4" /> },
   ];
 
   const fetchAllData = async (showToast: boolean = false) => {
@@ -102,18 +115,28 @@ const SuperAdminOperations = () => {
         setLoading(true);
       }
 
-      const [tasksRes, sitesRes] = await Promise.all([
+      const [tasksRes, sitesRes, rosterRes, servicesRes, alertsRes] = await Promise.all([
         axios.get(`${API_URL}/tasks`),
-        axios.get(`${API_URL}/sites`)
+        axios.get(`${API_URL}/sites`),
+        axios.get(`${API_URL}/roster`).catch(() => ({ data: { data: [] } })),
+        axios.get(`${API_URL}/services`).catch(() => ({ data: { data: [] } })),
+        axios.get(`${API_URL}/alerts`).catch(() => ({ data: { data: [] } })),
       ]);
 
       const sitesData = sitesRes.data.data || sitesRes.data || [];
       setAllSites(sitesData);
 
+      setRosterData(rosterRes.data.data || rosterRes.data || []);
+      setServicesData(servicesRes.data.data || servicesRes.data || []);
+      setAlertsData(alertsRes.data.data || alertsRes.data || []);
+
       window.dispatchEvent(new CustomEvent('refreshOperations', {
         detail: {
           tasks: tasksRes.data.data || tasksRes.data || [],
-          sites: sitesData
+          sites: sitesData,
+          roster: rosterData,
+          services: servicesData,
+          alerts: alertsData
         }
       }));
 
@@ -192,7 +215,7 @@ const SuperAdminOperations = () => {
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* ✅ Site Filter */}
+          {/* Site Filter */}
           <div className="flex items-center gap-2">
             <Building className="h-4 w-4 text-gray-500" />
             <select
@@ -241,7 +264,7 @@ const SuperAdminOperations = () => {
             />
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 md:space-y-6">
-              <TabsList className="hidden lg:grid w-full grid-cols-3">
+              <TabsList className="hidden lg:grid w-full grid-cols-6">
                 <TabsTrigger value="assign" className="text-sm">
                   <ClipboardList className="h-4 w-4 mr-2" />
                   Assign Task
@@ -253,6 +276,18 @@ const SuperAdminOperations = () => {
                 <TabsTrigger value="training" className="text-sm">
                   <Calendar className="h-4 w-4 mr-2" />
                   Training & Briefing
+                </TabsTrigger>
+                <TabsTrigger value="roster" className="text-sm">
+                  <Users className="h-4 w-4 mr-2" />
+                  Roster
+                </TabsTrigger>
+                <TabsTrigger value="services" className="text-sm">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Services
+                </TabsTrigger>
+                <TabsTrigger value="alerts" className="text-sm">
+                  <Bell className="h-4 w-4 mr-2" />
+                  Alerts & Issues
                 </TabsTrigger>
               </TabsList>
 
@@ -273,9 +308,34 @@ const SuperAdminOperations = () => {
               </TabsContent>
 
               <TabsContent value="training">
-                <TrainingBriefingSectionManager
+                <TrainingAndBriefing
                   selectedSite={selectedSite}
                   sites={allSites}
+                />
+              </TabsContent>
+
+              <TabsContent value="roster">
+                <RosterSection
+                  refreshTrigger={refreshTrigger}
+                  selectedSite={selectedSite}
+                  sites={allSites}
+                  rosterData={rosterData}
+                />
+              </TabsContent>
+
+              <TabsContent value="services">
+                <ServicesSection
+                  refreshTrigger={refreshTrigger}
+                  selectedSite={selectedSite}
+                  sites={allSites}
+                  servicesData={servicesData}
+                />
+              </TabsContent>
+
+              <TabsContent value="alerts">
+                <WorkQueryList
+                  mode="superadmin"
+                  refreshTrigger={refreshTrigger}
                 />
               </TabsContent>
             </Tabs>

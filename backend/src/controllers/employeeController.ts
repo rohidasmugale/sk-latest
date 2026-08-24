@@ -5,148 +5,97 @@ import {
   uploadSignatureToCloudinary 
 } from '../utils/CloudinaryUtils';
 
-// Generate unique employee ID
-const generateEmployeeId = async (): Promise<string> => {
-  try {
-    // Get the latest employee sorted by employeeId in descending order
-    const latestEmployee = await Employee.findOne().sort({ employeeId: -1 });
-    
-    if (!latestEmployee) {
-      return 'SKEMP0001';
-    }
-    
-    // Extract the numeric part from the latest employee ID
-    const latestId = latestEmployee.employeeId;
-    
-    // Handle both SKEMP and EMP formats
-    let numericPart = 0;
-    
-    if (latestId.startsWith('SKEMP')) {
-      numericPart = parseInt(latestId.replace('SKEMP', '')) || 0;
-    } else if (latestId.startsWith('EMP')) {
-      numericPart = parseInt(latestId.replace('EMP', '')) || 0;
-    } else {
-      // If format is unknown, find the highest numeric value
-      const allEmployees = await Employee.find().select('employeeId');
-      const numericIds = allEmployees
-        .map(emp => {
-          const id = emp.employeeId;
-          const matches = id.match(/\d+/);
-          return matches ? parseInt(matches[0]) : 0;
-        })
-        .filter(num => !isNaN(num));
-      
-      numericPart = numericIds.length > 0 ? Math.max(...numericIds) : 0;
-    }
-    
-    const newNumericPart = numericPart + 1;
-    
-    // Return in SKEMP format with 4-digit zero padding
-    return `SKEMP${String(newNumericPart).padStart(4, '0')}`;
-    
-  } catch (error) {
-    console.error('Error generating employee ID:', error);
-    
-    // Fallback: use timestamp
-    const timestamp = Date.now().toString().slice(-6);
-    return `SKEMP${timestamp}`;
-  }
-};
 
-// Create a new employee
+  
 export const createEmployee = async (req: Request, res: Response) => {
   try {
     console.log('Creating employee with data:', req.body);
     console.log('Files received:', req.files);
-    
-    // Check for existing employee with same email or Aadhar
+
+    // 1️⃣ Get the employeeId from request
+    const employeeId = req.body.employeeId?.trim();
+    if (!employeeId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Employee ID is required'
+      });
+    }
+
+    // 2️⃣ Check if this employeeId already exists (optional but gives nicer error)
+    const existingByEmployeeId = await Employee.findOne({ employeeId });
+    if (existingByEmployeeId) {
+      return res.status(400).json({
+        success: false,
+        message: `Employee ID "${employeeId}" already exists. Please choose a different one.`
+      });
+    }
+
+    // 3️⃣ Check existing email or Aadhar (keep as is)
     const existingEmployee = await Employee.findOne({
       $or: [
         { email: req.body.email },
         { aadharNumber: req.body.aadharNumber }
       ]
     });
-    
     if (existingEmployee) {
       return res.status(400).json({
         success: false,
         message: 'Employee with this email or Aadhar number already exists'
       });
     }
-    
-    let photoUrl = '';
-    let photoPublicId = '';
-    let employeeSignatureUrl = '';
-    let employeeSignaturePublicId = '';
-    let authorizedSignatureUrl = '';
-    let authorizedSignaturePublicId = '';
 
-    // Handle photo upload
+    // ---------- File uploads (no change) ----------
+    let photoUrl = '', photoPublicId = '';
+    let employeeSignatureUrl = '', employeeSignaturePublicId = '';
+    let authorizedSignatureUrl = '', authorizedSignaturePublicId = '';
+
     if (req.files && (req.files as any).photo) {
       try {
         const photoFile = (req.files as any).photo[0];
-        console.log('Uploading photo to Cloudinary...');
         const photoResult = await uploadImageToCloudinary(photoFile.buffer, 'employee-photos');
         photoUrl = photoResult.secure_url;
         photoPublicId = photoResult.public_id;
-        console.log('Photo uploaded to Cloudinary:', photoUrl);
       } catch (photoError) {
-        console.error('Error uploading photo to Cloudinary:', photoError);
-        // Continue without photo - don't fail the entire creation
+        console.error('Error uploading photo:', photoError);
       }
     }
 
-    // Handle employee signature upload
     if (req.files && (req.files as any).employeeSignature) {
       try {
         const signatureFile = (req.files as any).employeeSignature[0];
-        console.log('Uploading employee signature to Cloudinary...');
         const signatureResult = await uploadSignatureToCloudinary(signatureFile.buffer, 'employee-signatures');
         employeeSignatureUrl = signatureResult.secure_url;
         employeeSignaturePublicId = signatureResult.public_id;
-        console.log('Employee signature uploaded to Cloudinary:', employeeSignatureUrl);
       } catch (sigError) {
-        console.error('Error uploading employee signature to Cloudinary:', sigError);
+        console.error('Error uploading employee signature:', sigError);
       }
     }
 
-    // Handle authorized signature upload
     if (req.files && (req.files as any).authorizedSignature) {
       try {
         const authSigFile = (req.files as any).authorizedSignature[0];
-        console.log('Uploading authorized signature to Cloudinary...');
         const authSigResult = await uploadSignatureToCloudinary(authSigFile.buffer, 'authorized-signatures');
         authorizedSignatureUrl = authSigResult.secure_url;
         authorizedSignaturePublicId = authSigResult.public_id;
-        console.log('Authorized signature uploaded to Cloudinary:', authorizedSignatureUrl);
       } catch (authSigError) {
-        console.error('Error uploading authorized signature to Cloudinary:', authSigError);
+        console.error('Error uploading authorized signature:', authSigError);
       }
     }
 
-    // Generate unique employee ID
-    const employeeId = await generateEmployeeId();
-    console.log('Generated employee ID:', employeeId);
-
-    // Parse salary to number
+    // ---------- Build employee data ----------
     const salary = req.body.salary ? parseFloat(req.body.salary) : 0;
-
-    // Parse date fields
     const dateOfBirth = req.body.dateOfBirth ? new Date(req.body.dateOfBirth) : undefined;
     const dateOfJoining = req.body.dateOfJoining ? new Date(req.body.dateOfJoining) : new Date();
     const dateOfExit = req.body.dateOfExit ? new Date(req.body.dateOfExit) : undefined;
 
-    // Parse boolean fields
     const idCardIssued = req.body.idCardIssued === 'true' || req.body.idCardIssued === true;
     const westcoatIssued = req.body.westcoatIssued === 'true' || req.body.westcoatIssued === true;
     const apronIssued = req.body.apronIssued === 'true' || req.body.apronIssued === true;
-
-    // Parse numeric fields
     const numberOfChildren = req.body.numberOfChildren ? parseInt(req.body.numberOfChildren) : 0;
 
-    // Create employee object
+    // 4️⃣ Create employee object – using the user‑provided employeeId
     const employeeData: Partial<IEmployee> = {
-      employeeId,
+      employeeId,   // <── now uses the value from the request
       name: req.body.name,
       email: req.body.email,
       phone: req.body.phone,
@@ -154,62 +103,42 @@ export const createEmployee = async (req: Request, res: Response) => {
       panNumber: req.body.panNumber,
       esicNumber: req.body.esicNumber,
       uanNumber: req.body.uanNumber,
-      
-      // Personal Details
       dateOfBirth,
       dateOfJoining,
       dateOfExit,
       bloodGroup: req.body.bloodGroup,
       gender: req.body.gender,
       maritalStatus: req.body.maritalStatus,
-      
-      // Address
       permanentAddress: req.body.permanentAddress,
       permanentPincode: req.body.permanentPincode,
       localAddress: req.body.localAddress,
       localPincode: req.body.localPincode,
-      
-      // Bank Details
       bankName: req.body.bankName,
       accountNumber: req.body.accountNumber,
       ifscCode: req.body.ifscCode,
       branchName: req.body.branchName,
-      bankBranch: req.body.branchName, // Alias for compatibility
-      
-      // Family Details
+      bankBranch: req.body.branchName,
       fatherName: req.body.fatherName,
       motherName: req.body.motherName,
       spouseName: req.body.spouseName,
       numberOfChildren,
-      
-      // Emergency Contact
       emergencyContactName: req.body.emergencyContactName,
       emergencyContactPhone: req.body.emergencyContactPhone,
       emergencyContactRelation: req.body.emergencyContactRelation,
-      
-      // Nominee Details
       nomineeName: req.body.nomineeName,
       nomineeRelation: req.body.nomineeRelation,
-      
-      // Employment Details
       department: req.body.department,
       position: req.body.position,
       siteName: req.body.siteName,
       salary,
       status: 'active' as const,
       role: 'employee' as const,
-      
-      // Uniform Details
       pantSize: req.body.pantSize,
       shirtSize: req.body.shirtSize,
       capSize: req.body.capSize,
-      
-      // Issued Items
       idCardIssued,
       westcoatIssued,
       apronIssued,
-      
-      // Cloudinary URLs
       photo: photoUrl,
       photoPublicId,
       employeeSignature: employeeSignatureUrl,
@@ -218,15 +147,9 @@ export const createEmployee = async (req: Request, res: Response) => {
       authorizedSignaturePublicId,
     };
 
-    console.log('Creating employee with data:', employeeData);
-
-    // Create and save employee
     const employee = new Employee(employeeData);
     const savedEmployee = await employee.save();
 
-    console.log('Employee created successfully:', savedEmployee._id);
-
-    // Return the full employee object with all fields
     res.status(201).json({
       success: true,
       message: 'Employee created successfully',
@@ -235,46 +158,21 @@ export const createEmployee = async (req: Request, res: Response) => {
 
   } catch (error: any) {
     console.error('Error creating employee:', error);
-    
-    // Handle duplicate key errors
     if (error.code === 11000) {
-      console.error('Duplicate key error details:', error.keyPattern);
-      
       let message = 'Duplicate value entered';
       const field = Object.keys(error.keyPattern)[0];
-      
       if (field === 'email') message = 'Email already exists';
       else if (field === 'aadharNumber') message = 'Aadhar number already exists';
-      else if (field === 'employeeId') {
-        message = 'Employee ID conflict. Please try again.';
-      }
-      
-      return res.status(400).json({
-        success: false,
-        message,
-        error: error.message,
-        field
-      });
+      else if (field === 'employeeId') message = 'Employee ID already exists. Please use a unique ID.';
+      return res.status(400).json({ success: false, message, error: error.message, field });
     }
-    
-    // Handle validation errors
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map((err: any) => err.message);
-      return res.status(400).json({
-        success: false,
-        message: 'Validation error',
-        errors: messages
-      });
+      return res.status(400).json({ success: false, message: 'Validation error', errors: messages });
     }
-    
-    res.status(500).json({
-      success: false,
-      message: 'Error creating employee',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Error creating employee', error: error.message });
   }
 };
-
 // Get all employees
 export const getEmployees = async (req: Request, res: Response) => {
   try {

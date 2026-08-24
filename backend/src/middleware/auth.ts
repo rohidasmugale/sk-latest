@@ -22,10 +22,13 @@ export const auth = async (req: Request, res: Response, next: NextFunction) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
-
-    // Get full user from DB
-    const user = await User.findById(decoded.userId).select('-password').lean();
+   const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+// ✅ Try all possible ID fields
+const userId = decoded.userId || decoded.id || decoded._id;
+if (!userId) {
+  return res.status(401).json({ success: false, error: 'Invalid token payload' });
+}
+const user = await User.findById(userId).select('-password').lean();
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }

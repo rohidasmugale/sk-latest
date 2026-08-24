@@ -32,6 +32,16 @@ export interface IPayroll extends Document {
   otherAllowances?: number;
   leaveEncashment?: number;
   arrears?: number;
+  deductionBreakdown?: {
+    additionalDeductions: number;
+    items: Array<{
+      type: string;
+      amount: number;
+      description: string;
+      id: string;
+    }>;
+  };
+  
   createdBy: string;
   updatedBy: string;
   // Employee details for reference
@@ -210,6 +220,18 @@ const PayrollSchema: Schema = new Schema(
       default: 0,
       min: [0, 'Arrears cannot be negative']
     },
+
+    deductionBreakdown: {
+  additionalDeductions: { type: Number, default: 0 },
+  items: [
+    {
+      type: { type: String },
+      amount: { type: Number },
+      description: { type: String },
+      id: { type: String }
+    }
+  ]
+},
     // Employee details for reference
     employeeDetails: {
       accountNumber: {

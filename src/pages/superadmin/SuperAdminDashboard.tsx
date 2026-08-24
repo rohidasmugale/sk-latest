@@ -63,7 +63,7 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
-
+import { useRole } from "@/context/RoleContext";
 // Import axios for API calls
 import axios from 'axios';
 
@@ -125,6 +125,7 @@ interface Employee {
   updatedAt?: string;
   isManager?: boolean;
   isSupervisor?: boolean;
+  profileStatus?: "complete" | "incomplete";   // ✅ ADD THIS
 }
 
 interface SalaryStructure {
@@ -760,8 +761,12 @@ const MobilePayrollCard = ({ item, formatCurrency, index }: any) => {
     </Card>
   );
 };
-const SuperAdminDashboard = () => {
+const SuperAdminDashboard = ({ title: propTitle }: { title?: string }) => {
   const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
+  const { role } = useRole();
+
+  const basePath = role === 'admin' ? '/admin' : '/superadmin';
+  const dashboardTitle = propTitle || (role === 'admin' ? 'Admin Dashboard' : 'Super Admin Dashboard');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const departmentData = useMemo(() => {
@@ -1093,19 +1098,18 @@ const SuperAdminDashboard = () => {
 
   const handlePieChartClick = (date?: string) => {
     const selectedDate = date || currentDayData.date;
-    navigate(`/superadmin/attendaceview?view=site&date=${selectedDate}`);
+    navigate(`${basePath}/attendanceview?view=site&date=${selectedDate}`);
   };
 
   const handleSmallPieChartClick = (dayData: any) => {
-    navigate(`/superadmin/attendaceview?view=site&date=${dayData.date}`);
+    navigate(`${basePath}/attendanceview?view=site&date=${dayData.date}`);
   };
 
   const handleDepartmentCardClick = (department: string) => {
     const todayStr = new Date().toISOString().split('T')[0];
-    navigate(`/superadmin/attendaceview?view=service&service=${encodeURIComponent(department)}&date=${todayStr}`);
+    navigate(`${basePath}/attendanceview?view=service&service=${encodeURIComponent(department)}&date=${todayStr}`);
   };
-  // Custom tooltips
-  // ✅ Replace the CustomPieTooltip
+
   const CustomPieTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0];
@@ -1177,15 +1181,13 @@ const SuperAdminDashboard = () => {
   };
   return (
     <PullToRefreshWrapper
-      pageName="Super Admin Dashboard"
+      pageName={dashboardTitle}
       onRefresh={refreshAllData}
       className="min-h-screen bg-gradient-to-b from-background to-gray-50/50 relative overflow-y-auto"
     >
 
       <DashboardHeader
-        title=" Super Admin Dashboard"
-
-
+        title={dashboardTitle}
         onMenuClick={onMenuClick}
       />
 
@@ -1388,7 +1390,7 @@ const SuperAdminDashboard = () => {
           </Card>
         </motion.div>
 
-       
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

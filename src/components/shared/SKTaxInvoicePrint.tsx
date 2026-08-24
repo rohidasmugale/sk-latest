@@ -22,57 +22,82 @@ export const SKTaxInvoicePrint = ({ invoice, onClose }: PrintableInvoiceProps) =
   const handlePrint = () => {
     const printContent = document.getElementById("tax-invoice-print")?.innerHTML;
     const printWindow = window.open("", "_blank");
-    printWindow?.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Tax Invoice - ${invoice.invoiceNumber}</title>
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body {
-              font-family: 'Arial', sans-serif;
-              background: white;
-              padding: 15px;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-            .invoice-container { max-width: 1100px; margin: 0 auto; background: white; }
-            /* Main styles – no Tailwind */
-            .header { text-align: center; border-bottom: 2px solid #1e3a8a; margin-bottom: 15px; padding-bottom: 10px; }
-            .company-name { font-size: 26px; font-weight: bold; color: #1e3a8a; }
-            .services { font-size: 13px; margin: 5px 0; display: flex; justify-content: center; gap: 20px; }
-            .address, .contact { font-size: 11px; margin: 3px 0; }
-            .title { text-align: center; margin: 15px 0; }
-            .title h3 { font-size: 20px; font-weight: bold; border-top: 2px solid black; border-bottom: 2px solid black; display: inline-block; padding: 6px 30px; }
-            .service-period { background: #f3f4f6; text-align: center; padding: 5px; border-radius: 6px; margin: 10px 0; font-size: 12px; font-weight: 500; }
-            .site-section { border: 1px solid #ccc; border-radius: 6px; padding: 10px; background: #f9fafb; margin: 10px 0; }
-            .info-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 11px; }
-            .info-table td, .info-table th { border: 1px solid #ccc; padding: 5px 8px; vertical-align: top; }
-            .info-table td:first-child { font-weight: 600; width: 35%; background: #f9fafb; }
-            .items-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10px; }
-            .items-table th, .items-table td { border: 1px solid #000; padding: 4px 6px; vertical-align: top; }
-            .items-table th { background: #f5f5f5; font-weight: 700; text-align: center; }
-            .text-right { text-align: right; }
-            .text-center { text-align: center; }
-            .summary { width: 280px; margin-left: auto; border: 1px solid #ccc; border-radius: 4px; margin-top: 15px; }
-            .summary-row { display: flex; justify-content: space-between; padding: 6px 10px; border-bottom: 1px solid #eee; font-size: 11px; }
-            .total-row { background: #eef2ff; font-weight: bold; font-size: 13px; }
-            .words { background: #f3f4f6; padding: 8px; border-radius: 4px; margin: 15px 0; font-size: 11px; }
-            .bank-details { margin: 15px 0; font-size: 10px; border-top: 1px solid #ccc; padding-top: 8px; }
-            .signatures { display: flex; justify-content: space-between; margin-top: 30px; }
-            .signature-box { width: 180px; text-align: center; }
-            .signature-line { border-top: 1px solid black; margin-top: 25px; padding-top: 5px; font-size: 10px; }
-            .footer { text-align: center; font-size: 9px; color: gray; margin-top: 15px; }
-            @media print { button { display: none; } body { padding: 0; } }
-          </style>
-        </head>
-        <body>
-          <div class="invoice-container">${printContent}</div>
-          <script>window.print(); window.close();</script>
-        </body>
-      </html>
-    `);
-    printWindow?.document.close();
+
+    if (!printWindow) {
+      alert("Please allow pop-ups for this site to print.");
+      return;
+    }
+
+    printWindow.document.write(`
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Tax Invoice - ${invoice.invoiceNumber}</title>
+    <style>
+      @page {
+        size: A4 portrait;
+        margin: 10mm;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: 'Arial', sans-serif;
+        background: white;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .invoice-container {
+        width: 100%;
+        max-width: 100%;
+        margin: 0 auto;
+        background: white;
+      }
+      .header { text-align: center; border-bottom: 2px solid #1e3a8a; margin-bottom: 15px; padding-bottom: 10px; }
+      .company-name { font-size: 26px; font-weight: bold; color: #1e3a8a; }
+      .services { font-size: 13px; margin: 5px 0; display: flex; justify-content: center; gap: 20px; }
+      .address, .contact { font-size: 11px; margin: 3px 0; }
+      .title { text-align: center; margin: 15px 0; }
+      .title h3 { font-size: 20px; font-weight: bold; border-top: 2px solid black; border-bottom: 2px solid black; display: inline-block; padding: 6px 30px; }
+      .service-period { background: #f3f4f6; text-align: center; padding: 5px; border-radius: 6px; margin: 10px 0; font-size: 12px; font-weight: 500; }
+      .site-section { border: 1px solid #ccc; border-radius: 6px; padding: 10px; background: #f9fafb; margin: 10px 0; }
+      .info-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 11px; }
+      .info-table td, .info-table th { border: 1px solid #ccc; padding: 5px 8px; vertical-align: top; }
+      .info-table td:first-child { font-weight: 600; width: 35%; background: #f9fafb; }
+      .items-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10px; }
+      .items-table th, .items-table td { border: 1px solid #000; padding: 4px 6px; vertical-align: top; }
+      .items-table th { background: #f5f5f5; font-weight: 700; text-align: center; }
+      .text-right { text-align: right; }
+      .text-center { text-align: center; }
+      .summary { width: 280px; margin-left: auto; border: 1px solid #ccc; border-radius: 4px; margin-top: 15px; }
+      .summary-row { display: flex; justify-content: space-between; padding: 6px 10px; border-bottom: 1px solid #eee; font-size: 11px; }
+      .total-row { background: #eef2ff; font-weight: bold; font-size: 13px; }
+      .words { background: #f3f4f6; padding: 8px; border-radius: 4px; margin: 15px 0; font-size: 11px; }
+      .bank-details { margin: 15px 0; font-size: 10px; border-top: 1px solid #ccc; padding-top: 8px; }
+      .signatures { display: flex; justify-content: space-between; margin-top: 30px; }
+      .signature-box { width: 180px; text-align: center; }
+      .signature-line { border-top: 1px solid black; margin-top: 25px; padding-top: 5px; font-size: 10px; }
+      .footer { text-align: center; font-size: 9px; color: gray; margin-top: 15px; }
+      @media print { button { display: none; } body { padding: 0; } }
+    </style>
+  </head>
+  <body>
+    <div class="invoice-container">${printContent}</div>
+    <script>
+      window.onload = function() {
+        window.print();
+        window.onafterprint = function() {
+          window.close();
+        };
+      };
+    </script>
+  </body>
+</html>
+`);
+
+    printWindow.document.close();
   };
 
   const getFormattedPeriod = () => {
@@ -208,7 +233,12 @@ export const SKTaxInvoicePrint = ({ invoice, onClose }: PrintableInvoiceProps) =
             <div className="summary-row"><span>Net Taxable Value</span><span>{formatCurrency(subtotal)}</span></div>
             <div className="summary-row"><span>SGST @9%</span><span>{formatCurrency(sgst)}</span></div>
             <div className="summary-row"><span>CGST @9%</span><span>{formatCurrency(cgst)}</span></div>
-            {invoice.managementFeesAmount && <div className="summary-row"><span>Management Fees ({invoice.managementFeesPercent || 0}%)</span><span>{formatCurrency(invoice.managementFeesAmount)}</span></div>}
+            {invoice.managementFeesAmount !== undefined && invoice.managementFeesAmount !== 0 && (
+              <div className="summary-row">
+                <span>Management Fees ({invoice.managementFeesPercent || 0}%)</span>
+                <span>{formatCurrency(invoice.managementFeesAmount)}</span>
+              </div>
+            )}
             {invoice.roundUp !== undefined && invoice.roundUp !== 0 && <div className="summary-row"><span>Round Up</span><span>{formatCurrency(invoice.roundUp)}</span></div>}
             <div className="summary-row total-row"><span>Total Amount</span><span>{formatCurrency(total)}</span></div>
           </div>

@@ -49,7 +49,7 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
   const [items, setItems] = useState<PerformInvoiceItem[]>([
     { description: "", quantity: 0, unit: "No", rate: 0, amount: 0 }
   ]);
-  
+
   const [formData, setFormData] = useState({
     // Company Details
     companyName: "S K Enterprises",
@@ -58,21 +58,21 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
     companyState: "Maharashtra",
     companyStateCode: "27",
     companyEmail: "s.k.enterprises7583@gmail.com",
-    
+
     // Consignee Details (Ship to)
     consigneeName: "",
     consigneeAddress: "",
     consigneeGSTIN: "",
     consigneeState: "",
     consigneeStateCode: "",
-    
+
     // Buyer Details (Bill to)
     buyerName: "",
     buyerAddress: "",
     buyerGSTIN: "",
     buyerState: "",
     buyerStateCode: "",
-    
+
     // Order Details
     voucherNo: `FY${new Date().getFullYear() + 1}-${(new Date().getFullYear() + 2).toString().slice(-2)}-PI-${(performInvoicesCount + 1).toString().padStart(3, '0')}`,
     buyerRef: "",
@@ -83,11 +83,11 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
     otherReferences: "",
     destination: "",
     deliveryTerms: "",
-    
+
     // Client details
     clientEmail: "",
     serviceType: "",
-    
+
     // Bank details
     accountHolder: "S K ENTERPRISES",
     bankName: "BANK OF MAHARASHTRA",
@@ -145,30 +145,30 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
       };
 
       // ==================== COMPANY HEADER ====================
-      addText(formData.companyName || "S K Enterprises", pageWidth / 2, yPos, { 
-        size: 14, 
-        style: 'bold', 
-        align: 'center' 
+      addText(formData.companyName || "S K Enterprises", pageWidth / 2, yPos, {
+        size: 14,
+        style: 'bold',
+        align: 'center'
       });
       yPos += 7;
-      
+
       const companyAddress = formData.companyAddress || "Office No 505, 5th Floor, Global Square\nDeccan College Road, Yerwada, Pune";
       const companyAddressLines = companyAddress.split('\n');
       companyAddressLines.forEach((line: string) => {
         addText(line, pageWidth / 2, yPos, { size: 9, align: 'center' });
         yPos += 5;
       });
-      
+
       yPos += 2;
-      
+
       addText(`GSTIN/UIN: ${formData.companyGSTIN || "27ALKPK7734N1ZE"}`, pageWidth / 2, yPos, { size: 9, align: 'center' });
       yPos += 5;
-      
-      addText(`State Name : ${formData.companyState || "Maharashtra"}, Code : ${formData.companyStateCode || "27"}`, 
+
+      addText(`State Name : ${formData.companyState || "Maharashtra"}, Code : ${formData.companyStateCode || "27"}`,
         pageWidth / 2, yPos, { size: 9, align: 'center' });
       yPos += 5;
-      
-      addText(`E-Mail : ${formData.companyEmail || "s.k.enterprises7583@gmail.com"}`, 
+
+      addText(`E-Mail : ${formData.companyEmail || "s.k.enterprises7583@gmail.com"}`,
         pageWidth / 2, yPos, { size: 9, align: 'center' });
       yPos += 12;
 
@@ -176,15 +176,15 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
       const colWidth = (contentWidth - 10) / 2;
       const leftColX = leftMargin;
       const rightColX = leftMargin + colWidth + 10;
-      
+
       // Consignee (Ship to)
       addText("Consignee (Ship to)", leftColX, yPos, { size: 10, style: 'bold' });
       yPos += 6;
-      
+
       const consigneeName = formData.consigneeName || formData.buyerName || "";
       addText(consigneeName, leftColX, yPos, { size: 9 });
       yPos += 5;
-      
+
       if (formData.consigneeAddress) {
         const consigneeAddressLines = formData.consigneeAddress.split('\n');
         consigneeAddressLines.forEach((line: string) => {
@@ -192,31 +192,31 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
           yPos += 5;
         });
       }
-      
+
       if (formData.consigneeGSTIN) {
         addText(`GSTIN/UIN : ${formData.consigneeGSTIN}`, leftColX, yPos, { size: 9 });
         yPos += 5;
       }
-      
+
       if (formData.consigneeState && formData.consigneeStateCode) {
-        addText(`State Name : ${formData.consigneeState}, Code : ${formData.consigneeStateCode}`, 
+        addText(`State Name : ${formData.consigneeState}, Code : ${formData.consigneeStateCode}`,
           leftColX, yPos, { size: 9 });
         yPos += 5;
       }
-      
+
       const consigneeEndY = yPos;
-      
-      yPos = consigneeEndY - (consigneeName ? 5 : 0) - (formData.consigneeAddress ? (formData.consigneeAddress.split('\n').length * 5) : 0) - 
-             (formData.consigneeGSTIN ? 5 : 0) - (formData.consigneeState ? 5 : 0) - 6;
-      
+
+      yPos = consigneeEndY - (consigneeName ? 5 : 0) - (formData.consigneeAddress ? (formData.consigneeAddress.split('\n').length * 5) : 0) -
+        (formData.consigneeGSTIN ? 5 : 0) - (formData.consigneeState ? 5 : 0) - 6;
+
       // Buyer (Bill to)
       addText("Buyer (Bill to)", rightColX, yPos, { size: 10, style: 'bold' });
       yPos += 6;
-      
+
       const buyerName = formData.buyerName || "";
       addText(buyerName, rightColX, yPos, { size: 9 });
       yPos += 5;
-      
+
       if (formData.buyerAddress) {
         const buyerAddressLines = formData.buyerAddress.split('\n');
         buyerAddressLines.forEach((line: string) => {
@@ -224,62 +224,62 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
           yPos += 5;
         });
       }
-      
+
       if (formData.buyerGSTIN) {
         addText(`GSTIN/UIN : ${formData.buyerGSTIN}`, rightColX, yPos, { size: 9 });
         yPos += 5;
       }
-      
+
       if (formData.buyerState && formData.buyerStateCode) {
-        addText(`State Name : ${formData.buyerState}, Code : ${formData.buyerStateCode}`, 
+        addText(`State Name : ${formData.buyerState}, Code : ${formData.buyerStateCode}`,
           rightColX, yPos, { size: 9 });
         yPos += 5;
       }
-      
+
       yPos = Math.max(consigneeEndY, yPos) + 10;
 
       // ==================== ORDER DETAILS TABLE ====================
       const cellWidth = contentWidth / 2;
       const rowHeight = 10;
-      
+
       const row1Y = yPos;
       doc.setDrawColor(0, 0, 0);
       doc.setLineWidth(0.1);
       doc.rect(leftMargin, row1Y, cellWidth, rowHeight);
       addText("Voucher No.", leftMargin + 3, row1Y + 6, { size: 9 });
       addText(formData.voucherNo || "", leftMargin + 55, row1Y + 6, { size: 9, style: 'bold' });
-      
+
       doc.rect(leftMargin + cellWidth, row1Y, cellWidth, rowHeight);
       addText("Mode/Terms of Payment", leftMargin + cellWidth + 3, row1Y + 6, { size: 9 });
       addText(formData.paymentMethod || formData.paymentTerms || "", leftMargin + cellWidth + 70, row1Y + 6, { size: 9 });
-      
+
       const row2Y = row1Y + rowHeight;
       doc.rect(leftMargin, row2Y, cellWidth, rowHeight);
       addText("Buyer's Ref./Order No.", leftMargin + 3, row2Y + 6, { size: 9 });
       addText(formData.buyerRef || "", leftMargin + 55, row2Y + 6, { size: 9 });
-      
+
       doc.rect(leftMargin + cellWidth, row2Y, cellWidth, rowHeight);
       addText("Other References", leftMargin + cellWidth + 3, row2Y + 6, { size: 9 });
       addText(formData.otherReferences || "", leftMargin + cellWidth + 70, row2Y + 6, { size: 9 });
-      
+
       const row3Y = row2Y + rowHeight;
       doc.rect(leftMargin, row3Y, cellWidth, rowHeight);
       addText("Dispatched through", leftMargin + 3, row3Y + 6, { size: 9 });
       addText(formData.dispatchedThrough || "", leftMargin + 55, row3Y + 6, { size: 9 });
-      
+
       doc.rect(leftMargin + cellWidth, row3Y, cellWidth, rowHeight);
       addText("Destination", leftMargin + cellWidth + 3, row3Y + 6, { size: 9 });
       addText(formData.destination || "", leftMargin + cellWidth + 70, row3Y + 6, { size: 9 });
-      
+
       const row4Y = row3Y + rowHeight;
       doc.rect(leftMargin, row4Y, cellWidth, rowHeight);
       addText("Dated", leftMargin + 3, row4Y + 6, { size: 9 });
       addText(formatDateShort(formData.orderDate) || "", leftMargin + 55, row4Y + 6, { size: 9 });
-      
+
       doc.rect(leftMargin + cellWidth, row4Y, cellWidth, rowHeight);
       addText("Terms of Delivery", leftMargin + cellWidth + 3, row4Y + 6, { size: 9 });
       addText(formData.deliveryTerms || "", leftMargin + cellWidth + 70, row4Y + 6, { size: 9 });
-      
+
       yPos = row4Y + rowHeight + 12;
 
       // ==================== ITEMS TABLE ====================
@@ -289,29 +289,29 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
       const unitX = leftMargin + 135;
       const rateX = leftMargin + 155;
       const amountX = leftMargin + 180;
-      
+
       doc.setFillColor(240, 240, 240);
       doc.rect(leftMargin, yPos, contentWidth, 8, 'F');
-      
+
       addText("Sl No.", slNoX, yPos + 5, { size: 9, style: 'bold', align: 'center' });
       addText("Description of Goods", descriptionX, yPos + 5, { size: 9, style: 'bold', align: 'left' });
       addText("Quantity", quantityX, yPos + 5, { size: 9, style: 'bold', align: 'center' });
       addText("Unit", unitX, yPos + 5, { size: 9, style: 'bold', align: 'center' });
       addText("Rate per", rateX, yPos + 5, { size: 9, style: 'bold', align: 'right' });
       addText("Amount", amountX, yPos + 5, { size: 9, style: 'bold', align: 'right' });
-      
+
       yPos += 8;
       drawLine(yPos);
       yPos += 4;
-      
+
       let currentY = yPos;
       const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
-      
+
       items.forEach((item, index) => {
         if (currentY > pageHeight - 80) {
           doc.addPage();
           currentY = 20;
-          
+
           doc.setFillColor(240, 240, 240);
           doc.rect(leftMargin, currentY, contentWidth, 8, 'F');
           addText("Sl No.", slNoX, currentY + 5, { size: 9, style: 'bold', align: 'center' });
@@ -324,63 +324,63 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
           drawLine(currentY);
           currentY += 4;
         }
-        
+
         addText(`${index + 1}`, slNoX, currentY + 4, { size: 9, align: 'center' });
         addText(item.description || "", descriptionX, currentY + 4, { size: 9, align: 'left' });
         addText(`${item.quantity}`, quantityX, currentY + 4, { size: 9, align: 'center' });
         addText(item.unit || "No", unitX, currentY + 4, { size: 9, align: 'center' });
         addText(`${item.rate.toLocaleString('en-IN')}`, rateX, currentY + 4, { size: 9, align: 'right' });
         addText(`${item.amount.toLocaleString('en-IN')}`, amountX, currentY + 4, { size: 9, align: 'right' });
-        
+
         currentY += 7;
       });
-      
+
       drawLine(currentY);
       currentY += 6;
-      
+
       addText("Total", rateX - 20, currentY + 3, { size: 10, style: 'bold', align: 'left' });
       addText(subtotal.toLocaleString('en-IN'), amountX, currentY + 3, { size: 10, style: 'bold', align: 'right' });
-      
+
       currentY += 12;
       drawLine(currentY);
       currentY += 10;
-      
+
       // ==================== AMOUNT IN WORDS ====================
       addText("Amount Chargeable (in words)", leftMargin, currentY, { size: 10, style: 'bold' });
       currentY += 6;
-      
+
       const amountInWords = convertToIndianWords(subtotal);
       addText(amountInWords, leftMargin, currentY, { size: 9 });
       currentY += 8;
-      
+
       // ==================== BANK DETAILS ====================
       addText("Company's Bank Details", leftMargin, currentY, { size: 10, style: 'bold' });
       currentY += 6;
-      
+
       addText(`A/c Holder's Name : ${formData.accountHolder || "S K ENTERPRISES"}`, leftMargin, currentY, { size: 9 });
       currentY += 5;
-      
+
       addText(`Bank Name : ${formData.bankName || "BANK OF MAHARASHTRA"}`, leftMargin, currentY, { size: 9 });
       currentY += 5;
-      
+
       addText(`A/c No. : ${formData.accountNumber || "CA 60168661338"}`, leftMargin, currentY, { size: 9 });
       currentY += 5;
-      
+
       addText(`Branch & IFS Code : ${formData.branchAndIFSC || "KALYANI NAGAR & MAHB0001233"}`, leftMargin, currentY, { size: 9 });
       currentY += 12;
-      
+
       // ==================== SIGNATURE ====================
       const signatureY = pageHeight - 50;
       drawLine(signatureY - 8, 80);
-      
+
       addText("for S K Enterprises", leftMargin + 40, signatureY, { size: 9, align: 'center' });
       addText("Authorised Signatory", leftMargin + 40, signatureY + 6, { size: 8, align: 'center' });
-      
+
       // ==================== FOOTER ====================
       const footerY = pageHeight - 18;
       drawLine(footerY - 5);
       addText("This is a Computer Generated Document", pageWidth / 2, footerY, { size: 8, style: 'italic', align: 'center' });
-      
+
       const fileName = `Sales_Order_${formData.voucherNo || 'temp'}_${formatDate(formData.orderDate)}.pdf`;
       doc.save(fileName);
       return true;
@@ -395,22 +395,22 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
+
     if (!formData.consigneeName && !formData.buyerName) {
       alert("Please enter either Consignee Name or Buyer Name");
       return;
     }
-    
+
     if (!formData.paymentMethod) {
       alert("Please select a Payment Method");
       return;
     }
-    
+
     if (items.length === 0 || items.some(item => !item.description || item.quantity <= 0 || item.rate <= 0)) {
       alert("Please add valid items with description, quantity, and rate");
       return;
     }
-    
+
     setLoading(true);
 
     try {
@@ -427,38 +427,47 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
       const formattedDate = formatDate(formData.orderDate);
       const dueDate = calculateDueDate(formData.orderDate, 30);
       const amountInWords = convertToIndianWords(totalAmount);
+      // Generate a unique ID if not already set
+      let voucherNo = formData.voucherNo;
+      if (!voucherNo || voucherNo === `FY${new Date().getFullYear() + 1}-${(new Date().getFullYear() + 2).toString().slice(-2)}-PI-${(performInvoicesCount + 1).toString().padStart(3, '0')}`) {
+        const timestamp = Date.now().toString();
+        const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+        const seq = String(performInvoicesCount + 1).padStart(3, '0');
+        voucherNo = `FY${new Date().getFullYear() + 1}-${(new Date().getFullYear() + 2).toString().slice(-2)}-PI-${seq}-${timestamp}-${randomSuffix}`;
+      }
+
 
       // ✅ Removed 'branch' – not in Invoice interface
       const newInvoice: Invoice = {
-        id: formData.voucherNo,
-        invoiceNumber: formData.voucherNo,
-        voucherNo: formData.voucherNo,
+        id: voucherNo,
+        invoiceNumber: voucherNo,
+        voucherNo: voucherNo,
         invoiceType: "perform",
         status: "pending",
-        
+
         client: formData.consigneeName || formData.buyerName || "",
         clientEmail: formData.clientEmail,
         clientAddress: formData.buyerAddress,
-        
+
         companyName: formData.companyName,
         companyAddress: formData.companyAddress,
         companyGSTIN: formData.companyGSTIN,
         companyState: formData.companyState,
         companyStateCode: formData.companyStateCode,
         companyEmail: formData.companyEmail,
-        
+
         consignee: formData.consigneeName,
         consigneeAddress: formData.consigneeAddress,
         consigneeGSTIN: formData.consigneeGSTIN,
         consigneeState: formData.consigneeState,
         consigneeStateCode: formData.consigneeStateCode,
-        
+
         buyer: formData.buyerName,
         buyerAddress: formData.buyerAddress,
         buyerGSTIN: formData.buyerGSTIN,
         buyerState: formData.buyerState,
         buyerStateCode: formData.buyerStateCode,
-        
+
         buyerRef: formData.buyerRef,
         dispatchedThrough: formData.dispatchedThrough,
         paymentTerms: formData.paymentTerms,
@@ -468,27 +477,27 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
         destination: formData.destination,
         deliveryTerms: formData.deliveryTerms,
         serviceType: formData.serviceType,
-        
+
         items: invoiceItems,
-        
+
         subtotal: subtotal,
         tax: 0,
         discount: 0,
         amount: totalAmount,
         roundUp: 0,
-        
+
         date: formattedDate,
         dueDate: dueDate,
-        
+
         bankName: formData.bankName,
         accountNumber: formData.accountNumber,
         ifscCode: "MAHB0001233",
         accountHolder: formData.accountHolder,
         branchAndIFSC: formData.branchAndIFSC,
-        
+
         amountInWords: amountInWords,
         termsConditions: formData.termsConditions,
-               managementFeesPercent: 0,
+        managementFeesPercent: 0,
         managementFeesAmount: 0,
         sacCode: "",
         panNumber: "",
@@ -500,13 +509,13 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
         servicePeriodFrom: "",
         servicePeriodTo: ""
       };
-      
+
       console.log('Creating invoice with payment method:', newInvoice.paymentMethod);
-      
+
       generateSalesOrderPDF();
-      
+
       const success = await onInvoiceCreate(newInvoice);
-      
+
       if (success) {
         onClose();
         resetForm();
@@ -533,9 +542,9 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
 
   const updateItem = (index: number, field: keyof PerformInvoiceItem, value: string | number) => {
     const newItems = [...items];
-    const parsedValue = typeof value === 'string' ? 
+    const parsedValue = typeof value === 'string' ?
       (field === 'description' || field === 'unit' ? value : parseFloat(value) || 0) : value;
-    
+
     newItems[index] = {
       ...newItems[index],
       [field]: parsedValue
@@ -565,19 +574,19 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
       companyState: "Maharashtra",
       companyStateCode: "27",
       companyEmail: "s.k.enterprises7583@gmail.com",
-      
+
       consigneeName: "",
       consigneeAddress: "",
       consigneeGSTIN: "",
       consigneeState: "",
       consigneeStateCode: "",
-      
+
       buyerName: "",
       buyerAddress: "",
       buyerGSTIN: "",
       buyerState: "",
       buyerStateCode: "",
-      
+
       voucherNo: `FY${new Date().getFullYear() + 1}-${(new Date().getFullYear() + 2).toString().slice(-2)}-PI-${(performInvoicesCount + 1).toString().padStart(3, '0')}`,
       buyerRef: "",
       orderDate: new Date().toISOString().split('T')[0],
@@ -587,10 +596,10 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
       otherReferences: "",
       destination: "",
       deliveryTerms: "",
-      
+
       clientEmail: "",
       serviceType: "",
-      
+
       accountHolder: "S K ENTERPRISES",
       bankName: "BANK OF MAHARASHTRA",
       accountNumber: "CA 60168661338",
@@ -644,8 +653,8 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="companyName">Company Name</Label>
-                <Input 
-                  id="companyName" 
+                <Input
+                  id="companyName"
                   value={formData.companyName}
                   onChange={(e) => handleInputChange("companyName", e.target.value)}
                   required
@@ -653,8 +662,8 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="companyGSTIN">GSTIN/UIN</Label>
-                <Input 
-                  id="companyGSTIN" 
+                <Input
+                  id="companyGSTIN"
                   value={formData.companyGSTIN}
                   onChange={(e) => handleInputChange("companyGSTIN", e.target.value)}
                   required
@@ -662,8 +671,8 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="companyAddress">Company Address (use Enter for new lines)</Label>
-                <Textarea 
-                  id="companyAddress" 
+                <Textarea
+                  id="companyAddress"
                   value={formData.companyAddress}
                   onChange={(e) => handleInputChange("companyAddress", e.target.value)}
                   rows={3}
@@ -672,8 +681,8 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="companyEmail">Email</Label>
-                <Input 
-                  id="companyEmail" 
+                <Input
+                  id="companyEmail"
                   value={formData.companyEmail}
                   onChange={(e) => handleInputChange("companyEmail", e.target.value)}
                   type="email"
@@ -689,9 +698,9 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
             <div className="border rounded-lg p-4 space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="font-semibold text-lg">Consignee Details (Ship to)</h3>
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   size="sm"
                   onClick={handleCopyBuyerToConsignee}
                 >
@@ -710,8 +719,8 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
                 </div>
                 <div>
                   <Label htmlFor="consigneeAddress">Consignee Address</Label>
-                  <Textarea 
-                    id="consigneeAddress" 
+                  <Textarea
+                    id="consigneeAddress"
                     value={formData.consigneeAddress}
                     onChange={(e) => handleInputChange("consigneeAddress", e.target.value)}
                     rows={3}
@@ -720,8 +729,8 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
                 </div>
                 <div>
                   <Label htmlFor="consigneeGSTIN">Consignee GSTIN/UIN</Label>
-                  <Input 
-                    id="consigneeGSTIN" 
+                  <Input
+                    id="consigneeGSTIN"
                     value={formData.consigneeGSTIN}
                     onChange={(e) => handleInputChange("consigneeGSTIN", e.target.value)}
                   />
@@ -729,8 +738,8 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label htmlFor="consigneeState">State Name</Label>
-                    <Input 
-                      id="consigneeState" 
+                    <Input
+                      id="consigneeState"
                       value={formData.consigneeState}
                       onChange={(e) => handleInputChange("consigneeState", e.target.value)}
                       placeholder="Maharashtra"
@@ -738,8 +747,8 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
                   </div>
                   <div>
                     <Label htmlFor="consigneeStateCode">State Code</Label>
-                    <Input 
-                      id="consigneeStateCode" 
+                    <Input
+                      id="consigneeStateCode"
                       value={formData.consigneeStateCode}
                       onChange={(e) => handleInputChange("consigneeStateCode", e.target.value)}
                       placeholder="27"
@@ -765,8 +774,8 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
                 </div>
                 <div>
                   <Label htmlFor="buyerAddress">Buyer Address</Label>
-                  <Textarea 
-                    id="buyerAddress" 
+                  <Textarea
+                    id="buyerAddress"
                     value={formData.buyerAddress}
                     onChange={(e) => handleInputChange("buyerAddress", e.target.value)}
                     rows={3}
@@ -775,8 +784,8 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
                 </div>
                 <div>
                   <Label htmlFor="buyerGSTIN">Buyer GSTIN/UIN</Label>
-                  <Input 
-                    id="buyerGSTIN" 
+                  <Input
+                    id="buyerGSTIN"
                     value={formData.buyerGSTIN}
                     onChange={(e) => handleInputChange("buyerGSTIN", e.target.value)}
                   />
@@ -784,8 +793,8 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label htmlFor="buyerState">State Name</Label>
-                    <Input 
-                      id="buyerState" 
+                    <Input
+                      id="buyerState"
                       value={formData.buyerState}
                       onChange={(e) => handleInputChange("buyerState", e.target.value)}
                       placeholder="Maharashtra"
@@ -793,8 +802,8 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
                   </div>
                   <div>
                     <Label htmlFor="buyerStateCode">State Code</Label>
-                    <Input 
-                      id="buyerStateCode" 
+                    <Input
+                      id="buyerStateCode"
                       value={formData.buyerStateCode}
                       onChange={(e) => handleInputChange("buyerStateCode", e.target.value)}
                       placeholder="27"
@@ -812,9 +821,9 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="voucherNo">Voucher No. *</Label>
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
+                  <Button
+                    type="button"
+                    variant="ghost"
                     size="sm"
                     onClick={handleGenerateVoucherNo}
                     className="h-6 px-2 text-xs"
@@ -822,8 +831,8 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
                     Auto-generate
                   </Button>
                 </div>
-                <Input 
-                  id="voucherNo" 
+                <Input
+                  id="voucherNo"
                   value={formData.voucherNo}
                   onChange={(e) => handleInputChange("voucherNo", e.target.value)}
                   required
@@ -831,34 +840,34 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="buyerRef">Buyer's Ref./Order No.</Label>
-                <Input 
-                  id="buyerRef" 
+                <Input
+                  id="buyerRef"
                   value={formData.buyerRef}
                   onChange={(e) => handleInputChange("buyerRef", e.target.value)}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="orderDate">Dated *</Label>
-                <Input 
-                  id="orderDate" 
+                <Input
+                  id="orderDate"
                   value={formData.orderDate}
                   onChange={(e) => handleInputChange("orderDate", e.target.value)}
-                  type="date" 
-                  required 
+                  type="date"
+                  required
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="dispatchedThrough">Dispatched through</Label>
-                <Input 
-                  id="dispatchedThrough" 
+                <Input
+                  id="dispatchedThrough"
                   value={formData.dispatchedThrough}
                   onChange={(e) => handleInputChange("dispatchedThrough", e.target.value)}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="paymentMethod">Payment Method *</Label>
-                <Select 
-                  value={formData.paymentMethod} 
+                <Select
+                  value={formData.paymentMethod}
                   onValueChange={(value) => handleInputChange("paymentMethod", value)}
                   required
                 >
@@ -880,8 +889,8 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="paymentTerms">Terms of Payment</Label>
-                <Input 
-                  id="paymentTerms" 
+                <Input
+                  id="paymentTerms"
                   value={formData.paymentTerms}
                   onChange={(e) => handleInputChange("paymentTerms", e.target.value)}
                   placeholder="e.g., Net 30 days"
@@ -889,24 +898,24 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="destination">Destination</Label>
-                <Input 
-                  id="destination" 
+                <Input
+                  id="destination"
                   value={formData.destination}
                   onChange={(e) => handleInputChange("destination", e.target.value)}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="otherReferences">Other References</Label>
-                <Input 
-                  id="otherReferences" 
+                <Input
+                  id="otherReferences"
                   value={formData.otherReferences}
                   onChange={(e) => handleInputChange("otherReferences", e.target.value)}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="deliveryTerms">Terms of Delivery</Label>
-                <Input 
-                  id="deliveryTerms" 
+                <Input
+                  id="deliveryTerms"
                   value={formData.deliveryTerms}
                   onChange={(e) => handleInputChange("deliveryTerms", e.target.value)}
                 />
@@ -923,7 +932,7 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
                 Add Item
               </Button>
             </div>
-            
+
             <div className="border rounded-lg overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -1022,8 +1031,8 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="accountHolder">Account Holder's Name</Label>
-                <Input 
-                  id="accountHolder" 
+                <Input
+                  id="accountHolder"
                   value={formData.accountHolder}
                   onChange={(e) => handleInputChange("accountHolder", e.target.value)}
                   required
@@ -1031,8 +1040,8 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="bankName">Bank Name</Label>
-                <Input 
-                  id="bankName" 
+                <Input
+                  id="bankName"
                   value={formData.bankName}
                   onChange={(e) => handleInputChange("bankName", e.target.value)}
                   required
@@ -1040,8 +1049,8 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="accountNumber">Account Number</Label>
-                <Input 
-                  id="accountNumber" 
+                <Input
+                  id="accountNumber"
                   value={formData.accountNumber}
                   onChange={(e) => handleInputChange("accountNumber", e.target.value)}
                   required
@@ -1049,8 +1058,8 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="branchAndIFSC">Branch & IFS Code</Label>
-                <Input 
-                  id="branchAndIFSC" 
+                <Input
+                  id="branchAndIFSC"
                   value={formData.branchAndIFSC}
                   onChange={(e) => handleInputChange("branchAndIFSC", e.target.value)}
                   required
@@ -1077,7 +1086,7 @@ export const PerformInvoiceForm: React.FC<PerformInvoiceFormProps> = ({
           {/* Terms and Conditions */}
           <div className="space-y-2">
             <Label htmlFor="termsConditions">Terms & Conditions</Label>
-            <Textarea 
+            <Textarea
               id="termsConditions"
               value={formData.termsConditions}
               onChange={(e) => handleInputChange("termsConditions", e.target.value)}

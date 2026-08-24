@@ -5,6 +5,7 @@ import SalaryStructure from '../models/SalaryStructure';
 import SalarySlip from '../models/SalarySlip';
 import Employee, { IEmployee } from '../models/Employee';
 import * as XLSX from 'xlsx';
+import Deduction from '../models/Deduction';
 // Helper function to populate employee data
 const populateEmployeeData = async (payrollRecords: any[]) => {
   try {
@@ -408,14 +409,46 @@ export const processPayroll = async (req: Request, res: Response) => {
       (salaryStructure.arrears || 0);
 
     // Calculate total deductions
-    const totalDeductions = 
-      (salaryStructure.providentFund || 0) + 
-      (salaryStructure.professionalTax || 0) + 
-      (salaryStructure.incomeTax || 0) + 
-      (salaryStructure.otherDeductions || 0) + 
-      (salaryStructure.esic || 0) + 
-      (salaryStructure.advance || 0) + 
-      (salaryStructure.mlwf || 0);
+   // Calculate total deductions from salary structure
+const totalDeductions = 
+  (salaryStructure.providentFund || 0) + 
+  (salaryStructure.professionalTax || 0) + 
+  (salaryStructure.incomeTax || 0) + 
+  (salaryStructure.otherDeductions || 0) + 
+  (salaryStructure.esic || 0) + 
+  (salaryStructure.advance || 0) + 
+  (salaryStructure.mlwf || 0);
+
+// ─── FETCH ACTIVE DEDUCTIONS (ADVANCES, FINES, OTHER) ────────────────
+// Get all approved/completed deductions for this employee and month
+const activeDeductions = await Deduction.aggregate([
+  {
+    $match: {
+      employeeId: employeeId,
+      appliedMonth: month,
+      status: { $in: ['approved', 'completed'] }
+    }
+  },
+  {
+    $group: {
+      _id: null,
+      totalDeductions: { $sum: '$amount' },
+      items: { $push: '$$ROOT' }
+    }
+  }
+]);
+
+let additionalDeductions = 0;
+let deductionItems: any[] = [];
+
+if (activeDeductions.length > 0) {
+  additionalDeductions = activeDeductions[0].totalDeductions || 0;
+  deductionItems = activeDeductions[0].items || [];
+  console.log(`📌 Applying ${deductionItems.length} additional deductions: ₹${additionalDeductions}`);
+}
+
+// Add additional deductions to totalDeductions
+const finalTotalDeductions = totalDeductions + additionalDeductions;
 
     // Calculate net salary
     const netSalary = Math.max(0, netBasicSalary + totalAllowances - totalDeductions);
@@ -426,7 +459,7 @@ export const processPayroll = async (req: Request, res: Response) => {
       month,
       basicSalary: salaryStructure.basicSalary,
       allowances: totalAllowances,
-      deductions: totalDeductions,
+      deductions: finalTotalDeductions,
       netSalary,
       status: 'processed',
       presentDays,
@@ -597,15 +630,42 @@ export const bulkProcessPayroll = async (req: Request, res: Response) => {
           (salaryStructure.leaveEncashment || 0) + 
           (salaryStructure.arrears || 0);
 
-        const totalDeductions = 
-          (salaryStructure.providentFund || 0) + 
-          (salaryStructure.professionalTax || 0) + 
-          (salaryStructure.incomeTax || 0) + 
-          (salaryStructure.otherDeductions || 0) + 
-          (salaryStructure.esic || 0) + 
-          (salaryStructure.advance || 0) + 
-          (salaryStructure.mlwf || 0);
+      const totalDeductions = 
+  (salaryStructure.providentFund || 0) + 
+  (salaryStructure.professionalTax || 0) + 
+  (salaryStructure.incomeTax || 0) + 
+  (salaryStructure.otherDeductions || 0) + 
+  (salaryStructure.esic || 0) + 
+  (salaryStructure.advance || 0) + 
+  (salaryStructure.mlwf || 0);
 
+// ─── FETCH ACTIVE DEDUCTIONS ─────────────────────────────────────────────
+const activeDeductions = await Deduction.aggregate([
+  {
+    $match: {
+      employeeId: employeeId,
+      appliedMonth: month,
+      status: { $in: ['approved', 'completed'] }
+    }
+  },
+  {
+    $group: {
+      _id: null,
+      totalDeductions: { $sum: '$amount' },
+      items: { $push: '$$ROOT' }
+    }
+  }
+]);
+
+let additionalDeductions = 0;
+let deductionItems: any[] = [];
+
+if (activeDeductions.length > 0) {
+  additionalDeductions = activeDeductions[0].totalDeductions || 0;
+  deductionItems = activeDeductions[0].items || [];
+}
+
+const finalTotalDeductions = totalDeductions + additionalDeductions;
         const netSalary = Math.max(0, netBasicSalary + totalAllowances - totalDeductions);
 
         // Create payroll record with employee details
@@ -614,7 +674,7 @@ export const bulkProcessPayroll = async (req: Request, res: Response) => {
           month,
           basicSalary: salaryStructure.basicSalary,
           allowances: totalAllowances,
-          deductions: totalDeductions,
+          deductions: finalTotalDeductions,
           netSalary,
           status: 'processed',
           presentDays,

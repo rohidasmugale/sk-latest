@@ -50,9 +50,18 @@ import {
   Shield,
   ShieldCheck,
   Camera,
-  ExternalLink, Home, Car, Trash2, Droplets, ShoppingCart, Settings, Images, Cpu,        // missing
-  Shirt, Factory, MessageSquare   // missing
-
+  ExternalLink,
+  Home,
+  Car,
+  Trash2,
+  Droplets,
+  ShoppingCart,
+  Settings,
+  Images,
+  Cpu,
+  Shirt,
+  Factory,
+  MessageSquare
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -110,6 +119,7 @@ interface Employee {
   isManager?: boolean;
   isSupervisor?: boolean;
   totalHours?: number;
+  profileStatus?: "complete" | "incomplete";   // ✅ ADD THIS
 }
 
 // Attendance Record structure with photo fields
@@ -947,6 +957,31 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
   const [loadingTraining, setLoadingTraining] = useState(false);
   const [fetchTrigger, setFetchTrigger] = useState(0);
   // Add this inside SiteEmployeeDetails component:
+  const fetchGroomingCount = async () => {
+    if (!siteName || mainTab !== "employees") return;
+    setLoadingGroomingCount(true);
+    try {
+      const res = await apiClient.get('/grooming', {
+        params: { date: selectedDate, site: siteName }
+      });
+      const records = res.data?.data || [];
+      // records is an array of grooming records for employees of this site on selectedDate
+      // We consider "improper" if any required item is missing
+      // For simplicity, count employees that have at least one missing grooming item
+      let improperCount = 0;
+      records.forEach((rec: any) => {
+        // Check required fields based on gender (we don't have gender here, use basic)
+        const missing = !rec.shirt || !rec.pant || !rec.cap || !rec.shoes || !rec.idCard;
+        if (missing) improperCount++;
+      });
+      setGroomingCount(improperCount);
+    } catch (error) {
+      console.error("Error fetching grooming count:", error);
+      setGroomingCount(0);
+    } finally {
+      setLoadingGroomingCount(false);
+    }
+  };
   const filterByDept = (data: any[]) => {
     if (viewType === 'department' && department) {
       const target = department.trim().toLowerCase();
@@ -1067,31 +1102,7 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
   const [groomingCount, setGroomingCount] = useState(0);
   const [loadingGroomingCount, setLoadingGroomingCount] = useState(false);
 
-  const fetchGroomingCount = async () => {
-    if (!siteName || mainTab !== "employees") return;
-    setLoadingGroomingCount(true);
-    try {
-      const res = await apiClient.get('/grooming', {
-        params: { date: selectedDate, site: siteName }
-      });
-      const records = res.data?.data || [];
-      // records is an array of grooming records for employees of this site on selectedDate
-      // We consider "improper" if any required item is missing
-      // For simplicity, count employees that have at least one missing grooming item
-      let improperCount = 0;
-      records.forEach((rec: any) => {
-        // Check required fields based on gender (we don't have gender here, use basic)
-        const missing = !rec.shirt || !rec.pant || !rec.cap || !rec.shoes || !rec.idCard;
-        if (missing) improperCount++;
-      });
-      setGroomingCount(improperCount);
-    } catch (error) {
-      console.error("Error fetching grooming count:", error);
-      setGroomingCount(0);
-    } finally {
-      setLoadingGroomingCount(false);
-    }
-  };
+
 
   useEffect(() => {
     console.log('🔄 useEffect RUNNING for site:', siteName, 'date:', selectedDate);
@@ -1590,9 +1601,10 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
         <title>Attendance - ${siteName} - ${monthStart}</title>
         <meta charset="UTF-8" />
         <style>
-          body { font-family: Arial, sans-serif; margin: 10px; }
+         body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+table { width: 100%; border-collapse: collapse; font-size: 10px; }
           h1 { text-align: center; color: #0E2568; font-size: 18px; }
-          table { border-collapse: collapse; width: 100%; font-size: 10px; table-layout: auto; }
+         
           th, td { border: 1px solid #ccc; padding: 3px 4px; text-align: center; }
           th { background: #0E2568; color: white; font-weight: bold; }
           .wo { background: #e9e9e9; color: #333; font-weight: bold; }

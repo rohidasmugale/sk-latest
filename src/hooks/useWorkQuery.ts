@@ -1,16 +1,17 @@
 // hooks/useWorkQuery.ts
 import { useState, useEffect, useCallback } from 'react';
-import { workQueryApi, WorkQuery, Statistics, Category, Priority, Status, ServiceType, Pagination } from '@/services/workQueryApi';
+import { workQueryApi, WorkQuery, Statistics, SuperadminStatistics, Category, Priority, Status, ServiceType, Pagination } from '@/services/workQueryApi';
 import { toast } from 'sonner';
 
 interface UseWorkQueryProps {
-  supervisorId: string;
+  supervisorId?: string; // optional now: undefined = superadmin mode
   autoFetch?: boolean;
   initialFilters?: {
     search?: string;
     status?: string;
     priority?: string;
     serviceType?: string;
+    supervisorId?: string; // used only in superadmin mode, to filter by a specific supervisor
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -18,7 +19,6 @@ interface UseWorkQueryProps {
   };
 }
 
-// Helper to get error message from unknown error
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) return error.message;
   if (typeof error === 'string') return error;
@@ -27,7 +27,7 @@ const getErrorMessage = (error: unknown): string => {
 
 export const useWorkQuery = ({ supervisorId, autoFetch = true, initialFilters = {} }: UseWorkQueryProps) => {
   const [workQueries, setWorkQueries] = useState<WorkQuery[]>([]);
-  const [statistics, setStatistics] = useState<Statistics | null>(null);
+  const [statistics, setStatistics] = useState<Statistics | SuperadminStatistics | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [priorities, setPriorities] = useState<Priority[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
@@ -39,7 +39,7 @@ export const useWorkQuery = ({ supervisorId, autoFetch = true, initialFilters = 
     totalPages: 0
   });
   const [filters, setFilters] = useState(initialFilters);
-  
+
   const [loading, setLoading] = useState({
     queries: false,
     statistics: false,
@@ -48,19 +48,26 @@ export const useWorkQuery = ({ supervisorId, autoFetch = true, initialFilters = 
     updating: false
   });
 
-  // Fetch work queries
+  // true = supervisor mode (scoped to one supervisor), false = superadmin mode (all queries)
+  const isSupervisorMode = !!supervisorId;
+
+  // ---- Fetch work queries ----
   const fetchWorkQueries = useCallback(async () => {
-    if (!supervisorId) return;
-    
     setLoading(prev => ({ ...prev, queries: true }));
     try {
-      const response = await workQueryApi.getAllWorkQueries({
-        supervisorId,
-        ...filters,
-        page: pagination.page,
-        limit: pagination.limit
-      });
-      
+      const response = isSupervisorMode
+        ? await workQueryApi.getAllWorkQueries({
+            supervisorId: supervisorId!,
+            ...filters,
+            page: pagination.page,
+            limit: pagination.limit
+          })
+        : await workQueryApi.getAllWorkQueriesForSuperadmin({
+            ...filters,
+            page: pagination.page,
+            limit: pagination.limit
+          });
+
       if (response.success) {
         setWorkQueries(response.data);
         if (response.pagination) {
@@ -75,15 +82,16 @@ export const useWorkQuery = ({ supervisorId, autoFetch = true, initialFilters = 
     } finally {
       setLoading(prev => ({ ...prev, queries: false }));
     }
-  }, [supervisorId, filters, pagination.page, pagination.limit]);
+  }, [isSupervisorMode, supervisorId, filters, pagination.page, pagination.limit]);
 
-  // Fetch statistics
+  // ---- Fetch statistics ----
   const fetchStatistics = useCallback(async () => {
-    if (!supervisorId) return;
-    
     setLoading(prev => ({ ...prev, statistics: true }));
     try {
-      const response = await workQueryApi.getStatistics(supervisorId);
+      const response = isSupervisorMode
+        ? await workQueryApi.getStatistics(supervisorId!)
+        : await workQueryApi.getSuperadminStatistics();
+
       if (response.success) {
         setStatistics(response.data);
       }
@@ -92,9 +100,9 @@ export const useWorkQuery = ({ supervisorId, autoFetch = true, initialFilters = 
     } finally {
       setLoading(prev => ({ ...prev, statistics: false }));
     }
-  }, [supervisorId]);
+  }, [isSupervisorMode, supervisorId]);
 
-  // Fetch static data
+  // ---- Fetch static lookups (categories/priorities/statuses/serviceTypes) ----
   const fetchStaticData = useCallback(async () => {
     try {
       const [categoriesRes, prioritiesRes, statusesRes, serviceTypesRes] = await Promise.all([
@@ -103,7 +111,7 @@ export const useWorkQuery = ({ supervisorId, autoFetch = true, initialFilters = 
         workQueryApi.getStatuses(),
         workQueryApi.getServiceTypes()
       ]);
-      
+
       if (categoriesRes.success) setCategories(categoriesRes.data);
       if (prioritiesRes.success) setPriorities(prioritiesRes.data);
       if (statusesRes.success) setStatuses(statusesRes.data);
@@ -113,7 +121,7 @@ export const useWorkQuery = ({ supervisorId, autoFetch = true, initialFilters = 
     }
   }, []);
 
-  // Create work query with image upload support
+  // ---- Create work query (supervisor only, with optional image upload) ----
   const createWorkQuery = useCallback(async (
     data: {
       title: string;
@@ -129,27 +137,21 @@ export const useWorkQuery = ({ supervisorId, autoFetch = true, initialFilters = 
     files: File[] = []
   ): Promise<{ success: boolean; data?: WorkQuery; error?: string }> => {
     setLoading(prev => ({ ...prev, creating: true }));
-    
+
     try {
       let response;
-      
+
       if (files.length > 0) {
-        // Use FormData for multipart upload
         const formData = new FormData();
-        
-        // Append text data as JSON string
         formData.append('data', JSON.stringify(data));
-        
-        // Append files
         files.forEach((file) => {
           formData.append('images', file);
         });
-        
-        // Make custom fetch request
-   const API_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
+
+        const API_URL = import.meta.env.VITE_API_URL ||
+          (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
         const token = localStorage.getItem('access_token') || localStorage.getItem('token');
-        
+
         const fetchResponse = await fetch(`${API_URL}/work-queries`, {
           method: 'POST',
           headers: {
@@ -157,14 +159,12 @@ export const useWorkQuery = ({ supervisorId, autoFetch = true, initialFilters = 
           },
           body: formData
         });
-        
-        const result = await fetchResponse.json();
-        response = result;
+
+        response = await fetchResponse.json();
       } else {
-        // No files, use regular JSON request
         response = await workQueryApi.createWorkQuery(data);
       }
-      
+
       if (response.success) {
         toast.success('Work query created successfully');
         await fetchWorkQueries();
@@ -183,7 +183,7 @@ export const useWorkQuery = ({ supervisorId, autoFetch = true, initialFilters = 
     }
   }, [fetchWorkQueries, fetchStatistics]);
 
-  // Delete work query
+  // ---- Delete work query (supervisor only) ----
   const deleteWorkQuery = useCallback(async (id: string): Promise<{ success: boolean; error?: string }> => {
     setLoading(prev => ({ ...prev, deleting: true }));
     try {
@@ -206,34 +206,64 @@ export const useWorkQuery = ({ supervisorId, autoFetch = true, initialFilters = 
     }
   }, [fetchWorkQueries, fetchStatistics]);
 
-  // Update filters
+  // ---- Respond to / resolve / reject a work query (superadmin only) ----
+  const respondToWorkQuery = useCallback(async (
+    id: string,
+    status: WorkQuery['status'],
+    superadminResponse: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    setLoading(prev => ({ ...prev, updating: true }));
+    try {
+      const response = await workQueryApi.updateWorkQueryResponse(id, status, superadminResponse);
+      if (response.success) {
+        toast.success(`Query ${status} successfully`);
+        await fetchWorkQueries();
+        await fetchStatistics();
+        return { success: true };
+      } else {
+        toast.error(response.message || 'Failed to update query');
+        return { success: false, error: response.message };
+      }
+    } catch (error) {
+      console.error('Error responding to work query:', error);
+      toast.error(getErrorMessage(error) || 'Failed to update query');
+      return { success: false, error: getErrorMessage(error) };
+    } finally {
+      setLoading(prev => ({ ...prev, updating: false }));
+    }
+  }, [fetchWorkQueries, fetchStatistics]);
+
+  // ---- Filters / pagination helpers ----
   const updateFilters = useCallback((newFilters: Partial<typeof filters>) => {
     setFilters(prev => ({ ...prev, ...newFilters, page: 1 }));
   }, []);
 
-  // Change page
   const changePage = useCallback((page: number) => {
     setPagination(prev => ({ ...prev, page }));
   }, []);
 
-  // Change limit
   const changeLimit = useCallback((limit: number) => {
     setPagination(prev => ({ ...prev, limit, page: 1 }));
   }, []);
 
-  // Auto fetch
+  // ---- Auto fetch ----
+  // Runs once on mount (and whenever supervisorId flips between a value and undefined,
+  // e.g. if the same page is reused across a role switch).
   useEffect(() => {
-    if (autoFetch && supervisorId) {
+    if (autoFetch) {
       fetchStaticData();
       fetchWorkQueries();
       fetchStatistics();
     }
-  }, [autoFetch, supervisorId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFetch, isSupervisorMode, supervisorId]);
 
+  // Runs whenever filters or pagination change (search, status filter, page click, etc.)
   useEffect(() => {
-    if (autoFetch && supervisorId) {
+    if (autoFetch) {
       fetchWorkQueries();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, pagination.page, pagination.limit]);
 
   return {
@@ -248,6 +278,7 @@ export const useWorkQuery = ({ supervisorId, autoFetch = true, initialFilters = 
     filters,
     createWorkQuery,
     deleteWorkQuery,
+    respondToWorkQuery,
     fetchWorkQueries,
     fetchStatistics,
     updateFilters,

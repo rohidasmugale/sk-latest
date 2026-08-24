@@ -178,10 +178,7 @@ const SiteSchema: Schema = new Schema(
      latitude: { type: Number, default: 0 },
   longitude: { type: Number, default: 0 },
   geofenceRadius: { type: Number, default: 0.5 },
-   employeeCounter: {
-      type: Number,
-      default: 0
-    },
+   
     shifts: {
   type: [{
     id: { type: String, required: true },

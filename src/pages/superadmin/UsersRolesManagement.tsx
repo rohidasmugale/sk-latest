@@ -11,33 +11,33 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { 
-  Search, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Shield, 
-  Briefcase, 
-  Users, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  UserCog, 
-  Filter, 
-  Calendar, 
-  ChevronDown, 
-  UserPlus, 
-  TrendingUp, 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  MoreVertical, 
-  Sparkles, 
-  Eye, 
-  Coffee, 
-  LogIn, 
-  LogOut, 
-  Timer, 
+import {
+  Search,
+  Plus,
+  Edit,
+  Trash2,
+  Shield,
+  Briefcase,
+  Users,
+  Mail,
+  Phone,
+  MapPin,
+  UserCog,
+  Filter,
+  Calendar,
+  ChevronDown,
+  UserPlus,
+  TrendingUp,
+  CheckCircle,
+  XCircle,
+  Clock,
+  MoreVertical,
+  Sparkles,
+  Eye,
+  Coffee,
+  LogIn,
+  LogOut,
+  Timer,
   Award,
   Crown,
   Building,
@@ -65,18 +65,18 @@ import {
   ChevronDown as ChevronDownIcon,
   Camera,
   ExternalLink,
-  Upload ,X,
-Check
+  Upload, X,
+  Check
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect, useCallback ,useRef} from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import userService from "@/services/userService";
 import axios from "axios";
 import type { User, UserRole, CreateUserData } from "@/types/user";
 
 // API URL
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 // Types for Manager Attendance (from your backend) with photo fields
 interface ManagerAttendanceRecord {
@@ -214,23 +214,23 @@ const formatDateForAPI = (dateValue: any): string => {
 
 const formatTimeForDisplay = (timestamp: string | null): string => {
   if (!timestamp || timestamp === "-" || timestamp === "" || timestamp === "null") return "-";
-  
+
   try {
     if (typeof timestamp === 'string' && (timestamp.includes('AM') || timestamp.includes('PM'))) {
       return timestamp;
     }
-    
+
     if (timestamp.includes('T')) {
       const date = new Date(timestamp);
       if (!isNaN(date.getTime())) {
-        return date.toLocaleTimeString([], { 
-          hour: '2-digit', 
+        return date.toLocaleTimeString([], {
+          hour: '2-digit',
           minute: '2-digit',
-          hour12: true 
+          hour12: true
         });
       }
     }
-    
+
     const timeParts = timestamp.split(':');
     if (timeParts.length >= 2) {
       const hours = parseInt(timeParts[0]);
@@ -239,7 +239,7 @@ const formatTimeForDisplay = (timestamp: string | null): string => {
       const displayHours = hours % 12 || 12;
       return `${displayHours}:${minutes} ${period}`;
     }
-    
+
     return timestamp;
   } catch (error) {
     return timestamp || "-";
@@ -275,13 +275,13 @@ const getTodayDateString = (): string => {
 };
 
 // Mobile responsive card for manager attendance with photo
-const MobileManagerAttendanceCard = ({ 
-  record, 
-  getStatusBadge, 
+const MobileManagerAttendanceCard = ({
+  record,
+  getStatusBadge,
   getStatusIcon,
   onViewPhoto
-}: { 
-  record: any; 
+}: {
+  record: any;
   getStatusBadge: (status: string) => string;
   getStatusIcon: (status: string) => JSX.Element | null;
   onViewPhoto: (photoUrl: string | null | undefined, type: 'checkin' | 'checkout') => void;
@@ -306,7 +306,7 @@ const MobileManagerAttendanceCard = ({
             </span>
           </Badge>
         </div>
-        
+
         <div className="grid grid-cols-2 gap-3">
           <div className="p-2 bg-gray-50 rounded">
             <p className="text-sm text-muted-foreground">Check In</p>
@@ -367,12 +367,12 @@ const MobileManagerAttendanceCard = ({
 };
 
 // Mobile responsive card for supervisor attendance with photo
-const MobileSupervisorAttendanceCard = ({ 
-  record, 
+const MobileSupervisorAttendanceCard = ({
+  record,
   getStatusBadge,
   onViewPhoto
-}: { 
-  record: SupervisorAttendanceRecord; 
+}: {
+  record: SupervisorAttendanceRecord;
   getStatusBadge: (status: string) => string;
   onViewPhoto: (photoUrl: string | null | undefined, type: 'checkin' | 'checkout') => void;
 }) => {
@@ -388,7 +388,7 @@ const MobileSupervisorAttendanceCard = ({
             {record.status}
           </Badge>
         </div>
-        
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <p className="text-sm text-muted-foreground">Check In</p>
@@ -437,15 +437,15 @@ const MobileSupervisorAttendanceCard = ({
 };
 
 // Manager Attendance View Component with Photo Support
-const ManagerAttendanceView = ({ 
-  managerId, 
-  managerName, 
-  managerEmail, 
+const ManagerAttendanceView = ({
+  managerId,
+  managerName,
+  managerEmail,
   managerDepartment,
   assignedSites,
-  open, 
-  onOpenChange 
-}: { 
+  open,
+  onOpenChange
+}: {
   managerId: string;
   managerName: string;
   managerEmail: string;
@@ -469,17 +469,17 @@ const ManagerAttendanceView = ({
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [selectedPhotoType, setSelectedPhotoType] = useState<'checkin' | 'checkout'>('checkin');
-    
 
-       
+
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobileView(window.innerWidth < 768);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    
+
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
@@ -512,18 +512,18 @@ const ManagerAttendanceView = ({
 
   const fetchAttendanceData = useCallback(async () => {
     if (!managerId) return;
-    
+
     setLoading(true);
     try {
       console.log(`Fetching manager attendance for ${managerId} for ${selectedYear}-${selectedMonth}`);
-      
+
       const response = await fetch(
         `${API_URL}/manager-attendance/summary/${managerId}?year=${selectedYear}&month=${selectedMonth}`
       );
-      
+
       if (response.ok) {
         const data = await response.json();
-        
+
         if (data.success && data.data) {
           setAttendanceData(data);
           setCurrentStatus(data.data.currentStatus);
@@ -550,19 +550,19 @@ const ManagerAttendanceView = ({
 
   useEffect(() => {
     if (!attendanceData?.data?.dailyRecords) return;
-    
+
     let filtered = [...attendanceData.data.dailyRecords];
-    
+
     if (mySelectedDate) {
       filtered = filtered.filter(record => record.date === mySelectedDate);
     }
-    
+
     if (dateRangeStart && dateRangeEnd) {
-      filtered = filtered.filter(record => 
+      filtered = filtered.filter(record =>
         record.date >= dateRangeStart && record.date <= dateRangeEnd
       );
     }
-    
+
     if (myFilter === "present") {
       filtered = filtered.filter(record => record.status === "Present");
     } else if (myFilter === "present_half") {
@@ -580,13 +580,13 @@ const ManagerAttendanceView = ({
     } else if (myFilter === "leave") {
       filtered = filtered.filter(record => record.status === "Leave");
     }
-    
+
     setFilteredRecords(filtered);
   }, [attendanceData, mySelectedDate, dateRangeStart, dateRangeEnd, myFilter]);
 
   const handleExport = () => {
     if (!filteredRecords.length) return;
-    
+
     const headers = ["Date", "Day", "Check In", "Check Out", "Check In Photo URL", "Check Out Photo URL", "Status", "Total Hours", "Break Time", "Break Duration", "Breaks", "Overtime"];
     const csvContent = [
       headers.join(","),
@@ -605,7 +605,7 @@ const ManagerAttendanceView = ({
         record.overtime
       ].join(","))
     ].join("\n");
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -680,7 +680,7 @@ const ManagerAttendanceView = ({
                   <span className="text-sm md:text-sm truncate">{managerDepartment}</span>
                 </div>
               </div>
-              
+
               {/* Assigned Sites Display */}
               <div className="mt-3">
                 {assignedSites && assignedSites.length > 0 ? (
@@ -793,8 +793,8 @@ const ManagerAttendanceView = ({
                       </SelectContent>
                     </Select>
 
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       className="h-9 md:h-11"
                       onClick={fetchAttendanceData}
@@ -1195,15 +1195,15 @@ const ManagerAttendanceView = ({
 };
 
 // Supervisor Attendance View Component with Photo Support
-const SupervisorAttendanceView = ({ 
-  supervisorId, 
-  supervisorName, 
+const SupervisorAttendanceView = ({
+  supervisorId,
+  supervisorName,
   supervisorEmail,
   supervisorDepartment,
   assignedSites,
-  open, 
-  onOpenChange 
-}: { 
+  open,
+  onOpenChange
+}: {
   supervisorId: string;
   supervisorName: string;
   supervisorEmail: string;
@@ -1248,10 +1248,10 @@ const SupervisorAttendanceView = ({
     const checkMobile = () => {
       setIsMobileView(window.innerWidth < 768);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    
+
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
@@ -1269,7 +1269,7 @@ const SupervisorAttendanceView = ({
     try {
       setLoading(true);
       setApiError(null);
-      
+
       try {
         const statusResponse = await axios.get(`${API_URL}/attendance/status/${supervisorId}`);
         if (statusResponse.data && statusResponse.data.success) {
@@ -1283,16 +1283,16 @@ const SupervisorAttendanceView = ({
         const historyResponse = await axios.get(`${API_URL}/attendance/history`, {
           params: { employeeId: supervisorId }
         });
-        
+
         if (historyResponse.data && historyResponse.data.success && Array.isArray(historyResponse.data.data)) {
-          const supervisorRecords = historyResponse.data.data.filter((record: any) => 
+          const supervisorRecords = historyResponse.data.data.filter((record: any) =>
             record.employeeId === supervisorId
           );
-          
+
           const transformedRecords = supervisorRecords.map((record: any, index: number) => {
-            const recordDate = record.date ? record.date : 
-                             new Date(Date.now() - index * 86400000).toISOString().split('T')[0];
-            
+            const recordDate = record.date ? record.date :
+              new Date(Date.now() - index * 86400000).toISOString().split('T')[0];
+
             let status = "Absent";
             if (record.checkInTime && record.checkOutTime) {
               status = "Present";
@@ -1301,7 +1301,7 @@ const SupervisorAttendanceView = ({
             } else if (record.status === "Weekly Off") {
               status = "Weekly Off";
             }
-            
+
             return {
               id: record._id || record.id || `record-${index}`,
               employeeId: record.employeeId || supervisorId,
@@ -1321,11 +1321,11 @@ const SupervisorAttendanceView = ({
               hours: Number(record.totalHours) || 0
             };
           });
-          
-          transformedRecords.sort((a: SupervisorAttendanceRecord, b: SupervisorAttendanceRecord) => 
+
+          transformedRecords.sort((a: SupervisorAttendanceRecord, b: SupervisorAttendanceRecord) =>
             new Date(b.date).getTime() - new Date(a.date).getTime()
           );
-          
+
           setSupervisorAttendance(transformedRecords);
           setFilteredAttendance(transformedRecords);
           return;
@@ -1333,10 +1333,10 @@ const SupervisorAttendanceView = ({
       } catch (historyError) {
         console.log('History API call failed:', historyError);
       }
-      
+
       setSupervisorAttendance([]);
       setFilteredAttendance([]);
-      
+
     } catch (error) {
       console.error('Error loading supervisor attendance:', error);
       setApiError("Error loading attendance data");
@@ -1354,13 +1354,13 @@ const SupervisorAttendanceView = ({
   // Apply filters
   useEffect(() => {
     let filtered = [...supervisorAttendance];
-    
+
     if (dateRangeStart && dateRangeEnd) {
-      filtered = filtered.filter(record => 
+      filtered = filtered.filter(record =>
         record.date >= dateRangeStart && record.date <= dateRangeEnd
       );
     }
-    
+
     if (selectedMonth && selectedYear) {
       const monthStr = String(selectedMonth).padStart(2, '0');
       filtered = filtered.filter(record => {
@@ -1368,19 +1368,19 @@ const SupervisorAttendanceView = ({
         return year === String(selectedYear) && month === monthStr;
       });
     }
-    
+
     if (statusFilter !== "all") {
-      filtered = filtered.filter(record => 
+      filtered = filtered.filter(record =>
         record.status.toLowerCase() === statusFilter.toLowerCase()
       );
     }
-    
+
     setFilteredAttendance(filtered);
   }, [supervisorAttendance, dateRangeStart, dateRangeEnd, selectedMonth, selectedYear, statusFilter]);
 
   const handleExport = () => {
     if (!filteredAttendance.length) return;
-    
+
     const headers = ["Date", "Shift", "Check In", "Check Out", "Check In Photo URL", "Check Out Photo URL", "Break In", "Break Out", "Hours", "Break Time", "Status"];
     const csvContent = [
       headers.join(","),
@@ -1398,7 +1398,7 @@ const SupervisorAttendanceView = ({
         record.status
       ].join(","))
     ].join("\n");
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -1433,7 +1433,7 @@ const SupervisorAttendanceView = ({
     }
   };
 
-  const sortedAttendanceData = [...filteredAttendance].sort((a, b) => 
+  const sortedAttendanceData = [...filteredAttendance].sort((a, b) =>
     new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 
@@ -1485,7 +1485,7 @@ const SupervisorAttendanceView = ({
                   <span className="text-sm md:text-sm truncate">{supervisorDepartment}</span>
                 </div>
               </div>
-              
+
               {/* Assigned Sites Display */}
               <div className="mt-3">
                 {assignedSites && assignedSites.length > 0 ? (
@@ -1919,7 +1919,7 @@ const UserAvatar = ({ name, role, size = "md" }: { name: string; role: UserRole;
     md: "w-10 h-10 text-sm",
     lg: "w-12 h-12 text-base"
   };
-  
+
   const gradients = {
     admin: "bg-gradient-to-br from-red-500 to-pink-600 dark:from-red-600 dark:to-pink-700",
     manager: "bg-gradient-to-br from-emerald-500 to-teal-600 dark:from-emerald-600 dark:to-teal-700",
@@ -1934,7 +1934,7 @@ const UserAvatar = ({ name, role, size = "md" }: { name: string; role: UserRole;
     >
       <div className="absolute inset-0 bg-white/10 dark:bg-white/5 group-hover:bg-white/20 dark:group-hover:bg-white/10 transition-colors"></div>
       <span className="relative z-10">{initials}</span>
-      <motion.div 
+      <motion.div
         initial={{ x: -20, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white bg-white dark:bg-gray-100"
@@ -1956,20 +1956,21 @@ interface FormUserData {
   username?: string;
   firstName?: string;
   lastName?: string;
-   photoFile?: File | null;  // ✅ Add this if not present
+  photoFile?: File | null;  // ✅ Add this if not present
+  assignedSites?: string[];
 }
 
 const departments = ['Housekeeping', 'Security', 'Parking', 'Waste Management', 'Others'];
 const roles: UserRole[] = ['admin', 'manager', 'supervisor', 'employee'];
 
 
- // User Form Component with Photo Upload
-const UserForm = ({ 
-  onSubmit, 
-  isEditing = false, 
+// User Form Component with Photo Upload
+const UserForm = ({
+  onSubmit,
+  isEditing = false,
   user = null,
   presetRole = null
-}: { 
+}: {
   onSubmit: (data: FormUserData) => void;
   isEditing?: boolean;
   user?: User | null;
@@ -1983,7 +1984,8 @@ const UserForm = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
+  const [availableSites, setAvailableSites] = useState<{ _id: string; name: string }[]>([]);
+  const [loadingSites, setLoadingSites] = useState(false);
   const [formData, setFormData] = useState<FormUserData>({
     name: user?.name || '',
     email: user?.email || '',
@@ -1992,11 +1994,11 @@ const UserForm = ({
     department: user?.department || '',
     phone: user?.phone || '',
     status: user?.status || 'active',
-    joinDate: user?.joinDate 
+    joinDate: user?.joinDate
       ? (typeof user.joinDate === 'string' ? user.joinDate.split('T')[0] : new Date(user.joinDate).toISOString().split('T')[0])
-      : new Date().toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0],
+    assignedSites: user?.assignedSites || [],   // ✅ ADD THIS
   });
-
   // ---------- Camera Functions (fixed) ----------
   const startCamera = async () => {
     if (streamRef.current) stopCamera();
@@ -2095,16 +2097,38 @@ const UserForm = ({
   useEffect(() => {
     return () => stopCamera();
   }, []);
-// Inside UserForm component, after the stopCamera cleanup useEffect
-// In UserForm component, update the useEffect:
-// In UserForm component, update the useEffect:
-useEffect(() => {
-  if (user && 'photo' in user && user.photo) {
-    // ✅ Cast photo to string since it's a URL
-    setPhotoPreview(user.photo as string);
-  }
-}, [user]);
-
+  // Inside UserForm component, after the stopCamera cleanup useEffect
+  // In UserForm component, update the useEffect:
+  // In UserForm component, update the useEffect:
+  useEffect(() => {
+    if (user && 'photo' in user && user.photo) {
+      // ✅ Cast photo to string since it's a URL
+      setPhotoPreview(user.photo as string);
+    }
+  }, [user]);
+  useEffect(() => {
+    const fetchSites = async () => {
+      try {
+        setLoadingSites(true);
+        const response = await axios.get(`${API_URL}/sites`);
+        let sitesData = [];
+        if (response.data?.success && Array.isArray(response.data.data)) {
+          sitesData = response.data.data;
+        } else if (Array.isArray(response.data)) {
+          sitesData = response.data;
+        } else if (Array.isArray(response.data?.sites)) {
+          sitesData = response.data.sites;
+        }
+        setAvailableSites(sitesData);
+      } catch (err) {
+        console.error('Error fetching sites for user form:', err);
+        setAvailableSites([]);
+      } finally {
+        setLoadingSites(false);
+      }
+    };
+    fetchSites();
+  }, []);
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit({ ...formData, photoFile });
@@ -2183,11 +2207,10 @@ useEffect(() => {
                   {roles.map(role => (
                     <SelectItem key={role} value={role}>
                       <div className="flex items-center gap-3">
-                        <div className={`w-3 h-3 rounded-full ${
-                          role === 'admin' ? 'bg-red-500' :
+                        <div className={`w-3 h-3 rounded-full ${role === 'admin' ? 'bg-red-500' :
                           role === 'manager' ? 'bg-emerald-500' :
-                          role === 'supervisor' ? 'bg-amber-500' : 'bg-indigo-500'
-                        }`} />
+                            role === 'supervisor' ? 'bg-amber-500' : 'bg-indigo-500'
+                          }`} />
                         <span className="font-medium">{role.charAt(0).toUpperCase() + role.slice(1)}</span>
                       </div>
                     </SelectItem>
@@ -2212,6 +2235,47 @@ useEffect(() => {
               </SelectContent>
             </Select>
           </div>
+          {/* Assigned Sites – only for supervisors */}
+          {formData.role === 'supervisor' && (
+            <div className="space-y-2 col-span-full">
+              <Label className="text-sm font-medium">Assigned Sites</Label>
+              <div className="border rounded-lg p-3 max-h-40 overflow-y-auto space-y-2">
+                {loadingSites ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading sites...
+                  </div>
+                ) : availableSites.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No sites found. Add sites first.</p>
+                ) : (
+                  availableSites.map(site => (
+                    <div key={site._id} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id={`site-${site._id}`}
+                        checked={formData.assignedSites?.includes(site.name) || false}
+                        onChange={(e) => {
+                          const current = formData.assignedSites || [];
+                          const updated = e.target.checked
+                            ? [...current, site.name]
+                            : current.filter(s => s !== site.name);
+                          setFormData({ ...formData, assignedSites: updated });
+                        }}
+                        className="rounded border-gray-300"
+                      />
+                      <Label htmlFor={`site-${site._id}`} className="text-sm font-normal cursor-pointer">
+                        {site.name}
+                      </Label>
+                    </div>
+                  ))
+                )}
+              </div>
+              {formData.assignedSites && formData.assignedSites.length > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Selected: {formData.assignedSites.join(', ')}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Join Date & Phone */}
@@ -2377,20 +2441,20 @@ useEffect(() => {
   );
 };
 // User List Component
-const UserList = ({ 
-  title, 
-  icon: Icon, 
+const UserList = ({
+  title,
+  icon: Icon,
   roleFilter,
   description,
-  refreshTrigger ,
+  refreshTrigger,
   autoOpen = false,
-}: { 
+}: {
   title: string;
   icon: React.ElementType;
   roleFilter: UserRole[];
   description: string;
   refreshTrigger: number;
-   autoOpen?: boolean;  // ✅ Add this
+  autoOpen?: boolean;  // ✅ Add this
 }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2401,7 +2465,7 @@ const UserList = ({
   const [selectedSupervisor, setSelectedSupervisor] = useState<{ id: string; name: string; email: string; department: string; sites: SiteAssignment[] } | null>(null);
   const [managerAttendanceViewOpen, setManagerAttendanceViewOpen] = useState(false);
   const [supervisorAttendanceViewOpen, setSupervisorAttendanceViewOpen] = useState(false);
-useEffect(() => {
+  useEffect(() => {
     if (autoOpen) {
       setDialogOpen(true);
     }
@@ -2420,7 +2484,7 @@ useEffect(() => {
     try {
       setLoading(true);
       const data = await userService.getAllUsers();
-      const filteredUsers = data.allUsers.filter(user => 
+      const filteredUsers = data.allUsers.filter(user =>
         roleFilter.includes(user.role)
       );
       setUsers(filteredUsers);
@@ -2436,102 +2500,105 @@ useEffect(() => {
   }, [fetchUsers, refreshTrigger]);
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = searchTerm === '' || 
+    const matchesSearch = searchTerm === '' ||
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (user.department && user.department.toLowerCase().includes(searchTerm.toLowerCase())) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesFilter = filter === 'all' || 
+
+    const matchesFilter = filter === 'all' ||
       (filter === 'active' && user.status === 'active') ||
       (filter === 'inactive' && user.status === 'inactive');
-    
+
     return matchesSearch && matchesFilter;
   });
 
-const handleAddUser = async (formData: FormUserData) => {
-  try {
-    const [firstName, ...lastNameParts] = formData.name.split(' ');
-    const lastName = lastNameParts.join(' ');
-    
-    // ✅ Fix: Use the correct type
-    const userData: CreateUserData = {
-      username: formData.email.split('@')[0],
-      email: formData.email,
-      password: formData.password,
-      role: formData.role as 'admin' | 'manager' | 'supervisor' | 'employee' | 'superadmin',
-      firstName,
-      lastName,
-      department: formData.department,
-      phone: formData.phone,
-      joinDate: formatDateForAPI(formData.joinDate),
-      site: formData.department || '', // ✅ Add site property
-    };
+  const handleAddUser = async (formData: FormUserData) => {
+    try {
+      const [firstName, ...lastNameParts] = formData.name.split(' ');
+      const lastName = lastNameParts.join(' ');
 
-    const newUser = await userService.createUser(userData);
-    setUsers(prev => [...prev, newUser as User]);
-    
-    // ✅ Register face if photo was taken
-    if (formData.photoFile && newUser._id) {
-      try {
-        const faceFormData = new FormData();
-        faceFormData.append("photo", formData.photoFile);
-        await axios.post(`${API_URL}/attendance/register-face/${newUser._id}`, faceFormData);
-        toast.success(`Face registered for ${newUser.name}`);
-      } catch (faceError) {
-        console.error('Face registration failed:', faceError);
-        toast.warning(`User created but face registration failed. They can register later.`);
+      // ✅ Fix: Use the correct type
+      const userData: CreateUserData = {
+        username: formData.email.split('@')[0],
+        email: formData.email,
+        password: formData.password,
+        role: formData.role as 'admin' | 'manager' | 'supervisor' | 'employee' | 'superadmin',
+        firstName,
+        lastName,
+        department: formData.department,
+        phone: formData.phone,
+        joinDate: formatDateForAPI(formData.joinDate),
+        site: formData.department || '', // ✅ Add site property
+        assignedSites: formData.assignedSites || [],   // ✅ ADD THIS
+        siteName: formData.assignedSites?.[0] || '',    // ✅ ADD THIS
+      };
+
+      const newUser = await userService.createUser(userData);
+      setUsers(prev => [...prev, newUser as User]);
+
+      // ✅ Register face if photo was taken
+      if (formData.photoFile && newUser._id) {
+        try {
+          const faceFormData = new FormData();
+          faceFormData.append("photo", formData.photoFile);
+          await axios.post(`${API_URL}/attendance/register-face/${newUser._id}`, faceFormData);
+          toast.success(`Face registered for ${newUser.name}`);
+        } catch (faceError) {
+          console.error('Face registration failed:', faceError);
+          toast.warning(`User created but face registration failed. They can register later.`);
+        }
       }
+
+      toast.success(`${title.slice(0, -1)} added successfully`, {
+        icon: <CheckCircle className="h-5 w-5 text-green-500" />
+      });
+      setDialogOpen(false);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to add user');
     }
-    
-    toast.success(`${title.slice(0, -1)} added successfully`, {
-      icon: <CheckCircle className="h-5 w-5 text-green-500" />
-    });
-    setDialogOpen(false);
-  } catch (error: any) {
-    toast.error(error.response?.data?.message || 'Failed to add user');
-  }
-};
+  };
 
- const handleEditUser = async (formData: FormUserData, userId: string) => {
-  try {
-    const updateData = new FormData();
-    updateData.append('name', formData.name);
-    updateData.append('email', formData.email);
-    updateData.append('role', formData.role);
-    updateData.append('department', formData.department || '');
-    updateData.append('phone', formData.phone || '');
-    updateData.append('isActive', String(formData.status === 'active'));
-    updateData.append('joinDate', formatDateForAPI(formData.joinDate));
-
-    if (formData.photoFile) {
-      updateData.append('profilePhoto', formData.photoFile);
-    }
-
-    const updatedUser = await userService.updateUserWithPhoto(userId, updateData);
-
-    // ✅ If photo was updated, re-register face
-    if (formData.photoFile) {
-      try {
-        const faceFormData = new FormData();
-        faceFormData.append("photo", formData.photoFile);
-        await axios.post(`${API_URL}/attendance/register-face/${userId}`, faceFormData);
-        toast.success(`Face updated for ${updatedUser.name}`);
-      } catch (faceError) {
-        console.error('Face update failed:', faceError);
-        toast.warning('User updated but face registration failed.');
+  const handleEditUser = async (formData: FormUserData, userId: string) => {
+    try {
+      const updateData = new FormData();
+      updateData.append('name', formData.name);
+      updateData.append('email', formData.email);
+      updateData.append('role', formData.role);
+      updateData.append('department', formData.department || '');
+      updateData.append('phone', formData.phone || '');
+      updateData.append('isActive', String(formData.status === 'active'));
+      updateData.append('joinDate', formatDateForAPI(formData.joinDate));
+updateData.append('assignedSites', JSON.stringify(formData.assignedSites || []));  // ✅ ADD
+    updateData.append('siteName', formData.assignedSites?.[0] || '');                   // ✅ ADD
+      if (formData.photoFile) {
+        updateData.append('profilePhoto', formData.photoFile);
       }
-    }
 
-    setUsers(prev => prev.map(user =>
-      user._id === userId ? { ...user, ...updatedUser, status: updatedUser.isActive ? 'active' : 'inactive' } : user
-    ));
-    toast.success(`${title.slice(0, -1)} updated successfully`, {
-      icon: <CheckCircle className="h-5 w-5 text-green-500" />
-    });
-  } catch (error: any) {
-    toast.error(error.response?.data?.message || 'Failed to update user');
-  }
-};
+      const updatedUser = await userService.updateUserWithPhoto(userId, updateData);
+
+      // ✅ If photo was updated, re-register face
+      if (formData.photoFile) {
+        try {
+          const faceFormData = new FormData();
+          faceFormData.append("photo", formData.photoFile);
+          await axios.post(`${API_URL}/attendance/register-face/${userId}`, faceFormData);
+          toast.success(`Face updated for ${updatedUser.name}`);
+        } catch (faceError) {
+          console.error('Face update failed:', faceError);
+          toast.warning('User updated but face registration failed.');
+        }
+      }
+
+      setUsers(prev => prev.map(user =>
+        user._id === userId ? { ...user, ...updatedUser, status: updatedUser.isActive ? 'active' : 'inactive' } : user
+      ));
+      toast.success(`${title.slice(0, -1)} updated successfully`, {
+        icon: <CheckCircle className="h-5 w-5 text-green-500" />
+      });
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to update user');
+    }
+  };
   const handleDeleteUser = async (userId: string) => {
     try {
       await userService.deleteUser(userId);
@@ -2627,17 +2694,16 @@ const handleAddUser = async (formData: FormUserData) => {
       <div className={`flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 md:p-6 rounded-2xl border shadow-sm ${gradientStyle.light} ${gradientStyle.border}`}>
         <div className="flex items-center gap-3 md:gap-4">
           <div className={`p-2 md:p-3 rounded-xl ${gradientStyle.icon}`}>
-            <Icon className={`h-5 w-5 md:h-6 md:w-6 ${
-              title.includes('Admin') ? 'text-red-600 dark:text-red-400' :
+            <Icon className={`h-5 w-5 md:h-6 md:w-6 ${title.includes('Admin') ? 'text-red-600 dark:text-red-400' :
               title.includes('Manager') ? 'text-emerald-600 dark:text-emerald-400' :
-              title.includes('Supervisor') ? 'text-amber-600 dark:text-amber-400' :
-              'text-indigo-600 dark:text-indigo-400'
-            }`} />
+                title.includes('Supervisor') ? 'text-amber-600 dark:text-amber-400' :
+                  'text-indigo-600 dark:text-indigo-400'
+              }`} />
           </div>
           <div>
             <h3 className="text-lg md:text-xl font-bold text-foreground flex items-center gap-2">
               {title}
-              <motion.span 
+              <motion.span
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 className="px-2 py-0.5 md:px-3 md:py-1 text-sm md:text-sm font-normal bg-white/50 dark:bg-black/30 backdrop-blur-sm text-foreground rounded-full"
@@ -2648,7 +2714,7 @@ const handleAddUser = async (formData: FormUserData) => {
             <p className="text-sm md:text-sm text-muted-foreground mt-1">{description}</p>
           </div>
         </div>
-        
+
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
@@ -2666,7 +2732,7 @@ const handleAddUser = async (formData: FormUserData) => {
               </DialogHeader>
             </div>
             <div className="p-4 md:p-6">
-              <UserForm onSubmit={handleAddUser}   presetRole={title === "Administrators" ? "admin" : title === "Managers" ? "manager" : title === "Supervisors" ? "supervisor" : null}/>
+              <UserForm onSubmit={handleAddUser} presetRole={title === "Administrators" ? "admin" : title === "Managers" ? "manager" : title === "Supervisors" ? "supervisor" : null} />
             </div>
           </DialogContent>
         </Dialog>
@@ -2730,7 +2796,7 @@ const handleAddUser = async (formData: FormUserData) => {
                   </TableRow>
                 ) : (
                   filteredUsers.map((user, index) => (
-                    <motion.tr 
+                    <motion.tr
                       key={user._id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -2752,7 +2818,7 @@ const handleAddUser = async (formData: FormUserData) => {
                           </div>
                         </div>
                       </TableCell>
-                      
+
                       <TableCell className="py-3 md:py-4 hidden md:table-cell">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2 text-sm">
@@ -2765,33 +2831,32 @@ const handleAddUser = async (formData: FormUserData) => {
                           </div>
                         </div>
                       </TableCell>
-                      
+
                       <TableCell className="py-3 md:py-4">
                         <Badge className={`px-2 py-1 md:px-3 md:py-1.5 rounded-lg font-medium text-sm whitespace-nowrap ${getRoleColor(user.role)}`}>
                           {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                         </Badge>
                       </TableCell>
-                      
+
                       <TableCell className="py-3 md:py-4 hidden lg:table-cell">
                         <div className="flex items-center gap-2">
                           <Briefcase className="h-4 w-4 text-muted-foreground hidden xl:block" />
                           <span className="text-sm whitespace-nowrap">{user.department || 'N/A'}</span>
                         </div>
                       </TableCell>
-                      
+
                       <TableCell className="py-3 md:py-4 hidden xl:table-cell">
                         <div className="flex items-center gap-2 text-sm whitespace-nowrap">
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                           {formatDateForDisplay(user.joinDate)}
                         </div>
                       </TableCell>
-                      
+
                       <TableCell className="py-3 md:py-4">
-                        <div className={`inline-flex items-center gap-1 px-2 py-1 md:px-3 md:py-1.5 rounded-full font-medium text-sm whitespace-nowrap ${
-                          user.status === 'active' 
-                            ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800' 
-                            : 'bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 text-gray-700 dark:text-gray-400 border border-gray-200 dark:border-gray-700'
-                        }`}>
+                        <div className={`inline-flex items-center gap-1 px-2 py-1 md:px-3 md:py-1.5 rounded-full font-medium text-sm whitespace-nowrap ${user.status === 'active'
+                          ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800'
+                          : 'bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 text-gray-700 dark:text-gray-400 border border-gray-200 dark:border-gray-700'
+                          }`}>
                           {user.status === 'active' ? (
                             <motion.div
                               animate={{ scale: [1, 1.2, 1] }}
@@ -2805,7 +2870,7 @@ const handleAddUser = async (formData: FormUserData) => {
                           <span className="capitalize hidden sm:inline">{user.status || 'inactive'}</span>
                         </div>
                       </TableCell>
-                      
+
                       <TableCell className="py-3 md:py-4">
                         <div className="flex justify-end gap-1 md:gap-2">
                           {/* View Attendance Button for Managers */}
@@ -2843,30 +2908,28 @@ const handleAddUser = async (formData: FormUserData) => {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleToggleStatus(user._id)}
-                              className={`h-8 w-8 md:h-9 md:w-9 rounded-lg ${
-                                user.role === 'admin' ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20' :
+                              className={`h-8 w-8 md:h-9 md:w-9 rounded-lg ${user.role === 'admin' ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20' :
                                 user.role === 'manager' ? 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20' :
-                                user.role === 'supervisor' ? 'text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20' :
-                                'text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
-                              }`}
+                                  user.role === 'supervisor' ? 'text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20' :
+                                    'text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
+                                }`}
                               title={user.status === 'active' ? 'Deactivate' : 'Activate'}
                             >
                               {user.status === 'active' ? <XCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
                             </Button>
                           </motion.div>
-                          
+
                           <Dialog>
                             <DialogTrigger asChild>
                               <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className={`h-8 w-8 md:h-9 md:w-9 rounded-lg ${
-                                    user.role === 'admin' ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20' :
+                                  className={`h-8 w-8 md:h-9 md:w-9 rounded-lg ${user.role === 'admin' ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20' :
                                     user.role === 'manager' ? 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20' :
-                                    user.role === 'supervisor' ? 'text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20' :
-                                    'text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
-                                  }`}
+                                      user.role === 'supervisor' ? 'text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20' :
+                                        'text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
+                                    }`}
                                   title="Edit"
                                 >
                                   <Edit className="h-4 w-4" />
@@ -2881,26 +2944,25 @@ const handleAddUser = async (formData: FormUserData) => {
                                 </DialogHeader>
                               </div>
                               <div className="p-4 md:p-6">
-                                <UserForm 
-                                  user={user} 
+                                <UserForm
+                                  user={user}
                                   onSubmit={(data) => handleEditUser(data, user._id)}
                                   isEditing={true}
                                 />
                               </div>
                             </DialogContent>
                           </Dialog>
-                          
+
                           <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDeleteUser(user._id)}
-                              className={`h-8 w-8 md:h-9 md:w-9 rounded-lg ${
-                                user.role === 'admin' ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20' :
+                              className={`h-8 w-8 md:h-9 md:w-9 rounded-lg ${user.role === 'admin' ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20' :
                                 user.role === 'manager' ? 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20' :
-                                user.role === 'supervisor' ? 'text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20' :
-                                'text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
-                              }`}
+                                  user.role === 'supervisor' ? 'text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20' :
+                                    'text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
+                                }`}
                               title="Delete"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -2953,37 +3015,37 @@ const UsersRolesManagement = () => {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isMobileView, setIsMobileView] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
-const [autoOpenAdd, setAutoOpenAdd] = useState<"managers" | "supervisors" | "admins" | null>(null);
+  const [autoOpenAdd, setAutoOpenAdd] = useState<"managers" | "supervisors" | "admins" | null>(null);
 
-useEffect(() => {
-  const addParam = searchParams.get("add");
-  const tabParam = searchParams.get("tab");
-  if (addParam === "true") {
-    if (tabParam === "managers") {
-      setActiveTab("managers");
-      setAutoOpenAdd("managers");
-    } else if (tabParam === "supervisors") {
-      setActiveTab("supervisors");
-      setAutoOpenAdd("supervisors");
-    } else if (tabParam === "admins") {
-      setActiveTab("admins");
-      setAutoOpenAdd("admins");
+  useEffect(() => {
+    const addParam = searchParams.get("add");
+    const tabParam = searchParams.get("tab");
+    if (addParam === "true") {
+      if (tabParam === "managers") {
+        setActiveTab("managers");
+        setAutoOpenAdd("managers");
+      } else if (tabParam === "supervisors") {
+        setActiveTab("supervisors");
+        setAutoOpenAdd("supervisors");
+      } else if (tabParam === "admins") {
+        setActiveTab("admins");
+        setAutoOpenAdd("admins");
+      }
+      searchParams.delete("add");
+      searchParams.delete("tab");
+      setSearchParams(searchParams, { replace: true });
     }
-    searchParams.delete("add");
-    searchParams.delete("tab");
-    setSearchParams(searchParams, { replace: true });
-  }
-}, [searchParams, setSearchParams]);;
-     
+  }, [searchParams, setSearchParams]);;
+
 
   useEffect(() => {
     const checkMobile = () => {
       setIsMobileView(window.innerWidth < 768);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    
+
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
@@ -3002,34 +3064,34 @@ useEffect(() => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-blue-50/30 dark:to-blue-950/10 relative overflow-hidden">
       <ParticleBackground />
-      
+
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-      
-<DashboardHeader 
-  title="Users & Roles Management"  // ✅ Use a string, not JSX
-  subtitle="Manage your team with precision and elegance"
-  onMenuClick={handleMenuClick}
-/>
+
+        <DashboardHeader
+          title="Users & Roles Management"  // ✅ Use a string, not JSX
+          subtitle="Manage your team with precision and elegance"
+          onMenuClick={handleMenuClick}
+        />
       </motion.div>
-      
+
       {mobileSidebarOpen && (
-        <DashboardSidebar 
+        <DashboardSidebar
           mobileOpen={mobileSidebarOpen}
           onMobileClose={handleMobileClose}
         />
       )}
-      
-      <motion.div 
+
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
         className="px-3 sm:px-4 md:px-6 lg:px-8 max-w-screen-2xl mx-auto"
       >
-             
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -3041,8 +3103,8 @@ useEffect(() => {
               <Tabs defaultValue="admins" value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <div className="px-3 sm:px-4 md:px-6 pt-4 md:pt-6">
                   <TabsList className={`grid w-full ${isMobileView ? 'grid-cols-3' : 'grid-cols-3'} gap-1 md:gap-2 p-1 bg-gradient-to-r from-gray-100 to-gray-200/50 dark:from-gray-800 dark:to-gray-700/50 rounded-xl md:rounded-2xl`}>
-                    <TabsTrigger 
-                      value="admins" 
+                    <TabsTrigger
+                      value="admins"
                       className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-white data-[state=active]:to-red-50/50 data-[state=active]:dark:from-gray-800 data-[state=active]:dark:to-red-950/20 data-[state=active]:shadow-lg rounded-lg md:rounded-xl py-2 md:py-3 transition-all text-sm md:text-sm"
                     >
                       <div className="flex items-center gap-1 md:gap-2">
@@ -3052,8 +3114,8 @@ useEffect(() => {
                         <span className="sm:hidden">Admin</span>
                       </div>
                     </TabsTrigger>
-                    <TabsTrigger 
-                      value="managers" 
+                    <TabsTrigger
+                      value="managers"
                       className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-white data-[state=active]:to-emerald-50/50 data-[state=active]:dark:from-gray-800 data-[state=active]:dark:to-emerald-950/20 data-[state=active]:shadow-lg rounded-lg md:rounded-xl py-2 md:py-3 transition-all text-sm md:text-sm"
                     >
                       <div className="flex items-center gap-1 md:gap-2">
@@ -3063,8 +3125,8 @@ useEffect(() => {
                         <span className="sm:hidden">Mgr</span>
                       </div>
                     </TabsTrigger>
-                    <TabsTrigger 
-                      value="supervisors" 
+                    <TabsTrigger
+                      value="supervisors"
                       className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-white data-[state=active]:to-amber-50/50 data-[state=active]:dark:from-gray-800 data-[state=active]:dark:to-amber-950/20 data-[state=active]:shadow-lg rounded-lg md:rounded-xl py-2 md:py-3 transition-all text-sm md:text-sm"
                     >
                       <div className="flex items-center gap-1 md:gap-2">
@@ -3076,7 +3138,7 @@ useEffect(() => {
                     </TabsTrigger>
                   </TabsList>
                 </div>
-                
+
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={activeTab}
@@ -3086,39 +3148,38 @@ useEffect(() => {
                     transition={{ duration: 0.2 }}
                   >
                     <div className="p-3 sm:p-4 md:p-6">
-                     <TabsContent value="admins" className="m-0">
-  <UserList
-    title="Administrators"
-    icon={UserCog}
-    roleFilter={['admin']}
-    description="Full system access and control"
-    refreshTrigger={refreshTrigger}
-    autoOpen={activeTab === 'admins' && autoOpenAdd === 'admins'}
-  />
-</TabsContent>
-                      
-                      <TabsContent value="managers" className="m-0">
-  <UserList
-    title="Managers"
-    icon={Briefcase}
-    roleFilter={['manager']}
-    description="Department leadership and oversight"
-    refreshTrigger={refreshTrigger}
-    autoOpen={activeTab === 'managers' && autoOpenAdd === 'managers'}   // 👈 add this
-  />
-</TabsContent>
+                      <TabsContent value="admins" className="m-0">
+                        <UserList
+                          title="Administrators"
+                          icon={UserCog}
+                          roleFilter={['admin']}
+                          description="Full system access and control"
+                          refreshTrigger={refreshTrigger}
+                          autoOpen={activeTab === 'admins' && autoOpenAdd === 'admins'}
+                        />
+                      </TabsContent>
 
-<TabsContent value="supervisors" className="m-0">
-  <UserList
-    title="Supervisors"
-    icon={Shield}
-    roleFilter={['supervisor']}
-    description="Team coordination and task management"
-    refreshTrigger={refreshTrigger}
-    autoOpen={activeTab === 'supervisors' && autoOpenAdd === 'supervisors'} // 👈 add this
-  />
-</TabsContent>
-                      
+                      <TabsContent value="managers" className="m-0">
+                        <UserList
+                          title="Managers"
+                          icon={Briefcase}
+                          roleFilter={['manager']}
+                          description="Department leadership and oversight"
+                          refreshTrigger={refreshTrigger}
+                          autoOpen={activeTab === 'managers' && autoOpenAdd === 'managers'}   // 👈 add this
+                        />
+                      </TabsContent>
+
+                      <TabsContent value="supervisors" className="m-0">
+                        <UserList
+                          title="Supervisors"
+                          icon={Shield}
+                          roleFilter={['supervisor']}
+                          refreshTrigger={refreshTrigger}
+                          autoOpen={activeTab === 'supervisors' && autoOpenAdd === 'supervisors'} // 👈 add this
+                        />
+                      </TabsContent>
+
                     </div>
                   </motion.div>
                 </AnimatePresence>

@@ -29,7 +29,7 @@ import leadRoutes from './routes/leadRoutes';
 // In backend/src/server.ts
 import notificationRoutes from './routes/notificationRoutes';
 import expenseRoutes from './routes/expenseRoutes';
-
+import workQueryRoutes from './routes/workQuery.routes';
 import serviceRoutes from './routes/serviceRoutes';
 import alertRoutes from './routes/alertRoutes'
 import machineRoutes from './routes/machineRoutes';
@@ -50,6 +50,10 @@ import incidentRoutes from './routes/incidentRoutes';
 import cleaningPhotoRoutes from './routes/cleaningPhotoRoutes';
 import communicationRoutes from './routes/communicationRoutes';
 // ... other imports ...
+// Add this with other imports
+import rosterRoutes from './routes/rosterRoutes';
+
+// After other route registrations, add:
 
 
 import rateLimit from 'express-rate-limit';
@@ -717,7 +721,10 @@ app.patch('/api/notifications/read-all', (req: Request, res: Response) => {
 app.delete('/api/notifications/:id', (req: Request, res: Response) => {
   res.json({ success: true });
 });
+app.use('/api/roster', rosterRoutes);
+// In your main server file
 
+app.use('/api/work-queries', workQueryRoutes);
 // ==================== 404 HANDLER ====================
 app.use('*', (req: Request, res: Response) => {
   console.log(`❌ 404: ${req.method} ${req.url}`);

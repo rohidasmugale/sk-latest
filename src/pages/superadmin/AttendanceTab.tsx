@@ -51,9 +51,16 @@ import {
   Shield,
   ShieldCheck,
   Camera,
-  ExternalLink, Home, Car, Trash2, Droplets, ShoppingCart, Settings, Cpu,       // <-- add
-  Shirt,     // <-- add
-  Images,    // <-- add
+  ExternalLink,
+  Home,
+  Car,
+  Trash2,
+  Droplets,
+  ShoppingCart,
+  Settings,
+  Cpu,
+  Shirt,
+  Images,
   Factory,
   MessageSquare,
 } from "lucide-react";
@@ -116,6 +123,7 @@ interface Employee {
   isManager?: boolean;
   isSupervisor?: boolean;
   totalHours?: number;
+  profileStatus?: "complete" | "incomplete";   // ✅ ADD THIS
 }
 
 // Attendance Record structure with photo fields
@@ -559,11 +567,19 @@ const generateEmployeeData = async (
     // Normalise target site name
     const targetSite = siteName.trim().toLowerCase();
 
-    // Try exact match first
     let siteEmployees = allEmployees.filter(emp => {
       const empSite = (emp.site || emp.siteName || '').trim().toLowerCase();
-      return empSite === targetSite;
+      // ✅ ONLY include active employees
+      return empSite === targetSite && (emp.employeeStatus === 'active' || emp.status === 'active' || !emp.employeeStatus);
     });
+
+    // If none found with status filter, try without (fallback)
+    if (siteEmployees.length === 0) {
+      siteEmployees = allEmployees.filter(emp => {
+        const empSite = (emp.site || emp.siteName || '').trim().toLowerCase();
+        return empSite === targetSite;
+      });
+    }
 
     // If none, try partial match (e.g., "Global Square" matches "Global Square - Main")
     if (siteEmployees.length === 0) {
@@ -985,6 +1001,12 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
   const [staffBriefings, setStaffBriefings] = useState<any[]>([]);
   const [loadingTraining, setLoadingTraining] = useState(false);
   const [fetchTrigger, setFetchTrigger] = useState(0);
+
+  // Edit-employee (superadmin, from Attendance View)
+  const [editEmpDialogOpen, setEditEmpDialogOpen] = useState(false);
+  const [editEmpTarget, setEditEmpTarget] = useState<any>(null);
+  const [editEmpForm, setEditEmpForm] = useState<any>({});
+  const [savingEditEmp, setSavingEditEmp] = useState(false);
   // Add this inside SiteEmployeeDetails component:
   const filterByDept = (data: any[]) => {
     if (viewType === 'department' && department) {
@@ -1129,6 +1151,53 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
       else derivedStatus = 'present';
     }
     return { status: derivedStatus, isLate };
+  };
+  const isEmployeeIncomplete = (emp: any): boolean => {
+    // Uses profileStatus if the backend supplies it; falls back to a quick required-field check
+    if (emp.profileStatus) return emp.profileStatus === 'incomplete';
+    const requiredForBadge = [emp.employeeId, emp.name, emp.phone, emp.department, emp.position, emp.dateOfBirth];
+    return requiredForBadge.some((v) => v === undefined || v === null || v === '');
+  };
+
+  const openEditEmployee = (emp: any) => {
+    setEditEmpTarget(emp);
+    setEditEmpForm({
+      employeeId: emp.employeeId || '',
+      name: emp.name || '',
+      phone: emp.phone || '',
+      email: emp.email || '',
+      department: emp.department || '',
+      position: emp.position || '',
+      siteName: emp.siteName || emp.site || '',
+      salary: emp.salary || '',
+      status: emp.employeeStatus || emp.status || 'active', // ✅ ADD THIS
+    });
+    setEditEmpDialogOpen(true);
+  };
+  const saveEditEmployee = async () => {
+    if (!editEmpTarget?._id && !editEmpTarget?.id) {
+      toast.error("Missing employee reference");
+      return;
+    }
+    if (!editEmpForm.employeeId?.trim()) {
+      toast.error("Employee ID is required");
+      return;
+    }
+    setSavingEditEmp(true);
+    try {
+      const empDbId = editEmpTarget._id || editEmpTarget.id;
+      await apiClient.patch(`/employees/${empDbId}`, {
+        ...editEmpForm,
+        status: editEmpForm.status || 'active', // ✅ Include status
+      });
+      toast.success("Employee updated successfully");
+      setEditEmpDialogOpen(false);
+      setFetchTrigger((prev) => prev + 1);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to update employee");
+    } finally {
+      setSavingEditEmp(false);
+    }
   };
 
   useEffect(() => {
@@ -1389,14 +1458,20 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
     else if (activeTab === "absent") list = [...absentEmployees, ...leaveEmployees];
     else if (activeTab === "weekly-off") list = weeklyOffEmployees;
     else list = allEmployees;
+
     if (employeeSearch) {
       list = list.filter((emp) =>
         emp.name.toLowerCase().includes(employeeSearch.toLowerCase())
       );
     }
-    return list;
-  }, [activeTab, employeeSearch, allEmployees, presentEmployees, absentEmployees, weeklyOffEmployees, leaveEmployees]);
 
+    // ✅ Managers first, then Supervisors, then regular staff — alphabetical within each group
+    return [...list].sort((a, b) => {
+      const rank = (e: any) => (e.isManager ? 0 : e.isSupervisor ? 1 : 2);
+      const diff = rank(a) - rank(b);
+      return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
+    });
+  }, [activeTab, employeeSearch, allEmployees, presentEmployees, absentEmployees, weeklyOffEmployees, leaveEmployees]);
   const itemsPerPage = 20;
   const paginatedEmployees = filteredEmployees.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
@@ -1725,9 +1800,10 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
         <title>Attendance - ${siteName} - ${monthStart}</title>
         <meta charset="UTF-8" />
         <style>
-          body { font-family: Arial, sans-serif; margin: 10px; }
+         body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+table { width: 100%; border-collapse: collapse; font-size: 10px; }
           h1 { text-align: center; color: #0E2568; font-size: 18px; }
-          table { border-collapse: collapse; width: 100%; font-size: 10px; table-layout: auto; }
+          
           th, td { border: 1px solid #ccc; padding: 3px 4px; text-align: center; }
           th { background: #0E2568; color: white; font-weight: bold; }
           .wo { background: #e9e9e9; color: #333; font-weight: bold; }
@@ -2011,7 +2087,12 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
                   {/* Header */}
                   <div className="flex justify-between items-start">
                     <div>
-                      <h4 className="font-semibold">{emp.name}</h4>
+                      <h4 className="font-semibold flex items-center gap-1">
+                        {emp.name}
+                        {isEmployeeIncomplete(emp) && (
+                          <Badge className="bg-amber-100 text-amber-800 text-[10px]">Incomplete</Badge>
+                        )}
+                      </h4>
                       <p className="text-xs text-muted-foreground">{emp.employeeId}</p>
                       <p className="text-xs">{emp.department} • {emp.position}</p>
                     </div>
@@ -2054,6 +2135,16 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
                       <div className="flex justify-between"><span>Check In:</span><span>{emp.checkInTime || "-"}</span></div>
                       <div className="flex justify-between"><span>Check Out:</span><span>{emp.checkOutTime || "-"}</span></div>
                       <div className="flex justify-between"><span>Role:</span><span>{emp.isManager ? "Manager" : emp.isSupervisor ? "Supervisor" : "Staff"}</span></div>
+                      {role === 'superadmin' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full mt-2"
+                          onClick={() => openEditEmployee(emp)}
+                        >
+                          <Edit className="h-3 w-3 mr-1" /> Edit Employee
+                        </Button>
+                      )}
                       {emp.checkInPhoto && (
                         <button onClick={() => handleViewPhoto(emp.checkInPhoto, "checkin")} className="text-blue-500 text-xs flex items-center gap-1">
                           <Camera className="h-3 w-3" /> Check-in Photo
@@ -2064,17 +2155,7 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
                           <Camera className="h-3 w-3" /> Check-out Photo
                         </button>
                       )}
-                      <div className="mt-2">
-                        <Select value={emp.action || "none"} onValueChange={(v) => updateEmployeeAction(emp.id, v)}>
-                          <SelectTrigger className="h-7 w-24 text-xs"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            <SelectItem value="fine">Fine</SelectItem>
-                            <SelectItem value="advance">Advance</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+
                       <Input
                         value={emp.remark || ""}
                         onChange={(e) => updateEmployeeRemark(emp.id, e.target.value)}
@@ -2099,31 +2180,49 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
                 <th className="p-2 text-left text-xs">Dept</th>
                 <th className="p-2 text-left text-xs">Position</th>
                 <th className="p-2 text-left text-xs">Role</th>
+
+                {role === 'superadmin' && <th className="p-2 text-left text-xs">Edit</th>}
                 <th className="p-2 text-left text-xs">Status</th>
                 <th className="p-2 text-left text-xs">Check In</th>
                 <th className="p-2 text-left text-xs">Check Out</th>
                 <th className="p-2 text-left text-xs">In Photo</th>
                 <th className="p-2 text-left text-xs">Out Photo</th>
-                <th className="p-2 text-left text-xs">Date</th>
-                <th className="p-2 text-left text-xs">Action</th>
                 <th className="p-2 text-left text-xs">Remark</th>
               </tr>
             </thead>
             <tbody>
               {refreshing ? (
-                <tr><td colSpan={13} className="p-4 text-center"><Loader2 className="animate-spin h-5 w-5 mx-auto" /></td></tr>
+                <tr><td colSpan={14} className="p-4 text-center"><Loader2 className="animate-spin h-5 w-5 mx-auto" /></td></tr>
               ) : paginatedEmployees.length === 0 ? (
-                <tr><td colSpan={13} className="p-4 text-center text-muted-foreground">No employees found</td></tr>
+                <tr><td colSpan={14} className="p-4 text-center text-muted-foreground">No employees found</td></tr>
               ) : (
                 paginatedEmployees.map((emp: any) => {
                   const { status: displayStatus, isLate } = getDerivedAttendanceStatus(emp);
                   return (
                     <tr key={emp.id} className="border-b hover:bg-muted/50">
                       <td className="p-2 text-xs font-mono">{emp.employeeId}</td>
-                      <td className="p-2 font-medium">{emp.name}</td>
+                      <td className="p-2 font-medium">
+                        <div className="flex items-center gap-1">
+                          {emp.name}
+                          {isEmployeeIncomplete(emp) && (
+                            <Badge className="bg-amber-100 text-amber-800 text-[10px]">Incomplete</Badge>
+                          )}
+                        </div>
+                      </td>
                       <td className="p-2"><Badge variant="outline" className="text-xs">{emp.department}</Badge></td>
                       <td className="p-2 text-xs">{emp.position}</td>
                       <td className="p-2">{emp.isManager ? <Badge className="bg-amber-100 text-amber-800 text-xs">Mgr</Badge> : emp.isSupervisor ? <Badge className="bg-teal-100 text-teal-800 text-xs">Sup</Badge> : <Badge className="bg-cyan-100 text-cyan-800 text-xs">Staff</Badge>}</td>
+
+                      {/* ✅ Edit button - now second */}
+                      {role === 'superadmin' && (
+                        <td className="p-2">
+                          <Button variant="ghost" size="sm" onClick={() => openEditEmployee(emp)}>
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                        </td>
+                      )}
+
+                      {/* ✅ Status badge - now third */}
                       <td className="p-2">
                         <div className="flex items-center gap-2">
                           <Badge
@@ -2146,22 +2245,11 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
                           )}
                         </div>
                       </td>
+
                       <td className="p-2 text-xs">{emp.checkInTime || "-"}</td>
                       <td className="p-2 text-xs">{emp.checkOutTime || "-"}</td>
                       <td className="p-2">{emp.checkInPhoto ? <Button variant="ghost" size="sm" onClick={() => handleViewPhoto(emp.checkInPhoto, "checkin")} className="h-6 px-1"><Camera className="h-3 w-3" /></Button> : "-"}</td>
                       <td className="p-2">{emp.checkOutPhoto ? <Button variant="ghost" size="sm" onClick={() => handleViewPhoto(emp.checkOutPhoto, "checkout")} className="h-6 px-1"><Camera className="h-3 w-3" /></Button> : "-"}</td>
-                      <td className="p-2 text-xs">{emp.date ? formatDateDisplay(emp.date) : "-"}</td>
-                      <td className="p-2">
-                        <Select value={emp.action || "none"} onValueChange={(v) => updateEmployeeAction(emp.id, v)}>
-                          <SelectTrigger className="h-7 w-24 text-xs"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            <SelectItem value="fine">Fine</SelectItem>
-                            <SelectItem value="advance">Advance</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </td>
                       <td className="p-2"><Input value={emp.remark || ""} onChange={(e) => updateEmployeeRemark(emp.id, e.target.value)} placeholder="Remark" className="h-7 text-xs" /></td>
                     </tr>
                   );
@@ -2879,17 +2967,16 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
           </CardContent>
         </Card>
       </div>
-      {/* Main Tabs */}
-      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as any)} className="space-y-4">
-
-        <TabsContent value="employees">{renderEmployeesTab()}</TabsContent>
-        <TabsContent value="machines">{renderMachinesTab()}</TabsContent>
-        <TabsContent value="grooming">{renderGroomingTab()}</TabsContent>
-        <TabsContent value="incidents">{renderIncidentsTab()}</TabsContent>
-        <TabsContent value="photos">{renderPhotosTab()}</TabsContent>
-        <TabsContent value="shift">{renderShiftTab()}</TabsContent>
-        <TabsContent value="training">{renderTrainingTab()}</TabsContent>
-      </Tabs>
+      {/* Main Content - Conditional Rendering */}
+      <div className="mt-4">
+        {mainTab === "employees" && renderEmployeesTab()}
+        {mainTab === "machines" && renderMachinesTab()}
+        {mainTab === "grooming" && renderGroomingTab()}
+        {mainTab === "incidents" && renderIncidentsTab()}
+        {mainTab === "photos" && renderPhotosTab()}
+        {mainTab === "shift" && renderShiftTab()}
+        {mainTab === "training" && renderTrainingTab()}
+      </div>
 
       {/* Photo Modal (for attendance photos) */}
       <Dialog open={photoModalOpen && !!selectedPhotoType} onOpenChange={setPhotoModalOpen}>
@@ -2915,6 +3002,102 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
                 <ExternalLink className="h-4 w-4 mr-2" /> Open Original
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Edit Employee Dialog (Superadmin only, from Attendance View) */}
+      <Dialog open={editEmpDialogOpen} onOpenChange={setEditEmpDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Employee - {editEmpTarget?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <label className="text-xs font-medium">Employee ID (as provided by Client) *</label>
+              <Input
+                value={editEmpForm.employeeId || ''}
+                onChange={(e) => setEditEmpForm({ ...editEmpForm, employeeId: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium">Name</label>
+              <Input
+                value={editEmpForm.name || ''}
+                onChange={(e) => setEditEmpForm({ ...editEmpForm, name: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label className="text-xs font-medium">Phone</label>
+                <Input
+                  value={editEmpForm.phone || ''}
+                  onChange={(e) => setEditEmpForm({ ...editEmpForm, phone: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium">Email</label>
+                <Input
+                  value={editEmpForm.email || ''}
+                  onChange={(e) => setEditEmpForm({ ...editEmpForm, email: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label className="text-xs font-medium">Department</label>
+                <Input
+                  value={editEmpForm.department || ''}
+                  onChange={(e) => setEditEmpForm({ ...editEmpForm, department: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium">Position</label>
+                <Input
+                  value={editEmpForm.position || ''}
+                  onChange={(e) => setEditEmpForm({ ...editEmpForm, position: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label className="text-xs font-medium">Site Name</label>
+                <Input
+                  value={editEmpForm.siteName || ''}
+                  onChange={(e) => setEditEmpForm({ ...editEmpForm, siteName: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium">Salary</label>
+                <Input
+                  type="number"
+                  value={editEmpForm.salary || ''}
+                  onChange={(e) => setEditEmpForm({ ...editEmpForm, salary: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium">Status</label>
+                <Select
+                  value={editEmpForm.status || 'active'}
+                  onValueChange={(value) => setEditEmpForm({ ...editEmpForm, status: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="left">Left</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditEmpDialogOpen(false)}>Cancel</Button>
+            <Button onClick={saveEditEmployee} disabled={savingEditEmp}>
+              {savingEditEmp ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              Save
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -3599,7 +3782,11 @@ const SuperAdminAttendanceView = () => {
                   const status = parseFloat(rate) >= 90 ? 'Excellent' : parseFloat(rate) >= 80 ? 'Good' : parseFloat(rate) >= 70 ? 'Average' : 'Poor';
 
                   return (
-                    <Card key={item.siteId || item.id || index} className="p-3">
+                    <Card
+                      key={item.siteId || item.id || index}
+                      className="p-3 cursor-pointer"
+                      onClick={() => handleViewDetails(item)}
+                    >
                       <div className="flex justify-between items-start">
                         <div>
                           <h3 className="font-semibold">{item.siteName || item.name}</h3>
@@ -3614,7 +3801,7 @@ const SuperAdminAttendanceView = () => {
                         <div className="text-red-600"><span className="text-muted-foreground">Absent:</span> <strong>{absent}</strong></div>
                         <div><span className="text-muted-foreground">Rate:</span> <strong>{rate}%</strong></div>
                       </div>
-                      <div className="flex gap-2 mt-3">
+                      <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
                         <Button variant="outline" size="sm" onClick={() => handleViewDetails(item)}>
                           <Eye className="h-4 w-4 mr-1" /> Details
                         </Button>
@@ -3654,7 +3841,11 @@ const SuperAdminAttendanceView = () => {
                         const status = parseFloat(rate) >= 90 ? 'Excellent' : parseFloat(rate) >= 80 ? 'Good' : parseFloat(rate) >= 70 ? 'Average' : 'Poor';
 
                         return (
-                          <tr key={item.siteId || item.id || index} className="border-b hover:bg-muted/50">
+                          <tr
+                            key={item.siteId || item.id || index}
+                            className="border-b hover:bg-muted/50 cursor-pointer"
+                            onClick={() => handleViewDetails(item)}
+                          >
                             <td className="p-4 align-middle font-medium">
                               <div className="font-medium text-sm">{item.siteName || item.name}</div>
                               <div className="text-xs text-muted-foreground">
@@ -3674,7 +3865,7 @@ const SuperAdminAttendanceView = () => {
                                 {status}
                               </Badge>
                             </td>
-                            <td className="p-4 align-middle">
+                            <td className="p-4 align-middle" onClick={(e) => e.stopPropagation()}>
                               <Button variant="outline" size="sm" onClick={() => handleViewDetails(item)}>
                                 <Eye className="h-4 w-4 mr-1" /> Details
                               </Button>

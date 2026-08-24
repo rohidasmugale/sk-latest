@@ -170,6 +170,7 @@ interface Employee {
   site?: string;
   isSupervisor?: boolean;
   role?: string;
+  profileStatus?: "complete" | "incomplete";   // ✅ ADD THIS
 }
 
 // Interface for Manager Info
@@ -2073,7 +2074,7 @@ const ManagerLeaves = () => {
       if (managerTestResponse.ok) {
         const managerTestData = await managerTestResponse.json();
         console.log('✅ Manager leaves API test:', managerTestData);
-        toast.success('Manager leaves API connected');
+       
       } else {
         console.warn('⚠️ Manager leaves API test failed');
         toast.warning('Manager leaves API not available');

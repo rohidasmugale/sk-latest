@@ -3,7 +3,8 @@ import multer from 'multer';
 import xlsx from 'xlsx';
 import path from 'path';
 import fs from 'fs';
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';   // ← Added NextFunction
+import jwt from 'jsonwebtoken';                              // ← Added jwt
 import mongoose from 'mongoose';
 import Employee, { IEmployee } from '../models/Employee';
 import { 
@@ -13,7 +14,9 @@ import {
   deleteFromCloudinary 
 } from '../utils/CloudinaryUtils';
 import Task from '../models/Task';
-;
+import User from '../models/User'; // Add this import at the top
+
+
 const router = express.Router();
 
 // ==================== MULTER CONFIGURATIONS ====================
@@ -80,25 +83,73 @@ const excelStorage = multer.diskStorage({
     cb(null, 'employee-import-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
-// Get employees for the logged-in supervisor (filtered by their assigned sites)
-router.get('/supervisor', async (req: Request, res: Response) => {
+
+// ─── Authentication Middleware ──────────────────────────────────────────
+const authenticate = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const authHeader = req.headers.authorization;
+    console.log('🔑 Auth header:', authHeader);  // Debug log
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ No token provided');
+      return res.status(401).json({ success: false, message: 'No token provided' });
+    }
+    const token = authHeader.split(' ')[1];
+    console.log('🔑 Token received:', token.substring(0, 20) + '...');
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any;
+    console.log('✅ Token decoded:', decoded);
+
+    // Extract user ID – try multiple fields
+    const userId = decoded.id || decoded._id || decoded.userId;
+    if (!userId) {
+      console.log('❌ No user ID in token');
+      return res.status(401).json({ success: false, message: 'Invalid token payload' });
+    }
+
+    (req as any).user = { _id: userId, role: decoded.role };
+    console.log('✅ User set:', (req as any).user);
+    next();
+  } catch (error: any) {
+    console.error('❌ Token verification error:', error.message);
+    return res.status(401).json({ success: false, message: 'Invalid token' });
+  }
+};
+
+
+router.get('/supervisor', authenticate, async (req: Request, res: Response) => {
   try {
     const supervisorId = (req as any).user?._id;
     if (!supervisorId) {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
 
-    const tasks = await Task.find({ 'assignedSupervisors.userId': supervisorId }).select('siteName');
-    const siteNames = [...new Set(tasks.map((t: any) => t.siteName).filter(Boolean))];
-    
-    if (siteNames.length === 0) {
-      return res.json({ success: true, data: [] });
+    const user = await User.findById(supervisorId).select('assignedSites siteName');
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
     }
-    
-    const employees = await Employee.find({ siteName: { $in: siteNames }, status: 'active' });
+
+    // ✅ Ensure assignedSites is an array, fallback to siteName if empty
+    let siteNames = user.assignedSites || [];
+    if (!Array.isArray(siteNames)) {
+      siteNames = [siteNames]; // if it's a string
+    }
+    if (siteNames.length === 0 && user.siteName) {
+      siteNames = [user.siteName];
+    }
+
+    console.log('🔍 Supervisor ID:', supervisorId);
+    console.log('🔍 Assigned sites:', siteNames);
+
+    // ✅ Find active employees where siteName matches any in siteNames
+    const employees = await Employee.find({
+      siteName: { $in: siteNames },
+      status: 'active'
+    });
+
+    console.log(`✅ Found ${employees.length} employees`);
     res.json({ success: true, data: employees });
   } catch (error: any) {
-    console.error('Error fetching supervisor employees:', error);
+    console.error('Error in supervisor route:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -825,6 +876,9 @@ router.post('/',
     { name: 'authorizedSignature', maxCount: 1 }
   ]),
   async (req: any, res: any) => {
+    console.log('🔥 POST /api/employees called');
+    console.log('📥 req.body.employeeId:', req.body.employeeId);
+    console.log('📥 Full req.body:', req.body);
     try {
       const employeeData = { ...req.body };
       console.log('Creating employee with data:', employeeData);
@@ -844,30 +898,36 @@ router.post('/',
         });
       }
 
-       const Site = mongoose.model('Site');
-      const site = await Site.findOne({ name: employeeData.siteName });
-      
-      if (!site) {
-        return res.status(404).json({
-          success: false,
-          message: `Site "${employeeData.siteName}" not found. Please create the site first.`
-        });
-      }
+   // Check site existence (optional – keep if you want to validate site)
+const Site = mongoose.model('Site');
+const site = await Site.findOne({ name: employeeData.siteName });
+if (!site) {
+  return res.status(404).json({
+    success: false,
+    message: `Site "${employeeData.siteName}" not found. Please create the site first.`
+  });
+}
 
-      // ✅ Atomic counter increment
-      const updatedSite = await Site.findByIdAndUpdate(
-        site._id,
-        { $inc: { employeeCounter: 1 } },
-        { new: true }
-      );
+// ✅ Use the employeeId from the request
+const employeeId = employeeData.employeeId?.trim();
+if (!employeeId) {
+  return res.status(400).json({
+    success: false,
+    message: 'Employee ID is required'
+  });
+}
 
-      // ✅ Generate simple serial ID (1, 2, 3...)
-      const employeeId = updatedSite.employeeCounter.toString();
-      
-      console.log(`✅ Generated employee ID: ${employeeId} for site: ${site.name}`);
-      
-      // ✅ Set the generated ID
-      employeeData.employeeId = employeeId;
+// ✅ Check if this ID is already in use (optional but good)
+const existingEmployeeById = await Employee.findOne({ employeeId });
+if (existingEmployeeById) {
+  return res.status(400).json({
+    success: false,
+    message: `Employee ID "${employeeId}" already exists. Please choose a different one.`
+  });
+}
+
+// ✅ Set the ID (it’s already in employeeData, but we explicitly assign it)
+employeeData.employeeId = employeeId;
 
       let photoUrl = '';
       let photoPublicId = '';

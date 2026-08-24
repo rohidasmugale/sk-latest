@@ -41,6 +41,7 @@ export interface Employee {
   documents: Document[];
   uan?: string;
   esicNumber?: string;
+  profileStatus?: "complete" | "incomplete";   // ✅ ADD THIS
 }
 
 export interface LeaveRequest {

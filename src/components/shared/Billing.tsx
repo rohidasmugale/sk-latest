@@ -603,38 +603,38 @@ const Billing = () => {
 
   useEffect(() => {
     const fetchAllDataAndSites = async () => {
-  setLoading(true);
-  setError(null);
-  try {
-    // Fetch core data – handle failures individually
-    const [invoicesData, expensesData, sitesData] = await Promise.all([
-      invoiceService.getAllInvoices().catch(() => []),
-      expenseService.getExpenses().catch(() => []),
-      siteService.getAllSites().catch(() => [])
-    ]);
+      setLoading(true);
+      setError(null);
+      try {
+        // Fetch core data – handle failures individually
+        const [invoicesData, expensesData, sitesData] = await Promise.all([
+          invoiceService.getAllInvoices().catch(() => []),
+          expenseService.getExpenses().catch(() => []),
+          siteService.getAllSites().catch(() => [])
+        ]);
 
-    setInvoices((invoicesData || []).map(mapInvoice));
-    setExpenses(expensesData || []);
-    const siteNames = (sitesData || []).map((s: any) => s.name);
-    setSites(siteNames);
+        setInvoices((invoicesData || []).map(mapInvoice));
+        setExpenses(expensesData || []);
+        const siteNames = (sitesData || []).map((s: any) => s.name);
+        setSites(siteNames);
 
-    // Payments – optional; if it fails, fallback to empty array
-    try {
-      const paymentsData = await PaymentService.getAllPayments().then(res => res.data);
-      setPayments((paymentsData || []).map(mapPayment));
-    } catch (payErr) {
-      console.warn('Payments API not available – using empty data', payErr);
-      setPayments([]);
-      // Optionally inform the user (non‑blocking)
-      toast.warning('Payments data could not be loaded, some features may be limited');
-    }
-  } catch (err: any) {
-    setError(err.message || 'Failed to load billing data');
-    toast.error('Could not load billing data');
-  } finally {
-    setLoading(false);
-  }
-};
+        // Payments – optional; if it fails, fallback to empty array
+        try {
+          const paymentsData = await PaymentService.getAllPayments().then(res => res.data);
+          setPayments((paymentsData || []).map(mapPayment));
+        } catch (payErr) {
+          console.warn('Payments API not available – using empty data', payErr);
+          setPayments([]);
+          // Optionally inform the user (non‑blocking)
+          toast.warning('Payments data could not be loaded, some features may be limited');
+        }
+      } catch (err: any) {
+        setError(err.message || 'Failed to load billing data');
+        toast.error('Could not load billing data');
+      } finally {
+        setLoading(false);
+      }
+    };
   }, [userId, userRole]);
 
   // ── Calculations ────────────────────────────────────────────────────────────
@@ -796,16 +796,21 @@ const Billing = () => {
 
   // ── Event Handlers ──────────────────────────────────────────────────────────
 
-  const handleCreateInvoice = async (invoice: Invoice) => {
+  const handleCreateInvoice = (invoice: Invoice) => {
+    // The invoice is already saved by InvoicesTab – just add to local state
+    setInvoices(prev => [mapInvoice(invoice), ...prev]);
+    toast.success('Invoice created successfully!');
+  };
+  // ─── Refresh Invoices ──────────────────────────────────────────────────
+  const refreshInvoices = async () => {
     try {
-      const newInvoice = await invoiceService.createInvoice(invoice);
-      setInvoices(prev => [mapInvoice(newInvoice), ...prev]);
-      toast.success('Invoice created successfully!');
+      const invoicesData = await invoiceService.getAllInvoices();
+      setInvoices(invoicesData.map(mapInvoice));
+      toast.success('Invoices refreshed');
     } catch (err: any) {
-      toast.error(err.message || 'Failed to create invoice');
+      toast.error(err.message || 'Failed to refresh invoices');
     }
   };
-
   // These handlers only update local state – ExpensesTab already did the API call
   const handleAddExpense = (expense: Expense) => {
     setExpenses(prev => [expense, ...prev]);
@@ -1043,6 +1048,7 @@ const Billing = () => {
               invoices={invoices}
               onInvoiceCreate={handleCreateInvoice}
               onMarkAsPaid={handleMarkAsPaid}
+              onRefreshInvoices={refreshInvoices}   // ← new prop
               userId={userId}
               userRole={userRole}
             />

@@ -52,13 +52,7 @@ const parseExcelDate = (excelDate: any): Date | undefined => {
   }
 };
 
-// Function to generate employee ID
-const generateEmployeeId = async (): Promise<string> => {
-  const lastEmployee = await Employee.findOne().sort({ createdAt: -1 });
-  const lastId = lastEmployee?.employeeId || 'SKEMP0000';
-  const lastNumber = parseInt(lastId.replace('SKEMP', '')) || 0;
-  return `SKEMP${String(lastNumber + 1).padStart(4, '0')}`;
-};
+
 
 // Function to determine department from position
 const determineDepartment = (position: string = ''): string => {
@@ -99,7 +93,7 @@ const determineDepartment = (position: string = ''): string => {
 
 // Function to map Excel row to Employee schema based on YOUR Excel columns
 const mapExcelRowToEmployee = async (row: any, index: number): Promise<any> => {
-  const employeeId = await generateEmployeeId();
+ const employeeId = req.body.employeeId;
   
   // Extract position from column T (Position) or department from column AM
   const position = cleanValue(row.getCell('T')?.value) || 'Employee';

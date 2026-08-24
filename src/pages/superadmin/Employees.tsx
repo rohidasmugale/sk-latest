@@ -72,6 +72,7 @@ interface Employee {
   phone: string;
   status: "active" | "inactive";
   siteId?: string;
+  profileStatus?: "complete" | "incomplete";   // ✅ ADD THIS
 }
 
 // Sample employee data with site associations

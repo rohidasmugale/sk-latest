@@ -31,6 +31,7 @@ interface Employee {
   joinDate?: string;
   dateOfJoining?: string;
   status: "active" | "inactive" | "left";
+  profileStatus?: "complete" | "incomplete";   // ✅ NEW
   salary: number | string;
   uanNumber?: string;
   uan?: string;
@@ -73,6 +74,7 @@ interface Employee {
   updatedAt?: string;
   isManager?: boolean;
   isSupervisor?: boolean;
+  isProfileComplete?: boolean;   // ✅ NEW
 }
 
 interface SalaryStructure {
@@ -123,6 +125,7 @@ interface Site {
 
 interface NewEmployeeForm {
   // Basic Information
+  employeeId: string;  // ADD THIS
   name: string;
   email: string;
   phone: string;
@@ -266,7 +269,29 @@ const departments = [
   "Maintenance",
   "Other"
 ];
+// Fields that must be filled for a "complete" profile (exclude panNumber, email, numberOfChildren)
+const FIELDS_REQUIRED_FOR_COMPLETE: (keyof NewEmployeeForm)[] = [
+  'employeeId', 'name', 'phone', 'aadharNumber', 'esicNumber', 'uanNumber',
+  'siteName', 'dateOfBirth', 'dateOfJoining', 'bloodGroup', 'gender', 'maritalStatus',
+  'permanentAddress', 'permanentPincode', 'localAddress', 'localPincode',
+  'bankName', 'accountNumber', 'ifscCode', 'branchName',
+  'fatherName', 'motherName',
+  'emergencyContactName', 'emergencyContactPhone', 'emergencyContactRelation',
+  'nomineeName', 'nomineeRelation',
+  'pantSize', 'shirtSize', 'capSize',
+  'department', 'position', 'salary',
+];
 
+const checkEmployeeCompleteness = (emp: NewEmployeeForm): { isComplete: boolean; missingFields: string[] } => {
+  const missing: string[] = [];
+  FIELDS_REQUIRED_FOR_COMPLETE.forEach((field) => {
+    const value = emp[field];
+    if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
+      missing.push(field);
+    }
+  });
+  return { isComplete: missing.length === 0, missingFields: missing };
+};
 // FormField Component
 const FormField = ({
   label,
@@ -290,6 +315,7 @@ const FormField = ({
 
 // Reset form function
 const resetNewEmployeeForm = () => ({
+  employeeId: "",  // ADD THIS
   name: "",
   email: "",
   phone: "",
@@ -1158,7 +1184,6 @@ const OnboardingTab = ({
     }
   };
 
-  // Bulk import function
   const handleBulkImport = async () => {
     if (excelData.length === 0) {
       toast.error('No data to import');
@@ -1166,15 +1191,12 @@ const OnboardingTab = ({
     }
 
     // Validate site capacities first
-    const siteCounts: { [key: string]: number } = {};
     const siteDetails: { [key: string]: Site } = {};
-
     sites.forEach(site => {
       siteDetails[site.name] = site;
     });
 
     const employeesBySite: { [key: string]: NewEmployeeForm[] } = {};
-
     excelData.forEach(emp => {
       if (emp.siteName) {
         if (!employeesBySite[emp.siteName]) {
@@ -1184,25 +1206,19 @@ const OnboardingTab = ({
       }
     });
 
-    // Check each site's capacity
     const sitesExceedingCapacity: string[] = [];
-
     for (const siteName in employeesBySite) {
       const site = siteDetails[siteName];
       if (!site) {
         sitesExceedingCapacity.push(`${siteName} (Site not found)`);
         continue;
       }
-
       const regularStaffCount = calculateRegularStaffCount(site);
       const currentStaff = employees.filter(emp =>
-        emp.siteName === siteName &&
-        emp.status === "active"
+        emp.siteName === siteName && emp.status === "active"
       ).length;
-
       const importCount = employeesBySite[siteName].length;
       const totalAfterImport = currentStaff + importCount;
-
       if (totalAfterImport > regularStaffCount) {
         sitesExceedingCapacity.push(
           `${siteName}: Would exceed capacity (Current: ${currentStaff}, Importing: ${importCount}, Capacity: ${regularStaffCount})`
@@ -1245,6 +1261,10 @@ const OnboardingTab = ({
             continue;
           }
 
+          // ✅ Compute completeness for this employee (moved inside the loop)
+          const { isComplete, missingFields } = checkEmployeeCompleteness(employeeData);
+          const profileStatus = isComplete ? 'complete' : 'incomplete';
+
           // Generate email if not provided
           let finalEmail = employeeData.email || '';
           if (!finalEmail && employeeData.name) {
@@ -1261,8 +1281,8 @@ const OnboardingTab = ({
           // Create FormData for each employee
           const formData = new FormData();
 
-          // Add employee data
           const employeeDataToSend = {
+            employeeId: newEmployee.employeeId.trim(),
             name: employeeData.name,
             email: finalEmail,
             phone: employeeData.phone || '',
@@ -1302,17 +1322,18 @@ const OnboardingTab = ({
             apronIssued: employeeData.apronIssued || false,
             department: employeeData.department || '',
             position: employeeData.position || '',
-            salary: employeeData.salary || '0'
+            salary: employeeData.salary || '0',
+            status: 'active',
+            profileStatus: profileStatus,
+            missingFields: isComplete ? [] : missingFields,
           };
 
-          // Append all data
           Object.entries(employeeDataToSend).forEach(([key, value]) => {
             if (value !== undefined && value !== null && value !== '') {
               formData.append(key, value.toString());
             }
           });
 
-          // Send to backend
           const response = await fetch(`${API_URL}/employees`, {
             method: "POST",
             body: formData
@@ -1336,23 +1357,19 @@ const OnboardingTab = ({
           });
         }
 
-        // Update progress
         setImportProgress(Math.round(((i + 1) / excelData.length) * 100));
       }
 
-      // Update employees list
       if (successfulImports.length > 0) {
         setEmployees(prev => [...prev, ...successfulImports]);
         toast.success(`Successfully imported ${successfulImports.length} employees`);
       }
 
-      // Show errors if any
       if (failedImports.length > 0) {
         toast.error(`${failedImports.length} employees failed to import`);
         console.log('Failed imports:', failedImports);
       }
 
-      // Reset
       setExcelData([]);
       setShowExcelPreview(false);
 
@@ -1668,6 +1685,7 @@ const OnboardingTab = ({
   const handleAddEmployee = async () => {
     // Validate required fields (email is optional but we'll generate if empty for backend)
     const requiredFields = [
+      { field: newEmployee.employeeId, name: 'Employee ID' },  // ADD THIS
       { field: newEmployee.name, name: 'Name' },
       { field: newEmployee.aadharNumber, name: 'Aadhar Number' },
       { field: newEmployee.dateOfBirth, name: 'Date of Birth' },  // ✅ Added
@@ -1675,7 +1693,19 @@ const OnboardingTab = ({
       { field: newEmployee.siteName, name: 'Site Name' },
 
     ];
-
+    // Validate Employee ID – user must provide a non‑empty, unique ID
+    if (!newEmployee.employeeId.trim()) {
+      toast.error('Employee ID is required. Please enter a unique ID.');
+      return;
+    }
+    // Check for duplicate employeeId in the existing employees list
+    const existingEmployee = employees.find(
+      emp => emp.employeeId === newEmployee.employeeId.trim()
+    );
+    if (existingEmployee) {
+      toast.error(`Employee ID "${newEmployee.employeeId}" is already taken. Please use a unique ID.`);
+      return;
+    }
     const missingFields = requiredFields
       .filter(item => !item.field || item.field.trim() === '')
       .map(item => item.name);
@@ -1749,19 +1779,32 @@ const OnboardingTab = ({
     }
 
     // Validate site capacity
+    // Validate site capacity – only enforce if the site has a real staff requirement set
     if (selectedSiteDetails) {
       const regularStaffCount = calculateRegularStaffCount(selectedSiteDetails);
-      const siteEmployees = employees.filter(emp =>
-        emp.siteName === selectedSiteDetails.name &&
-        emp.status === "active"
-      );
+      if (regularStaffCount > 0) {
+        const siteEmployees = employees.filter(emp =>
+          emp.siteName === selectedSiteDetails.name &&
+          emp.status === "active"
+        );
 
-      if (siteEmployees.length >= regularStaffCount) {
-        toast.error(`Cannot onboard employee: Site "${selectedSiteDetails.name}" has reached its regular staff capacity (${regularStaffCount} staff).`);
-        return;
+        if (siteEmployees.length >= regularStaffCount) {
+          toast.error(`Cannot onboard employee: Site "${selectedSiteDetails.name}" has reached its regular staff capacity (${regularStaffCount} staff).`);
+          return;
+        }
       }
     }
+    // ----- Compute profile completeness -----
+    const { isComplete, missingFields: missingCompleteFields } = checkEmployeeCompleteness(newEmployee);
+    const profileStatus = isComplete ? 'complete' : 'incomplete';
 
+    if (!isComplete) {
+      toast.warning(
+        `Employee created, but profile is incomplete. Missing: ${missingCompleteFields.join(', ')}`,
+        { duration: 6000 }
+      );
+    }
+    // ----------------------------------------
     setLoading(true);
 
     try {
@@ -1785,6 +1828,7 @@ const OnboardingTab = ({
 
       // Clean and prepare data for sending
       const employeeDataToSend = {
+        employeeId: newEmployee.employeeId.trim(),
         name: newEmployee.name.trim(),
         email: finalEmail, // Use generated email if not provided
         phone: newEmployee.phone?.trim() || '',
@@ -1824,7 +1868,10 @@ const OnboardingTab = ({
         apronIssued: newEmployee.apronIssued,
         department: newEmployee.department.trim(),
         position: newEmployee.position.trim(),
-        salary: salaryValue.toString()
+        salary: salaryValue.toString(),
+        status: 'active',                                    // ✅ ADD THIS
+        profileStatus: profileStatus,                        // ✅ ADD THIS
+        missingFields: isComplete ? [] : missingCompleteFields,
       };
 
       // Append all other data
@@ -1877,6 +1924,7 @@ const OnboardingTab = ({
         joinDate: createdEmployee.joinDate || createdEmployee.dateOfJoining,
         dateOfJoining: createdEmployee.dateOfJoining,
         status: createdEmployee.status || 'active',
+        profileStatus: createdEmployee.profileStatus || profileStatus,  // ✅ ADD THIS
         salary: createdEmployee.salary || 0,
         uanNumber: createdEmployee.uanNumber,
         uan: createdEmployee.uan,
@@ -2114,57 +2162,71 @@ const OnboardingTab = ({
   <!DOCTYPE html>
   <html>
   <head>
-    <title>Joining Form - ${employee.name}</title>
-    <style>
-      * { box-sizing: border-box; }
-      body { font-family: 'Times New Roman', Georgia, serif; margin: 0; padding: 20px; background: #fff; color:#000; }
-      .page { max-width: 800px; margin: 0 auto 30px auto; padding: 20px 30px; background:#fff; page-break-after: always; }
-      .page:last-child { page-break-after: auto; }
-
-      /* ---------- PAGE 1: JOINING FORM ---------- */
-      .header { position: relative; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 10px; }
-      .header h1 { margin:0; font-size: 30px; letter-spacing: 3px; font-weight: bold; }
-      .header .subtitle { font-size: 12px; margin-top: 2px; }
-      .header .form-title { font-size: 17px; font-weight: bold; text-align:center; margin-top: 6px; text-decoration: underline; }
-      .photo-box { position: absolute; top: 0; right: 0; width: 95px; height: 110px; border: 1px solid #000; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:10px; color:#999; }
-      .photo-box img { width:100%; height:100%; object-fit:cover; }
-
-      .field-row { display:flex; align-items:baseline; border-bottom:1px solid #000; padding: 5px 0; min-height: 24px; }
-      .field-row .label { font-size: 13px; width: 150px; flex-shrink:0; }
-      .field-row .colon { width: 14px; flex-shrink:0; }
-      .field-row .value { font-size: 13px; flex:1; }
-      .field-row .pin { display:flex; align-items:baseline; margin-left: 20px; flex-shrink:0; }
-      .field-row .pin .plabel { font-size:13px; margin-right:4px; }
-      .field-row .pin .pvalue { font-size:13px; min-width: 90px; border-bottom:1px solid #000; }
-      .cont-row { border-bottom: 1px solid #000; min-height: 22px; }
-
-      .uniform-row { border-bottom: 1px solid #000; padding: 6px 0; font-size: 13px; }
-      .uniform-row .label { display:inline-block; width:150px; }
-      .uniform-row .issued { font-weight: bold; text-decoration: underline; }
-
-      .signature-section { display:flex; justify-content:space-between; margin-top: 45px; }
-      .signature-box { text-align:center; width:45%; font-size: 13px; font-weight:bold; }
-      .signature-box .line { border-top: 1px solid #000; margin-top: 4px; padding-top: 4px; }
-
-      .footer { text-align:center; font-size: 9px; color:#666; margin-top: 15px; }
-
-      /* ---------- PAGE 2: DECLARATION (BACKSIDE) ---------- */
-      .declaration-title { text-align:center; font-size:20px; font-weight:bold; margin-bottom: 22px; }
-      .declaration-intro { font-size: 13.5px; line-height: 1.9; margin-bottom: 10px; }
-      .declaration-name-line { border-bottom: 1px solid #000; display:inline-block; min-width: 320px; }
-      .declaration-list { font-size: 13.5px; line-height: 1.9; margin: 0; padding-left: 0; list-style: none; }
-      .declaration-list li { margin-bottom: 14px; display:flex; }
-      .declaration-list .num { flex-shrink:0; width: 26px; }
-      .declaration-list .txt { flex:1; text-align: justify; }
-      .declaration-closing { font-size: 13.5px; line-height: 1.9; margin-top: 20px; text-align: justify; }
-      .declaration-sign { margin-top: 50px; display:flex; justify-content:space-between; font-size:13.5px; }
-
-      @media print {
-        body { padding: 0; }
-        .page { margin: 0 auto; padding: 15mm; }
-      }
-    </style>
-  </head>
+  <title>Joining Form - ${employee.name}</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 12mm 15mm;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Times New Roman', Georgia, serif;
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      color: #000;
+    }
+    .page {
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      page-break-after: always;
+    }
+    .page:last-child {
+      page-break-after: auto;
+    }
+    /* ---------- PAGE 1: JOINING FORM ---------- */
+    .header { position: relative; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 10px; }
+    .header h1 { margin:0; font-size: 30px; letter-spacing: 3px; font-weight: bold; }
+    .header .subtitle { font-size: 12px; margin-top: 2px; }
+    .header .form-title { font-size: 17px; font-weight: bold; text-align:center; margin-top: 6px; text-decoration: underline; }
+    .photo-box { position: absolute; top: 0; right: 0; width: 95px; height: 110px; border: 1px solid #000; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:10px; color:#999; }
+    .photo-box img { width:100%; height:100%; object-fit:cover; }
+    .field-row { display:flex; align-items:baseline; border-bottom:1px solid #000; padding: 5px 0; min-height: 24px; }
+    .field-row .label { font-size: 13px; width: 150px; flex-shrink:0; }
+    .field-row .colon { width: 14px; flex-shrink:0; }
+    .field-row .value { font-size: 13px; flex:1; }
+    .field-row .pin { display:flex; align-items:baseline; margin-left: 20px; flex-shrink:0; }
+    .field-row .pin .plabel { font-size:13px; margin-right:4px; }
+    .field-row .pin .pvalue { font-size:13px; min-width: 90px; border-bottom:1px solid #000; }
+    .cont-row { border-bottom: 1px solid #000; min-height: 22px; }
+    .uniform-row { border-bottom: 1px solid #000; padding: 6px 0; font-size: 13px; }
+    .uniform-row .label { display:inline-block; width:150px; }
+    .uniform-row .issued { font-weight: bold; text-decoration: underline; }
+    .signature-section { display:flex; justify-content:space-between; margin-top: 45px; }
+    .signature-box { text-align:center; width:45%; font-size: 13px; font-weight:bold; }
+    .signature-box .line { border-top: 1px solid #000; margin-top: 4px; padding-top: 4px; }
+    .footer { text-align:center; font-size: 9px; color:#666; margin-top: 15px; }
+    /* ---------- PAGE 2: DECLARATION (BACKSIDE) ---------- */
+    .declaration-title { text-align:center; font-size:20px; font-weight:bold; margin-bottom: 22px; }
+    .declaration-intro { font-size: 13.5px; line-height: 1.9; margin-bottom: 10px; }
+    .declaration-name-line { border-bottom: 1px solid #000; display:inline-block; min-width: 320px; }
+    .declaration-list { font-size: 13.5px; line-height: 1.9; margin: 0; padding-left: 0; list-style: none; }
+    .declaration-list li { margin-bottom: 14px; display:flex; }
+    .declaration-list .num { flex-shrink:0; width: 26px; }
+    .declaration-list .txt { flex:1; text-align: justify; }
+    .declaration-closing { font-size: 13.5px; line-height: 1.9; margin-top: 20px; text-align: justify; }
+    .declaration-sign { margin-top: 50px; display:flex; justify-content:space-between; font-size:13.5px; }
+    @media print {
+      body { padding: 0; }
+      .page { margin: 0 auto; padding: 15mm; }
+    }
+  </style>
+</head>
   <body>
 
     <!-- PAGE 1: JOINING FORM -->
@@ -2287,124 +2349,142 @@ const OnboardingTab = ({
       <html>
         <head>
           <title>EPF Form 11 - ${epfFormData.memberName}</title>
-          <style>
-            body { 
-              font-family: Arial, sans-serif; 
-              margin: 0; 
-              padding: 20px;
-              font-size: 12px;
-              line-height: 1.4;
-            }
-            .form-container { 
-              max-width: 800px; 
-              margin: 0 auto; 
-              border: 1px solid #000;
-              padding: 20px;
-              position: relative;
-            }
-            .header { 
-              text-align: center; 
-              margin-bottom: 20px;
-              border-bottom: 2px solid #000;
-              padding-bottom: 10px;
-            }
-            .header h2 {
-              margin: 0;
-              font-size: 16px;
-              font-weight: bold;
-            }
-            .header h3 {
-              margin: 5px 0;
-              font-size: 14px;
-              font-weight: normal;
-            }
-            .subtitle {
-              font-size: 10px;
-              margin-top: 5px;
-              font-style: italic;
-            }
-            .section { 
-              margin-bottom: 20px; 
-            }
-            .section-title { 
-              background: #f0f0f0; 
-              padding: 8px; 
-              font-weight: bold;
-              border: 1px solid #000;
-              margin-bottom: 10px;
-              font-size: 11px;
-            }
-            .field-row {
-              display: flex;
-              margin-bottom: 8px;
-              align-items: flex-start;
-            }
-            .field-group {
-              display: flex;
-              flex-direction: column;
-              margin-right: 20px;
-              flex: 1;
-            }
-            .label { 
-              font-weight: bold; 
-              margin-bottom: 2px;
-              font-size: 10px;
-            }
-            .value { 
-              min-height: 18px;
-              border-bottom: 1px solid #000;
-              padding: 2px 5px;
-              flex: 1;
-            }
-            .checkbox-group {
-              display: flex;
-              align-items: center;
-              margin-right: 15px;
-            }
-            .checkbox {
-              margin-right: 5px;
-            }
-            .full-width {
-              width: 100%;
-            }
-            .half-width {
-              width: 48%;
-            }
-            .quarter-width {
-              width: 24%;
-            }
-            .signature-area { 
-              margin-top: 30px; 
-              border-top: 1px solid #000; 
-              padding-top: 15px;
-            }
-            .signature-line {
-              display: inline-block;
-              width: 200px;
-              border-bottom: 1px solid #000;
-              margin: 0 10px;
-            }
-            .declaration {
-              margin: 20px 0;
-              padding: 15px;
-              border: 1px solid #000;
-              background: #f9f9f9;
-            }
-            .declaration p {
-              margin: 5px 0;
-              font-size: 11px;
-            }
-            .note {
-              font-size: 10px;
-              font-style: italic;
-              color: #666;
-              margin-top: 3px;
-            }
-            @media print {
-              body { margin: 0; padding: 10px; }
-              .form-container { border: none; padding: 10px; }
-            }
-          </style>
+      <style>
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  body { 
+    font-family: Arial, sans-serif; 
+    margin: 0;
+    padding: 20px;
+    font-size: 12px;
+    line-height: 1.4;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .form-container { 
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto; 
+    border: 1px solid #000;
+    padding: 20px;
+    position: relative;
+  }
+  .header { 
+    text-align: center; 
+    margin-bottom: 20px;
+    border-bottom: 2px solid #000;
+    padding-bottom: 10px;
+  }
+  .header h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: bold;
+  }
+  .header h3 {
+    margin: 5px 0;
+    font-size: 14px;
+    font-weight: normal;
+  }
+  .subtitle {
+    font-size: 10px;
+    margin-top: 5px;
+    font-style: italic;
+  }
+  .section { 
+    margin-bottom: 20px; 
+  }
+  .section-title { 
+    background: #f0f0f0; 
+    padding: 8px; 
+    font-weight: bold;
+    border: 1px solid #000;
+    margin-bottom: 10px;
+    font-size: 11px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .field-row {
+    display: flex;
+    margin-bottom: 8px;
+    align-items: flex-start;
+  }
+  .field-group {
+    display: flex;
+    flex-direction: column;
+    margin-right: 20px;
+    flex: 1;
+  }
+  .label { 
+    font-weight: bold; 
+    margin-bottom: 2px;
+    font-size: 10px;
+  }
+  .value { 
+    min-height: 18px;
+    border-bottom: 1px solid #000;
+    padding: 2px 5px;
+    flex: 1;
+  }
+  .checkbox-group {
+    display: flex;
+    align-items: center;
+    margin-right: 15px;
+  }
+  .checkbox {
+    margin-right: 5px;
+  }
+  .full-width {
+    width: 100%;
+  }
+  .half-width {
+    width: 48%;
+  }
+  .quarter-width {
+    width: 24%;
+  }
+  .signature-area { 
+    margin-top: 30px; 
+    border-top: 1px solid #000; 
+    padding-top: 15px;
+  }
+  .signature-line {
+    display: inline-block;
+    width: 200px;
+    border-bottom: 1px solid #000;
+    margin: 0 10px;
+  }
+  .declaration {
+    margin: 20px 0;
+    padding: 15px;
+    border: 1px solid #000;
+    background: #f9f9f9;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .declaration p {
+    margin: 5px 0;
+    font-size: 11px;
+  }
+  .note {
+    font-size: 10px;
+    font-style: italic;
+    color: #666;
+    margin-top: 3px;
+  }
+  @media print {
+    body { margin: 0; padding: 10px; }
+    .form-container { border: none; padding: 10px; }
+    .section-title { background: #f0f0f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .declaration { background: #f9f9f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
         </head>
         <body>
           <div class="form-container">
@@ -3068,6 +3148,15 @@ const OnboardingTab = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField label="Site Name" required>
                         <SiteDropdown />
+                      </FormField>
+                      <FormField label="Employee ID (as provided by Client)" required>
+                        <Input
+                          value={newEmployee.employeeId}
+                          onChange={(e) => setNewEmployee({ ...newEmployee, employeeId: e.target.value })}
+                          placeholder="Enter client-provided ID"
+                          className="border-2 border-blue-200 focus:border-blue-500"
+                        />
+
                       </FormField>
                       <FormField label="Name" required>
                         <Input value={newEmployee.name} onChange={(e) => setNewEmployee({ ...newEmployee, name: e.target.value })} />
@@ -3925,7 +4014,7 @@ const OnboardingTab = ({
                     <div className="section-title">DECLARATION BY PRESENT EMPLOYER</div>
 
                     <div className="space-y-2">
-                      <Label>A. The member Mr./Ms./Mrs. {epfFormData.memberName} has joined on {epfFormData.enrolledDate} and has been allotted PF Number ${createdEmployeeData?.uanNumber || createdEmployeeData?.uan || "Pending"}</Label>
+                     <Label>A. The member Mr./Ms./Mrs. {epfFormData.memberName} has joined on {epfFormData.enrolledDate} and has been allotted PF Number {createdEmployeeData?.uanNumber || createdEmployeeData?.uan || "Pending"}</Label>
                     </div>
 
                     <div className="space-y-2">

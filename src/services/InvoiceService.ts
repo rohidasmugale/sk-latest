@@ -121,25 +121,35 @@ class InvoiceService {
   }
 
   // Helper function for API calls
-  private async fetchApi(endpoint: string, options?: RequestInit) {
-    try {
-      const response = await fetch(`${API_URL}${endpoint}`, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        ...options
-      });
-      
-      if (!response.ok) {
-        throw new Error(`http error! status: ${response.status}`);
+private async fetchApi(endpoint: string, options?: RequestInit) {
+  try {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      ...options
+    });
+    
+    if (!response.ok) {
+      let message = `http error! status: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        console.error('Server validation error:', errorData);
+        message = errorData.message || message;
+        if (errorData.errors) message += `: ${errorData.errors.join(', ')}`;
+      } catch (error) {
+        console.error('Could not parse error response:', error);
       }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('API Error:', error);
-      throw error;
+      throw new Error(message);
     }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
   }
+}
 
   // Get all invoices for current user
   async getAllInvoices(): Promise<Invoice[]> {

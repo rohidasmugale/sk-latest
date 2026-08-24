@@ -132,23 +132,38 @@ export const checkSuperadminStatus = async (req: Request, res: Response) => {
   }
 };
 
-// Add this update user function with superadmin check
 export const updateUser = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
     
     console.log('👑 [CONTROLLER] Updating user:', id, 'with data:', updateData);
-    
-    // Check if trying to update role to superadmin
+
+    // ======== FIX: Parse assignedSites if it comes as a string ========
+    if (updateData.assignedSites && typeof updateData.assignedSites === 'string') {
+      try {
+        const parsed = JSON.parse(updateData.assignedSites);
+        if (Array.isArray(parsed)) {
+          updateData.assignedSites = parsed;
+        } else {
+          // If parsed is not an array, treat it as a single string in an array
+          updateData.assignedSites = [parsed];
+        }
+      } catch {
+        // If JSON parsing fails, keep it as-is (but it's likely corrupted)
+        // Optionally, you could fallback to an empty array or log an error
+        console.warn('⚠️ Failed to parse assignedSites, leaving as string');
+      }
+    }
+    // ==============================================================
+
+    // Check superadmin logic (unchanged)
     if (updateData.role === 'superadmin') {
       const existingSuperadmin = await User.findOne({ 
         role: 'superadmin',
-        _id: { $ne: id } // Exclude the current user
+        _id: { $ne: id }
       });
-      
       if (existingSuperadmin) {
-        console.log('👑 [CONTROLLER] Superadmin already exists:', existingSuperadmin.email);
         return res.status(400).json({ 
           success: false,
           message: 'Only one superadmin is allowed. Another superadmin already exists.'
@@ -177,15 +192,12 @@ export const updateUser = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('❌ [CONTROLLER] Error updating user:', error.message);
-    
-    // Handle specific superadmin limit error from Mongoose middleware
     if (error.name === 'SuperadminLimitError') {
       return res.status(400).json({ 
         success: false,
         message: error.message
       });
     }
-    
     res.status(400).json({ 
       success: false,
       message: error.message || 'Error updating user'

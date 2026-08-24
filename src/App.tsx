@@ -5,6 +5,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { RoleProvider, useRole } from "@/context/RoleContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+// In your router file (e.g., App.tsx or router.tsx)
+import ManagerHRMS from "./pages/manager/ManagerHRMS";
+import AdminDashboard from "./pages/admin/AdminDashboard";  
 
 // Auth Pages
 import Login from "./pages/Login";
@@ -82,18 +85,20 @@ import IncidentReports from "./pages/supervisor/IncidentReports";
 import CleaningPhotos from "./pages/supervisor/CleaningPhotos";
 import ShiftDeployment from "./pages/supervisor/ShiftDeployment";
 import SalarySlip from "./pages/supervisor/SalarySlip";
+import WorkQuery from "./pages/supervisor/WorkQueryPage";
+import SupervisorRosterSection from "./pages/supervisor/SupervisorRosterSection";
 // Employee Pages
 import EmployeeTasks from "./pages/employee/EmployeeTasks";
 import EmployeeDocuments from "./pages/employee/EmployeeDocuments";
-
+import SupervisorHRMS from "./pages/supervisor/SupervisorHRMS";
 import ApplyLeave from "./pages/employee/ApplyLeave";
 import EmployeeAttendance from "./pages/employee/EmployeeAttendance";
 
 import NotFound from "./pages/NotFound";
 import ManagerAttendance from "./pages/manager/ManagerAttendance";
-import SuperAdminWorkIssues from "./pages/superadmin/SuperAdminWorkIssues";
 
-import AdminHRMS from "./pages/admin/AdminHRMS";
+
+
 import SupervisorAssignTask from "./pages/supervisor/SupervisorAssignTask";
 import ManagerAssignTask from "./pages/manager/ManagerAssignTask";
 import SuperAdminReports from "./pages/superadmin/SuperAdminReports";
@@ -192,7 +197,7 @@ const App = () => (
                 <Route path="employees" element={<Employees />} />
                 <Route path="hrms" element={<HRMS />} />
                 <Route path="documents" element={<Documents />} />
-                <Route path="workissue" element={<SuperAdminWorkIssues />} />
+               
                 <Route path="operations" element={<Operations />} />
                 <Route path="notifications" element={<Notifications />} />
                 <Route path="crm" element={<CRM />} />
@@ -201,7 +206,7 @@ const App = () => (
                 <Route path="billing" element={<Billing />} />
                 <Route path="reports" element={<Reports />} />
                 <Route path="settings" element={<Settings />} />
-                <Route path="attendaceview" element={<AttendanceTab />} />
+                <Route path="attendanceview" element={<AttendanceTab />} />
                 <Route path="profile" element={<SuperAdminProfile />} />
 
                 <Route path="/superadmin/machines/:siteId" element={<SiteMachinesView />} />
@@ -216,11 +221,11 @@ const App = () => (
                   </ProtectedRoute>
                 }
               >
-              <Route path="dashboard" element={<SuperAdminDashboard />} />
-  <Route path="attendance" element={<AttendanceTab />} />
+               <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="attendanceview" element={<AttendanceTab />} />
                 <Route path="profile" element={<AdminProfile />} />
                 <Route path="team" element={<AdminTeam />} />
-             
+
                 <Route path="tasks" element={<AdminTasks />} />
                 <Route path="reports" element={<AdminReports />} />
                 <Route path="leave" element={<AdminLeave />} />
@@ -231,11 +236,7 @@ const App = () => (
                 <Route path="billing" element={<Billing />} />
                 <Route path="operations" element={<AdminOperations />} />
                 <Route path="documents" element={<AdminDocuments />} />
-                <Route path="hrms" element={<AdminHRMS />} />
-
-                <Route path="notifications" element={<AdminNotifications />} />
-
-
+                <Route path="hrms" element={<HRMS />} />
               </Route>
 
 
@@ -267,7 +268,7 @@ const App = () => (
                 <Route path="/manager/shift-deployment" element={<ManagerShiftDeployment />} />
                 <Route path="/manager/training" element={<ManagerTraining />} />
                 <Route path="/manager/briefing" element={<ManagerBriefing />} />
-
+                <Route path="hrms" element={<ManagerHRMS />} />
                 <Route path="notifications" element={<ManagerNotifications />} />
 
 
@@ -287,14 +288,14 @@ const App = () => (
                 <Route path="tasks" element={<Tasks />} />
 
                 <Route path="inventory" element={<InventoryPage />} /> {/* ADD THIS ROUTE */}
-
+                <Route path="query" element={<WorkQuery />} />
                 <Route path="attendance" element={<Attendance />} />
                 <Route path="leave" element={<SupervisorLeave />} />
                 <Route path="reports" element={<SupervisorReports />} />
                 <Route path="settings" element={<SupervisorSettings />} />
                 <Route path="assigntask" element={<SupervisorAssignTask />} />
                 <Route path="supervisortraining" element={<SupervisorTrainingBriefing />} />
-
+                <Route path="hrms" element={<SupervisorHRMS />} />
                 <Route path="machine-status" element={<MachineStatus />} />
                 <Route path="grooming" element={<GroomingStatus />} />
                 <Route path="incidents" element={<IncidentReports />} />
@@ -302,6 +303,7 @@ const App = () => (
                 <Route path="shift-deployment" element={<ShiftDeployment />} />
                 <Route path="salary-slip" element={<SalarySlip />} />
                 <Route path="notifications" element={<SupervisorNotification />} />
+                <Route path="supervisorroster" element={<SupervisorRosterSection />} />
               </Route>
 
               {/* Employee Routes */}

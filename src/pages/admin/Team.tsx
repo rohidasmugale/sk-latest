@@ -68,6 +68,7 @@ interface FormUserData {
   username?: string;
   firstName?: string;
   lastName?: string;
+   assignedSites?: string[];  
 }
 
 const departments = ['Housekeeping', 'Security', 'Parking', 'Waste Management', 'Others'];

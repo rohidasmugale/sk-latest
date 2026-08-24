@@ -53,4 +53,5 @@ export interface Employee {
   isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
+  profileStatus?: "complete" | "incomplete";   // ✅ ADD THIS
 }
