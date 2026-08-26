@@ -741,8 +741,8 @@ const OnboardingTab = ({
                     <div
                       key={site._id}
                       className={`px-3 py-3 text-sm cursor-pointer transition-colors hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${newEmployee.siteName === site.name ? "bg-blue-50 border-l-4 border-l-blue-500" : ""
-                        } ${isFull ? 'opacity-60' : ''}`}
-                      onClick={() => !isFull && handleSiteSelect(site)}
+                        }`}
+                      onClick={() => handleSiteSelect(site)}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
@@ -820,11 +820,7 @@ const OnboardingTab = ({
                             {site.status === 'active' ? 'Active' : 'Inactive'}
                           </Badge>
 
-                          {isFull && (
-                            <Badge variant="destructive" className="text-xs">
-                              Full
-                            </Badge>
-                          )}
+                        
                         </div>
                       </div>
 
@@ -841,11 +837,7 @@ const OnboardingTab = ({
                         </div>
                       )}
 
-                      {isFull && (
-                        <div className="mt-2 text-xs text-red-600 bg-red-50 p-1 rounded">
-                          No regular staff positions available
-                        </div>
-                      )}
+                   
                     </div>
                   );
                 })}
@@ -913,11 +905,7 @@ const OnboardingTab = ({
             </div>
           </div>
 
-          {currentSiteStaffCount >= availableStaffPositions && (
-            <div className="text-sm text-red-600 bg-red-50 p-2 rounded border border-red-200">
-              ⚠️ This site has reached its regular staff capacity. No more regular staff can be onboarded.
-            </div>
-          )}
+         
         </div>
       )}
 
@@ -1190,11 +1178,7 @@ const OnboardingTab = ({
       return;
     }
 
-    // Validate site capacities first
-    const siteDetails: { [key: string]: Site } = {};
-    sites.forEach(site => {
-      siteDetails[site.name] = site;
-    });
+   
 
     const employeesBySite: { [key: string]: NewEmployeeForm[] } = {};
     excelData.forEach(emp => {
@@ -1226,21 +1210,7 @@ const OnboardingTab = ({
       }
     }
 
-    if (sitesExceedingCapacity.length > 0) {
-      toast.error(
-        <div>
-          <p className="font-semibold">Cannot import due to capacity issues:</p>
-          <ul className="list-disc pl-4 mt-1 text-sm">
-            {sitesExceedingCapacity.map((msg, i) => (
-              <li key={i}>{msg}</li>
-            ))}
-          </ul>
-        </div>
-      );
-      setImporting(false);
-      return;
-    }
-
+  
     setImporting(true);
     setImportProgress(0);
 
@@ -1780,20 +1750,7 @@ const OnboardingTab = ({
 
     // Validate site capacity
     // Validate site capacity – only enforce if the site has a real staff requirement set
-    if (selectedSiteDetails) {
-      const regularStaffCount = calculateRegularStaffCount(selectedSiteDetails);
-      if (regularStaffCount > 0) {
-        const siteEmployees = employees.filter(emp =>
-          emp.siteName === selectedSiteDetails.name &&
-          emp.status === "active"
-        );
-
-        if (siteEmployees.length >= regularStaffCount) {
-          toast.error(`Cannot onboard employee: Site "${selectedSiteDetails.name}" has reached its regular staff capacity (${regularStaffCount} staff).`);
-          return;
-        }
-      }
-    }
+   
     // ----- Compute profile completeness -----
     const { isComplete, missingFields: missingCompleteFields } = checkEmployeeCompleteness(newEmployee);
     const profileStatus = isComplete ? 'complete' : 'incomplete';
@@ -4014,7 +3971,7 @@ const OnboardingTab = ({
                     <div className="section-title">DECLARATION BY PRESENT EMPLOYER</div>
 
                     <div className="space-y-2">
-                     <Label>A. The member Mr./Ms./Mrs. {epfFormData.memberName} has joined on {epfFormData.enrolledDate} and has been allotted PF Number {createdEmployeeData?.uanNumber || createdEmployeeData?.uan || "Pending"}</Label>
+                      <Label>A. The member Mr./Ms./Mrs. {epfFormData.memberName} has joined on {epfFormData.enrolledDate} and has been allotted PF Number {createdEmployeeData?.uanNumber || createdEmployeeData?.uan || "Pending"}</Label>
                     </div>
 
                     <div className="space-y-2">

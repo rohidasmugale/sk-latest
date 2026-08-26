@@ -4,7 +4,7 @@ import {
   uploadImageToCloudinary, 
   uploadSignatureToCloudinary 
 } from '../utils/CloudinaryUtils';
-
+import Site from '../models/Site';
 
   
 export const createEmployee = async (req: Request, res: Response) => {
@@ -83,6 +83,20 @@ export const createEmployee = async (req: Request, res: Response) => {
     }
 
     // ---------- Build employee data ----------
+    const siteId = req.body.siteId;   // expect siteId from frontend
+    if (!siteId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Site ID is required'
+      });
+    }
+    const site = await Site.findById(siteId);
+    if (!site) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid site ID'
+      });
+    }
     const salary = req.body.salary ? parseFloat(req.body.salary) : 0;
     const dateOfBirth = req.body.dateOfBirth ? new Date(req.body.dateOfBirth) : undefined;
     const dateOfJoining = req.body.dateOfJoining ? new Date(req.body.dateOfJoining) : new Date();
@@ -96,6 +110,8 @@ export const createEmployee = async (req: Request, res: Response) => {
     // 4️⃣ Create employee object – using the user‑provided employeeId
     const employeeData: Partial<IEmployee> = {
       employeeId,   // <── now uses the value from the request
+      siteId: site._id,             // <-- store the ObjectId
+      siteName: site.name,   
       name: req.body.name,
       email: req.body.email,
       phone: req.body.phone,
@@ -129,7 +145,7 @@ export const createEmployee = async (req: Request, res: Response) => {
       nomineeRelation: req.body.nomineeRelation,
       department: req.body.department,
       position: req.body.position,
-      siteName: req.body.siteName,
+     
       salary,
       status: 'active' as const,
       role: 'employee' as const,

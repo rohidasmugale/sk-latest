@@ -17,7 +17,7 @@ export interface IAttendance extends Document {
   isOnBreak: boolean;
   department: string;
   siteName?: string;
-  siteId?: string;
+  siteId?: mongoose.Types.ObjectId; 
   supervisorId?: string;
   remarks?: string;
   latitude?: number | null;
@@ -109,15 +109,8 @@ const attendanceSchema = new Schema<IAttendance>(
       type: String,
       default: null,
     },
-    siteId: {
-      type: String,
-      default: null,
-    },
-    supervisorId: {
-      type: String,
-      trim: true,
-      default: null,
-    },
+   siteId: { type: mongoose.Schema.Types.ObjectId, ref: 'Site', index: true },
+  
     remarks: {
       type: String,
       default: '',

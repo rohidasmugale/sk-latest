@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { useRole } from '@/context/RoleContext';
 import { Loader2 } from 'lucide-react';
-import { salarySlipApi } from '@/services/payrollApi';
+import { salarySlipApi, salaryStructureApi } from '@/services/payrollApi';
 import axios from 'axios';
 import { BackButton } from '@/components/shared/BackButton';
 import { DashboardHeader } from "@/components/shared/DashboardHeader";
@@ -30,6 +30,26 @@ interface Site {
   _id: string;
   name: string;
   clientName?: string;
+}
+
+interface SalaryStructure {
+  employeeId: string;
+  basicSalary?: number;
+  hra?: number;
+  da?: number;
+  specialAllowance?: number;
+  conveyance?: number;
+  medicalAllowance?: number;
+  otherAllowances?: number;
+  providentFund?: number;
+  professionalTax?: number;
+  incomeTax?: number;
+  otherDeductions?: number;
+  leaveEncashment?: number;
+  arrears?: number;
+  esic?: number;
+  advance?: number;
+  mlwf?: number;
 }
 
 export default function SupervisorSalarySlip() {
@@ -121,18 +141,29 @@ export default function SupervisorSalarySlip() {
     }
   }, [supervisorSites, fetchEmployeesBySites]);
 
-  const printSlip = (slip: any) => {
-    const employee = employees.find(e => e.employeeId === slip.employeeId);
-    if (!employee) {
-      toast.error('Employee details not found');
-      return;
+  // Fetch the employee's active salary structure so the printed breakdown
+  // (DA/HRA/PF/ESIC/etc.) reflects real numbers instead of hardcoded zeros.
+  const fetchSalaryStructure = async (employeeId: string): Promise<SalaryStructure | null> => {
+    try {
+      const res = await salaryStructureApi.getByEmployeeId(employeeId);
+      if (res.success && res.data) {
+        return res.data;
+      }
+      return null;
+    } catch (error) {
+      console.warn(`No salary structure found for employee ${employeeId}:`, error);
+      return null;
     }
+  };
 
+  const printSlip = (slip: any, employee: Employee, structure: SalaryStructure | null) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       toast.error('Please allow popups for this site');
       return;
     }
+
+    const fmt = (n: number | undefined | null) => (n || 0).toLocaleString();
 
     const printContent = `
     <!DOCTYPE html>
@@ -205,28 +236,28 @@ export default function SupervisorSalarySlip() {
         <div class="section">
           <div class="section-title">EARNINGS</div>
           <table class="breakdown">
-            <tr><td>BASIC</td><td class="amount">₹${slip.basicSalary.toLocaleString()}</td></tr>
-            <tr><td>DA</td><td class="amount">₹0</td></tr>
-            <tr><td>HRA</td><td class="amount">₹0</td></tr>
-            <tr><td>CCA</td><td class="amount">₹0</td></tr>
-            <tr><td>BONUS</td><td class="amount">₹0</td></tr>
-            <tr><td>LEAVE</td><td class="amount">₹0</td></tr>
-            <tr><td>MEDICAL</td><td class="amount">₹0</td></tr>
-            <tr><td>ARREARS</td><td class="amount">₹0</td></tr>
-            <tr><td>OTHER ALL</td><td class="amount">₹0</td></tr>
-            <tr class="total"><td><strong>TOTAL EARNINGS</strong></td><td class="amount"><strong>₹${slip.allowances.toLocaleString()}</strong></td></tr>
+            <tr><td>GROSS</td><td class="amount">₹${fmt(slip.basicSalary)}</td></tr>
+            <tr><td>DA</td><td class="amount">₹${fmt(structure?.da)}</td></tr>
+            <tr><td>HRA</td><td class="amount">₹${fmt(structure?.hra)}</td></tr>
+            <tr><td>CCA</td><td class="amount">₹${fmt(structure?.conveyance)}</td></tr>
+            <tr><td>BONUS</td><td class="amount">₹${fmt(structure?.specialAllowance)}</td></tr>
+            <tr><td>LEAVE</td><td class="amount">₹${fmt(structure?.leaveEncashment)}</td></tr>
+            <tr><td>MEDICAL</td><td class="amount">₹${fmt(structure?.medicalAllowance)}</td></tr>
+            <tr><td>ARREARS</td><td class="amount">₹${fmt(structure?.arrears)}</td></tr>
+            <tr><td>OTHER ALL</td><td class="amount">₹${fmt(structure?.otherAllowances)}</td></tr>
+            <tr class="total"><td><strong>GROSS TOTAL</strong></td><td class="amount"><strong>₹${fmt(slip.allowances)}</strong></td></tr>
           </table>
         </div>
 
         <div class="section">
           <div class="section-title">DEDUCTIONS</div>
           <table class="breakdown">
-            <tr><td>PF</td><td class="amount">-₹0</td></tr>
-            <tr><td>ESIC</td><td class="amount">-₹0</td></tr>
-            <tr><td>ADVANCE</td><td class="amount">-₹0</td></tr>
-            <tr><td>MLWF</td><td class="amount">-₹0</td></tr>
-            <tr><td>Profession Tax</td><td class="amount">-₹0</td></tr>
-            <tr class="total"><td><strong>TOTAL DEDUCTIONS</strong></td><td class="amount"><strong>-₹${slip.deductions.toLocaleString()}</strong></td></tr>
+            <tr><td>PF</td><td class="amount">-₹${fmt(structure?.providentFund)}</td></tr>
+            <tr><td>ESIC</td><td class="amount">-₹${fmt(structure?.esic)}</td></tr>
+            <tr><td>ADVANCE</td><td class="amount">-₹${fmt(structure?.advance)}</td></tr>
+            <tr><td>MLWF</td><td class="amount">-₹${fmt(structure?.mlwf)}</td></tr>
+            <tr><td>Profession Tax</td><td class="amount">-₹${fmt(structure?.professionalTax)}</td></tr>
+            <tr class="total"><td><strong>TOTAL DEDUCTIONS</strong></td><td class="amount"><strong>-₹${fmt(slip.deductions)}</strong></td></tr>
           </table>
         </div>
       </div>
@@ -234,7 +265,7 @@ export default function SupervisorSalarySlip() {
       <div class="section">
         <div class="section-title">NET SALARY</div>
         <table class="breakdown">
-          <tr class="total"><td><strong>NET PAYABLE</strong></td><td class="amount"><strong>₹${slip.netSalary.toLocaleString()}</strong></td></tr>
+          <tr class="total"><td><strong>NET PAYABLE</strong></td><td class="amount"><strong>₹${fmt(slip.netSalary)}</strong></td></tr>
         </table>
       </div>
 
@@ -276,9 +307,16 @@ export default function SupervisorSalarySlip() {
     }
     setLoading(true);
     try {
+      const employee = employees.find(e => e.employeeId === myEmployeeId);
+      if (!employee) {
+        toast.error('Employee details not found');
+        return;
+      }
+
       const res = await salarySlipApi.getAll({ month: selectedMonth, employeeId: myEmployeeId });
       if (res.success && res.data.length > 0) {
-        printSlip(res.data[0]);
+        const structure = await fetchSalaryStructure(myEmployeeId);
+        printSlip(res.data[0], employee, structure);
         toast.success('Salary slip loaded');
       } else {
         toast.info('No salary slip found for this month');
@@ -298,12 +336,19 @@ export default function SupervisorSalarySlip() {
     }
     setLoading(true);
     try {
+      const employee = employees.find(e => e.employeeId === selectedEmployeeId);
+      if (!employee) {
+        toast.error('Employee details not found');
+        return;
+      }
+
       const res = await salarySlipApi.getAll({
         month: selectedMonth,
         employeeId: selectedEmployeeId,
       });
       if (res.success && res.data.length > 0) {
-        printSlip(res.data[0]);
+        const structure = await fetchSalaryStructure(selectedEmployeeId);
+        printSlip(res.data[0], employee, structure);
         toast.success('Employee salary slip loaded');
       } else {
         toast.info('No salary slip found for this employee this month');

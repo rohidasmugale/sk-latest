@@ -55,6 +55,8 @@ const EmployeeManagementWrapper = () => {
   const [selectedSiteForDetails, setSelectedSiteForDetails] = useState<ServiceSite | null>(null);
   const [allEmployees, setAllEmployees] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("sites");
+  const [employeesForTab, setEmployeesForTab] = useState<any[]>([]); // ← ADDED for EmployeesTab
+  const [loadingEmployees, setLoadingEmployees] = useState(false); // ← ADDED
 
   // Fetch real sites
   useEffect(() => {
@@ -98,7 +100,31 @@ const EmployeeManagementWrapper = () => {
     }
   }, [realSites]);
 
-  // Existing logic
+  // Fetch employees for site counts AND for EmployeesTab
+  useEffect(() => {
+    const fetchAllEmployees = async () => {
+      try {
+        setLoadingEmployees(true);
+        const response = await axios.get(`${API_URL}/employees`, {
+          params: { limit: 10000 },
+        });
+        if (response.data?.success) {
+          const employees = response.data.data || response.data.employees || [];
+          setAllEmployees(employees);
+          setEmployeesForTab(employees); // ← SET employees for the tab
+          console.log(`✅ Loaded ${employees.length} employees for EmployeeManagementWrapper`);
+        }
+      } catch (error) {
+        console.error("Error fetching employees:", error);
+        toast.error("Failed to load employees");
+      } finally {
+        setLoadingEmployees(false);
+      }
+    };
+    fetchAllEmployees();
+  }, []);
+
+  // Existing logic for role-based access
   useEffect(() => {
     const determineAccess = async () => {
       try {
@@ -133,23 +159,6 @@ const EmployeeManagementWrapper = () => {
     };
     determineAccess();
   }, [role, user]);
-
-  // Fetch employees for site counts
-  useEffect(() => {
-    const fetchAllEmployees = async () => {
-      try {
-        const response = await axios.get(`${API_URL}/employees`, {
-          params: { limit: 10000 },
-        });
-        if (response.data?.success) {
-          setAllEmployees(response.data.data || response.data.employees || []);
-        }
-      } catch (error) {
-        console.error("Error fetching employees:", error);
-      }
-    };
-    fetchAllEmployees();
-  }, []);
 
   // Site Detail View
   if (showSiteDetails && selectedSiteForDetails) {
@@ -248,7 +257,7 @@ const EmployeeManagementWrapper = () => {
 
   if (loading) return <div className="p-8 text-center">Loading employees...</div>;
 
-  // Explicitly typed fetch function
+  // Explicitly typed fetch function - kept for backward compatibility if needed
   const customFetch = async (params: Record<string, unknown>) => {
     const finalParams = { ...params, ...filterParams };
     const response = await axios.get(`${API_URL}/employees`, { params: finalParams });
@@ -271,7 +280,7 @@ const EmployeeManagementWrapper = () => {
             </TabsTrigger>
             <TabsTrigger value="employees">
               <Users className="mr-2 h-4 w-4" />
-              All Employees
+              All Employees ({employeesForTab.length})
             </TabsTrigger>
           </TabsList>
 
@@ -341,10 +350,16 @@ const EmployeeManagementWrapper = () => {
 
           <TabsContent value="employees">
             <EmployeesTab
-              customFetch={customFetch}
-              initialSiteFilter={initialSite}
-              allowImport={allowImport}
-              allowExport={allowExport}
+              employees={employeesForTab}        // ← PASS employees
+              setEmployees={setEmployeesForTab}  // ← PASS setter
+              setActiveTab={setActiveTab}        // ← PASS active tab setter
+              selectedSite="all"                 // ← PASS selected site
+              sites={realSites}                  // ← PASS sites
+              skipFetch={true}                   // ← CRITICAL: prevents double fetching
+            // customFetch removed
+            // initialSiteFilter removed
+            // allowImport removed
+            // allowExport removed
             />
           </TabsContent>
         </div>

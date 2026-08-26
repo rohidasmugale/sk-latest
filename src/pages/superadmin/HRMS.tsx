@@ -69,7 +69,7 @@ const HRMS = () => {
   const [salarySlips, setSalarySlips] = useState<SalarySlip[]>([]);
   const [activeTab, setActiveTab] = useState("employees");
   const [deductions, setDeductions] = useState<Deduction[]>([]);
-  
+
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedMonth, setSelectedMonth] = useState(
     new Date().toISOString().slice(0, 7)
@@ -274,7 +274,7 @@ const HRMS = () => {
             </TabsTrigger>
             <TabsTrigger value="leave" className="flex-1 min-w-[120px]">Leave Management</TabsTrigger>
             <TabsTrigger value="payroll" className="flex-1 min-w-[120px]">Payroll</TabsTrigger>
-              <TabsTrigger value="performance" className="flex-1 min-w-[120px]">Deduction</TabsTrigger>
+            <TabsTrigger value="performance" className="flex-1 min-w-[120px]">Deduction</TabsTrigger>
             <TabsTrigger value="reports" className="flex-1 min-w-[120px]">Reports</TabsTrigger>
           </TabsList>
 
@@ -285,6 +285,7 @@ const HRMS = () => {
               setActiveTab={setActiveTab}
               selectedSite={selectedSite}
               sites={allSites}
+
             />
           </TabsContent>
 

@@ -73,10 +73,12 @@ export interface IEmployee extends Document {
   department: string;
   position: string;
   siteName?: string;
+   siteId?: mongoose.Types.ObjectId;   // <-- ADD THIS
   salary: number;
   status: 'active' | 'inactive' | 'left';
   role?: string;
-  
+    
+ 
   // Uniform Details
   pantSize?: string;
   shirtSize?: string;
@@ -379,6 +381,7 @@ employeeId: {
       trim: true,
       default: ''
     },
+     siteId: { type: mongoose.Schema.Types.ObjectId, ref: 'Site', index: true },
     salary: {
       type: Number,
       required: [true, 'Salary is required'],

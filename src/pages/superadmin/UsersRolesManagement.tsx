@@ -1960,7 +1960,7 @@ interface FormUserData {
   assignedSites?: string[];
 }
 
-const departments = ['Housekeeping', 'Security', 'Parking', 'Waste Management', 'Others'];
+const departments = ['Housekeeping', 'Security', 'Parking', 'Waste Management', 'Others','Admin','Operations'];
 const roles: UserRole[] = ['admin', 'manager', 'supervisor', 'employee'];
 
 

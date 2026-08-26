@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { DashboardHeader } from "@/components/shared/DashboardHeader";
 import { DashboardSidebar } from "@/components/shared/DashboardSidebar";
 import { motion } from "framer-motion";
@@ -8,9 +9,12 @@ import { useRole } from "@/context/RoleContext";
 import employeeService from "@/services/employeeService";
 import { Employee } from "@/types/employee";
 import { Site } from "@/services/SiteService";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import OnboardingTab from "@/pages/superadmin/OnboardingTab";
 
 const SupervisorHRMS = () => {
   const { user } = useRole();
+  const navigate = useNavigate();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -18,6 +22,7 @@ const SupervisorHRMS = () => {
   const [allSites, setAllSites] = useState<Site[]>([]);
   const [selectedSite, setSelectedSite] = useState<string>("all");
   const [isLoadingSites, setIsLoadingSites] = useState(false);
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
 
   // Resolve site name from ID
   const resolveSiteName = (siteId: string): string | undefined => {
@@ -91,6 +96,15 @@ const SupervisorHRMS = () => {
     const empSite = emp.siteName || '';
     return empSite === selectedSite || empSite === resolvedName;
   });
+
+  // Handle adding a new employee - opens the onboarding modal
+  const handleAddEmployee = () => {
+    // Option A: Navigate to onboarding route (uncomment if you have a dedicated route)
+    // navigate("/supervisor/onboarding");
+    
+    // Option B: Open the onboarding modal (currently using this approach)
+    setShowOnboardingModal(true);
+  };
 
   if (loading) {
     return (
@@ -186,13 +200,48 @@ const SupervisorHRMS = () => {
           <EmployeesTab
             employees={filteredEmployees as any}
             setEmployees={setEmployees as any}
-            setActiveTab={() => { }}
+            setActiveTab={() => {}}
+            onAddEmployee={handleAddEmployee}
             selectedSite={selectedSite}
-            sites={allSites}           // ← ADD THIS
+            sites={allSites}
             skipFetch={true}
           />
         </div>
       </motion.div>
+
+      {/* Onboarding Modal */}
+      <Dialog open={showOnboardingModal} onOpenChange={setShowOnboardingModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle className="text-xl font-bold">Add New Employee</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 pb-6">
+            <OnboardingTab
+              employees={filteredEmployees as any}
+              setEmployees={setEmployees as any}
+              salaryStructures={[]}
+              setSalaryStructures={() => {}}
+              onEmployeeUpdate={(updatedEmployee) => {
+                // Update the employee in the list if needed
+                setEmployees(prev => 
+                  prev.map(emp => 
+                    emp._id === updatedEmployee._id ? updatedEmployee : emp
+                  )
+                );
+              }}
+              onEmployeesBulkUpdate={(updatedEmployees) => {
+                // Handle bulk updates if needed
+                setEmployees(prev => {
+                  const updatedIds = new Set(updatedEmployees.map(e => e._id));
+                  return prev.map(emp => 
+                    updatedIds.has(emp._id) ? updatedEmployees.find(e => e._id === emp._id) || emp : emp
+                  );
+                });
+              }}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -82,7 +82,13 @@ interface Site {
 interface OutletContext {
   onMenuClick: () => void;
 }
-
+// Returns YYYY-MM-DD using LOCAL date parts (not UTC, unlike toISOString)
+const getLocalDateString = (date: Date = new Date()): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 // ---------- Helper functions ----------
 const formatTimeForDisplay = (timestamp: string | null): string => {
   if (!timestamp || timestamp === "-") return "-";
@@ -155,7 +161,7 @@ const getDerivedAttendanceStatus = (record: AttendanceRecord | undefined, checkI
 const Attendance = () => {
   const { onMenuClick } = useOutletContext<OutletContext>();
   const { user: currentUser, isAuthenticated } = useRole();
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(getLocalDateString());
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
@@ -213,21 +219,32 @@ const Attendance = () => {
     if (!currentUser) return [];
     try {
       const supervisorId = currentUser._id || currentUser.id;
+      const supervisorName = currentUser.name;
       const response = await axios.get(`${API_URL}/tasks`, { params: { limit: 1000 } });
       let allTasks = response.data?.data || response.data || [];
       if (!Array.isArray(allTasks)) allTasks = [];
-      const siteSet = new Set<string>();
+
+      const siteIdSet = new Set<string>();
       allTasks.forEach((task: any) => {
-        if (task.assignedUsers?.some((u: any) => u.userId === supervisorId)) {
-          if (task.siteName) siteSet.add(task.siteName);
-        }
-        if (task.assignedTo === supervisorId && task.siteName) siteSet.add(task.siteName);
+        const assigned =
+          task.assignedUsers?.some((u: any) =>
+            u.userId === supervisorId ||
+            (u.name && supervisorName && u.name.toLowerCase() === supervisorName.toLowerCase())
+          ) ||
+          task.assignedTo === supervisorId;
+        if (assigned && task.siteId) siteIdSet.add(task.siteId);
       });
-      const siteNames = Array.from(siteSet);
+
       const sitesRes = await axios.get(`${API_URL}/sites`);
       let allSites = sitesRes.data?.data || sitesRes.data || [];
       if (!Array.isArray(allSites)) allSites = [];
-      const filtered = allSites.filter((s: any) => siteNames.includes(s.name));
+
+      const filtered = allSites.filter((s: any) => siteIdSet.has(s._id));
+
+      if (filtered.length === 0) {
+        console.warn("⚠️ No sites found via task assignment for this supervisor — check that this supervisor has at least one task with a siteId set.");
+      }
+
       setSupervisorSites(filtered);
       return filtered;
     } catch (error) {
@@ -235,6 +252,7 @@ const Attendance = () => {
       return [];
     }
   }, [currentUser]);
+
   const fetchSiteShifts = async (siteName: string) => {
     if (!siteName) return;
     setLoadingShifts(true);
@@ -259,23 +277,38 @@ const Attendance = () => {
       setLoadingShifts(false);
     }
   };
+
+  // Attendance.tsx – fetchEmployees
   const fetchEmployees = useCallback(async () => {
     if (!currentUser) return;
     try {
       let sites = supervisorSites;
       if (sites.length === 0) sites = await fetchSupervisorSites();
-      const siteNames = sites.map(s => s.name);
-      if (siteNames.length === 0) {
+
+      if (sites.length === 0) {
+        console.warn("⚠️ No sites resolved for this supervisor (no tasks with siteId?)");
         setEmployees([]);
         return;
       }
+
+      const siteIds = sites.map((s: any) => s._id).filter(Boolean);
+      const siteNames = sites
+        .map((s: any) => (s.name || "").trim().toLowerCase())
+        .filter(Boolean);
+
       const response = await axios.get(`${API_URL}/employees`, { params: { limit: 1000 } });
       let allEmployees = response.data?.data || response.data?.employees || response.data || [];
       if (!Array.isArray(allEmployees)) allEmployees = [];
+
+      // ✅ Match by siteId OR siteName (fallback), same as SuperAdmin view does
       const filtered = allEmployees.filter((emp: any) => {
-        const empSite = emp.siteName || '';
-        return siteNames.some(sn => normalizeSiteName(sn) === normalizeSiteName(empSite));
+        if (emp.status !== 'active') return false;
+        const empSiteId = emp.siteId;
+        const empSiteName = (emp.siteName || emp.site || "").trim().toLowerCase();
+        return siteIds.includes(empSiteId) || siteNames.includes(empSiteName);
       });
+
+      console.log(`✅ Supervisor employees resolved: ${filtered.length} (siteIds: ${siteIds.length}, siteNames: ${siteNames.length}, totalEmployees: ${allEmployees.length})`);
       setEmployees(filtered);
     } catch (error) {
       console.error("Error fetching employees:", error);
@@ -797,7 +830,7 @@ const Attendance = () => {
               onChange={(e) => setSelectedDate(e.target.value)}
               className="w-36"
             />
-            <Button variant="outline" size="sm" onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}>
+            <Button variant="outline" size="sm" onClick={() => setSelectedDate(getLocalDateString())}>
               Today
             </Button>
           </div>

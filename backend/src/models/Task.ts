@@ -50,7 +50,7 @@ export type ITask = Document & ITaskMethods & {
   status: 'pending' | 'in-progress' | 'completed' | 'cancelled';
   deadline: Date;
   dueDateTime: Date;
-  siteId: string;
+  siteId: mongoose.Types.ObjectId;  
   siteName: string;
   clientName: string;
   taskType?: string;
@@ -227,11 +227,12 @@ const TaskSchema: Schema<ITask, ITaskModel> = new Schema(
         message: 'Invalid due date and time'
       }
     },
-    siteId: {
-      type: String,
-      required: [true, 'Site ID is required'],
-      trim: true
-    },
+     siteId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Site',
+    required: true,
+    index: true
+  },
     siteName: {
       type: String,
       required: [true, 'Site name is required'],

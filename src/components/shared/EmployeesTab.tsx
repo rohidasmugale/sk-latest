@@ -15,16 +15,17 @@ import StatCard from "@/pages/admin/StatCard";
 import SearchBar from "@/pages/admin/SearchBar";
 import Pagination from "@/pages/admin/Pagination";
 import ExcelImportDialog from "@/pages/admin/ExcelImportDialog";
-import axios from "axios";
+
 import * as XLSX from 'xlsx';
 import { format, differenceInDays } from 'date-fns';
 import DocumentUpload from "../../pages/superadmin/DocumentUpload";
 import { FaceRegisterButton } from "@/pages/supervisor/FaceRegisterButton";
 import { siteService, Site } from "@/services/SiteService";
 import { useRole } from "@/context/RoleContext";
-// ─── API URL ──────────────────────────────────────────────────────────────
+import apiClient from '@/lib/apiClient';  // or your path
+
 const API_URL = import.meta.env.VITE_API_URL ||
-  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
+  (import.meta.env.DEV ? "http://localhost:5001/api" : "https://sk-backend-btbj.onrender.com/api");
 
 // ─── Extended Interfaces ──────────────────────────────────────────────────
 // Fields that must be filled for a "complete" profile (exclude panNumber, email, numberOfChildren)
@@ -52,7 +53,11 @@ interface SiteAssignmentHistory {
   leftDate?: string;
   daysWorked?: number;
 }
-
+interface SiteWithCounts extends Site {
+  currentManagerCount?: number;
+  currentSupervisorCount?: number;
+  currentStaffCount?: number;
+}
 interface ExtendedEmployee extends Employee {
   siteHistory: SiteAssignmentHistory[];
   isManager: boolean;
@@ -111,19 +116,7 @@ interface EPFForm11Data {
   physicalClaimFiled: boolean;
 }
 
-interface Site {
-  _id: string;
-  name: string;
-  location?: string;
-  address?: string;
-  status?: 'active' | 'inactive';
-  managerCount?: number;
-  supervisorCount?: number;
-  staffDeployment?: Array<{ role: string; count: number }>;
-  currentManagerCount?: number;
-  currentSupervisorCount?: number;
-  currentStaffCount?: number;
-}
+
 
 interface SiteDeploymentStatus {
   siteName: string;
@@ -205,7 +198,8 @@ interface EmployeesTabProps {
   allowExport?: boolean;
   selectedSite?: string;
   sites?: Site[];
-  skipFetch?: boolean;   // ADD THIS
+  skipFetch?: boolean;   // ADD THIS/
+   onAddEmployee?: () => void;  // ADD THIS
 }
 
 // ─── Site Filter Component ──────────────────────────────────────────────
@@ -246,7 +240,8 @@ const EmployeesTab = ({
   onEmployeesBulkUpdate,
   selectedSite: propSelectedSite = 'all',
   sites: propSites = [],
-  skipFetch = false   // ✅ ADD THIS
+  skipFetch = false  , // ✅ ADD THIS
+  onAddEmployee,   // ADD THIS
 
 }: EmployeesTabProps) => {
   // ─── State ──────────────────────────────────────────────────────────────
@@ -284,7 +279,7 @@ const EmployeesTab = ({
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
-  const [sitesFromAPI, setSitesFromAPI] = useState<Site[]>([]);
+
   const [loadingSites, setLoadingSites] = useState(false);
 
   const [siteDeploymentStatus, setSiteDeploymentStatus] = useState<Map<string, SiteDeploymentStatus>>(new Map());
@@ -298,10 +293,10 @@ const EmployeesTab = ({
   const [isImporting, setIsImporting] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
-
+  const [sitesFromAPI, setSitesFromAPI] = useState<SiteWithCounts[]>([]);
   // Mobile responsiveness state
   const [isMobileView, setIsMobileView] = useState(window.innerWidth < 768);
-
+  const [dryRun, setDryRun] = useState(false);
   // Use local employees if no prop provided
   const employees = propEmployees ? (propEmployees as ExtendedEmployee[]) : localEmployees;
   const setEmployees = propSetEmployees ? (propSetEmployees as React.Dispatch<React.SetStateAction<ExtendedEmployee[]>>) : setLocalEmployees;
@@ -357,6 +352,12 @@ const EmployeesTab = ({
   // Photo Preview state
   const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false);
   const [selectedPhotoPreview, setSelectedPhotoPreview] = useState<string | null>(null);
+
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [jobStatus, setJobStatus] = useState<'idle' | 'uploading' | 'processing' | 'completed' | 'failed'>('idle');
+  const [jobProgress, setJobProgress] = useState(0);
+  const [jobResult, setJobResult] = useState<{ created: number; updated: number; errors: any[] } | null>(null);
+
   const { role } = useRole();
   const isSupervisor = role === "supervisor";
   // Handle photo click to maximize
@@ -391,7 +392,7 @@ const EmployeesTab = ({
     fetchEmployeeStats();
   }, [
     skipFetch,
-    propEmployees,
+
     employeesPage,
     employeesItemsPerPage,
     searchTerm,
@@ -401,6 +402,20 @@ const EmployeesTab = ({
     sortBy,
     refreshDocuments
   ]);
+
+  // Separate effect to handle propEmployees updates when in skipFetch mode
+  useEffect(() => {
+    if (!skipFetch || !propEmployees) return;
+
+    const total = propEmployees.length;
+    const active = propEmployees.filter((e: any) => e.status === 'active').length;
+    const left = propEmployees.filter((e: any) => e.status === 'left' || e.status === 'inactive').length;
+
+    setStatsData({ total, active, left });
+    setTotalEmployees(total);
+  }, [skipFetch, propEmployees?.length]); // Only re-run when length changes, not array reference
+
+
   useEffect(() => {
     fetchSites();
   }, []);
@@ -444,7 +459,7 @@ const EmployeesTab = ({
         params.sortOrder = "asc";
       }
 
-      const response = await axios.get(`${API_URL}/employees`, { params });
+      const response = await apiClient.get('/employees', { params });
 
       if (response.data && response.data.success) {
         const apiData = response.data.data || response.data.employees || [];
@@ -491,6 +506,7 @@ const EmployeesTab = ({
             department: emp.department || "Unknown",
             position: emp.position || emp.designation || "",
             siteName: emp.siteName || emp.site || "",
+            site: emp.siteName || emp.site || "",
             salary: emp.salary || emp.basicSalary || 0,
             status: emp.status || "active",
             documents: emp.documents || [],
@@ -568,7 +584,7 @@ const EmployeesTab = ({
       const params: any = { limit: 10000 };
       if (selectedSite !== "all") params.siteName = resolveSiteName(selectedSite);
 
-      const response = await axios.get(`${API_URL}/employees`, { params });
+      const response = await apiClient.get('/employees', { params });
 
       if (response.data && response.data.success) {
         const allEmps = response.data.data || response.data.employees || [];
@@ -585,7 +601,7 @@ const EmployeesTab = ({
   const fetchSites = async () => {
     try {
       setLoadingSites(true);
-      const response = await axios.get(`${API_URL}/sites`);
+      const response = await apiClient.get('/sites');
 
       let sitesData: Site[] = [];
 
@@ -696,61 +712,17 @@ const EmployeesTab = ({
   };
 
   // ─── Helper Functions ──────────────────────────────────────────────────
-
-  const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]): {
-    allowed: boolean;
-    message?: string;
-    violations: Array<{
-      employee: ExtendedEmployee;
-      reason: string;
-    }>;
-  } => {
-    const status = siteDeploymentStatus.get(siteName);
-    if (!status) {
-      return { allowed: true, violations: [] };
-    }
-
-    const violations: Array<{ employee: ExtendedEmployee; reason: string }> = [];
-
-    const managersToAdd = employeesToAssign.filter(emp => emp.isManager).length;
-    const supervisorsToAdd = employeesToAssign.filter(emp => emp.isSupervisor).length;
-    const staffToAdd = employeesToAssign.filter(emp => !emp.isManager && !emp.isSupervisor).length;
-
-    if (managersToAdd > status.remainingManagers) {
-      const overLimit = managersToAdd - status.remainingManagers;
-      employeesToAssign.filter(emp => emp.isManager).slice(0, overLimit).forEach(emp => {
-        violations.push({
-          employee: emp,
-          reason: `Manager position full for ${siteName}. Only ${status.remainingManagers} manager position(s) remaining.`
-        });
-      });
-    }
-
-    if (supervisorsToAdd > status.remainingSupervisors) {
-      const overLimit = supervisorsToAdd - status.remainingSupervisors;
-      employeesToAssign.filter(emp => emp.isSupervisor).slice(0, overLimit).forEach(emp => {
-        violations.push({
-          employee: emp,
-          reason: `Supervisor position full for ${siteName}. Only ${status.remainingSupervisors} supervisor position(s) remaining.`
-        });
-      });
-    }
-
-    if (staffToAdd > status.remainingStaff) {
-      const overLimit = staffToAdd - status.remainingStaff;
-      employeesToAssign.filter(emp => !emp.isManager && !emp.isSupervisor).slice(0, overLimit).forEach(emp => {
-        violations.push({
-          employee: emp,
-          reason: `Staff position full for ${siteName}. Only ${status.remainingStaff} staff position(s) remaining.`
-        });
-      });
-    }
-
-    return {
-      allowed: violations.length === 0,
-      violations
-    };
-  };
+const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]): {
+  allowed: boolean;
+  message?: string;
+  violations: Array<{
+    employee: ExtendedEmployee;
+    reason: string;
+  }>;
+} => {
+  // Capacity limits removed — any number of employees can be assigned to any site.
+  return { allowed: true, violations: [] };
+};
 
   const updateSiteHistory = (employee: ExtendedEmployee, newSiteName: string): ExtendedEmployee => {
     const today = new Date().toISOString().split('T')[0];
@@ -1026,7 +998,7 @@ const EmployeesTab = ({
       });
       apiData['profileStatus'] = isComplete ? 'complete' : 'incomplete';
 
-      const response = await axios.patch(`${API_URL}/employees/${employeeId}`, apiData);
+      const response = await apiClient.patch(`/employees/${employeeId}`, apiData);
 
       if (response.data.success) {
         setEmployees(prev => prev.map(emp =>
@@ -1121,7 +1093,7 @@ const EmployeesTab = ({
 
       console.log('Sending bulk site update:', { employeeIds, siteName: selectedSiteForBulk });
 
-      const response = await axios.patch(`${API_URL}/employees/bulk/site`, {
+      const response = await apiClient.patch('/employees/bulk/site', {
         employeeIds: employeeIds,
         siteName: selectedSiteForBulk
       });
@@ -1178,7 +1150,7 @@ const EmployeesTab = ({
     try {
       setIsBulkDeleting(true);
 
-      const response = await axios.delete(`${API_URL}/employees/bulk`, {
+      const response = await apiClient.delete('/employees/bulk', {
         data: { employeeIds: selectedEmployees }
       });
 
@@ -1224,7 +1196,7 @@ const EmployeesTab = ({
 
       const employeeId = employee.id || employee._id;
 
-      const response = await axios.delete(`${API_URL}/employees/${employeeId}`);
+      const response = await apiClient.delete(`/employees/${employeeId}`);
 
       if (response.data.success) {
         setEmployees(prev => prev.filter(emp => emp.id !== id && emp._id !== id));
@@ -1258,7 +1230,7 @@ const EmployeesTab = ({
       const employeeId = employee._id || employee.id;
 
       // Use PATCH to set photo fields to null
-      const response = await axios.patch(`${API_URL}/employees/${employeeId}`, {
+      const response = await apiClient.patch(`/employees/${employeeId}`, {
         photo: null,
         photoPublicId: null
       });
@@ -1288,8 +1260,8 @@ const EmployeesTab = ({
     try {
       setLoading(true);
       const employeeId = employee.id || employee._id;
-      const response = await axios.patch(
-        `${API_URL}/employees/${employeeId}/status`,
+      const response = await apiClient.patch(
+        `/employees/${employeeId}/status`,
         { status: "left" }
       );
 
@@ -1329,14 +1301,11 @@ const EmployeesTab = ({
       setIsExporting(true);
       toast.loading('Fetching employee data for export...');
 
-      // Fetch ALL employees (limit=10000)
-      const response = await axios.get(`${API_URL}/employees`, {
+      const response = await apiClient.get('/employees', {
         params: { limit: 10000 }
       });
       let allEmps = response.data?.data || response.data?.employees || response.data || [];
       if (!Array.isArray(allEmps)) allEmps = [];
-
-      // Map to the exact columns the client requested in the handwritten note
       const exportData = allEmps.map((emp: any) => ({
         'Site Name': emp.siteName || emp.site || '',
         'Status': emp.status || 'active',
@@ -1346,23 +1315,31 @@ const EmployeesTab = ({
         'Designation': emp.position || '',
         'Name as per Aadhar': emp.name || '',
         'Gender': emp.gender || '',
-        'Date of Birth': emp.dateOfBirth || '',
-        'Date of Joining': emp.joinDate || emp.dateOfJoining || '',
+        'DOB': emp.dateOfBirth || '',
+        'Date of Join': emp.joinDate || emp.dateOfJoining || '',
         'Date of Exit': emp.exitDate || '',
-        'Aadhar No': emp.aadharNumber || '',
-        'Mobile No': emp.phone || '',
-        'PAN No': emp.panNumber || '',
-        'Blood Group': emp.bloodGroup || '',
-        'Father Name': emp.fatherName || '',
+        'Adhaar Number': emp.aadharNumber || '',
+        'Mobile Number': emp.phone || '',
+        'PAN NO': emp.panNumber || '',
+        'Father / Husband Name': emp.fatherName || '',
         'Relation': emp.relation || emp.emergencyContactRelation || '',
-        'Bank Account No': emp.accountNumber || '',
-        'IFSC code': emp.ifscCode || '',
-        'Bank Branch': emp.branchName || '',
+        'Bank A/c Number': emp.accountNumber || '',
+        'IFSC Code': emp.ifscCode || '',
+        'Branch Name': emp.branchName || '',
         'Nominee Name': emp.nomineeName || '',
         'Nominee Relation': emp.nomineeRelation || '',
-        'Emergency contact no': emp.emergencyContactPhone || '',
+        'Emergency Contact 1': emp.emergencyContactPhone || '',
+        'Emergency Contact 2': '', // add if you have second emergency contact
         'Local Address': emp.localAddress || '',
-        'Permanent Address': emp.permanentAddress || ''
+        'Permannt Address': emp.permanentAddress || '',
+        'Remark': '',
+        'Email': emp.email || '',
+        'Spouse Name': emp.spouseName || '',
+        'Number of Children': emp.numberOfChildren || '',
+        'Department': emp.department || '',
+        'Salary': emp.salary || '',
+        'Permanent Pincode': emp.permanentPincode || '',
+        'Local Pincode': emp.localPincode || '',
       }));
 
       const wb = XLSX.utils.book_new();
@@ -1411,7 +1388,7 @@ const EmployeesTab = ({
 
       let freshSites: Site[] = [];
       try {
-        const response = await axios.get(`${API_URL}/sites`);
+        const response = await apiClient.get('/sites');
 
         if (response.data) {
           if (response.data.success && Array.isArray(response.data.data)) {
@@ -1446,7 +1423,7 @@ const EmployeesTab = ({
         return;
       }
 
-      const employeesResponse = await axios.get(`${API_URL}/employees`, {
+      const employeesResponse = await apiClient.get('/employees', {
         params: { limit: 10000 }
       });
 
@@ -1454,7 +1431,7 @@ const EmployeesTab = ({
       if (employeesResponse.data && employeesResponse.data.success) {
         existingEmployees = employeesResponse.data.data || employeesResponse.data.employees || [];
       }
-      const existingAadharSet = new Set(existingEmployees.map(emp => emp.aadharNumber).filter(Boolean));
+
       const siteCapacityMap = new Map<string, {
         name: string;
         managerRequirement: number;
@@ -1513,7 +1490,22 @@ const EmployeesTab = ({
           remainingStaff: Math.max(0, staffRequirement - staffCount)
         });
       });
+      // ─── Normalise site names from DB ───────────────────────────────
+      const normalizeSiteName = (name: string): string =>
+        name.trim().toUpperCase().replace(/\s+/g, ' ');
+      const SITE_ALIASES: Record<string, string> = {
+        'OWC OPRETER': 'OWC OPERATOR',
+        'GOLBAL SQUARE': 'GLOBAL SQUARE',
+        'GOLBAL LIFE STYLE': 'GLOBAL LIFE STYLE',
+        'GANGA TRUENO': 'GANGA TRUENO', // adjust to your actual DB name
+        // Add more as you find them
+      };
+      // Build a map from normalised DB site name → original DB site name
 
+      const dbSiteNormalizedMap = new Map<string, string>();
+      for (const siteName of siteCapacityMap.keys()) {
+        dbSiteNormalizedMap.set(normalizeSiteName(siteName), siteName);
+      }
       const arrayBuffer = await file.arrayBuffer();
       const workbook = XLSX.read(arrayBuffer, {
         type: 'array',
@@ -1549,34 +1541,34 @@ const EmployeesTab = ({
 
       const headers = jsonData[0] as string[];
 
-      // ✅ FIX 1: DECLARE ALL COLUMN INDICES HERE
-      const siteIndex = 0;
-      const statusIndex = 1;
-      const uanIndex = 2;
-      const esicIndex = 3;
-      const empCodeIndex = 4;
-      const positionIndex = 5;
-      const nameIndex = 6;
-      const genderIndex = 7;
-      const dobIndex = 8;
-      const dojIndex = 9;
-      const dateOfExitIndex = 10;
-      const aadharIndex = 11;
-      const contactIndex = 12;
-      const panIndex = 13;
-      const bloodGroupIndex = 14;
-      const relativeNameIndex = 15;
-      const relationIndex = 16;
-      const accountNumberIndex = 17;
-      const ifscIndex = 18;
-      const bankBranchIndex = 19;
-      const nomineeNameIndex = 20;
-      const nomineeRelationIndex = 21;
-      const emergencyContactPhoneIndex = 22;
-      const localAddressIndex = 23;
-      const permanentAddressIndex = 24;
+      // ✅ REPLACED: column indices now resolved by header NAME, not fixed position.
+      const col = buildImportColumnMap(headers);
 
-      // ❌ DELETED: The orphaned `const siteName = row[siteIndex]...` block that was here earlier.
+      // Guard: required columns must exist somewhere in the sheet, or every
+      // row will fail for confusing reasons. Fail fast with a clear message.
+      const requiredMissing: string[] = [];
+      if (col.site === -1) requiredMissing.push('Site');
+      if (col.name === -1) requiredMissing.push('Name');
+      if (col.aadhar === -1) requiredMissing.push('Aadhar');
+      if (col.employeeCode === -1) requiredMissing.push('Emp Code / Employee ID');
+
+      if (requiredMissing.length > 0) {
+        toast.error(
+          <div className="space-y-2">
+            <div className="flex items-centergap-2">
+              <XCircle className="h-4 w-4 text-red-500" />
+              <span className="font-medium">Missing Required Columns</span>
+            </div>
+            <div className="text-sm text-red-600">
+              Could not find a column for: {requiredMissing.join(', ')}. Please check
+              your column headers, or rename them to match a recognized label
+              (e.g. "Site" / "Site Name", "Name", "Aadhar No", "Emp Code").
+            </div>
+          </div>,
+          { id: toastId, duration: 10000 }
+        );
+        return;
+      }
 
       const employeesBySiteAndRole: Map<string, {
         managers: any[],
@@ -1584,17 +1576,38 @@ const EmployeesTab = ({
         staff: any[],
         rows: number[]
       }> = new Map();
-
+      const existingByAadhar = new Map<string, any>();
+      const existingByEmpId = new Map<string, any>();
+      existingEmployees.forEach(emp => {
+        if (emp.aadharNumber) existingByAadhar.set(emp.aadharNumber, emp);
+        if (emp.employeeId) existingByEmpId.set(String(emp.employeeId), emp);
+      });
+      const seenInFileAadhar = new Set<string>();
       const employeesToImport = [];
+      const employeesToUpdate: { id: string; payload: any }[] = [];
       let processedCount = 0;
 
       let skippedCount = 0;
-      let duplicateCount = 0;
+
       const skippedReasons: string[] = [];
       const invalidSiteNames: Set<string> = new Set();
       const capacityViolations: Array<{ site: string; role: string; count: number; available: number }> = [];
-
+      // if (dryRun) {
+      //   // Build report
+      //   const report = {
+      //     creates: employeesToImport.length,
+      //     updates: employeesToUpdate.length,
+      //     skips: skippedCount,
+      //     errors: skippedReasons,   // array of reason strings
+      //     capacityWarnings: capacityViolations,
+      //     invalidSites: Array.from(invalidSiteNames),
+      //   };
+      //   // Display a preview dialog with this report
+      //   // (You can reuse a new Dialog component or extend the existing one)
+      //   return; // Exit without calling the API
+      // }
       // --- Grouping Loop ---
+      // --- Grouping Loop (now records skip reasons) ---
       for (let i = 1; i < jsonData.length; i++) {
         const row = jsonData[i] as any[];
         if (!row || row.length === 0) continue;
@@ -1602,39 +1615,51 @@ const EmployeesTab = ({
         const hasData = row.some(cell => cell !== undefined && cell !== null && cell.toString().trim() !== '');
         if (!hasData) continue;
 
+        // Get site name from the mapped column
         let siteName = '';
-        if (row[siteIndex] !== undefined && row[siteIndex] !== null) {
-          siteName = String(row[siteIndex]).trim();
-          siteName = siteName.replace(/[^\x20-\x7E]/g, '').trim();
+        if (row[col.site] !== undefined && row[col.site] !== null) {
+          siteName = String(row[col.site]).trim().replace(/[^\x20-\x7E]/g, '').trim();
         }
 
-        const position = row[positionIndex] ? String(row[positionIndex]).trim() : '';
+        if (!siteName) {
+          skippedCount++;
+          skippedReasons.push(`Row ${i}: Missing site name`);
+          continue;
+        }
 
-        // ✅ FIX 2: Remove departmentIndex usage; detect role from position only
+        const normalizedSite = normalizeSiteName(siteName);
+        const aliasedSite = SITE_ALIASES[normalizedSite] || normalizedSite;
+        const dbSite = dbSiteNormalizedMap.get(aliasedSite);
+
+        if (!dbSite) {
+          skippedCount++;
+          invalidSiteNames.add(siteName);
+          skippedReasons.push(`Row ${i}: Site "${siteName}" not found in database (normalised: "${aliasedSite}")`);
+          continue;
+        }
+
+        // Use the DB‑exact site name from now on
+        const actualSiteName = dbSite;
+
+        // Also need to fetch position
+        const position = col.position !== -1 && row[col.position] ? String(row[col.position]).trim() : '';
+
         const isManager = position.toLowerCase().includes('manager');
         const isSupervisor = position.toLowerCase().includes('supervisor');
 
-        if (!siteName) {
-          continue;
+        // Store under the actual site name (so grouping uses DB name)
+        if (!employeesBySiteAndRole.has(actualSiteName)) {
+          employeesBySiteAndRole.set(actualSiteName, { managers: [], supervisors: [], staff: [], rows: [] });
         }
 
-        const siteCapacity = siteCapacityMap.get(siteName);
-        if (!siteCapacity) {
-          continue;
-        }
-
-        if (!employeesBySiteAndRole.has(siteName)) {
-          employeesBySiteAndRole.set(siteName, { managers: [], supervisors: [], staff: [], rows: [] });
-        }
-
-        const siteGroup = employeesBySiteAndRole.get(siteName)!;
+        const siteGroup = employeesBySiteAndRole.get(actualSiteName)!;
         siteGroup.rows.push(i);
 
         const employeeInfo = {
           row: i,
-          siteName,
+          siteName: actualSiteName,   // store DB name
           position,
-          department: '', // No longer used; kept for compatibility
+          department: '',
           isManager,
           isSupervisor,
           data: row
@@ -1662,38 +1687,99 @@ const EmployeesTab = ({
       for (const rowIndex of sortedRows) {
         const row = jsonData[rowIndex] as any[];
 
-        // ✅ FIX 3: Extract only the 25 mapped variables, no orphaned indices
-        const siteName = row[siteIndex] ? String(row[siteIndex]).trim().replace(/[^\x20-\x7E]/g, '').trim() : '';
-        const status = row[statusIndex] ? String(row[statusIndex]).trim().toLowerCase() : 'active';
-        const uanNumber = safeNumericString(row[uanIndex]);
-        const esicNumber = safeNumericString(row[esicIndex]);
-        const employeeCode = safeNumericString(row[empCodeIndex]);
+        let siteName = '';
+        if (row[col.site] !== undefined && row[col.site] !== null) {
+          siteName = String(row[col.site]).trim().replace(/[^\x20-\x7E]/g, '').trim();
+        }
+        const normalizedSite = normalizeSiteName(siteName);
+        const aliasedSite = SITE_ALIASES[normalizedSite] || normalizedSite;
+        const dbSite = dbSiteNormalizedMap.get(aliasedSite);
+        if (!dbSite) {
+          skippedCount++;
+          skippedReasons.push(`Row ${rowIndex}: Site "${siteName}" not found in database (processing)`);
+          continue;
+        }
+        const actualSiteName = dbSite;
+        const rawStatus = col.status !== -1 && row[col.status]
+          ? String(row[col.status]).trim().toLowerCase()
+          : 'active';
+
+        const LEFT_KEYWORDS = ['left', 'off', 'resigned', 'terminated', 'exit', 'relieved', 'discontinued', 'stopped'];
+        const INACTIVE_KEYWORDS = ['inactive', 'suspended', 'on hold', 'hold'];
+        const ACTIVE_KEYWORDS = ['active', 'on', 'working', 'present'];
+
+        let status: 'active' | 'inactive' | 'left' = 'active'; // safe default
+
+        if (LEFT_KEYWORDS.some(v => rawStatus.includes(v))) {
+          status = 'left';
+        } else if (INACTIVE_KEYWORDS.some(v => rawStatus.includes(v))) {
+          status = 'inactive';
+        } else if (ACTIVE_KEYWORDS.some(v => rawStatus.includes(v))) {
+          status = 'active';
+        }
+        // if rawStatus is blank or matches nothing at all, status stays 'active' (the default above)
+
+        const uanNumber = col.uan !== -1 ? safeNumericString(row[col.uan]) : '';
+        const esicNumber = col.esic !== -1 ? safeNumericString(row[col.esic]) : '';
+        const employeeCode = safeNumericString(row[col.employeeCode]);
         if (!employeeCode) {
           skippedCount++;
           skippedReasons.push(`Row ${rowIndex}: Missing Employee ID`);
           continue;
         }
-        const position = row[positionIndex] ? String(row[positionIndex]).trim() : '';
-        const name = row[nameIndex] ? String(row[nameIndex]).trim() : '';
-        const gender = row[genderIndex] ? String(row[genderIndex]).trim() : '';
-        const dobRaw = row[dobIndex];
-        const dojRaw = row[dojIndex];
-        const dateOfExitRaw = row[dateOfExitIndex];
-        const aadhar = safeNumericString(row[aadharIndex]).replace(/\s/g, '');
+        const position = col.position !== -1 && row[col.position] ? String(row[col.position]).trim() : '';
+        const name = row[col.name] ? String(row[col.name]).trim() : '';
+        let gender = '';
+        if (col.gender !== -1 && row[col.gender]) {
+          gender = String(row[col.gender]).trim();
+        }
+        // Normalise gender to full words
+        let normalizedGender: string | null = null;
+        const genderLower = gender.toLowerCase();
+        if (['male', 'm'].includes(genderLower)) {
+          normalizedGender = 'Male';
+        } else if (['female', 'f'].includes(genderLower)) {
+          normalizedGender = 'Female';
+        } else if (['transgender', 't'].includes(genderLower)) {
+          normalizedGender = 'Transgender';
+        }
+
+        const dobRaw = col.dob !== -1 ? row[col.dob] : undefined;
+        const dojRaw = col.doj !== -1 ? row[col.doj] : undefined;
+        const dateOfExitRaw = col.dateOfExit !== -1 ? row[col.dateOfExit] : undefined;
+        const aadhar = safeNumericString(row[col.aadhar]).replace(/\s/g, '');
         const paddedAadhar = aadhar.length < 12 && /^\d+$/.test(aadhar) ? aadhar.padStart(12, '0') : aadhar;
-        const contact = safeNumericString(row[contactIndex]);
-        const pan = safeNumericString(row[panIndex]).toUpperCase();
-        const bloodGroup = row[bloodGroupIndex] ? String(row[bloodGroupIndex]).trim() : '';
-        const relativeName = row[relativeNameIndex] ? String(row[relativeNameIndex]).trim() : '';
-        const relation = row[relationIndex] ? String(row[relationIndex]).trim() : '';
-        const accountNumber = safeNumericString(row[accountNumberIndex]);
-        const ifscCode = safeNumericString(row[ifscIndex]).toUpperCase();
-        const bankBranch = row[bankBranchIndex] ? String(row[bankBranchIndex]).trim() : '';
-        const nomineeName = row[nomineeNameIndex] ? String(row[nomineeNameIndex]).trim() : '';
-        const nomineeRelation = row[nomineeRelationIndex] ? String(row[nomineeRelationIndex]).trim() : '';
-        const emergencyContactPhone = row[emergencyContactPhoneIndex] ? String(row[emergencyContactPhoneIndex]).trim() : '';
-        const localAddress = row[localAddressIndex] ? String(row[localAddressIndex]).trim() : '';
-        const permanentAddress = row[permanentAddressIndex] ? String(row[permanentAddressIndex]).trim() : '';
+        // Duplicate within same file
+        if (seenInFileAadhar.has(paddedAadhar)) {
+          skippedCount++;
+          skippedReasons.push(`Row ${rowIndex}: Duplicate Aadhar within this file`);
+          continue;
+        }
+        seenInFileAadhar.add(paddedAadhar);
+
+        // Check if employee already exists (by Aadhar or Employee ID)
+        const matchedExisting = existingByAadhar.get(paddedAadhar) || existingByEmpId.get(employeeCode);
+        const contact = col.mobile !== -1 ? safeNumericString(row[col.mobile]) : '';
+        const pan = col.pan !== -1 ? safeNumericString(row[col.pan]).toUpperCase() : '';
+        const bloodGroup = col.bloodGroup !== -1 && row[col.bloodGroup] ? String(row[col.bloodGroup]).trim() : '';
+        const relativeName = col.relativeName !== -1 && row[col.relativeName] ? String(row[col.relativeName]).trim() : '';
+        const relation = col.relation !== -1 && row[col.relation] ? String(row[col.relation]).trim() : '';
+        const accountNumber = col.accountNumber !== -1 ? safeNumericString(row[col.accountNumber]) : '';
+        const ifscCode = col.ifsc !== -1 ? safeNumericString(row[col.ifsc]).toUpperCase() : '';
+        const bankBranch = col.bankBranch !== -1 && row[col.bankBranch] ? String(row[col.bankBranch]).trim() : '';
+        const nomineeName = col.nomineeName !== -1 && row[col.nomineeName] ? String(row[col.nomineeName]).trim() : '';
+        const nomineeRelation = col.nomineeRelation !== -1 && row[col.nomineeRelation] ? String(row[col.nomineeRelation]).trim() : '';
+        const emergencyContactPhone = col.emergencyPhone !== -1 && row[col.emergencyPhone] ? String(row[col.emergencyPhone]).trim() : '';
+        const localAddress = col.localAddress !== -1 && row[col.localAddress] ? String(row[col.localAddress]).trim() : '';
+        const permanentAddress = col.permanentAddress !== -1 && row[col.permanentAddress] ? String(row[col.permanentAddress]).trim() : '';
+        const rawMaritalStatus = col.maritalStatus !== -1 && row[col.maritalStatus] ? String(row[col.maritalStatus]).trim().toLowerCase() : '';
+        let maritalStatus: string | null = null;
+        if (rawMaritalStatus.includes('unmarried') || rawMaritalStatus.includes('single')) {
+          maritalStatus = 'Single';
+        } else if (rawMaritalStatus.includes('married')) {
+          maritalStatus = 'Married';
+        }
+
         const isManager = position.toLowerCase().includes('manager');
         const isSupervisor = position.toLowerCase().includes('supervisor');
 
@@ -1711,7 +1797,6 @@ const EmployeesTab = ({
           continue;
         }
 
-
         if (!name || !paddedAadhar) {
           skippedCount++;
           skippedReasons.push(`Row ${rowIndex}: Missing name or aadhar`);
@@ -1723,53 +1808,42 @@ const EmployeesTab = ({
           continue;
         }
 
-        // ✅ DUPLICATE CHECK – add this block:
-        if (existingAadharSet.has(paddedAadhar)) {
-          skippedCount++;
-          duplicateCount++;  // will be used in final summary
-          skippedReasons.push(`Row ${rowIndex}: Employee with Aadhar ${paddedAadhar} already exists.`);
-          continue;
-        }
-
         const taken = takenCounts.get(siteName)!;
 
         if (isManager) {
           if (taken.managers >= siteCapacity.remainingManagers) {
-            skippedCount++;
+
             capacityViolations.push({
               site: siteName,
               role: 'Manager',
               count: 1,
               available: siteCapacity.remainingManagers
             });
-            skippedReasons.push(`Row ${rowIndex}: Manager position full for ${siteName}. Only ${siteCapacity.remainingManagers} manager positions available.`);
-            continue;
+
           }
           taken.managers++;
         } else if (isSupervisor) {
           if (taken.supervisors >= siteCapacity.remainingSupervisors) {
-            skippedCount++;
+
             capacityViolations.push({
               site: siteName,
               role: 'Supervisor',
               count: 1,
               available: siteCapacity.remainingSupervisors
             });
-            skippedReasons.push(`Row ${rowIndex}: Supervisor position full for ${siteName}. Only ${siteCapacity.remainingSupervisors} supervisor positions available.`);
-            continue;
+
           }
           taken.supervisors++;
         } else {
           if (taken.staff >= siteCapacity.remainingStaff) {
-            skippedCount++;
+
             capacityViolations.push({
               site: siteName,
               role: 'Staff',
               count: 1,
               available: siteCapacity.remainingStaff
             });
-            skippedReasons.push(`Row ${rowIndex}: Staff position full for ${siteName}. Only ${siteCapacity.remainingStaff} staff positions available.`);
-            continue;
+
           }
           taken.staff++;
         }
@@ -1846,7 +1920,8 @@ const EmployeesTab = ({
           'SECURITY': 'Security',
           'MAINTENANCE': 'Maintenance',
           'IT STAFF': 'IT',
-          'SALES': 'Sales'
+          'SALES': 'Sales',
+          'HK': 'Housekeeping', // ✅ ADDED — matches this file's "HK" designation
         };
 
         let finalDepartment = 'General Staff';
@@ -1881,7 +1956,7 @@ const EmployeesTab = ({
           finalPhone = '98' + Math.floor(10000000 + Math.random() * 90000000).toString();
         }
 
-        let salary = 15000; // default
+        const salary = 15000; // default
 
         let finalBloodGroup = null;
         if (bloodGroup) {
@@ -1892,7 +1967,12 @@ const EmployeesTab = ({
           }
         }
 
-        // ✅ FIX 4 & 5: CORRECT employeeData (NO duplicate keys)
+        // ✅ Relation-based name assignment now also covers husband/wife, not just spouse
+        const relationLower = relation.toLowerCase();
+        const isFatherRelation = relationLower.includes('father');
+        const isMotherRelation = relationLower.includes('mother');
+        const isSpouseRelation = relationLower.includes('spouse') || relationLower.includes('husband') || relationLower.includes('wife');
+
         const employeeData = {
           name: name,
           email: finalEmail,
@@ -1904,11 +1984,12 @@ const EmployeesTab = ({
           department: finalDepartment,
           position: position || 'Employee',
           salary: salary,
-          status: status === 'left' || status === 'inactive' ? status : 'active',
+          status: status,
           role: 'employee',
           siteName: siteName,
           dateOfBirth: dateOfBirth,
-          gender: gender || null,
+          gender: normalizedGender,
+          maritalStatus: maritalStatus,
           bloodGroup: finalBloodGroup,
           panNumber: pan || null,
           uanNumber: uanNumber || null,
@@ -1917,9 +1998,9 @@ const EmployeesTab = ({
           branchName: bankBranch || null,
           accountNumber: accountNumber || null,
           ifscCode: ifscCode || null,
-          fatherName: relation.toLowerCase().includes('father') ? relativeName : null,
-          spouseName: relation.toLowerCase().includes('spouse') ? relativeName : null,
-          motherName: relation.toLowerCase().includes('mother') ? relativeName : null,
+          fatherName: isFatherRelation ? relativeName : null,
+          spouseName: isSpouseRelation ? relativeName : null,
+          motherName: isMotherRelation ? relativeName : null,
           permanentAddress: permanentAddress || null,
           localAddress: localAddress || null,
           nomineeName: nomineeName || null,
@@ -1946,7 +2027,23 @@ const EmployeesTab = ({
           kycDocuments: []
         };
 
-        employeesToImport.push(employeeData);
+        if (matchedExisting) {
+          const updatePayload: any = {};
+          Object.entries(employeeData).forEach(([k, v]) => {
+            if (v !== null && v !== '' && v !== undefined) updatePayload[k] = v;
+          });
+          employeesToUpdate.push({ id: matchedExisting._id || matchedExisting.id, payload: updatePayload });
+        } else {
+          if (matchedExisting) {
+            const updatePayload: any = {};
+            Object.entries(employeeData).forEach(([k, v]) => {
+              if (v !== null && v !== '' && v !== undefined) updatePayload[k] = v;
+            });
+            employeesToUpdate.push({ id: matchedExisting._id || matchedExisting.id, payload: updatePayload });
+          } else {
+            employeesToImport.push(employeeData);
+          }
+        }
         processedCount++;
 
         setImportProgress({ current: rowIndex, total: jsonData.length - 1 });
@@ -1955,7 +2052,6 @@ const EmployeesTab = ({
           console.log(`Processed ${rowIndex}/${jsonData.length - 1} rows...`);
         }
       }
-
       if (employeesToImport.length === 0) {
         let errorMessage = "No valid employees found to import.";
         if (invalidSiteNames.size > 0) {
@@ -2023,69 +2119,26 @@ const EmployeesTab = ({
         { id: toastId }
       );
 
-      let successCount = 0;
-      let errorCount = 0;
-      const errorMessages: string[] = [];
+
       const importedSites: Set<string> = new Set();
+      // REMOVE the token line entirely - apiClient handles it automatically
+      const { data } = await apiClient.post('/employees/bulk-import', {
+        creates: employeesToImport,
+        updates: employeesToUpdate,
+      }, { timeout: 300000 });
 
-      const batchSize = 20;
-      for (let batchStart = 0; batchStart < employeesToImport.length; batchStart += batchSize) {
-        const batch = employeesToImport.slice(batchStart, batchStart + batchSize);
-
-        for (let i = 0; i < batch.length; i++) {
-          const employee = batch[i];
-
-          try {
-            const response = await axios.post(`${API_URL}/employees`, employee, {
-              timeout: 15000
-            });
-
-            if (response.data.success) {
-              successCount++;
-              importedSites.add(employee.siteName);
-            } else {
-              errorCount++;
-              const errorMsg = response.data.message || 'Unknown error';
-              errorMessages.push(`${employee.name}: ${errorMsg}`);
-
-              if (errorMsg.includes('already exists') || errorMsg.includes('duplicate')) {
-                duplicateCount++;
-              }
-            }
-          } catch (error: any) {
-            errorCount++;
-            const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Unknown error';
-            errorMessages.push(`${employee.name}: ${errorMsg}`);
-
-            if (errorMsg.includes('already exists') || errorMsg.includes('duplicate')) {
-              duplicateCount++;
-            }
-          }
-
-          setImportProgress({
-            current: batchStart + i + 1,
-            total: employeesToImport.length
-          });
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
+      const successCount = data.createdCount || 0;
+      const updatedCount = data.updatedCount || 0;
+      const errorMessages = data.errors ? data.errors.map((e: any) => `${e.row || e.id}: ${e.message}`) : [];
+      const errorCount = errorMessages.length;
 
       const actualNewImports = successCount;
 
       let resultMessage = '';
-      if (actualNewImports > 0) {
-        resultMessage = `✅ ${actualNewImports} employees imported successfully`;
-        if (duplicateCount > 0) {
-          resultMessage += `, ⚠️ ${duplicateCount} already existed (skipped)`;
-        }
-        if (errorCount > duplicateCount) {
-          const otherErrors = errorCount - duplicateCount;
-          resultMessage += `, ❌ ${otherErrors} failed`;
-        }
-      } else {
-        resultMessage = `❌ No new employees imported. ${duplicateCount} already exist, ${errorCount - duplicateCount} failed.`;
-      }
+      if (successCount > 0) resultMessage += `✅ ${successCount} created`;
+      if (updatedCount > 0) resultMessage += `, 🔄 ${updatedCount} updated`;
+      if (errorCount > 0) resultMessage += `, ❌ ${errorCount} failed`;
+      if (skippedCount > 0) resultMessage += `, ⚠️ ${skippedCount} skipped`;
 
       let siteSummary = '';
       if (importedSites.size > 0) {
@@ -2155,6 +2208,64 @@ const EmployeesTab = ({
     } finally {
       setIsImporting(false);
       setImportProgress({ current: 0, total: 0 });
+    }
+  };
+
+
+  // ─── Async Import Functions ──────────────────────────────────────────────
+  const handleAsyncImport = async (file: File) => {
+    try {
+      setJobStatus('uploading');
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const { data } = await apiClient.post('/import/start', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (progressEvent) => {
+          // optional: you can show upload progress
+        }
+      });
+
+      setJobId(data.jobId);
+      setJobStatus('processing');
+      toast.info('Import job started. Processing in background...');
+      pollStatus(data.jobId);
+    } catch (err: any) {
+      toast.error('Failed to start import job: ' + (err.message || 'Unknown error'));
+      setJobStatus('failed');
+    }
+  };
+
+  const pollStatus = async (id: string) => {
+    try {
+      const response = await apiClient.get(`/import/status/${id}`);
+      const data = response.data;
+
+      setJobProgress(data.progress || 0);
+      setJobResult({
+        created: data.createdCount || 0,
+        updated: data.updatedCount || 0,
+        errors: data.errors || []
+      });
+
+      if (data.status === 'processing') {
+        // Poll again after 2 seconds
+        setTimeout(() => pollStatus(id), 2000);
+      } else if (data.status === 'completed') {
+        setJobStatus('completed');
+        toast.success(`Import complete: ${data.createdCount} created, ${data.updatedCount} updated`);
+        // Refresh employee list and site data
+        await fetchEmployees();
+        await fetchSites();
+        calculateSiteDeploymentStatus();
+        setImportDialogOpen(false);
+      } else if (data.status === 'failed') {
+        setJobStatus('failed');
+        toast.error(`Import failed: ${data.errors?.[0]?.message || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      setJobStatus('failed');
+      toast.error('Error checking import status: ' + (err.message || ''));
     }
   };
 
@@ -2233,7 +2344,86 @@ const EmployeesTab = ({
       return null;
     }
   };
+  // ─── NEW: Header normalization + column mapping ──────────────────────────
+  // Strips punctuation/extra spaces so "Bank A/c Number" -> "bank a c number"
+  const normalizeHeaderText = (h: any): string => {
+    return String(h ?? '')
+      .toLowerCase()
+      .replace(/[/.\-_]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
 
+  // Canonical field -> list of header phrases (already normalized) that should map to it.
+  // Add more aliases here any time a new template variant shows up.
+  const IMPORT_FIELD_ALIASES: Record<string, string[]> = {
+    site: ['site', 'site name'],
+    status: ['status'],
+    uan: ['uan no', 'uan number', 'uan'],
+    esic: ['esic no', 'esic number', 'esic'],
+    employeeCode: ['emp code', 'emp no', 'employee id', 'employee code', 'empcode', 'emp id', 'emp code'], // added 'emp code'
+    position: ['designation', 'position'],
+    name: ['name as per aadhar', 'name', 'employee name'],
+    gender: ['gender', 'sex'],
+    dob: ['date of birth', 'full date of birth', 'dob', 'dob'], // added 'dob'
+    doj: ['date of joining', 'doj', 'joining date', 'date of join'],
+    dateOfExit: ['date of exit', 'exit date'],
+    aadhar: ['aadhar no', 'adhaar number', 'aadhar number', 'aadhaar number', 'aadhar', 'aadhaar'],
+    pan: ['pan no', 'pan number', 'pan'],
+    bloodGroup: ['blood group'],
+    relativeName: ['father name', 'father husband name', 'father s name', 'relative name', 'father / husband name'], // added 'father / husband name'
+    relation: ['relation'],
+    mobile: ['mobile no', 'mobile number', 'contact no', 'contact', 'mobile'],
+    accountNumber: ['bank account no', 'bank a c number', 'account number', 'bank ac number'],
+    ifsc: ['ifsc code', 'ifsc'],
+    bankBranch: ['bank branch', 'branch name'],
+    nomineeName: ['nominee name'],
+    nomineeRelation: ['nominee relation', 'relation2'],
+    emergencyPhone: ['emergency contact no', 'emer no', 'emergency contact', 'emergency no', 'emergency contact 1'],
+    localAddress: ['local address', 'present add'],
+    permanentAddress: ['permanent address', 'adhar add', 'aadhar address', 'permannt address'], // ✅ added 'permannt address'
+    maritalStatus: ['married unmarried', 'marital status'],
+    pfNo: ['pf no', 'pf number'],
+    email: ['email', 'e mail', 'e mail id'],
+    spouseName: ['spouse name', 'husband wife name'],
+    numberOfChildren: ['number of children', 'no of children', 'children'],
+    department: ['department'],
+    salary: ['salary', 'basic salary'],
+    permanentPincode: ['permanent pincode', 'permanent pin code'],
+    localPincode: ['local pincode', 'local pin code'],
+  };
+
+  interface ImportColumnMap {
+    site: number; status: number; uan: number; esic: number; employeeCode: number;
+    position: number; name: number; gender: number; dob: number; doj: number;
+    dateOfExit: number; aadhar: number; pan: number; bloodGroup: number;
+    relativeName: number; relation: number; mobile: number; accountNumber: number;
+    ifsc: number; bankBranch: number; nomineeName: number; nomineeRelation: number;
+    emergencyPhone: number; localAddress: number; permanentAddress: number;
+    maritalStatus: number; pfNo: number;
+  }
+
+  // Builds { fieldKey: columnIndex } by matching each sheet header (by name) against
+  // the alias list above. Returns -1 for any field whose column wasn't found.
+  const buildImportColumnMap = (headers: any[]): ImportColumnMap => {
+    const normalizedHeaders = headers.map(normalizeHeaderText);
+    const map = {} as ImportColumnMap;
+
+    (Object.keys(IMPORT_FIELD_ALIASES) as (keyof ImportColumnMap)[]).forEach((field) => {
+      const aliases = IMPORT_FIELD_ALIASES[field];
+      let foundIndex = -1;
+      for (const alias of aliases) {
+        const idx = normalizedHeaders.indexOf(alias);
+        if (idx !== -1) {
+          foundIndex = idx;
+          break;
+        }
+      }
+      map[field] = foundIndex;
+    });
+
+    return map;
+  };
   const handleSortChange = (value: string) => {
     setSortBy(value);
   };
@@ -2455,7 +2645,7 @@ body {
       <div class="field-row"><span class="label">Site Name</span><span class="colon">:</span><span class="value">${employee.siteName || ''}</span></div>
       <div class="field-row"><span class="label">Name</span><span class="colon">:</span><span class="value">${employee.name || ''}</span></div>
       <div class="field-row"><span class="label">Date of Birth</span><span class="colon">:</span><span class="value">${employee.dateOfBirth || ''}</span></div>
-      <div class="field-row"><span class="label">Date of Joining</span><span class="colon">:</span><span class="value">${employee.joinDate || employee.dateOfJoining || ''}</span></div>
+      <div class="field-row"><span class="label">Date of Joining</span><span class="colon">:</span><span class="value">${employee.joinDate || employee.joinDate || ''}</span></div>
       <div class="field-row"><span class="label">Contact No.</span><span class="colon">:</span><span class="value">${employee.phone || ''}</span></div>
       <div class="field-row"><span class="label">Blood Group</span><span class="colon">:</span><span class="value">${employee.bloodGroup || ''}</span></div>
 
@@ -3054,13 +3244,7 @@ body {
               <span>•</span>
               <span>₹{employee.salary ? employee.salary.toLocaleString() : '0'}</span>
             </div>
-            <div className="flex flex-wrap gap-1 mt-1">
-              {employee.panNumber && <Badge variant="outline" className="text-[10px]">PAN</Badge>}
-              {employee.uan && <Badge variant="outline" className="text-[10px]">UAN</Badge>}
-              {employee.esicNumber && <Badge variant="outline" className="text-[10px]">ESIC</Badge>}
 
-              {employee.kycDocuments?.length > 0 && <Badge variant="outline" className="text-[10px] bg-blue-50">KYC</Badge>}
-            </div>
           </div>
           <Button variant="ghost" size="icon" className="h-6 w-6 -mt-1" onClick={() => setExpanded(!expanded)}>
             {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -3862,7 +4046,25 @@ body {
           </CardContent>
         </Card>
       )}
-
+      {jobStatus === 'processing' && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="pt-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <div>
+                  <h4 className="font-semibold text-sm">Processing import in background...</h4>
+                  <p className="text-xs text-muted-foreground">Job ID: {jobId}</p>
+                </div>
+              </div>
+              <Badge variant="secondary">{jobProgress}%</Badge>
+            </div>
+            <div className="h-2 w-full bg-muted rounded-full overflow-hidden mt-2">
+              <div className="h-full bg-primary transition-all duration-300" style={{ width: `${jobProgress}%` }} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
       {/* ─── Loading overlay ────────────────────────────────────────── */}
       {loading && employees.length === 0 && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -3962,11 +4164,14 @@ body {
               )}
               {isExporting ? "Exporting..." : "Export"}
             </Button>
-            <Button onClick={() => setActiveTab?.("onboarding")} className="flex-1 sm:flex-none">
-              <Plus className="h-4 w-4 mr-1" />
-              <span className="hidden sm:inline">Add Employee</span>
-              <span className="sm:hidden">Add</span>
-            </Button>
+           <Button 
+  onClick={() => (onAddEmployee ? onAddEmployee() : setActiveTab?.("onboarding"))} 
+  className="flex-1 sm:flex-none"
+>
+  <Plus className="h-4 w-4 mr-1" />
+  <span className="hidden sm:inline">Add Employee</span>
+  <span className="sm:hidden">Add</span>
+</Button>
           </div>
         </div>
       </div>
@@ -4006,8 +4211,8 @@ body {
       <ExcelImportDialog
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
-        onImport={handleImportEmployees}
-        loading={isImporting}
+        onImport={handleAsyncImport}              // ← was handleImportEmployees
+        loading={isImporting || jobStatus === 'processing'}
       />
 
       {/* ─── Document Upload Dialog ──────────────────────────────────── */}
@@ -4673,8 +4878,8 @@ body {
               <div className="section-title">DECLARATION BY PRESENT EMPLOYER</div>
 
               <div className="space-y-2">
-              
-<Label>A. The member Mr./Ms./Mrs. {epfFormData.memberName} has joined on {epfFormData.enrolledDate} and has been allotted PF Number {selectedEmployeeForEPF?.uan || epfFormData.pfNumber || "Pending"}</Label>
+
+                <Label>A. The member Mr./Ms./Mrs. {epfFormData.memberName} has joined on {epfFormData.enrolledDate} and has been allotted PF Number {selectedEmployeeForEPF?.uan || epfFormData.pfNumber || "Pending"}</Label>
               </div>
 
               <div className="space-y-2">
@@ -5802,30 +6007,7 @@ body {
                         <p className="text-sm text-muted-foreground truncate">{employee.position}</p>
                         <p className="text-sm text-muted-foreground truncate">Site: {employee.siteName || "Not specified"}</p>
                         <p className="text-sm text-muted-foreground">Join Date: {employee.joinDate}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Salary: ₹{(employee.salary ?? 0).toLocaleString()}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-2 mt-1">
-                          <Badge variant="outline" className="text-xs">
-                            Documents: {employee.documents?.length || 0}
-                          </Badge>
-                          {employee.panNumber && (
-                            <Badge variant="secondary" className="text-xs">PAN</Badge>
-                          )}
-                          {employee.uan && (
-                            <Badge variant="secondary" className="text-xs">UAN</Badge>
-                          )}
-                          {employee.esicNumber && (
-                            <Badge variant="secondary" className="text-xs">ESIC</Badge>
-                          )}
 
-                          {employee.kycDocuments && employee.kycDocuments.length > 0 && (
-                            <Badge variant="secondary" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-                              <Shield className="h-3 w-3 mr-1" />
-                              {employee.kycDocuments.length} KYC
-                            </Badge>
-                          )}
-                        </div>
                       </div>
                     </div>
 

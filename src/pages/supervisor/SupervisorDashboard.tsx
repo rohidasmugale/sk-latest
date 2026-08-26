@@ -105,6 +105,7 @@ interface Employee {
   department: string;
   position: string;
   siteName?: string;
+  siteId?: string;
   status: "active" | "inactive" | "left";
   email?: string;
   phone?: string;
@@ -1624,28 +1625,21 @@ const SupervisorDashboard = () => {
         status: site.status || "active"
       }));
 
+      // Inside fetchAllSites, after transforming sites
       let supervisorSiteList: Site[] = [];
 
-      if (taskSiteNames.length > 0) {
-        supervisorSiteList = transformedSites.filter(site => {
-          const exactNameMatch = taskSiteNames.some(taskSiteName =>
-            site.name === taskSiteName
-          );
-
-          const exactNormalizedMatch = taskSiteNames.some(taskSiteName =>
-            normalizeSiteName(site.name) === normalizeSiteName(taskSiteName)
-          );
-
-          const idMatch = taskSiteIds.includes(site._id);
-
-          return exactNameMatch || exactNormalizedMatch || idMatch;
-        });
-
-        console.log(`✅ Matched ${supervisorSiteList.length} sites from task assignments (exact matches only)`);
+      if (taskSiteIds.length > 0) {
+        // ✅ Only match by siteId (exact, reliable)
+        supervisorSiteList = transformedSites.filter(site =>
+          taskSiteIds.includes(site._id)
+        );
       } else {
+        // Fallback: if no taskSiteIds, show all sites (or empty)
         supervisorSiteList = transformedSites;
-        console.log("⚠️ No task sites found, showing all sites");
+        console.warn("No task site IDs found – showing all sites as fallback");
       }
+
+      // Remove the old name‑based matching entirely.
 
       setSupervisorSites(supervisorSiteList);
       setSupervisorSiteNames(supervisorSiteList.map(site => site.name));
@@ -1662,7 +1656,6 @@ const SupervisorDashboard = () => {
     }
   }, [currentSupervisor, fetchSupervisorSitesFromTasks]);
 
-  // Fetch employees assigned to supervisor's sites
   const fetchEmployees = useCallback(async () => {
     if (!currentSupervisor) {
       console.log("No current supervisor");
@@ -1685,17 +1678,8 @@ const SupervisorDashboard = () => {
         console.log("❌ No sites from tasks - setting empty employees array");
         setEmployees([]);
         setSiteEmployeeCounts([]);
-
-        setSummary(prev => ({
-          ...prev,
-          totalEmployees: 0
-        }));
-
-        setStats(prev => ({
-          ...prev,
-          totalEmployees: 0
-        }));
-
+        setSummary(prev => ({ ...prev, totalEmployees: 0 }));
+        setStats(prev => ({ ...prev, totalEmployees: 0 }));
         toast.warning("You have no tasks assigned to any sites. Please contact your administrator.");
         setLoadingEmployees(false);
         return;
@@ -1722,28 +1706,22 @@ const SupervisorDashboard = () => {
         console.log(`📊 Total employees from API: ${allEmployees.length}`);
         console.log("📍 Supervisor's task-assigned sites:", supervisorSiteNameList);
 
-        fetchedEmployees = allEmployees.filter((emp: Employee) => {
-          const employeeSite = emp.siteName || '';
+        // ✅ NEW: filter by siteId only
+        const siteIds = supervisorSiteList.map(site => site._id);
 
-          const exactMatch = supervisorSiteNameList.some(siteName =>
-            siteName === employeeSite
-          );
+        if (siteIds.length === 0) {
+          setEmployees([]);
+          setSiteEmployeeCounts([]);
+          setSummary(prev => ({ ...prev, totalEmployees: 0 }));
+          setLoadingEmployees(false);
+          return;
+        }
 
-          const normalizedExactMatch = supervisorSiteNameList.some(siteName =>
-            normalizeSiteName(siteName) === normalizeSiteName(employeeSite)
-          );
+       fetchedEmployees = allEmployees.filter((emp: Employee) =>
+  siteIds.includes(emp.siteId) && emp.status === 'active'   // ✅ ID match + active only
+);
 
-          const matches = exactMatch || normalizedExactMatch;
-
-          if (matches) {
-            console.log(`✅ Employee ${emp.name} (${emp.employeeId}) matches site: "${employeeSite}"`);
-          } else {
-            console.log(`❌ Employee ${emp.name} site: "${employeeSite}" does NOT match any supervisor site`);
-          }
-
-          return matches;
-        });
-
+       
         console.log(`✅ Filtered ${fetchedEmployees.length} employees for supervisor's task-assigned sites`);
 
         const siteCountMap = new Map<string, number>();
@@ -1758,18 +1736,8 @@ const SupervisorDashboard = () => {
         }));
 
         setSiteEmployeeCounts(siteCounts);
-
-        setSummary(prev => ({
-          ...prev,
-          totalEmployees: fetchedEmployees.length
-        }));
-
-        setStats(prev => ({
-          ...prev,
-          totalEmployees: fetchedEmployees.length
-        }));
-
-
+        setSummary(prev => ({ ...prev, totalEmployees: fetchedEmployees.length }));
+        setStats(prev => ({ ...prev, totalEmployees: fetchedEmployees.length }));
       }
 
       setEmployees(fetchedEmployees);
@@ -1785,16 +1753,8 @@ const SupervisorDashboard = () => {
 
       setEmployees([]);
       setSiteEmployeeCounts([]);
-
-      setSummary(prev => ({
-        ...prev,
-        totalEmployees: 0
-      }));
-
-      setStats(prev => ({
-        ...prev,
-        totalEmployees: 0
-      }));
+      setSummary(prev => ({ ...prev, totalEmployees: 0 }));
+      setStats(prev => ({ ...prev, totalEmployees: 0 }));
     } finally {
       setLoadingEmployees(false);
     }

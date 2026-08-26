@@ -270,7 +270,7 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Serve static files
 
-app.use('/api/import', excelImportRoutes);
+app.use('/api/import', employeeRoutes); 
 app.use('/api/settings', settingsRoutes);
 console.log('✅ Settings routes registered at /api/settings');
 app.use('/api', uploadRoutes);

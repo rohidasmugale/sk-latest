@@ -3,8 +3,8 @@ import multer from 'multer';
 import xlsx from 'xlsx';
 import path from 'path';
 import fs from 'fs';
-import { Request, Response, NextFunction } from 'express';   // ← Added NextFunction
-import jwt from 'jsonwebtoken';                              // ← Added jwt
+import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import Employee, { IEmployee } from '../models/Employee';
 import { 
@@ -14,8 +14,10 @@ import {
   deleteFromCloudinary 
 } from '../utils/CloudinaryUtils';
 import Task from '../models/Task';
-import User from '../models/User'; // Add this import at the top
-
+import User from '../models/User';
+import { v4 as uuidv4 } from 'uuid';                // ✅ fixed
+import ImportJob from '../models/ImportJob';        // ✅ fixed
+import { processImportJob } from '../services/importService'; // ✅ fixed
 
 const router = express.Router();
 
@@ -88,7 +90,7 @@ const excelStorage = multer.diskStorage({
 const authenticate = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
-    console.log('🔑 Auth header:', authHeader);  // Debug log
+    console.log('🔑 Auth header:', authHeader);
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       console.log('❌ No token provided');
       return res.status(401).json({ success: false, message: 'No token provided' });
@@ -99,7 +101,6 @@ const authenticate = async (req: Request, res: Response, next: NextFunction) => 
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any;
     console.log('✅ Token decoded:', decoded);
 
-    // Extract user ID – try multiple fields
     const userId = decoded.id || decoded._id || decoded.userId;
     if (!userId) {
       console.log('❌ No user ID in token');
@@ -114,8 +115,6 @@ const authenticate = async (req: Request, res: Response, next: NextFunction) => 
     return res.status(401).json({ success: false, message: 'Invalid token' });
   }
 };
-
-
 router.get('/supervisor', authenticate, async (req: Request, res: Response) => {
   try {
     const supervisorId = (req as any).user?._id;
@@ -123,24 +122,51 @@ router.get('/supervisor', authenticate, async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
 
-    const user = await User.findById(supervisorId).select('assignedSites siteName');
+    const user = await User.findById(supervisorId).select('name assignedSites siteName');
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    // ✅ Ensure assignedSites is an array, fallback to siteName if empty
-    let siteNames = user.assignedSites || [];
-    if (!Array.isArray(siteNames)) {
-      siteNames = [siteNames]; // if it's a string
-    }
-    if (siteNames.length === 0 && user.siteName) {
-      siteNames = [user.siteName];
+    // Primary source of truth: sites derived from this supervisor's task assignments
+    const Task = mongoose.model('Task');
+    const tasks = await Task.find({
+      $or: [
+        { 'assignedUsers.userId': supervisorId },
+        { assignedTo: supervisorId }
+      ]
+    }).select('siteId siteName assignedUsers assignedTo');
+
+    const siteNameSet = new Set<string>();
+    tasks.forEach((task: any) => {
+      const isAssigned =
+        task.assignedUsers?.some((u: any) =>
+          String(u.userId) === String(supervisorId) ||
+          (u.name && user.name && u.name.toLowerCase() === user.name.toLowerCase())
+        ) || String(task.assignedTo) === String(supervisorId);
+
+      if (isAssigned && task.siteName) {
+        siteNameSet.add(task.siteName);
+      }
+    });
+
+    let siteNames = Array.from(siteNameSet);
+
+    // Fallback: legacy static assignment on the User doc, if tasks yielded nothing
+    if (siteNames.length === 0) {
+      let fallback = user.assignedSites || [];
+      if (!Array.isArray(fallback)) fallback = [fallback];
+      if (fallback.length === 0 && user.siteName) fallback = [user.siteName];
+      siteNames = fallback;
     }
 
     console.log('🔍 Supervisor ID:', supervisorId);
-    console.log('🔍 Assigned sites:', siteNames);
+    console.log('🔍 Sites resolved from tasks (+ fallback):', siteNames);
 
-    // ✅ Find active employees where siteName matches any in siteNames
+    if (siteNames.length === 0) {
+      console.warn('⚠️ No sites resolved for this supervisor via tasks or assignedSites');
+      return res.json({ success: true, data: [] });
+    }
+
     const employees = await Employee.find({
       siteName: { $in: siteNames },
       status: 'active'
@@ -153,6 +179,7 @@ router.get('/supervisor', authenticate, async (req: Request, res: Response) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
 const excelUpload = multer({ 
   storage: excelStorage,
   fileFilter: function (req, file, cb) {
@@ -700,6 +727,111 @@ router.post('/import', excelUpload.single('file'), async (req: any, res: any) =>
   }
 });
 
+router.post('/bulk-import', authenticate, async (req: any, res: any) => {
+  try {
+    const { creates, updates } = req.body;
+
+    if (!creates && !updates) {
+      return res.status(400).json({ success: false, message: 'No data provided' });
+    }
+
+    const operations: any[] = [];
+
+    if (creates && creates.length) {
+      creates.forEach((doc: any) => {
+        operations.push({
+          insertOne: {
+            document: {
+              ...doc,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            }
+          }
+        });
+      });
+    }
+
+    if (updates && updates.length) {
+      updates.forEach(({ id, payload }: { id: string; payload: any }) => {
+        operations.push({
+          updateOne: {
+            filter: { _id: id },
+            update: {
+              $set: {
+                ...payload,
+                updatedAt: new Date()
+              }
+            }
+          }
+        });
+      });
+    }
+
+    const result = await Employee.bulkWrite(operations, { ordered: false });
+
+    const errors = result.hasWriteErrors() 
+      ? result.getWriteErrors().map((e: any) => ({
+          row: e.index,
+          message: e.errmsg
+        })) 
+      : [];
+
+    res.json({
+      success: true,
+      createdCount: result.insertedCount,
+      updatedCount: result.modifiedCount,
+      errors
+    });
+  } catch (error: any) {
+    console.error('Bulk import error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ─── Async Import ──────────────────────────────────────────────────────
+router.post('/start', authenticate, excelUpload.single('file'), async (req: any, res: any) => {
+  try {
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'No file uploaded' });
+
+    const jobId = uuidv4();
+    const job = new ImportJob({
+      jobId,
+      status: 'pending',
+      fileName: file.originalname,
+      startedAt: new Date(),
+      totalRows: 0
+    });
+    await job.save();
+
+    setImmediate(() => processImportJob(jobId, file.path));
+    res.json({ success: true, jobId });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/status/:jobId', authenticate, async (req: any, res: any) => {
+  try {
+    const job = await ImportJob.findOne({ jobId: req.params.jobId });
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+
+    const progress = job.totalRows > 0 ? Math.round((job.processedRows / job.totalRows) * 100) : 0;
+    res.json({
+      status: job.status,
+      progress,
+      totalRows: job.totalRows,
+      processedRows: job.processedRows,
+      createdCount: job.createdCount,
+      updatedCount: job.updatedCount,
+      errors: job.importErrors,
+      isComplete: job.status === 'completed' || job.status === 'failed'
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ==================== EXPORT ROUTES ====================
 
 router.get('/export', async (req: any, res: any) => {
@@ -802,23 +934,23 @@ router.get('/', async (req: any, res: any) => {
         { phone: { $regex: search, $options: 'i' } }
       ];
     }
- if (req.query.supervisorId) {
+    if (req.query.supervisorId) {
       query.supervisorId = req.query.supervisorId;
     }
     if (req.query.userId) {
-  query.userId = req.query.userId;
-}
+      query.userId = req.query.userId;
+    }
     if (department && department !== 'all') {
       query.department = department;
     }
 
     if (siteName && siteName !== 'all') {
-  if (Array.isArray(siteName)) {
-    query.siteName = { $in: siteName };
-  } else {
-    query.siteName = siteName;
-  }
-}
+      if (Array.isArray(siteName)) {
+        query.siteName = { $in: siteName };
+      } else {
+        query.siteName = siteName;
+      }
+    }
     if (dateOfJoining) {
       const date = new Date(dateOfJoining);
       date.setHours(0, 0, 0, 0);
@@ -898,36 +1030,32 @@ router.post('/',
         });
       }
 
-   // Check site existence (optional – keep if you want to validate site)
-const Site = mongoose.model('Site');
-const site = await Site.findOne({ name: employeeData.siteName });
-if (!site) {
-  return res.status(404).json({
-    success: false,
-    message: `Site "${employeeData.siteName}" not found. Please create the site first.`
-  });
-}
+      const Site = mongoose.model('Site');
+      const site = await Site.findOne({ name: employeeData.siteName });
+      if (!site) {
+        return res.status(404).json({
+          success: false,
+          message: `Site "${employeeData.siteName}" not found. Please create the site first.`
+        });
+      }
 
-// ✅ Use the employeeId from the request
-const employeeId = employeeData.employeeId?.trim();
-if (!employeeId) {
-  return res.status(400).json({
-    success: false,
-    message: 'Employee ID is required'
-  });
-}
+      const employeeId = employeeData.employeeId?.trim();
+      if (!employeeId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Employee ID is required'
+        });
+      }
 
-// ✅ Check if this ID is already in use (optional but good)
-const existingEmployeeById = await Employee.findOne({ employeeId });
-if (existingEmployeeById) {
-  return res.status(400).json({
-    success: false,
-    message: `Employee ID "${employeeId}" already exists. Please choose a different one.`
-  });
-}
+      const existingEmployeeById = await Employee.findOne({ employeeId });
+      if (existingEmployeeById) {
+        return res.status(400).json({
+          success: false,
+          message: `Employee ID "${employeeId}" already exists. Please choose a different one.`
+        });
+      }
 
-// ✅ Set the ID (it’s already in employeeData, but we explicitly assign it)
-employeeData.employeeId = employeeId;
+      employeeData.employeeId = employeeId;
 
       let photoUrl = '';
       let photoPublicId = '';

@@ -203,6 +203,7 @@ interface SalarySlip {
 
 interface Attendance {
   employeeId: string;
+  employeeName?: string;
   date: string;
   status: "present" | "absent" | "half-day";
   checkIn?: string;
@@ -289,7 +290,7 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
   const [activePayrollTab, setActivePayrollTab] = useState("salary-slips");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-
+  const [slipPaidDays, setSlipPaidDays] = useState<number | null>(null);
   // Data states
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [payroll, setPayroll] = useState<Payroll[]>([]);
@@ -397,6 +398,20 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
     );
   }, [employees, selectedSite, sites]);
 
+  // Convert YYYY-MM to "Month Year"
+  const formatMonthYear = (monthStr: string) => {
+    if (!monthStr) return '';
+    const [year, month] = monthStr.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1);
+    return date.toLocaleString('default', { month: 'long' }) + ' ' + year;
+  };
+
+  // Get number of days in a given month (YYYY-MM)
+  const getDaysInMonth = (monthStr: string) => {
+    if (!monthStr) return 30;
+    const [year, month] = monthStr.split('-').map(Number);
+    return new Date(year, month, 0).getDate();
+  };
   // Filter payroll records to only those belonging to site-filtered employees
   const filteredPayroll = useMemo(() => {
     const empIds = new Set(siteFilteredEmployees.map(e => e.employeeId));
@@ -470,6 +485,7 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
 
       const transformed = records.map((r: any) => ({
         employeeId: r.employeeId,
+        employeeName: r.employeeName,
         date: r.date,
         status: r.status,
         checkIn: r.checkInTime,
@@ -482,6 +498,71 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
       console.error('Failed to fetch attendance for payroll:', error);
     }
   };
+
+  // Fetch attendance records for a given month (returns raw array)
+  const fetchAttendanceRecordsForMonth = async (month: string): Promise<Attendance[]> => {
+    try {
+      const [year, monthNum] = month.split('-');
+      const startDate = `${year}-${monthNum}-01`;
+      const endDate = new Date(Number(year), Number(monthNum), 0).toISOString().split('T')[0];
+      const response = await axios.get(`${API_URL}/attendance`, {
+        params: { startDate, endDate, limit: 10000 }
+      });
+      let records = response.data?.data || response.data || [];
+      if (!Array.isArray(records)) records = [];
+      return records.map((r: any) => ({
+        employeeId: r.employeeId,
+        employeeName: r.employeeName,
+        date: r.date,
+        status: r.status,
+      }));
+    } catch (error) {
+      console.error('Failed to fetch attendance for month:', month, error);
+      return [];
+    }
+  };
+
+ const computePaidDays = (employeeId: string, month: string, records: Attendance[]): number | null => {
+  const employee = employees.find(e => e.employeeId === employeeId || e._id === employeeId);
+  if (!employee) {
+    console.warn('[computePaidDays] Employee not found for ID:', employeeId);
+    return null;
+  }
+
+  console.log('[computePaidDays] Matching employee:', employee.name, '(_id:', employee._id, 'employeeId:', employee.employeeId, ')');
+  console.log('[computePaidDays] Total attendance records for month:', records.length);
+
+  const monthAttendance = records.filter((a) => {
+    const empIdStr = String(a.employeeId);
+    const empMongoStr = String(employee._id);
+    const empCodeStr = String(employee.employeeId);
+    const nameMatch = a.employeeName?.trim().toLowerCase() === employee.name?.trim().toLowerCase();
+
+    const matches =
+      empIdStr === empMongoStr ||
+      empIdStr === empCodeStr ||
+      nameMatch;
+
+    if (matches) {
+      console.log('[computePaidDays] ✅ Matched record:', a.date, a.status);
+    }
+    return matches && a.date?.startsWith(month);
+  });
+
+  console.log('[computePaidDays] Matched records count:', monthAttendance.length);
+
+  let absentDays = 0, halfDays = 0;
+  monthAttendance.forEach(a => {
+    const status = a.status?.toLowerCase() || '';
+    if (status === 'half-day' || status === 'half day') halfDays++;
+    else if (status !== 'present') absentDays++;
+  });
+
+  const totalDays = getDaysInMonth(month);
+  const paid = totalDays - absentDays - halfDays * 0.5;
+  console.log('[computePaidDays] totalDays:', totalDays, 'absentDays:', absentDays, 'halfDays:', halfDays, 'paid:', paid);
+  return paid;
+};
 
   const fetchAllData = async () => {
     try {
@@ -596,7 +677,23 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
   useEffect(() => {
     fetchAllData();
   }, [selectedMonth]);
+  useEffect(() => {
+    const compute = async () => {
+      if (!slipDialog.salarySlip) {
+        setSlipPaidDays(null);
+        return;
+      }
+      const slip = slipDialog.salarySlip;
+      // If the slip month matches the currently selected month, reuse the already-fetched attendance
+      const records = (slip.month === selectedMonth && attendance.length > 0)
+        ? attendance
+        : await fetchAttendanceRecordsForMonth(slip.month);
 
+      const paid = computePaidDays(slip.employeeId, slip.month, records);
+      setSlipPaidDays(paid);
+    };
+    compute();
+  }, [slipDialog.salarySlip, selectedMonth, attendance, employees]);
   // ----- HELPER FUNCTIONS -----
   const getEmployeeAttendance = (employeeId: string) => {
     const employee = employees.find(e =>
@@ -606,13 +703,14 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
       return { presentDays: 0, absentDays: 0, halfDays: 0, totalWorkingDays: 22 };
     }
 
-    const monthAttendance = attendance.filter(
-      (a) => {
-        const matchesEmpId = a.employeeId === employee._id || a.employeeId === employee.employeeId;
-        const matchesMonth = a.date?.startsWith(selectedMonth);
-        return matchesEmpId && matchesMonth;
-      }
-    );
+    const monthAttendance = attendance.filter((a) => {
+      const matchesEmpId =
+        a.employeeId === employee._id ||
+        a.employeeId === employee.employeeId ||
+        (a.employeeName?.trim().toLowerCase() === employee.name?.trim().toLowerCase()); // ✅ fallback
+      const matchesMonth = a.date?.startsWith(selectedMonth);
+      return matchesEmpId && matchesMonth;
+    });
 
     let presentDays = 0, absentDays = 0, halfDays = 0;
     monthAttendance.forEach(a => {
@@ -1025,7 +1123,7 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
   const handleEditStructure = (structure: SalaryStructure) => {
     setEditingStructure(structure);
     setStructureForm({
-      employeeId: structure.employeeId,
+      employeeId: structure.employeeId || "",
       basicSalary: structure.basicSalary.toString(),
       hra: (structure.hra || 0).toString(),
       da: (structure.da || 0).toString(),
@@ -1094,15 +1192,17 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
       );
       if (!employee) return;
 
-      const structure = filteredSalaryStructures.find(
+      const structure = salaryStructures.find(
         (s) => s.employeeId === slipDialog.salarySlip!.employeeId
+      ) || salaryStructures.find(
+        (s) => s.employeeId === employee?._id
       );
 
       const printContent = `
         <!DOCTYPE html>
         <html>
         <head>
-          <title>Salary Slip - ${employee.name}</title>
+         
           <style>
            @page {
   size: A4 portrait;
@@ -1141,25 +1241,25 @@ body {
           <div class="header">
             <div class="company-name">S K ENTERPRISES</div>
             <div class="slip-title">SALARY SLIP</div>
-            <div>Period: ${slipDialog.salarySlip.month}</div>
+            <div>Period: ${formatMonthYear(slipDialog.salarySlip.month)}</div>
             <div>Wages Slip Rule 27(2) Maharashtra Minimum Wages Rules, 1963</div>
           </div>
           
           <div class="employee-info">
-            <div>
-              <strong>Name:</strong> ${employee.name}<br>
-              <strong>Employee ID:</strong> ${employee.employeeId}<br>
-              <strong>Department:</strong> ${employee.department}<br>
-              <strong>Bank Account:</strong> ${employee.accountNumber || "N/A"}<br>
-              <strong>Bank:</strong> ${employee.bankName || "N/A"} - ${employee.bankBranch || "N/A"}
-            </div>
-            <div>
-              <strong>Generated Date:</strong> ${new Date(slipDialog.salarySlip.generatedDate).toLocaleDateString()}<br>
-              <strong>Slip Number:</strong> ${slipDialog.salarySlip.slipNumber}<br>
-              <strong>Aadhar:</strong> ${employee.aadharNumber || "N/A"}<br>
-              <strong>PAN:</strong> ${employee.panNumber || "N/A"}
-            </div>
-          </div>
+          <div>
+  <strong>Name:</strong> ${employee.name}<br>
+  <strong>Employee ID:</strong> ${employee.employeeId}<br>
+  <strong>Department:</strong> ${employee.department}<br>
+  <strong>Designation:</strong> ${employee.position || "N/A"}<br>
+  <strong>Site:</strong> ${employee.siteName || employee.site || "N/A"}<br>
+  <strong>UAN:</strong> ${employee.uanNumber || "N/A"}<br>
+  <strong>ESIC:</strong> ${employee.esicNumber || "N/A"}<br>
+  <strong>Bank Account:</strong> ${employee.accountNumber || "N/A"}<br>
+  <strong>Bank:</strong> ${employee.bankName || "N/A"} - ${employee.bankBranch || "N/A"}<br>
+
+<strong>Paid Days:</strong> ${slipPaidDays !== null ? slipPaidDays : getDaysInMonth(slipDialog.salarySlip.month) - slipDialog.salarySlip.absentDays - (slipDialog.salarySlip.halfDays || 0) * 0.5}
+</div>
+</div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
             <!-- Earnings Section -->
@@ -1176,7 +1276,7 @@ body {
                 <tr><td>ARREARS</td><td class="amount">₹${(structure?.arrears || 0).toLocaleString()}</td></tr>
                 <tr><td>OTHER ALL</td><td class="amount">₹${(structure?.otherAllowances || 0).toLocaleString()}</td></tr>
                 <tr class="total">
-                  <td><strong>TOTAL EARNINGS</strong></td>
+                  <td><strong>GROSS TOTAL</strong></td>
                   <td class="amount"><strong>₹${slipDialog.salarySlip.allowances.toLocaleString()}</strong></td>
                 </tr>
               </table>
@@ -1209,16 +1309,7 @@ body {
             </table>
           </div>
 
-          <div class="section">
-            <div class="section-title">Attendance Summary</div>
-            <div class="attendance-grid">
-              <div class="attendance-item present"><div style="font-size: 18px; font-weight: bold;">${slipDialog.salarySlip.presentDays}</div><div>Present</div></div>
-              <div class="attendance-item absent"><div style="font-size: 18px; font-weight: bold;">${slipDialog.salarySlip.absentDays}</div><div>Absent</div></div>
-              <div class="attendance-item half-day"><div style="font-size: 18px; font-weight: bold;">${slipDialog.salarySlip.halfDays}</div><div>Half Days</div></div>
-              <div class="attendance-item leaves"><div style="font-size: 18px; font-weight: bold;">${slipDialog.salarySlip.leaves}</div><div>Leaves</div></div>
-            </div>
-          </div>
-
+          
           <div style="margin-top: 30px; text-align: center; color: #666; font-size: 12px;">
             <p>Office No 505, Global Square, Deccan College Road, Yerwada, Pune 411006</p>
             <p>THIS IS COMPUTER GENERATED SLIP NOT REQUIRED SIGNATURE & STAMP</p>
@@ -1422,9 +1513,9 @@ body {
       setStructureForm((prev) => ({
         ...prev,
         employeeId,
-        basicSalary: employee.salary.toString(),
-        providentFund: (employee.providentFund || 0).toString(),
-        professionalTax: (employee.professionalTax || 0).toString(),
+        basicSalary: (employee.salary ?? 0).toString(),
+        providentFund: (employee.providentFund ?? 0).toString(),
+        professionalTax: (employee.professionalTax ?? 0).toString(),
       }));
     }
   };
@@ -1840,20 +1931,29 @@ body {
               <div className="space-y-6 p-1">
                 <div className="border-b pb-4">
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-                    <div><h2 className="text-xl sm:text-2xl font-bold">Salary Slip</h2><p className="text-muted-foreground">{slipDialog.salarySlip.month}</p></div>
-                    <div className="text-left sm:text-right"><div className="text-lg font-semibold">{employee.name}</div><div className="text-sm text-muted-foreground">{employee.employeeId}</div><div className="text-sm text-muted-foreground">{employee.department}</div><div className="text-sm text-muted-foreground">Bank: {employee.accountNumber ? `XXXX${employee.accountNumber.slice(-4)}` : "N/A"}</div></div>
+                    <div>
+                      <h2 className="text-xl sm:text-2xl font-bold">Salary Slip</h2>
+                      <p className="text-muted-foreground">{formatMonthYear(slipDialog.salarySlip.month)}</p>
+                    </div>
+                    <div className="text-left sm:text-right">
+                      <div className="text-lg font-semibold">{employee.name}</div>
+                      <div className="text-sm text-muted-foreground">{employee.employeeId}</div>
+                      <div className="text-sm text-muted-foreground">{employee.department}</div>
+                      <div className="text-sm text-muted-foreground">Designation: {employee.position || "N/A"}</div>
+                      <div className="text-sm text-muted-foreground">Site: {employee.siteName || employee.site || "N/A"}</div>
+                      <div className="text-sm text-muted-foreground">
+                        UAN: {employee.uanNumber || "N/A"} | ESIC: {employee.esicNumber || "N/A"}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+
+                        Paid Days: {slipPaidDays !== null ? slipPaidDays : getDaysInMonth(slipDialog.salarySlip.month) - slipDialog.salarySlip.absentDays - (slipDialog.salarySlip.halfDays || 0) * 0.5}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Bank: {employee.accountNumber ? `XXXX${employee.accountNumber.slice(-4)}` : "N/A"}
+                      </div>
+                    </div>
                   </div>
                 </div>
-
-                <div><h3 className="font-semibold mb-3">Earnings</h3><div className="space-y-2"><div className="flex justify-between"><span>Basic Salary</span><span>₹{slipDialog.salarySlip.basicSalary.toLocaleString()}</span></div><div className="flex justify-between"><span>Allowances</span><span className="text-green-600">₹{slipDialog.salarySlip.allowances.toLocaleString()}</span></div><div className="flex justify-between border-t pt-2 font-medium"><span>Gross Earnings</span><span>₹{(slipDialog.salarySlip.basicSalary + slipDialog.salarySlip.allowances).toLocaleString()}</span></div></div></div>
-
-                <div><h3 className="font-semibold mb-3">Deductions</h3><div className="space-y-2"><div className="flex justify-between"><span>Total Deductions</span><span className="text-red-600">-₹{slipDialog.salarySlip.deductions.toLocaleString()}</span></div></div></div>
-
-                <div className="bg-gray-50 rounded-lg p-4"><div className="flex justify-between items-center"><span className="text-lg font-bold">Net Salary</span><span className="text-xl sm:text-2xl font-bold text-green-600">₹{slipDialog.salarySlip.netSalary.toLocaleString()}</span></div></div>
-
-                <div><h3 className="font-semibold mb-3">Attendance Summary</h3><div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm"><div className="bg-green-50 rounded p-3 text-center"><div className="font-semibold text-green-600 text-lg">{slipDialog.salarySlip.presentDays}</div><div className="text-muted-foreground">Present</div></div><div className="bg-red-50 rounded p-3 text-center"><div className="font-semibold text-red-600 text-lg">{slipDialog.salarySlip.absentDays}</div><div className="text-muted-foreground">Absent</div></div><div className="bg-yellow-50 rounded p-3 text-center"><div className="font-semibold text-yellow-600 text-lg">{slipDialog.salarySlip.halfDays}</div><div className="text-muted-foreground">Half Days</div></div><div className="bg-blue-50 rounded p-3 text-center"><div className="font-semibold text-blue-600 text-lg">{slipDialog.salarySlip.leaves}</div><div className="text-muted-foreground">Leaves</div></div></div></div>
-
-                <div className="text-xs text-muted-foreground text-center border-t pt-4">Generated on {new Date(slipDialog.salarySlip.generatedDate).toLocaleDateString()} | Slip Number: {slipDialog.salarySlip.slipNumber}</div>
               </div>
             );
           })()}
@@ -2371,7 +2471,9 @@ body {
                           <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
                           <SelectContent>
                             {employeesWithoutStructure.length > 0 ? employeesWithoutStructure.map((employee) => (
-                              <SelectItem key={employee.employeeId} value={employee.employeeId}>{employee.name} ({employee.employeeId}) - {employee.department} - ₹{employee.salary.toLocaleString()}</SelectItem>
+                              <SelectItem key={employee.employeeId} value={employee.employeeId}>
+                                {employee.name} ({employee.employeeId}) - {employee.department} - ₹{(employee.salary ?? 0).toLocaleString()}
+                              </SelectItem>
                             )) : <SelectItem value="no-employees" disabled>All employees have salary structures</SelectItem>}
                           </SelectContent>
                         </Select>
@@ -2381,7 +2483,7 @@ body {
                           if (!selectedEmployee) return null;
                           return (
                             <div className="text-sm text-muted-foreground mt-1 p-2 bg-gray-50 rounded">
-                              <div>Monthly Salary: ₹{selectedEmployee.salary.toLocaleString()}</div>
+                              <div>Monthly Salary: ₹{(selectedEmployee.salary ?? 0).toLocaleString()}</div>
                               {selectedEmployee.accountNumber && <div>Bank Account: XXXX{selectedEmployee.accountNumber.slice(-4)}</div>}
                               {selectedEmployee.providentFund && <div>PF Contribution: ₹{selectedEmployee.providentFund.toLocaleString()}</div>}
                             </div>
@@ -2391,7 +2493,7 @@ body {
 
                       <div className="border rounded-lg p-4"><h3 className="font-semibold mb-4 text-lg">EARNINGS</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-3">
-                          <div className="space-y-2"><Label htmlFor="basic" className="font-medium">BASIC *</Label><Input id="basic" type="number" placeholder="Basic Salary" value={structureForm.basicSalary} onChange={(e) => setStructureForm((prev) => ({ ...prev, basicSalary: e.target.value }))} required /><p className="text-xs text-muted-foreground">Auto-filled from employee's monthly salary</p></div>
+                          <div className="space-y-2"><Label htmlFor="basic" className="font-medium">GROSS *</Label><Input id="basic" type="number" placeholder="Basic Salary" value={structureForm.basicSalary} onChange={(e) => setStructureForm((prev) => ({ ...prev, basicSalary: e.target.value }))} required /><p className="text-xs text-muted-foreground">Auto-filled from employee's monthly salary</p></div>
                           <div className="space-y-2"><Label htmlFor="da" className="font-medium">DA</Label><Input id="da" type="number" placeholder="Dearness Allowance" value={structureForm.da} onChange={(e) => setStructureForm((prev) => ({ ...prev, da: e.target.value }))} /></div>
                           <div className="space-y-2"><Label htmlFor="hra" className="font-medium">HRA</Label><Input id="hra" type="number" placeholder="House Rent Allowance" value={structureForm.hra} onChange={(e) => setStructureForm((prev) => ({ ...prev, hra: e.target.value }))} /></div>
                         </div>
@@ -2418,7 +2520,7 @@ body {
                         </div>
                       </div></div>
 
-                      <div className="bg-gray-50 rounded-lg p-4"><h3 className="font-semibold mb-3">Summary</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm"><div className="space-y-2"><div className="flex justify-between"><span>Total Earnings:</span><span className="font-medium text-green-600">₹{calculateStructureTotals().totalEarnings.toLocaleString()}</span></div><div className="flex justify-between"><span>Total Deductions:</span><span className="font-medium text-red-600">₹{calculateStructureTotals().totalDeductions.toLocaleString()}</span></div></div><div className="space-y-2"><div className="flex justify-between border-t pt-2"><span className="font-semibold">Net Salary:</span><span className="font-bold text-lg">₹{calculateStructureTotals().netSalary.toLocaleString()}</span></div></div></div></div>
+                      <div className="bg-gray-50 rounded-lg p-4"><h3 className="font-semibold mb-3">Summary</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm"><div className="space-y-2"><div className="flex justify-between"><span>Net Total:</span><span className="font-medium text-green-600">₹{calculateStructureTotals().totalEarnings.toLocaleString()}</span></div><div className="flex justify-between"><span>Total Deductions:</span><span className="font-medium text-red-600">₹{calculateStructureTotals().totalDeductions.toLocaleString()}</span></div></div><div className="space-y-2"><div className="flex justify-between border-t pt-2"><span className="font-semibold">Net Salary:</span><span className="font-bold text-lg">₹{calculateStructureTotals().netSalary.toLocaleString()}</span></div></div></div></div>
 
                       <div className="flex flex-col sm:flex-row gap-2 pt-4">
                         <Button onClick={editingStructure ? handleUpdateStructure : handleAddStructure} disabled={!structureForm.basicSalary || !structureForm.employeeId || structureForm.employeeId === "no-employees"} className="flex-1">{editingStructure ? "Update Structure" : "Add Structure"}</Button>
@@ -2467,7 +2569,16 @@ body {
                                     </div>
                                   </div>
                                 </TableCell>
-                                <TableCell><div className="flex items-center"><IndianRupee className="h-4 w-4 mr-1" />{(structure.basicSalary || 0).toLocaleString()}</div><div className="text-xs text-muted-foreground">Monthly: ₹{employee.salary.toLocaleString()}</div></TableCell>
+
+                                <TableCell>
+                                  <div className="flex items-center">
+                                    <IndianRupee className="h-4 w-4 mr-1" />
+                                    {(structure.basicSalary || 0).toLocaleString()}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    Monthly: ₹{(employee.salary ?? 0).toLocaleString()}
+                                  </div>
+                                </TableCell>
                                 <TableCell><div className="flex items-center"><IndianRupee className="h-4 w-4 mr-1" />{totalAllowances.toLocaleString()}</div></TableCell>
                                 <TableCell><div className="flex items-center"><IndianRupee className="h-4 w-4 mr-1" />{totalDeductions.toLocaleString()}</div></TableCell>
                                 <TableCell><div className="font-medium flex items-center"><IndianRupee className="h-4 w-4 mr-1" />{totalCTC.toLocaleString()}</div></TableCell>

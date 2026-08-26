@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import Site from '../models/Site';
-
+import Employee from '../models/Employee';
+import Task from '../models/Task';
+import AttendanceRecord from '../models/attendance';
 // Helper function to clean object
 const cleanObject = (obj: any) => {
   const cleaned: any = {};
@@ -277,7 +279,23 @@ export const updateSite = async (req: Request, res: Response) => {
       site.markModified('shifts');   // force Mongoose to detect the change
     }
     
+     const oldName = site.name;   // capture before saving
     await site.save();
+
+      if (req.body.name && req.body.name !== oldName) {
+      const filter = { siteId: site._id };
+      const update = { siteName: site.name };
+      await Promise.all([
+        Employee.updateMany(filter, update),
+        Task.updateMany(filter, update),
+        AttendanceRecord.updateMany(filter, update),
+        // ShiftDeployment.updateMany(filter, update),
+        // GroomingRecord.updateMany(filter, update),
+        // Incident.updateMany(filter, update),
+        // CleaningPhoto.updateMany(filter, update),
+        // Machine.updateMany(filter, update),
+      ]);
+    }
     
     res.status(200).json({
       success: true,
