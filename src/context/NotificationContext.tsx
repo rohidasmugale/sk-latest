@@ -62,6 +62,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const knownTaskIds = useRef<Set<string>>(new Set());
   const isFirstTaskLoad = useRef(true);
 
+
+
   // Refs for completed tasks polling (admin)
   const knownCompletedIds = useRef<Set<string>>(new Set());
   const isFirstCompletedLoad = useRef(true);
@@ -73,7 +75,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Refs for geofence breaches
   const knownBreachIds = useRef<Set<string>>(new Set());
   const isFirstBreachLoad = useRef(true);
-const shownNotificationIds = useRef<Set<string>>(new Set());
+  const shownNotificationIds = useRef<Set<string>>(new Set());
+  const isFirstApiNotificationLoad = useRef(true);
+  const notifiedLeaveActions = useRef<Set<string>>(new Set());
   const apiClientRef = useRef<AxiosInstance>(
     axios.create({
       baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5001/api',
@@ -224,107 +228,83 @@ const shownNotificationIds = useRef<Set<string>>(new Set());
   }, [role, addNotification]);
 
   // ========== Poll /leaves for status changes ==========
-// Replace the entire leave polling useEffect with this:
+  useEffect(() => {
+    if (!role) return;
 
-useEffect(() => {
-  if (!role) return;
+    const checkLeaves = async () => {
+      try {
+        const storedUser = localStorage.getItem('sk_user');
+        const userData = storedUser ? JSON.parse(storedUser) : null;
+        const userId = userData?._id || userData?.id;
 
-  // ✅ Track which leave IDs we've already notified about (per status)
-  // Key format: "leaveId_status" e.g. "abc123_approved"
-  const notifiedLeaveActions = new Set<string>();
+        const response = await apiClientRef.current.get('/leaves');
+        const data = response.data;
+        const leaves: any[] = Array.isArray(data) ? data : data?.data || [];
 
-  const checkLeaves = async () => {
-    try {
-      const storedUser = localStorage.getItem('sk_user');
-      const userData = storedUser ? JSON.parse(storedUser) : null;
-      const userId = userData?._id || userData?.id;
+        // On first load, just record current statuses, do NOT notify
+        if (isFirstLeaveLoad.current) {
+          leaves.forEach((leave: any) => {
+            knownLeaveStatuses.current.set(leave._id, leave.status);
+          });
+          isFirstLeaveLoad.current = false;
+          return;
+        }
 
-      const response = await apiClientRef.current.get('/leaves');
-      const data = response.data;
-      const leaves: any[] = Array.isArray(data) ? data : data?.data || [];
+        leaves.forEach((leave: any) => {
+          const currentStatus = leave.status;
+          const leaveId = leave._id;
 
-      leaves.forEach((leave: any) => {
-        const currentStatus = leave.status;
-        const leaveId = leave._id;
+          // Skip if not approved/rejected (still pending)
+          if (currentStatus !== 'approved' && currentStatus !== 'rejected') {
+            // Update known status (it might change from pending to something else later)
+            knownLeaveStatuses.current.set(leaveId, currentStatus);
+            return;
+          }
 
-        // ✅ Create a unique key for this specific leave + status combination
-        const actionKey = `${leaveId}_${currentStatus}`;
-
-        // ✅ Skip if we've already sent a notification for this exact leave+status
-        if (notifiedLeaveActions.has(actionKey)) return;
-
-        // ✅ Only notify for final states (approved/rejected), not pending
-        if (currentStatus !== 'approved' && currentStatus !== 'rejected') {
-          // Still track pending so we know the "previous" state
+          const previousStatus = knownLeaveStatuses.current.get(leaveId);
+          // Update known status
           knownLeaveStatuses.current.set(leaveId, currentStatus);
-          return;
-        }
 
-        const previousStatus = knownLeaveStatuses.current.get(leaveId);
+          // If status hasn't changed, skip
+          if (previousStatus === currentStatus) return;
 
-        // ✅ Update tracked status
-        knownLeaveStatuses.current.set(leaveId, currentStatus);
+          // Check if we already sent a notification for this exact leave + status
+          const actionKey = `${leaveId}_${currentStatus}`;
+          if (notifiedLeaveActions.current.has(actionKey)) return;
 
-        // ✅ Skip on first load - just record statuses, don't notify
-        if (isFirstLeaveLoad.current) return;
+          // Now we have a genuine status change
 
-        // ✅ Only notify if status actually CHANGED from something else
-        if (previousStatus === currentStatus) return;
+          // Superadmin/admin see new pending requests (but pending is handled above)
+          // Actually we only care about approved/rejected here.
 
-        // ✅ Mark this leave+status as notified BEFORE sending notification
-        notifiedLeaveActions.add(actionKey);
+          // Employee/supervisor see their OWN leave status change
+          const isMyLeave = leave.employeeId === userId ||
+            (leave.isSupervisorLeave && leave.supervisorId === userId);
 
-        // Superadmin/admin see new pending requests only
-        if ((role === 'superadmin' || role === 'admin') && currentStatus === 'pending' && !previousStatus) {
-          addNotification({
-            title: `📅 New Leave Request`,
-            message: `${leave.employeeName} applied for ${leave.leaveType} leave (${leave.totalDays} days)`,
-            type: 'leave',
-            metadata: { leaveId: leave._id, notificationType: 'leave_request' },
-          });
-          return;
-        }
+          if (isMyLeave) {
+            // Mark as notified BEFORE adding to state to prevent race
+            notifiedLeaveActions.current.add(actionKey);
 
-        // Manager/supervisor see pending requests
-        if ((role === 'manager' || role === 'supervisor') && currentStatus === 'pending' && !previousStatus) {
-          addNotification({
-            title: `📅 Leave Request`,
-            message: `${leave.employeeName} applied for ${leave.leaveType} leave`,
-            type: 'leave',
-            metadata: { leaveId: leave._id, notificationType: 'leave_request' },
-          });
-          return;
-        }
+            addNotification({
+              title: currentStatus === 'approved' ? '✅ Leave Approved' : '❌ Leave Rejected',
+              message: `Your ${leave.leaveType} leave has been ${currentStatus}`,
+              type: 'leave',
+              metadata: { leaveId: leave._id, notificationType: `leave_${currentStatus}` },
+            });
+          }
 
-        // Employee/supervisor see their OWN leave status change
-        const isMyLeave = leave.employeeId === userId ||
-          (leave.isSupervisorLeave && leave.supervisorId === userId);
-
-        if (isMyLeave) {
-          addNotification({
-            title: currentStatus === 'approved' ? '✅ Leave Approved' : '❌ Leave Rejected',
-            message: `Your ${leave.leaveType} leave has been ${currentStatus}`,
-            type: 'leave',
-            metadata: { leaveId: leave._id, notificationType: `leave_${currentStatus}` },
-          });
-        }
-      });
-
-      // ✅ Mark first load complete AFTER processing
-      if (isFirstLeaveLoad.current) {
-        isFirstLeaveLoad.current = false;
+          // Also, if admin/superadmin, notify about pending? (already handled above, but we keep for completeness)
+          // For this fix, we only send employee notifications as per your existing logic.
+        });
+      } catch {
+        // silent
       }
+    };
 
-    } catch {
-      // silent
-    }
-  };
-
-  // ✅ Increase interval to 60 seconds to reduce hammering
-  checkLeaves();
-  const interval = setInterval(checkLeaves, 60_000);
-  return () => clearInterval(interval);
-}, [role, addNotification]);
+    checkLeaves();
+    const interval = setInterval(checkLeaves, 60_000);
+    return () => clearInterval(interval);
+  }, [role, addNotification]);
 
   // ========== Poll /attendance/geofence-breaches ==========
   useEffect(() => {
@@ -367,82 +347,97 @@ useEffect(() => {
 
 
   // ========== Poll /notifications for NEW notifications (Super Admin, Admin, Manager, Supervisor) ==========
-// ========== Poll /notifications for NEW notifications ==========
-useEffect(() => {
-  if (!role || role === 'employee') return;
+  // ========== Poll /notifications for NEW notifications ==========
+  // ========== Poll /notifications for NEW notifications ==========
+  useEffect(() => {
+    if (!role || role === 'employee') return;
 
-  const checkNotifications = async () => {
-    try {
-      const token = localStorage.getItem('sk_token');
-      if (!token) return;
+    const checkNotifications = async () => {
+      try {
+        const token = localStorage.getItem('sk_token');
+        if (!token) return;
 
-      // ✅ Check if notifications were cleared recently
-      const wereCleared = localStorage.getItem('notifications_cleared');
-      if (wereCleared === 'true') {
-        // Skip polling if cleared
-        return;
-      }
+        const wereCleared = localStorage.getItem('notifications_cleared');
+        if (wereCleared === 'true') return;
 
-      const response = await apiClientRef.current.get('/notifications', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      const data = response.data;
-      if (data.success && Array.isArray(data.data)) {
-        const apiNotifications = data.data;
-        const existingIds = new Set(notifications.map(n => n.id));
-        
-        // ✅ Find only BRAND NEW notifications
-        const newNotifs = apiNotifications.filter((notif: any) => {
-          const id = notif._id || notif.id;
-          return !existingIds.has(id) && !shownNotificationIds.current.has(id);
+        const response = await apiClientRef.current.get('/notifications', {
+          headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        if (newNotifs.length > 0) {
-          console.log(`🔔 Found ${newNotifs.length} new notifications`);
-          
-          newNotifs.forEach((notif: any) => {
-            const id = notif._id || notif.id;
-            
-            // ✅ Mark as shown immediately to prevent duplicates
-            shownNotificationIds.current.add(id);
-            
-            const notifItem: NotificationItem = {
-              id: id,
-              title: notif.title || 'Notification',
-              message: notif.message || '',
-              type: notif.type === 'urgent' ? 'system' : (notif.type || 'system'),
-              isRead: notif.read || false,
-              timestamp: notif.createdAt || new Date().toISOString(),
-              metadata: notif.metadata || {}
-            };
-            
-            // Add to state
-            setNotifications(prev => {
-              if (prev.some(n => n.id === id)) return prev;
-              return [notifItem, ...prev];
+        const data = response.data;
+        if (data.success && Array.isArray(data.data)) {
+          const apiNotifications = data.data;
+
+          // ✅ On first load, just record what's already there — don't toast old stuff
+          if (isFirstApiNotificationLoad.current) {
+            apiNotifications.forEach((notif: any) => {
+              const id = notif._id || notif.id;
+              shownNotificationIds.current.add(id);
             });
-            
-            // ✅ Only trigger sound/toast for unread notifications
-            if (!notif.read) {
-              playNotificationSound();
-              toast.info(notif.title, {
-                description: notif.message,
-                duration: 6000,
-              });
-            }
+
+            setNotifications(prev => {
+              const existingIds = new Set(prev.map(n => n.id));
+              const initial = apiNotifications
+                .filter((n: any) => !existingIds.has(n._id || n.id))
+                .map((notif: any) => ({
+                  id: notif._id || notif.id,
+                  title: notif.title || 'Notification',
+                  message: notif.message || '',
+                  type: notif.type === 'urgent' ? 'system' : (notif.type || 'system'),
+                  isRead: notif.read || false,
+                  timestamp: notif.createdAt || new Date().toISOString(),
+                  metadata: notif.metadata || {}
+                }));
+              return [...initial, ...prev];
+            });
+
+            isFirstApiNotificationLoad.current = false;
+            return;
+          }
+
+          setNotifications(prev => {
+            const existingIds = new Set(prev.map(n => n.id));
+            const newNotifs = apiNotifications.filter((notif: any) => {
+              const id = notif._id || notif.id;
+              return !existingIds.has(id) && !shownNotificationIds.current.has(id);
+            });
+
+            if (newNotifs.length === 0) return prev;
+
+            console.log(`🔔 Found ${newNotifs.length} new notifications`);
+
+            const newItems = newNotifs.map((notif: any) => {
+              const id = notif._id || notif.id;
+              shownNotificationIds.current.add(id);
+
+              if (!notif.read) {
+                playNotificationSound();
+                toast.info(notif.title, { description: notif.message, duration: 6000 });
+              }
+
+              return {
+                id,
+                title: notif.title || 'Notification',
+                message: notif.message || '',
+                type: notif.type === 'urgent' ? 'system' : (notif.type || 'system'),
+                isRead: notif.read || false,
+                timestamp: notif.createdAt || new Date().toISOString(),
+                metadata: notif.metadata || {}
+              };
+            });
+
+            return [...newItems, ...prev];
           });
         }
+      } catch (error) {
+        // silent
       }
-    } catch (error) {
-      // silent
-    }
-  };
+    };
 
-  checkNotifications();
-  const interval = setInterval(checkNotifications, 15000);
-  return () => clearInterval(interval);
-}, [role, notifications]);
+    checkNotifications();
+    const interval = setInterval(checkNotifications, 15000);
+    return () => clearInterval(interval);
+  }, [role]); // ✅ removed `notifications` from deps
 
   // ========== Window event listeners for same‑tab fallback ==========
   useEffect(() => {
@@ -484,90 +479,95 @@ useEffect(() => {
 
   // ========== Load initial notifications from localStorage ==========
   // ========== Load initial notifications from localStorage ==========
-useEffect(() => {
-  isMounted.current = true;
-  
-  // ✅ Check if notifications were cleared
-  const wereCleared = localStorage.getItem('notifications_cleared');
-  if (wereCleared === 'true') {
-    // If cleared, don't load from localStorage
-    setNotifications([]);
-    // Clear the flag after checking
-    localStorage.removeItem('notifications_cleared');
-    return;
-  }
-  
-  const cached = service.getNotifications();
-  if (cached.length > 0) setNotifications(cached);
+  useEffect(() => {
+    isMounted.current = true;
 
-  const unsubscribe = service.subscribe((updated) => {
-    if (isMounted.current) setNotifications([...updated]);
-  });
+    // ✅ Check if notifications were cleared
+    const wereCleared = localStorage.getItem('notifications_cleared');
+    if (wereCleared === 'true') {
+      // If cleared, don't load from localStorage
+      setNotifications([]);
+      // Clear the flag after checking
+      localStorage.removeItem('notifications_cleared');
+      return;
+    }
 
-  return () => {
-    isMounted.current = false;
-    unsubscribe();
-    if (pollInterval.current) clearInterval(pollInterval.current);
-  };
-}, [service]);
+    const cached = service.getNotifications();
+    if (cached.length > 0) setNotifications(cached);
+
+    const unsubscribe = service.subscribe((updated) => {
+      if (isMounted.current) setNotifications([...updated]);
+    });
+
+    return () => {
+      isMounted.current = false;
+      unsubscribe();
+      if (pollInterval.current) clearInterval(pollInterval.current);
+    };
+  }, [service]);
+
+  // ========== Poll /incidents for NEW incident reports (admin/superadmin/manager) ==========
 
   // ========== Refresh (reset all internal caches) ==========
-const refresh = useCallback(async () => {
-  knownTaskIds.current = new Set();
-  isFirstTaskLoad.current = true;
-  knownCompletedIds.current = new Set();
-  isFirstCompletedLoad.current = true;
-  knownBreachIds.current = new Set();
-  isFirstBreachLoad.current = true;
-  shownNotificationIds.current.clear();
-}, []);
-
+  const refresh = useCallback(async () => {
+    knownTaskIds.current = new Set();
+    isFirstTaskLoad.current = true;
+    knownCompletedIds.current = new Set();
+    isFirstCompletedLoad.current = true;
+    knownBreachIds.current = new Set();
+    isFirstBreachLoad.current = true;
+    shownNotificationIds.current.clear();
+    isFirstApiNotificationLoad.current = true;
+    notifiedLeaveActions.current = new Set();   // ✅ add this
+    knownLeaveStatuses.current = new Map();     // also reset this
+    isFirstLeaveLoad.current = true;
+  }, []);
   // ========== CRUD operations (now use setNotifications) ==========
-const markAsRead = useCallback((id: string) => {
-  setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-  service.markAsRead(id);
-  apiClientRef.current.patch(`/notifications/${id}/read`).catch(() => {});
-}, [service]);
+  const markAsRead = useCallback((id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    service.markAsRead(id);
+    apiClientRef.current.patch(`/notifications/${id}/read`).catch(() => { });
+  }, [service]);
 
-const markAllAsRead = useCallback(() => {
-  setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-  service.markAllAsRead();
-  apiClientRef.current.patch('/notifications/read-all').catch(() => {});
-}, [service]);
+  const markAllAsRead = useCallback(() => {
+    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    service.markAllAsRead();
+    apiClientRef.current.patch('/notifications/read-all').catch(() => { });
+  }, [service]);
 
-const removeNotification = useCallback((id: string) => {
-  // ✅ Also remove from shown IDs
-  shownNotificationIds.current.delete(id);
-  setNotifications(prev => prev.filter(n => n.id !== id));
-  service.deleteNotification(id);
-}, [service]);
+  const removeNotification = useCallback((id: string) => {
+    // ✅ Also remove from shown IDs
+    shownNotificationIds.current.delete(id);
+    setNotifications(prev => prev.filter(n => n.id !== id));
+    service.deleteNotification(id);
+  }, [service]);
 
-const clearAll = useCallback(() => {
-  // 1. Clear the shown IDs to prevent duplicates
-  shownNotificationIds.current.clear();
-  
-  // 2. Clear React state
-  setNotifications([]);
-  
-  // 3. Clear from service
-  service.clearAllNotifications();
-  
-  // 4. Explicitly clear all localStorage items
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('site_notifications');
-    localStorage.removeItem('sk_notifications');
-    // Set a flag that notifications were cleared
-    localStorage.setItem('notifications_cleared', 'true');
-  }
-  
-  // 5. Show success message
-  toast.success('All notifications cleared');
-  
-  // 6. Force a re-render by triggering a storage event
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('storage'));
-  }
-}, [service]);
+  const clearAll = useCallback(() => {
+    // 1. Clear the shown IDs to prevent duplicates
+    shownNotificationIds.current.clear();
+
+    // 2. Clear React state
+    setNotifications([]);
+
+    // 3. Clear from service
+    service.clearAllNotifications();
+
+    // 4. Explicitly clear all localStorage items
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('site_notifications');
+      localStorage.removeItem('sk_notifications');
+      // Set a flag that notifications were cleared
+      localStorage.setItem('notifications_cleared', 'true');
+    }
+
+    // 5. Show success message
+    toast.success('All notifications cleared');
+
+    // 6. Force a re-render by triggering a storage event
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
+    }
+  }, [service]);
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return (

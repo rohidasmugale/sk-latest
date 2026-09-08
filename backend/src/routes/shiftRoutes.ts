@@ -11,6 +11,7 @@ import {
   getShiftStats
 } from '../controllers/shiftController';
 import SiteShiftDeployment from '../models/SiteShiftDeployment';
+import Site from '../models/Site'; // ✅ ADD THIS
 
 const router = Router();
 
@@ -19,14 +20,21 @@ const router = Router();
 
 router.get('/site-deployment', auth, async (req: Request, res: Response) => {
   try {
-    const { site, date } = req.query;
-    if (!site || typeof site !== 'string') {
-      return res.status(400).json({ success: false, message: 'Site name required' });
+    // ❌ CHANGE: Use siteId instead of site
+    // const { site, date } = req.query;
+    const { siteId, date } = req.query; // ✅ CHANGED
+    
+    if (!siteId || typeof siteId !== 'string') {
+      return res.status(400).json({ success: false, message: 'Site ID required' });
     }
     if (!date || typeof date !== 'string') {
       return res.status(400).json({ success: false, message: 'Date required' });
     }
-    const deployment = await SiteShiftDeployment.findOne({ site, date });
+    
+    // ✅ Find deployment by siteId
+    const deployment = await SiteShiftDeployment.findOne({ siteId, date });
+    
+    // ✅ If no deployment, return empty text
     res.json({
       success: true,
       data: { text: deployment?.text || 'No shift deployment information available.' }
@@ -39,16 +47,32 @@ router.get('/site-deployment', auth, async (req: Request, res: Response) => {
 
 router.post('/site-deployment', auth, async (req: Request, res: Response) => {
   try {
-    const { site, date, text } = req.body;
-    if (!site) {
-      return res.status(400).json({ success: false, message: 'Site name required' });
+    // ❌ CHANGE: Use siteId instead of site
+    // const { site, date, text } = req.body;
+    const { siteId, date, text } = req.body; // ✅ CHANGED
+    
+    if (!siteId) {
+      return res.status(400).json({ success: false, message: 'Site ID required' });
     }
+    
+    // ✅ Validate site exists
+    const site = await Site.findById(siteId);
+    if (!site) {
+      return res.status(400).json({ success: false, message: 'Invalid site' });
+    }
+    
     if (!date) {
       return res.status(400).json({ success: false, message: 'Date required' });
     }
+    
     await SiteShiftDeployment.findOneAndUpdate(
-      { site, date },
-      { text, updatedAt: new Date() },
+      { siteId, date }, // ✅ Use siteId
+      { 
+        site: site.name, // ✅ Store site name for display
+        siteId: site._id, // ✅ Store siteId
+        text, 
+        updatedAt: new Date() 
+      },
       { upsert: true, new: true }
     );
     res.json({ success: true, message: 'Site shift deployment saved' });

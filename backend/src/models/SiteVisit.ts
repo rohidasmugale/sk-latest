@@ -36,7 +36,7 @@ export interface ISiteVisit extends mongoose.Document {
 }
 
 const SiteVisitSchema = new mongoose.Schema({
-  siteId: { type: String, required: true, index: true },
+  siteId: { type: mongoose.Schema.Types.ObjectId, ref: 'Site', index: true },
   siteName: { type: String, required: true },
   managerId: { type: String, required: true, index: true },
   managerName: { type: String, required: true },

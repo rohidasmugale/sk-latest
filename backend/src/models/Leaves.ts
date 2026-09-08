@@ -170,10 +170,7 @@ const LeaveSchema: Schema = new Schema({
     type: String,
     default: null
   },
-  siteId: {
-    type: String,
-    default: null
-  },
+   siteId: { type: mongoose.Schema.Types.ObjectId, ref: 'Site', index: true },
   // Employee fields
   position: {
     type: String,

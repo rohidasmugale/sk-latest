@@ -99,18 +99,17 @@ interface Employee {
   gender?: string;
   maritalStatus?: string;
   permanentAddress?: string;
-  permanentPincode?: string;
+
   localAddress?: string;
-  localPincode?: string;
+
   bankName?: string;
   accountNumber?: string;
   ifscCode?: string;
   branchName?: string;
-  fatherName?: string;
-  motherName?: string;
-  spouseName?: string;
+  relativeName?: string;
+  relation?: string; // "Father" | "Mother" | "Spouse" | "Husband" | "Wife"
   numberOfChildren?: string | number;
-  emergencyContactName?: string;
+  
   emergencyContactPhone?: string;
   emergencyContactRelation?: string;
   nomineeName?: string;
@@ -160,7 +159,7 @@ const CHART_COLORS = {
   absent: '#ef4444',
   late: '#f59e0b',
   weeklyOff: '#94a3b8',
- 
+
 };
 
 // Animation variants

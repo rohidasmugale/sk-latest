@@ -40,9 +40,9 @@ export interface ISite extends Document {
   updatedAt: Date;
   latitude?: number;
   longitude?: number;
-   geofenceRadius?: number; // in km, default 0.5
+  geofenceRadius?: number; // in km, default 0.5
 
-   shifts?: Array<{
+  shifts?: Array<{
     id: string;
     name: string;
     label?: string;
@@ -175,27 +175,25 @@ const SiteSchema: Schema = new Schema(
       required: [true, 'User role is required'],
       default: 'admin'
     },
-     latitude: { type: Number, default: 0 },
-  longitude: { type: Number, default: 0 },
-  geofenceRadius: { type: Number, default: 0.5 },
+    latitude: { type: Number, default: 0 },
+    longitude: { type: Number, default: 0 },
+    geofenceRadius: { type: Number, default: 0.5 },
    
     shifts: {
-  type: [{
-    id: { type: String, required: true },
-    name: { type: String, required: true },
-    label: { type: String, default: '' },
-    startTime: { type: String, required: true, match: /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/ },
-    endTime: { type: String, required: true, match: /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/ },
-    graceMinutes: { type: Number, default: 15, min: 0 },
-    color: { type: String, default: '#4CAF50' },
-    appliesTo: { type: [String], default: [] },
-    isOvernight: { type: Boolean, default: false }
-  }],
-  default: []
-},
+      type: [{
+        id: { type: String, required: true },
+        name: { type: String, required: true },
+        label: { type: String, default: '' },
+        startTime: { type: String, required: true, match: /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/ },
+        endTime: { type: String, required: true, match: /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/ },
+        graceMinutes: { type: Number, default: 15, min: 0 },
+        color: { type: String, default: '#4CAF50' },
+        appliesTo: { type: [String], default: [] },
+        isOvernight: { type: Boolean, default: false }
+      }],
+      default: []
+    },
   },
-  // After the existing fields, before timestamps
-
   {
     timestamps: true,
     toJSON: { virtuals: true },
@@ -203,8 +201,17 @@ const SiteSchema: Schema = new Schema(
   }
 );
 
-// Indexes for better query performance
-SiteSchema.index({ name: 1 });
+// ✅ FIX 1: Case-insensitive unique index on name
+// This prevents "Global Square" and "GLOBAL SQUARE" from being created as separate sites
+SiteSchema.index(
+  { name: 1 }, 
+  { 
+    unique: true, 
+    collation: { locale: 'en', strength: 2 }  // case-insensitive
+  }
+);
+
+// Existing indexes
 SiteSchema.index({ clientName: 1 });
 SiteSchema.index({ status: 1 });
 SiteSchema.index({ contractEndDate: 1 });
@@ -243,6 +250,15 @@ SiteSchema.virtual('addedByDisplay').get(function(this: ISite) {
     return 'Manager';
   }
   return this.addedBy;
+});
+
+// ✅ FIX 2: Pre-save hook to normalize site name
+SiteSchema.pre('save', function(next) {
+  // Trim whitespace and normalize multiple spaces
+  if (this.name) {
+    this.name = this.name.trim().replace(/\s+/g, ' ');
+  }
+  next();
 });
 
 export default mongoose.model<ISite>('Site', SiteSchema);

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import ExcelJS from 'exceljs';
 import Employee from '../models/Employee';
-import path from 'path';
+import path, { relative } from 'path';
 import fs from 'fs';
 
 // Function to clean and validate data
@@ -123,9 +123,9 @@ const mapExcelRowToEmployee = async (row: any, index: number): Promise<any> => {
     
     // Address
     permanentAddress: cleanValue(row.getCell('M')?.value), // Permanent Address
-    permanentPincode: cleanValue(row.getCell('N')?.value), // Permanent Pin Code
+   
     localAddress: cleanValue(row.getCell('O')?.value), // Local Address
-    localPincode: cleanValue(row.getCell('P')?.value), // Local Pin Code
+   
     
     // Bank Details
     bankName: cleanValue(row.getCell('Q')?.value), // Bank Name
@@ -134,16 +134,14 @@ const mapExcelRowToEmployee = async (row: any, index: number): Promise<any> => {
     branchName: cleanValue(row.getCell('T')?.value), // Branch Name
     
     // Family Details
-    fatherName: cleanValue(row.getCell('U')?.value), // Father's Name
-    motherName: cleanValue(row.getCell('V')?.value), // Mother's Name
-    spouseName: cleanValue(row.getCell('W')?.value), // Spouse Name
+   relativeName: cleanValue(row.getCell('U')?.value), // Relative Name
+    relation: cleanValue(row.getCell('V')?.value), // Relation
     numberOfChildren: parseInt(cleanValue(row.getCell('X')?.value) || '0'), // Number of Children
     
     // Emergency Contact
-    emergencyContactName: cleanValue(row.getCell('Y')?.value), // Emergency Contact Name
+  
     emergencyContactPhone: cleanValue(row.getCell('Z')?.value), // Emergency Contact Phone
-    emergencyContactRelation: cleanValue(row.getCell('AA')?.value), // Relation
-    
+    emergencyPhone2: cleanValue(row.getCell('AA')?.value), // Emergency Phone 2
     // Nominee Details
     nomineeName: cleanValue(row.getCell('AB')?.value), // Nominee Name
     nomineeRelation: cleanValue(row.getCell('AC')?.value), // Nominee Relation
@@ -350,9 +348,7 @@ export const testDirectImport = async (req: Request, res: Response): Promise<voi
       maritalStatus: 'Single',
       
       permanentAddress: '123 Test Street, Pune',
-      permanentPincode: '411001',
-      localAddress: '456 Local Road, Pune',
-      localPincode: '411002',
+     
       
       bankName: 'State Bank of India',
       accountNumber: '12345678901234',
@@ -360,12 +356,11 @@ export const testDirectImport = async (req: Request, res: Response): Promise<voi
       branchName: 'Main Branch',
       bankBranch: 'Main Branch',
       
-      fatherName: 'Father Test',
-      motherName: 'Mother Test',
-      spouseName: '',
+    relativeName: 'Father Test',
+    relation: 'Father',
       numberOfChildren: 0,
       
-      emergencyContactName: 'Emergency Contact',
+    
       emergencyContactPhone: '9876543211',
       emergencyContactRelation: 'Father',
       

@@ -139,6 +139,7 @@ export class MachineController {
         description: data.description || '',
         status: data.status || 'operational',
         location: data.location || '',
+        siteId: data.siteId || undefined,
         manufacturer: data.manufacturer || '',
         modelNumber: data.model || data.modelNumber || '',
         serialNumber: serialNumber,
@@ -196,6 +197,7 @@ export class MachineController {
       }
       
       const updateData: any = { ...data };
+      if (data.siteId !== undefined) updateData.siteId = data.siteId;
       if (data.model !== undefined) {
         updateData.modelNumber = data.model;
         delete updateData.model;

@@ -26,41 +26,36 @@ export default function CleaningPhotos() {
   const [photos, setPhotos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [site, setSite] = useState("");
+  // ✅ CHANGED: site → siteId + siteName
+  const [siteId, setSiteId] = useState("");
+  const [siteName, setSiteName] = useState("");
   const [remark, setRemark] = useState("");
-  const [supervisorSite, setSupervisorSite] = useState("");
+  const [supervisorSiteId, setSupervisorSiteId] = useState("");
 
   // Multi‑upload state – only for showing selected count, auto‑upload on selection
   const [selectedFileCount, setSelectedFileCount] = useState(0);
 
+  // ✅ CHANGED: Fetch siteId from auth endpoint
   const fetchSupervisorSite = useCallback(async () => {
     if (!currentUser || role !== "supervisor") return;
-    const supervisorId = currentUser._id || currentUser.id;
     try {
-      const res = await apiClient.get('/tasks', { params: { limit: 1000 } });
-      let tasks = res.data?.data || res.data || [];
-      if (!Array.isArray(tasks)) tasks = [];
-      const siteSet = new Set<string>();
-      tasks.forEach((task: any) => {
-        const assigned = task.assignedUsers?.some((u: any) => u.userId === supervisorId);
-        const assignedOld = task.assignedTo === supervisorId;
-        if ((assigned || assignedOld) && task.siteName) {
-          siteSet.add(task.siteName);
-        }
-      });
-      const siteArray = Array.from(siteSet);
-      if (siteArray.length > 0) {
-        setSupervisorSite(siteArray[0]);
-        setSite(siteArray[0]);
+      const res = await apiClient.get('/auth/supervisor-site');
+      if (res.data.success && res.data.siteId) {
+        setSupervisorSiteId(res.data.siteId);
+        setSiteId(res.data.siteId);
+        setSiteName(res.data.siteName);
       }
     } catch (error) {
       console.error("Error fetching supervisor site:", error);
     }
   }, [currentUser, role]);
 
+  // ✅ CHANGED: Use siteId in API call
   const fetchPhotos = useCallback(async () => {
     try {
-      const res = await apiClient.get('/cleaning-photos/supervisor');
+      const res = await apiClient.get('/cleaning-photos', {
+        params: { siteId }
+      });
       setPhotos(res.data.data || []);
     } catch (error: any) {
       console.error("Fetch photos error:", error);
@@ -68,7 +63,7 @@ export default function CleaningPhotos() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [siteId]);
 
   useEffect(() => {
     if (role === "supervisor" && currentUser) {
@@ -79,15 +74,15 @@ export default function CleaningPhotos() {
     }
   }, [currentUser, role, fetchSupervisorSite, fetchPhotos]);
 
-  // Single photo capture – uploads immediately, keeps camera open for continuous capture
+  // ✅ CHANGED: Use siteId in upload
   const handlePhotoCapture = async (photoFile: File) => {
-    if (!site) {
+    if (!siteId) {
       toast.error("No site assigned");
       return;
     }
     const formData = new FormData();
     formData.append("photo", photoFile);
-    formData.append("site", site);
+    formData.append("siteId", siteId);
     if (remark) formData.append("remark", remark);
     try {
       await apiClient.post('/cleaning-photos', formData, {
@@ -100,18 +95,21 @@ export default function CleaningPhotos() {
       console.error("Upload error:", error);
       toast.error(error.response?.data?.message || "Upload failed");
     }
-    // Do NOT close camera – continuous mode handles that inside CameraCapture
   };
 
-  // Handle multiple file selection – auto‑upload immediately
+  // ✅ CHANGED: Use siteId in multi-upload
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
+    if (!siteId) {
+      toast.error("No site assigned");
+      return;
+    }
     const files = Array.from(e.target.files);
     setSelectedFileCount(files.length);
 
     const formData = new FormData();
     files.forEach(file => formData.append('photos', file));
-    formData.append('site', site);
+    formData.append('siteId', siteId);
     if (remark) formData.append('remark', remark);
 
     try {
@@ -124,7 +122,6 @@ export default function CleaningPhotos() {
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Upload failed");
     }
-    // Reset file input
     e.target.value = '';
   };
 
@@ -178,11 +175,9 @@ export default function CleaningPhotos() {
         <CardContent className="space-y-3">
           <Input
             placeholder="Site name"
-            value={site}
-            onChange={e => setSite(e.target.value)}
-            required
-            readOnly={!!supervisorSite}
-            className={supervisorSite ? "bg-gray-50 text-sm" : "text-sm"}
+            value={siteName}
+            readOnly
+            className="bg-gray-50 text-sm"
           />
           <Textarea
             placeholder="Remark (optional)"
@@ -193,12 +188,10 @@ export default function CleaningPhotos() {
           />
 
           <div className="flex flex-wrap gap-2 items-center">
-            {/* Camera button – opens CameraCapture with continuous mode */}
             <Button onClick={() => setCameraOpen(true)} size="sm">
               <Camera className="h-4 w-4 mr-1" /> Take Photo
             </Button>
 
-            {/* Multi‑file upload – auto‑upload on selection */}
             <label className="cursor-pointer">
               <Button variant="outline" size="sm" asChild>
                 <div className="flex items-center gap-2">
@@ -231,25 +224,24 @@ export default function CleaningPhotos() {
             <Card key={photo._id} className="p-2">
               <img src={photo.photoUrl} alt="Cleaning" className="w-full h-32 object-cover rounded" />
               <p className="text-xs mt-1 font-medium truncate">{photo.site}</p>
-         <p className="text-xs text-muted-foreground">
-  {new Date(photo.createdAt).toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })}{' '}
-  {new Date(photo.createdAt).toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  })}
-</p>
+              <p className="text-xs text-muted-foreground">
+                {new Date(photo.createdAt).toLocaleDateString('en-IN', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                })}{' '}
+                {new Date(photo.createdAt).toLocaleTimeString('en-IN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: true,
+                })}
+              </p>
               {photo.remark && <p className="text-xs mt-1 truncate">{photo.remark}</p>}
             </Card>
           ))}
         </div>
       )}
 
-      {/* CameraCapture with continuous mode – stays open after each capture */}
       <CameraCapture
         open={cameraOpen}
         onOpenChange={setCameraOpen}

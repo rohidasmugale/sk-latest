@@ -3,12 +3,13 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IGrooming extends Document {
   employeeId: string;
   date: string;
+  siteId?: mongoose.Types.ObjectId;  // ✅ ADD THIS
+  site?: string;  // keep for back-compat
   shirt: boolean;
   pant: boolean;
   cap: boolean;
   shoes: boolean;
   idCard: boolean;
-  // new fields
   nails?: boolean;
   singleBangles?: boolean;
   studs?: boolean;
@@ -22,6 +23,8 @@ export interface IGrooming extends Document {
 const GroomingSchema = new Schema({
   employeeId: { type: String, required: true, index: true },
   date: { type: String, required: true, index: true },
+  siteId: { type: Schema.Types.ObjectId, ref: 'Site', index: true },  // ✅ ADD THIS
+  site: { type: String },  // keep for back-compat
   shirt: { type: Boolean, default: false },
   pant: { type: Boolean, default: false },
   cap: { type: Boolean, default: false },
@@ -38,5 +41,7 @@ const GroomingSchema = new Schema({
 }, { timestamps: true });
 
 GroomingSchema.index({ employeeId: 1, date: 1 }, { unique: true });
+// ✅ ADD THIS INDEX for siteId + date queries
+GroomingSchema.index({ siteId: 1, date: 1 });
 
 export default mongoose.model<IGrooming>('Grooming', GroomingSchema);

@@ -16,6 +16,7 @@ export interface FrontendMachine {
   lastMaintenanceDate?: string;
   nextMaintenanceDate?: string;
   location?: string;
+  siteId?: string;
   manufacturer?: string;
   model?: string;
   serialNumber?: string;
@@ -47,6 +48,7 @@ export interface CreateMachineDTO {
   lastMaintenanceDate?: string;
   nextMaintenanceDate?: string;
   location?: string;
+  siteId?: string;
   manufacturer?: string;
   model?: string;
   serialNumber?: string;
@@ -306,6 +308,7 @@ export const machineService = {
         description: data.description || '',
         status: data.status || 'operational',
         location: data.location || '',
+        siteId: data.siteId || undefined,
         manufacturer: data.manufacturer || '',
         model: data.model || '',
         serialNumber: data.serialNumber || '',

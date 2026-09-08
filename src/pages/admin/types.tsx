@@ -1,4 +1,5 @@
 // src/components/hrms/types.ts
+import { relative } from 'path';
 export interface Document {
   id: number;
   type: string;
@@ -10,8 +11,8 @@ export interface Document {
 }
 
 export interface Employee {
-  fatherName: any;
-  spouseName: any;
+ relativeName: string;
+  relation: string;   // "Father" | "Mother" | "Spouse" | "Husband" | "Wife"
   dateOfBirth: string;
   gender: string;
   maritalStatus: string;
@@ -53,7 +54,7 @@ export interface LeaveRequest {
   to: string;
   reason: string;
   status: "pending" | "approved" | "rejected";
-    site?: string; // ADD THIS
+  site?: string; // ADD THIS
   siteName?: string; // ADD THIS
   siteId?: string; // ADD THIS
 }
@@ -177,19 +178,19 @@ export interface NewEmployeeForm {
   dateOfExit: string;
   bloodGroup: string;
   permanentAddress: string;
-  permanentPincode: string;
+  
   localAddress: string;
-  localPincode: string;
+  
   bankName: string;
   accountNumber: string;
   ifscCode: string;
   branchName: string;
-  fatherName: string;
-  motherName: string;
-  spouseName: string;
+ relativeName: string;
+relation: string;   // "Father" | "Mother" | "Spouse" | "Husband" | "Wife"
   numberOfChildren: string;
-  emergencyContactName: string;
+ 
   emergencyContactPhone: string;
+  emergencyPhone2: string;
   emergencyContactRelation: string;
   nomineeName: string;
   nomineeRelation: string;

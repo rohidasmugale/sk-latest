@@ -3,30 +3,20 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import User, { IUser } from '../models/User';
 import Employee from '../models/Employee';
+import AssignTask from '../models/AssignTask';
+import Site from '../models/Site';
+import { auth } from '../middleware/auth';
 
 const router = express.Router();
 
-// Define auth middleware inline or import properly
-const auth = async (req: Request, res: Response, next: any) => {
-  try {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) {
-      return res.status(401).json({ success: false, message: 'No token provided' });
-    }
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
-    (req as any).user = { id: decoded.userId, role: decoded.role };
-    next();
-  } catch (error) {
-    return res.status(401).json({ success: false, message: 'Invalid token' });
-  }
-};
+// =============================================
+// AUTH ENDPOINTS (Signup, Login, etc.)
+// =============================================
 
-// Signup route
 router.post('/signup', async (req: Request, res: Response) => {
   try {
     const { name, email, password, role } = req.body;
 
-    // Validate required fields
     if (!name || !email || !password || !role) {
       return res.status(400).json({
         success: false,
@@ -34,7 +24,6 @@ router.post('/signup', async (req: Request, res: Response) => {
       });
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({
@@ -43,7 +32,6 @@ router.post('/signup', async (req: Request, res: Response) => {
       });
     }
 
-    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(409).json({
@@ -52,7 +40,6 @@ router.post('/signup', async (req: Request, res: Response) => {
       });
     }
 
-    // Only allow superadmin role for signup
     if (role !== 'superadmin') {
       return res.status(403).json({
         success: false,
@@ -67,7 +54,6 @@ router.post('/signup', async (req: Request, res: Response) => {
       });
     }
 
-    // Create new user
     const newUser = new User({
       name,
       email,
@@ -82,11 +68,10 @@ router.post('/signup', async (req: Request, res: Response) => {
 
     await newUser.save();
 
-    // Generate JWT token
     const token = jwt.sign(
       { userId: newUser._id, role: newUser.role },
       process.env.JWT_SECRET || 'your-secret-key',
-       { expiresIn: '30d' }
+      { expiresIn: '30d' }
     );
 
     const userResponse = {
@@ -108,14 +93,12 @@ router.post('/signup', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Signup error:', error);
-    
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
         message: 'Email already registered'
       });
     }
-    
     res.status(500).json({
       success: false,
       message: error.message || 'An error occurred during signup'
@@ -123,7 +106,6 @@ router.post('/signup', async (req: Request, res: Response) => {
   }
 });
 
-// Login route - FIXED VERSION
 router.post('/login', async (req: Request, res: Response) => {
   try {
     const { email, password, role } = req.body;
@@ -135,10 +117,8 @@ router.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    // Find user by email
     let user = await User.findOne({ email }).select('+password');
 
-    // If not found by email, try employeeId
     if (!user) {
       const employee = await Employee.findOne({ employeeId: email });
       if (employee?.email) {
@@ -160,9 +140,7 @@ router.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    // Verify password
     const isValidPassword = await user.comparePassword(password);
-    
     if (!isValidPassword) {
       return res.status(401).json({
         success: false,
@@ -170,7 +148,6 @@ router.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    // Verify role
     if (user.role !== role) {
       return res.status(403).json({
         success: false,
@@ -178,20 +155,18 @@ router.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    // Update last login
     user.lastLogin = new Date();
     await user.save();
 
-    // Generate JWT token
     const token = jwt.sign(
-      { 
-        userId: user._id, 
+      {
+        userId: user._id,
         role: user.role,
         email: user.email,
         name: user.name
       },
       process.env.JWT_SECRET || 'your-secret-key',
-       { expiresIn: '30d' }
+      { expiresIn: '30d' }
     );
 
     const userResponse = {
@@ -223,10 +198,9 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 });
 
-// Get current user
 router.get('/me', auth, async (req: Request, res: Response) => {
   try {
-    const user = await User.findById((req as any).user.id);
+    const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -261,11 +235,9 @@ router.get('/me', auth, async (req: Request, res: Response) => {
   }
 });
 
-// Verify token
 router.post('/verify', async (req: Request, res: Response) => {
   try {
     const { token } = req.body;
-    
     if (!token) {
       return res.status(400).json({
         success: false,
@@ -274,7 +246,6 @@ router.post('/verify', async (req: Request, res: Response) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
-    
     res.status(200).json({
       success: true,
       message: 'Token is valid',
@@ -294,13 +265,9 @@ router.post('/verify', async (req: Request, res: Response) => {
   }
 });
 
-// =============================================
-// ADD: Token Refresh Endpoint
-// =============================================
 router.post('/refresh', async (req: Request, res: Response) => {
   try {
     const { token } = req.body;
-    
     if (!token) {
       return res.status(400).json({
         success: false,
@@ -308,13 +275,10 @@ router.post('/refresh', async (req: Request, res: Response) => {
       });
     }
 
-    // Verify old token
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
-    
-    // Generate new token with extended expiry
     const newToken = jwt.sign(
-      { 
-        userId: decoded.userId, 
+      {
+        userId: decoded.userId,
         role: decoded.role,
         email: decoded.email,
         name: decoded.name
@@ -322,9 +286,8 @@ router.post('/refresh', async (req: Request, res: Response) => {
       process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '30d' }
     );
-    
+
     console.log('✅ Token refreshed for user:', decoded.email);
-    
     res.status(200).json({
       success: true,
       token: newToken,
@@ -335,6 +298,142 @@ router.post('/refresh', async (req: Request, res: Response) => {
     res.status(401).json({
       success: false,
       message: 'Invalid token'
+    });
+  }
+});
+
+// =============================================
+// ✅ SUPERVISOR SITE ENDPOINTS (FIXED)
+// =============================================
+
+/**
+ * Helper: get all site IDs for a supervisor (by user ID)
+ */
+async function getSupervisorSiteIds(userId: string): Promise<string[]> {
+  // 1. Try to get from User.assignedSites (if stored)
+  const user = await User.findById(userId);
+  if (user?.assignedSites && Array.isArray(user.assignedSites) && user.assignedSites.length > 0) {
+    // Resolve names to IDs
+    const sites = await Site.find({
+      name: { $in: user.assignedSites.map((n: string) => new RegExp(`^${n.trim()}$`, 'i')) }
+    });
+    if (sites.length > 0) {
+      return sites.map(s => s._id.toString());
+    }
+  }
+
+  // 2. Fallback: find from AssignTask where this user is a supervisor
+  const tasks = await AssignTask.find({
+    $or: [
+      { 'assignedSupervisors.userId': userId },
+      { assignedTo: userId }
+    ],
+    siteId: { $exists: true }
+  });
+
+  if (tasks.length === 0) return [];
+
+  const siteIdSet = new Set<string>();
+  tasks.forEach(task => {
+    if (task.siteId) {
+      siteIdSet.add(task.siteId.toString());
+    }
+  });
+
+  return Array.from(siteIdSet);
+}
+
+// GET /api/auth/supervisor-site - returns first site ID and name
+router.get('/supervisor-site', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user._id;
+    const siteIds = await getSupervisorSiteIds(userId);
+
+    if (siteIds.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No site assigned to this supervisor'
+      });
+    }
+
+    const site = await Site.findById(siteIds[0]);
+    if (!site) {
+      return res.status(404).json({
+        success: false,
+        message: 'Site not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      siteId: site._id.toString(),
+      siteName: site.name
+    });
+  } catch (error: any) {
+    console.error('Error fetching supervisor site:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching site'
+    });
+  }
+});
+
+// GET /api/auth/supervisor-sites - returns all site IDs and names
+router.get('/supervisor-sites', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user._id;
+    const siteIds = await getSupervisorSiteIds(userId);
+
+    if (siteIds.length === 0) {
+      return res.json({
+        success: true,
+        siteIds: [],
+        siteNames: [],
+        sites: []
+      });
+    }
+
+    const sites = await Site.find({ _id: { $in: siteIds } });
+    const siteData = sites.map(s => ({
+      id: s._id.toString(),
+      name: s.name
+    }));
+
+    res.json({
+      success: true,
+      siteIds: siteData.map(s => s.id),
+      siteNames: siteData.map(s => s.name),
+      sites: siteData
+    });
+  } catch (error: any) {
+    console.error('Error fetching supervisor sites:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching sites'
+    });
+  }
+});
+
+// GET /api/auth/site-name/:siteId - helper to get site name from ID
+router.get('/site-name/:siteId', auth, async (req: Request, res: Response) => {
+  try {
+    const { siteId } = req.params;
+    const site = await Site.findById(siteId);
+    if (!site) {
+      return res.status(404).json({
+        success: false,
+        message: 'Site not found'
+      });
+    }
+    res.json({
+      success: true,
+      siteName: site.name
+    });
+  } catch (error: any) {
+    console.error('Error fetching site name:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching site name'
     });
   }
 });

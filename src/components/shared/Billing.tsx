@@ -600,13 +600,11 @@ const Billing = () => {
   }, []);
 
   // ── Data Fetch ──────────────────────────────────────────────────────────────
-
   useEffect(() => {
     const fetchAllDataAndSites = async () => {
       setLoading(true);
       setError(null);
       try {
-        // Fetch core data – handle failures individually
         const [invoicesData, expensesData, sitesData] = await Promise.all([
           invoiceService.getAllInvoices().catch(() => []),
           expenseService.getExpenses().catch(() => []),
@@ -618,14 +616,12 @@ const Billing = () => {
         const siteNames = (sitesData || []).map((s: any) => s.name);
         setSites(siteNames);
 
-        // Payments – optional; if it fails, fallback to empty array
         try {
           const paymentsData = await PaymentService.getAllPayments().then(res => res.data);
           setPayments((paymentsData || []).map(mapPayment));
         } catch (payErr) {
           console.warn('Payments API not available – using empty data', payErr);
           setPayments([]);
-          // Optionally inform the user (non‑blocking)
           toast.warning('Payments data could not be loaded, some features may be limited');
         }
       } catch (err: any) {
@@ -635,6 +631,8 @@ const Billing = () => {
         setLoading(false);
       }
     };
+
+    fetchAllDataAndSites();   // ← ADD THIS LINE
   }, [userId, userRole]);
 
   // ── Calculations ────────────────────────────────────────────────────────────

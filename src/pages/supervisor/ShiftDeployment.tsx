@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import axios from "axios";
 import { useRole } from "@/context/RoleContext";
 import { DashboardHeader } from "@/components/shared/DashboardHeader";
+
 const API_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
@@ -24,29 +25,22 @@ export default function ShiftDeployment() {
   const [tomorrowShift, setTomorrowShift] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [siteId, setSiteId] = useState<string>("");
   const [siteName, setSiteName] = useState<string>("");
 
   const today = new Date().toISOString().split('T')[0];
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
-  // Get supervisor's site(s) from assigned tasks (same logic as dashboard)
+  // ✅ CHANGED: Fetch siteId from auth endpoint
   const fetchSupervisorSite = async () => {
     try {
-      const supervisorId = currentUser?._id || currentUser?.id;
-      if (!supervisorId) return null;
-      const res = await apiClient.get('/tasks', { params: { limit: 1000 } });
-      let tasks = res.data?.data || res.data || [];
-      if (!Array.isArray(tasks)) tasks = [];
-      const siteSet = new Set<string>();
-      tasks.forEach((task: any) => {
-        const assigned = task.assignedUsers?.some((u: any) => u.userId === supervisorId);
-        const assignedOld = task.assignedTo === supervisorId;
-        if ((assigned || assignedOld) && task.siteName) {
-          siteSet.add(task.siteName);
-        }
-      });
-      const sites = Array.from(siteSet);
-      return sites.length > 0 ? sites[0] : null;
+      const res = await apiClient.get('/auth/supervisor-site');
+      if (res.data.success && res.data.siteId) {
+        setSiteId(res.data.siteId);
+        setSiteName(res.data.siteName);
+        return res.data.siteId;
+      }
+      return null;
     } catch (error) {
       console.error("Error fetching supervisor site:", error);
       return null;
@@ -55,23 +49,23 @@ export default function ShiftDeployment() {
 
   useEffect(() => {
     const init = async () => {
-      const site = await fetchSupervisorSite();
-      if (!site) {
+      const siteIdFromResponse = await fetchSupervisorSite();
+      if (!siteIdFromResponse) {
         toast.error("No site found for this supervisor. Please contact admin.");
         setLoading(false);
         return;
       }
-      setSiteName(site);
-      await fetchShiftDeployment(site);
+      await fetchShiftDeployment(siteIdFromResponse);
     };
     init();
   }, []);
 
-  const fetchShiftDeployment = async (site: string) => {
+  // ✅ CHANGED: Use siteId in API calls
+  const fetchShiftDeployment = async (siteIdParam: string) => {
     try {
       const [todayRes, tomorrowRes] = await Promise.all([
-        apiClient.get('/shifts/site-deployment', { params: { site, date: today } }),
-        apiClient.get('/shifts/site-deployment', { params: { site, date: tomorrow } })
+        apiClient.get('/shifts/site-deployment', { params: { siteId: siteIdParam, date: today } }),
+        apiClient.get('/shifts/site-deployment', { params: { siteId: siteIdParam, date: tomorrow } })
       ]);
       setTodayShift(todayRes.data?.data?.text || "");
       setTomorrowShift(tomorrowRes.data?.data?.text || "");
@@ -83,15 +77,16 @@ export default function ShiftDeployment() {
     }
   };
 
+  // ✅ CHANGED: Use siteId in save
   const saveShiftDeployment = async () => {
-    if (!siteName) {
+    if (!siteId) {
       toast.error("No site selected");
       return;
     }
     setSaving(true);
     try {
-      await apiClient.post('/shifts/site-deployment', { site: siteName, date: today, text: todayShift });
-      await apiClient.post('/shifts/site-deployment', { site: siteName, date: tomorrow, text: tomorrowShift });
+      await apiClient.post('/shifts/site-deployment', { siteId, date: today, text: todayShift });
+      await apiClient.post('/shifts/site-deployment', { siteId, date: tomorrow, text: tomorrowShift });
       toast.success("Shift deployment saved");
     } catch (error: any) {
       console.error("Save error:", error);
@@ -105,11 +100,11 @@ export default function ShiftDeployment() {
 
   return (
     <div className="p-4 space-y-4">
-     <DashboardHeader 
-  title="Shift-wise Deployment" 
-  subtitle={siteName ? `Site: ${siteName}` : "Loading..."}
-  onMenuClick={() => {}}
-/>
+      <DashboardHeader 
+        title="Shift-wise Deployment" 
+        subtitle={siteName ? `Site: ${siteName}` : "Loading..."}
+        onMenuClick={() => {}}
+      />
       <Card>
         <CardContent className="pt-4 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

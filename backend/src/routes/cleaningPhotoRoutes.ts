@@ -5,6 +5,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import CleaningPhoto from '../models/CleaningPhoto';
 import { auth } from '../middleware/auth';
 import mongoose from 'mongoose';
+import Site from '../models/Site'; // ✅ ADD THIS
 
 const router = express.Router();
 const storage = multer.memoryStorage();
@@ -20,7 +21,7 @@ const upload = multer({
   }
 });
 
-// POST /api/cleaning-photos â€“ upload a cleaning photo
+// POST /api/cleaning-photos – upload a cleaning photo
 router.post('/', auth, upload.single('photo'), async (req: Request, res: Response) => {
   try {
     if (!req.file) {
@@ -28,7 +29,18 @@ router.post('/', auth, upload.single('photo'), async (req: Request, res: Respons
     }
 
     const user = req.user;
-    const { site, remark } = req.body;
+    // ❌ CHANGE: Accept siteId instead of site
+    // const { site, remark } = req.body;
+    const { siteId, remark } = req.body; // ✅ CHANGED
+
+    // ✅ Validate siteId exists
+    if (!siteId) {
+      return res.status(400).json({ success: false, message: 'Site ID is required' });
+    }
+    const site = await Site.findById(siteId);
+    if (!site) {
+      return res.status(400).json({ success: false, message: 'Invalid site' });
+    }
 
     const result = await new Promise<any>((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
@@ -44,7 +56,8 @@ router.post('/', auth, upload.single('photo'), async (req: Request, res: Respons
     const photo = new CleaningPhoto({
       photoUrl: result.secure_url,
       cloudinaryPublicId: result.public_id,
-      site,
+      site: site.name, // ✅ Keep site name for display
+      siteId: site._id, // ✅ ADD THIS
       remark,
       uploadedBy: user._id,
     });
@@ -57,13 +70,15 @@ router.post('/', auth, upload.single('photo'), async (req: Request, res: Respons
   }
 });
 
-// GET /api/cleaning-photos?site=xxx â€“ fetch photos by site (admin/superadmin)
+// GET /api/cleaning-photos?siteId=xxx – fetch photos by siteId
 router.get('/', auth, async (req: Request, res: Response) => {
   try {
-    const { site } = req.query;
+    // ❌ CHANGE: Use siteId instead of site
+    // const { site } = req.query;
+    const { siteId } = req.query; // ✅ CHANGED
     const filter: any = {};
-    if (site && typeof site === 'string') {
-      filter.site = site;
+    if (siteId && typeof siteId === 'string') {
+      filter.siteId = siteId; // ✅ CHANGED
     }
     const photos = await CleaningPhoto.find(filter).sort({ createdAt: -1 });
     res.json({ success: true, data: photos });
@@ -72,11 +87,24 @@ router.get('/', auth, async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
-// POST /api/cleaning-photos/multiple â€“ upload multiple cleaning photos
+
+// POST /api/cleaning-photos/multiple – upload multiple cleaning photos
 router.post('/multiple', auth, upload.array('photos', 10), async (req: Request, res: Response) => {
   try {
     const user = req.user;
-    const { site, remark } = req.body;
+    // ❌ CHANGE: Accept siteId instead of site
+    // const { site, remark } = req.body;
+    const { siteId, remark } = req.body; // ✅ CHANGED
+
+    // ✅ Validate siteId exists
+    if (!siteId) {
+      return res.status(400).json({ success: false, message: 'Site ID is required' });
+    }
+    const site = await Site.findById(siteId);
+    if (!site) {
+      return res.status(400).json({ success: false, message: 'Invalid site' });
+    }
+
     const files = req.files as Express.Multer.File[];
     if (!files || files.length === 0) {
       return res.status(400).json({ success: false, message: 'No files uploaded' });
@@ -84,7 +112,6 @@ router.post('/multiple', auth, upload.array('photos', 10), async (req: Request, 
 
     const uploadedPhotos = [];
     for (const file of files) {
-      // Upload to Cloudinary
       const result = await new Promise<any>((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           { folder: 'cleaning-photos' },
@@ -96,11 +123,11 @@ router.post('/multiple', auth, upload.array('photos', 10), async (req: Request, 
         uploadStream.end(file.buffer);
       });
 
-      // Save to database
       const photo = new CleaningPhoto({
         photoUrl: result.secure_url,
         cloudinaryPublicId: result.public_id,
-        site,
+        site: site.name, // ✅ Keep site name for display
+        siteId: site._id, // ✅ ADD THIS
         remark: remark || '',
         uploadedBy: user._id,
       });
@@ -114,7 +141,8 @@ router.post('/multiple', auth, upload.array('photos', 10), async (req: Request, 
     res.status(500).json({ success: false, message: 'Upload failed' });
   }
 });
-// GET /api/cleaning-photos/supervisor â€“ fetch photos for loggedâ€‘in supervisor
+
+// GET /api/cleaning-photos/supervisor – fetch photos for logged-in supervisor
 router.get('/supervisor', auth, async (req: Request, res: Response) => {
   try {
     let userId = req.user._id;

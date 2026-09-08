@@ -42,6 +42,7 @@ export interface FrontendMachine {
   createdAt?: string;
   updatedAt?: string;
   location?: string;
+  siteId?: string;
   model?: string;
 }
 
@@ -56,6 +57,7 @@ export interface CreateMachineDTO {
   lastMaintenanceDate?: string;
   nextMaintenanceDate?: string;
   location?: string;
+  siteId?: string;
   manufacturer?: string;
   serialNumber?: string;
   department?: string;

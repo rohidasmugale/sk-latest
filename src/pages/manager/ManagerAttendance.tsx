@@ -893,7 +893,7 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
   siteData,
   onBack,
   viewType,
-  department
+  department,
 }) => {
   const { role } = useRole();
 
@@ -945,7 +945,26 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
   const [editTomorrowText, setEditTomorrowText] = useState<string>("");
   const [editingShift, setEditingShift] = useState(false);
   const [loadingShift, setLoadingShift] = useState(false);
-  const siteName = siteData?.siteName || siteData?.name;
+  // Use the actual Site ObjectId from originalSite
+  // Get the REAL site ObjectId from originalSite
+  const siteId = (() => {
+    // Primary: use originalSite._id
+    if (siteData?.originalSite?._id) {
+      return siteData.originalSite._id.toString();
+    }
+    // Fallback: extract from composite ID (remove -date-date)
+    const raw = siteData?._id || siteData?.siteId || '';
+    if (typeof raw === 'string') {
+      const parts = raw.split('-');
+      if (parts.length > 0 && /^[a-fA-F0-9]{24}$/.test(parts[0])) {
+        return parts[0];
+      }
+    }
+    return '';
+  })();
+  // Optional: If still not valid, fallback to siteData._id but only if it's a valid ObjectId
+
+  const siteName = siteData?.originalSite?.name || siteData?.siteName || siteData?.name;
   const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null);
   // Remark editing for machines (inside SiteEmployeeDetails)
   const [editingRemarkId, setEditingRemarkId] = useState<string | null>(null);
@@ -958,19 +977,15 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
   const [fetchTrigger, setFetchTrigger] = useState(0);
   // Add this inside SiteEmployeeDetails component:
   const fetchGroomingCount = async () => {
-    if (!siteName || mainTab !== "employees") return;
+    if (!siteId || mainTab !== "employees") return;
     setLoadingGroomingCount(true);
     try {
       const res = await apiClient.get('/grooming', {
-        params: { date: selectedDate, site: siteName }
+        params: { date: selectedDate, siteId }
       });
       const records = res.data?.data || [];
-      // records is an array of grooming records for employees of this site on selectedDate
-      // We consider "improper" if any required item is missing
-      // For simplicity, count employees that have at least one missing grooming item
       let improperCount = 0;
       records.forEach((rec: any) => {
-        // Check required fields based on gender (we don't have gender here, use basic)
         const missing = !rec.shirt || !rec.pant || !rec.cap || !rec.shoes || !rec.idCard;
         if (missing) improperCount++;
       });
@@ -982,6 +997,8 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
       setLoadingGroomingCount(false);
     }
   };
+
+
   const filterByDept = (data: any[]) => {
     if (viewType === 'department' && department) {
       const target = department.trim().toLowerCase();
@@ -1018,7 +1035,8 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
     setLoadingMachines(true);
     try {
       const allMachines = await machineService.getMachines();
-      const siteMachines = allMachines.filter((m) => m.location === siteName);
+      // Filter by siteId (instead of location string)
+      const siteMachines = allMachines.filter((m) => m.siteId === siteId);
       setMachines(siteMachines);
     } catch (error) {
       console.error(error);
@@ -1061,20 +1079,36 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
     }
     return { status: derivedStatus, isLate };
   };
+
   const fetchGrooming = async () => {
+    if (!siteId) return;
     setLoadingGrooming(true);
     try {
-      // Get employees of this site
-      const allEmployeesRes = await apiClient.get('/employees', { params: { limit: 1000 } });
-      const allEmployees = allEmployeesRes.data?.data || allEmployeesRes.data || [];
-      const siteEmployees = allEmployees.filter((emp: any) => emp.siteName === siteName);
-      setGroomingEmployees(siteEmployees);
-
-      // Fetch grooming records for the selected date AND site
-      const groomingRes = await apiClient.get('/grooming', {
-        params: { date: selectedDate, site: siteName }   // ← ADD site parameter
+      // 1. Fetch attendance records for the selected date
+      const attendanceRes = await apiClient.get('/attendance', {
+        params: { date: selectedDate, limit: 1000 }  // ← ADD THIS
+      });
+      const attendanceRecords = attendanceRes.data?.data || [];
+      const presentEmployeeIds = new Set<string>();
+      attendanceRecords.forEach((rec: any) => {
+        if (rec.status === 'present' || rec.status === 'half-day') {
+          presentEmployeeIds.add(rec.employeeId); // this is employee's Mongo _id
+        }
       });
 
+      // 2. Fetch all employees for this site
+      const employeesRes = await apiClient.get('/employees', { params: { limit: 1000 } });
+      const allEmployees = employeesRes.data?.data || employeesRes.data || [];
+      const siteEmployees = allEmployees.filter((emp: any) => emp.siteId === siteId);
+
+      // 3. Filter to only those present today
+      const presentEmployees = siteEmployees.filter(emp => presentEmployeeIds.has(emp._id));
+      setGroomingEmployees(presentEmployees);
+
+      // 4. Fetch grooming records for this site and date
+      const groomingRes = await apiClient.get('/grooming', {
+        params: { date: selectedDate, siteId }
+      });
       const records = groomingRes.data?.data || [];
       const map = new Map();
       records.forEach((r: any) => map.set(r.employeeId, r));
@@ -1090,7 +1124,7 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
   const fetchIncidents = async () => {
     setLoadingIncidents(true);
     try {
-      const incidentRes = await apiClient.get('/incidents', { params: { site: siteName } });
+      const incidentRes = await apiClient.get('/incidents', { params: { siteId } });
       setIncidents(incidentRes.data?.data || []);
     } catch (error) {
       toast.error("Failed to load incidents");
@@ -1147,7 +1181,7 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
   const fetchCleaningPhotos = async () => {
     setLoadingPhotos(true);
     try {
-      const photosRes = await apiClient.get('/cleaning-photos', { params: { site: siteName } });
+      const photosRes = await apiClient.get('/cleaning-photos', { params: { siteId } });
       setCleaningPhotos(photosRes.data?.data || []);
     } catch (error) {
       toast.error("Failed to load cleaning photos");
@@ -1156,15 +1190,15 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
     }
   };
   const fetchShiftDeployment = async () => {
-    if (!siteName) return;
+    if (!siteId) return;
     setLoadingShift(true);
     try {
       const today = getLocalToday();
       const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
       const [todayRes, tomorrowRes] = await Promise.all([
-        apiClient.get('/shifts/site-deployment', { params: { site: siteName, date: today } }),
-        apiClient.get('/shifts/site-deployment', { params: { site: siteName, date: tomorrow } })
+        apiClient.get('/shifts/site-deployment', { params: { siteId, date: today } }),
+        apiClient.get('/shifts/site-deployment', { params: { siteId, date: tomorrow } })
       ]);
 
       const todayText = todayRes.data?.data?.text || 'No shift deployment available.';
@@ -1190,10 +1224,8 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
       const today = getLocalToday();
       const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
-      // Save today
-      await apiClient.post('/shifts/site-deployment', { site: siteName, date: today, text: editTodayText });
-      // Save tomorrow
-      await apiClient.post('/shifts/site-deployment', { site: siteName, date: tomorrow, text: editTomorrowText });
+      await apiClient.post('/shifts/site-deployment', { siteId, date: today, text: editTodayText });
+      await apiClient.post('/shifts/site-deployment', { siteId, date: tomorrow, text: editTomorrowText });
 
       setTodayShift(editTodayText);
       setTomorrowShift(editTomorrowText);
@@ -1203,14 +1235,52 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
       toast.error('Failed to save shift deployment');
     }
   };
+  // Fetch Training & Briefing data for this site
+  const fetchTrainingData = async () => {
+    if (!siteName) return;
+    setLoadingTraining(true);
+    try {
+      // Fetch ALL trainings (without search filter) and then filter on frontend
+      const trainingsRes = await apiClient.get('/trainings', {
+        params: { limit: 1000 }
+      });
+      const trainings = trainingsRes.data?.trainings || [];
+      // Filter trainings for this site (case-insensitive)
+      const siteTrainings = trainings.filter((t: any) =>
+        t.site && t.site.toLowerCase() === siteName.toLowerCase()
+      );
+      setTrainingSessions(siteTrainings);
+      console.log(`✅ Found ${siteTrainings.length} trainings for site: ${siteName}`);
+
+      // Fetch ALL briefings and filter on frontend
+      const briefingsRes = await apiClient.get('/briefings', {
+        params: { limit: 1000 }
+      });
+      const briefings = briefingsRes.data?.briefings || [];
+      // Filter briefings for this site (case-insensitive)
+      const siteBriefings = briefings.filter((b: any) =>
+        b.site && b.site.toLowerCase() === siteName.toLowerCase()
+      );
+      setStaffBriefings(siteBriefings);
+      console.log(`✅ Found ${siteBriefings.length} briefings for site: ${siteName}`);
+    } catch (error) {
+      console.error('Error fetching training data:', error);
+      toast.error('Failed to load training & briefing data');
+    } finally {
+      setLoadingTraining(false);
+    }
+  };
+
   // Load data when tab changes
   useEffect(() => {
+    if (!siteId) return;
     if (mainTab === "machines") fetchMachines();
     if (mainTab === "grooming") fetchGrooming();
     if (mainTab === "incidents") fetchIncidents();
     if (mainTab === "photos") fetchCleaningPhotos();
     if (mainTab === "shift") fetchShiftDeployment();
-  }, [mainTab, selectedDate, siteName]);
+    if (mainTab === "training") fetchTrainingData();
+  }, [mainTab, selectedDate, siteId]);
 
   // Update machine status (allowed for admin/manager/superadmin)
   const updateMachineStatus = async (machineId: string, newStatus: string) => {
@@ -1771,7 +1841,7 @@ table { width: 100%; border-collapse: collapse; font-size: 10px; }
   };
   // Export old incidents (all except selected date)
   const exportOldIncidents = () => {
-    const oldIncidents = incidents.filter(inc => inc.date !== selectedDate);
+    const oldIncidents = incidents.filter(inc => !inc.date?.startsWith?.(selectedDate));
     if (oldIncidents.length === 0) {
       toast.info("No old incidents to export");
       return;
@@ -1971,31 +2041,33 @@ table { width: 100%; border-collapse: collapse; font-size: 10px; }
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
               <tr>
+                <th className="p-2 text-left text-xs">Sr No</th>
                 <th className="p-2 text-left text-xs">ID</th>
                 <th className="p-2 text-left text-xs">Name</th>
                 <th className="p-2 text-left text-xs">Dept</th>
                 <th className="p-2 text-left text-xs">Position</th>
                 <th className="p-2 text-left text-xs">Role</th>
+                {role === 'superadmin' && <th className="p-2 text-left text-xs">Edit</th>}
                 <th className="p-2 text-left text-xs">Status</th>
                 <th className="p-2 text-left text-xs">Check In</th>
                 <th className="p-2 text-left text-xs">Check Out</th>
                 <th className="p-2 text-left text-xs">In Photo</th>
                 <th className="p-2 text-left text-xs">Out Photo</th>
-                <th className="p-2 text-left text-xs">Date</th>
-                <th className="p-2 text-left text-xs">Action</th>
                 <th className="p-2 text-left text-xs">Remark</th>
               </tr>
             </thead>
             <tbody>
               {refreshing ? (
-                <tr><td colSpan={13} className="p-4 text-center"><Loader2 className="animate-spin h-5 w-5 mx-auto" /></td></tr>
+                <tr><td colSpan={14} className="p-4 text-center"><Loader2 className="animate-spin h-5 w-5 mx-auto" /></td></tr>
               ) : paginatedEmployees.length === 0 ? (
-                <tr><td colSpan={13} className="p-4 text-center text-muted-foreground">No employees found</td></tr>
+                <tr><td colSpan={14} className="p-4 text-center text-muted-foreground">No employees found</td></tr>
               ) : (
-                paginatedEmployees.map((emp: any) => {
+                paginatedEmployees.map((emp: any, index: number) => {
                   const { status: displayStatus, isLate } = getDerivedAttendanceStatus(emp);
+                  const srNo = (currentPage - 1) * itemsPerPage + index + 1;
                   return (
                     <tr key={emp.id} className="border-b hover:bg-muted/50">
+                      <td className="p-2 text-xs font-medium text-center">{srNo}</td>
                       <td className="p-2 text-xs font-mono">{emp.employeeId}</td>
                       <td className="p-2 font-medium">{emp.name}</td>
                       <td className="p-2"><Badge variant="outline" className="text-xs">{emp.department}</Badge></td>
@@ -2185,73 +2257,146 @@ table { width: 100%; border-collapse: collapse; font-size: 10px; }
     );
   };
 
-  const renderGroomingTab = () => (
-    <div>
-      {loadingGrooming ? (
+  const renderGroomingTab = () => {
+    // Compute counts
+    let withoutUniform = 0;
+    let notSubmitted = 0;
+
+    groomingEmployees.forEach(emp => {
+      const rec = groomingRecords.get(emp._id);
+      if (!rec) {
+        notSubmitted++;
+        return;
+      }
+      const gender = emp.gender?.toLowerCase() === 'female' ? 'female' : 'male';
+      let missing = false;
+      if (gender === 'female') {
+        if (!rec.shirt || !rec.pant || !rec.cap || !rec.shoes || !rec.idCard ||
+          !rec.nails || !rec.singleBangles || !rec.studs) {
+          missing = true;
+        }
+      } else {
+        if (!rec.shirt || !rec.pant || !rec.cap || !rec.shoes || !rec.idCard ||
+          !rec.nails || !rec.shaving || !rec.haircut) {
+          missing = true;
+        }
+      }
+      if (missing) withoutUniform++;
+    });
+
+    if (loadingGrooming) {
+      return (
         <div className="flex justify-center py-8">
           <Loader2 className="animate-spin" />
         </div>
-      ) : groomingEmployees.length === 0 ? (
+      );
+    }
+
+    if (groomingEmployees.length === 0) {
+      return (
         <div className="text-center py-8 text-muted-foreground">
           <Shirt className="h-12 w-12 mx-auto mb-2" />
-          <p>No employees found for this site.</p>
+          <p>No present employees found for this site on {formatDateDisplay(selectedDate)}.</p>
         </div>
-      ) : (
+      );
+    }
+
+    return (
+      <div>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-sm font-medium">Grooming Status</h3>
+          <div className="flex gap-2">
+            <Badge variant="destructive" className="text-sm">
+              Without uniform: {withoutUniform}
+            </Badge>
+            <Badge variant="outline" className="text-sm">
+              Not submitted: {notSubmitted}
+            </Badge>
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm border">
             <thead className="bg-muted/50">
               <tr>
-                <th className="p-2">Employee</th>
-                <th>Shirt</th>
-                <th>Pant</th>
-                <th>Cap</th>
-                <th>Shoes</th>
-                <th>ID Card</th>
-                <th>Nails</th>
-                <th>Shaving</th>
-                <th>Haircut</th>
-                <th>Apron</th>
-                <th>Westcoat</th>
+                <th className="p-2 text-left">Employee</th>
+                <th className="p-2 text-center">Shirt</th>
+                <th className="p-2 text-center">Pant</th>
+                <th className="p-2 text-center">Cap</th>
+                <th className="p-2 text-center">Shoes</th>
+                <th className="p-2 text-center">ID Card</th>
+                <th className="p-2 text-center">Nails</th>
+                <th className="p-2 text-center">S. Bangles</th>
+                <th className="p-2 text-center">Studs</th>
+                <th className="p-2 text-center">Shaving</th>
+                <th className="p-2 text-center">Haircut</th>
+                <th className="p-2 text-center">Apron</th>
+                <th className="p-2 text-center">Westcoat</th>
               </tr>
             </thead>
             <tbody>
               {groomingEmployees.map((emp) => {
-                const rec = groomingRecords.get(emp._id) || {};
-                const check = (value: boolean) =>
-                  value ? <CheckCircle className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-red-400" />;
+                const rec = groomingRecords.get(emp._id);
+                const hasRecord = !!rec;
+                const gender = emp.gender?.toLowerCase() === 'female' ? 'female' : 'male';
+                const isFemale = gender === 'female';
+
+                const renderField = (field: string) => {
+                  // Gender-specific dash
+                  if (isFemale && (field === 'shaving' || field === 'haircut')) {
+                    return <span className="text-muted-foreground">-</span>;
+                  }
+                  if (!isFemale && (field === 'singleBangles' || field === 'studs')) {
+                    return <span className="text-muted-foreground">-</span>;
+                  }
+                  if (!hasRecord) {
+                    // Not submitted – show a distinct dash
+                    return <span className="text-muted-foreground text-xs">—</span>;
+                  }
+                  const checked = !!rec[field];
+                  return checked ? (
+                    <CheckCircle className="h-4 w-4 text-green-600 mx-auto" />
+                  ) : (
+                    <XCircle className="h-4 w-4 text-red-400 mx-auto" />
+                  );
+                };
+
                 return (
                   <tr key={emp._id} className="border-b">
                     <td className="p-2">
                       <div className="font-medium">{emp.name}</div>
                       <div className="text-xs text-muted-foreground">{emp.employeeId}</div>
+                      <div className="text-[10px] text-muted-foreground">{gender}</div>
                     </td>
-                    <td className="p-2 text-center">{check(rec.shirt)}</td>
-                    <td className="p-2 text-center">{check(rec.pant)}</td>
-                    <td className="p-2 text-center">{check(rec.cap)}</td>
-                    <td className="p-2 text-center">{check(rec.shoes)}</td>
-                    <td className="p-2 text-center">{check(rec.idCard)}</td>
-                    <td className="p-2 text-center">{check(rec.nails)}</td>
-                    <td className="p-2 text-center">{check(rec.shaving)}</td>
-                    <td className="p-2 text-center">{check(rec.haircut)}</td>
-                    <td className="p-2 text-center">{check(rec.apron)}</td>
-                    <td className="p-2 text-center">{check(rec.westcoat)}</td>
+                    <td className="p-2 text-center">{renderField('shirt')}</td>
+                    <td className="p-2 text-center">{renderField('pant')}</td>
+                    <td className="p-2 text-center">{renderField('cap')}</td>
+                    <td className="p-2 text-center">{renderField('shoes')}</td>
+                    <td className="p-2 text-center">{renderField('idCard')}</td>
+                    <td className="p-2 text-center">{renderField('nails')}</td>
+                    <td className="p-2 text-center">{renderField('singleBangles')}</td>
+                    <td className="p-2 text-center">{renderField('studs')}</td>
+                    <td className="p-2 text-center">{renderField('shaving')}</td>
+                    <td className="p-2 text-center">{renderField('haircut')}</td>
+                    <td className="p-2 text-center">{renderField('apron')}</td>
+                    <td className="p-2 text-center">{renderField('westcoat')}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-      )}
-    </div>
-  );
+      </div>
+    );
+  };
 
   const renderIncidentsTab = () => {
     if (loadingIncidents) {
       return <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>;
     }
 
-    const incidentsForDate = incidents.filter(inc => inc.date === selectedDate);
-    const oldIncidentsCount = incidents.filter(inc => inc.date !== selectedDate).length;
+    const incidentsForDate = incidents.filter(inc => inc.date?.startsWith?.(selectedDate));
+    const oldIncidentsCount = incidents.filter(inc => !inc.date?.startsWith?.(selectedDate)).length;
 
     return (
       <div className="space-y-4">
@@ -2277,7 +2422,9 @@ table { width: 100%; border-collapse: collapse; font-size: 10px; }
                   <Badge variant={inc.type === "accident" ? "destructive" : "default"}>
                     {inc.type}
                   </Badge>
-                  <span className="text-xs text-muted-foreground">{formatDateDisplay(inc.date)}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatDateDisplay(normalizeDateStr(inc.date))}
+                  </span>
                 </div>
                 <p className="text-sm mt-1">{inc.description}</p>
                 {inc.employeeId && <p className="text-xs text-muted-foreground">Employee: {inc.employeeId}</p>}

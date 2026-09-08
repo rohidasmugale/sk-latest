@@ -3244,25 +3244,7 @@ const getSiteDisplayName = () => {
                     <SelectTrigger className="w-[180px]">
                       <SelectValue placeholder="Filter by site" />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All My Sites</SelectItem>
-                      {sites.map(site => {
-                        const requirements = siteStaffingRequirements.get(site._id);
-                        return (
-                          <SelectItem key={site._id} value={site._id}>
-                            <div className="flex items-center gap-2">
-                              <Building className="h-3 w-3" />
-                              {site.name}
-                              {requirements && !requirements.isSupervisorRequirementMet && (
-                                <Badge variant="outline" className="bg-amber-50 text-amber-700 text-[10px] px-1 ml-1">
-                                  Need {requirements.requiredSupervisors - requirements.assignedSupervisors}
-                                </Badge>
-                              )}
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
+                   
                   </Select>
                 </div>
               </div>

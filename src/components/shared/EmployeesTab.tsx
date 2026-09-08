@@ -27,17 +27,13 @@ import apiClient from '@/lib/apiClient';  // or your path
 const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? "http://localhost:5001/api" : "https://sk-backend-btbj.onrender.com/api");
 
-// ─── Extended Interfaces ──────────────────────────────────────────────────
-// Fields that must be filled for a "complete" profile (exclude panNumber, email, numberOfChildren)
 const EMPLOYEE_COMPLETE_FIELDS: (keyof ExtendedEmployee)[] = [
-  'name', 'phone', 'aadharNumber', 'esicNumber', 'uanNumber',
-  'siteName', 'dateOfBirth', 'joinDate', 'bloodGroup', 'gender', 'maritalStatus',
-  'permanentAddress', 'permanentPincode', 'localAddress', 'localPincode',
+  'name', 'phone', 'aadharNumber',
+  'siteName', 'dateOfBirth', 'joinDate', 'bloodGroup', 'gender', 'maritalStatus', 'status',
+  'permanentAddress', 'localAddress',
   'bankName', 'accountNumber', 'ifscCode', 'branchName',
-  'fatherName', 'motherName',
-  'emergencyContactName', 'emergencyContactPhone', 'emergencyContactRelation',
+   'emergencyContactPhone','emergencyPhone2',
   'nomineeName', 'nomineeRelation',
-  'pantSize', 'shirtSize', 'capSize',
   'department', 'position', 'salary',
 ];
 
@@ -57,21 +53,32 @@ interface SiteWithCounts extends Site {
   currentManagerCount?: number;
   currentSupervisorCount?: number;
   currentStaffCount?: number;
+  staffRequirement?: number;   // ✅ ADD THIS
 }
 interface ExtendedEmployee extends Employee {
   siteHistory: SiteAssignmentHistory[];
   isManager: boolean;
   isSupervisor?: boolean;
+  relativeName?: string;   // ← ADD
+  relation?: string;        // ← ADD
   kycDocuments: any[];
   documents: any[];
   photo?: string | null;
   photoPublicId?: string | null;
   uanNumber: string;
-  dateOfJoining: string;            // ✅ ADD
-
+  dateOfJoining: string;
   _id?: string;
-  faceEmbeddings?: number[][];  // ✅ ADD THIS
-  profileStatus?: "complete" | "incomplete";   // ✅ ADD
+  faceEmbeddings?: number[][];
+  profileStatus?: "complete" | "incomplete";
+  // ADD THESE MISSING FIELDS:
+
+  pantSize?: string;
+  shirtSize?: string;
+  capSize?: string;
+  idCardIssued?: boolean;
+  westcoatIssued?: boolean;
+  apronIssued?: boolean;
+  emergencyPhone2?: string;
 }
 
 interface EPFForm11Data {
@@ -155,20 +162,22 @@ interface EditEmployeeForm {
   gender: string;
   maritalStatus: string;
   permanentAddress: string;
-  permanentPincode: string;
+
   localAddress: string;
-  localPincode: string;
+
   bankName: string;
   accountNumber: string;
   ifscCode: string;
   branchName: string;
-  fatherName: string;
-  motherName: string;
-  spouseName: string;
+  relativeName: string;
+  relation: string;   // "Father" | "Mother" | "Spouse" | "Husband" | "Wife"
+  dateOfJoining: string;   // ADD THIS
   numberOfChildren: string;
-  emergencyContactName: string;
+
   emergencyContactPhone: string;
-  emergencyContactRelation: string;
+  emergencyPhone2: string;
+
+
   nomineeName: string;
   nomineeRelation: string;
   pantSize: string;
@@ -199,7 +208,7 @@ interface EmployeesTabProps {
   selectedSite?: string;
   sites?: Site[];
   skipFetch?: boolean;   // ADD THIS/
-   onAddEmployee?: () => void;  // ADD THIS
+  onAddEmployee?: () => void;  // ADD THIS
 }
 
 // ─── Site Filter Component ──────────────────────────────────────────────
@@ -240,7 +249,7 @@ const EmployeesTab = ({
   onEmployeesBulkUpdate,
   selectedSite: propSelectedSite = 'all',
   sites: propSites = [],
-  skipFetch = false  , // ✅ ADD THIS
+  skipFetch = false, // ✅ ADD THIS
   onAddEmployee,   // ADD THIS
 
 }: EmployeesTabProps) => {
@@ -512,22 +521,31 @@ const EmployeesTab = ({
             documents: emp.documents || [],
             photo: emp.photo || null,
             photoPublicId: emp.photoPublicId || null,
-            fatherName: emp.fatherName || "",
-            motherName: emp.motherName || "",
-            spouseName: emp.spouseName || "",
+            relativeName: emp.relativeName || "",
+            relation: emp.relation || "",   // "Father" | "Mother" | "Spouse" | "Husband" | "Wife"
             numberOfChildren: emp.numberOfChildren ? emp.numberOfChildren.toString() : "0",
             nomineeName: emp.nomineeName || "",
             nomineeRelation: emp.nomineeRelation || "",
             accountNumber: emp.accountNumber || emp.bankAccountNumber || "",
             ifscCode: emp.ifscCode || "",
             bankName: emp.bankName || "",
+            branchName: emp.branchName || "",        // ✅ ADD THIS LINE HERE
             permanentAddress: emp.permanentAddress || "",
             localAddress: emp.localAddress || "",
-            emergencyContactName: emp.emergencyContactName || "",
+           
             emergencyContactPhone: emp.emergencyContactPhone || "",
-            emergencyContactRelation: emp.emergencyContactRelation || "",
+            emergencyPhone2: emp.emergencyPhone2 || "",
+
+
+            pantSize: emp.pantSize || "",
+            shirtSize: emp.shirtSize || "",
+            capSize: emp.capSize || "",
+            idCardIssued: emp.idCardIssued || false,
+            westcoatIssued: emp.westcoatIssued || false,
+            apronIssued: emp.apronIssued || false,
             siteHistory: siteHistory,
             kycDocuments: emp.kycDocuments || [],
+
             isManager: false,
             isSupervisor: false,
             faceEmbeddings: (emp as any).faceEmbeddings || [],
@@ -550,8 +568,8 @@ const EmployeesTab = ({
           employee.isManager = position.includes('manager') || department.includes('manager');
           employee.isSupervisor = position.includes('supervisor') || department.includes('supervisor');
 
-          // ✅ NOW add profileStatus using the complete employee
-          employee.profileStatus = emp.profileStatus || (checkEmployeeCompleteness(employee) ? 'complete' : 'incomplete');
+          // ✅ ALWAYS recompute profileStatus fresh (don't trust stale DB value)
+          employee.profileStatus = checkEmployeeCompleteness(employee) ? 'complete' : 'incomplete';
 
           return employee;
         });
@@ -712,17 +730,17 @@ const EmployeesTab = ({
   };
 
   // ─── Helper Functions ──────────────────────────────────────────────────
-const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]): {
-  allowed: boolean;
-  message?: string;
-  violations: Array<{
-    employee: ExtendedEmployee;
-    reason: string;
-  }>;
-} => {
-  // Capacity limits removed — any number of employees can be assigned to any site.
-  return { allowed: true, violations: [] };
-};
+  const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]): {
+    allowed: boolean;
+    message?: string;
+    violations: Array<{
+      employee: ExtendedEmployee;
+      reason: string;
+    }>;
+  } => {
+    // Capacity limits removed — any number of employees can be assigned to any site.
+    return { allowed: true, violations: [] };
+  };
 
   const updateSiteHistory = (employee: ExtendedEmployee, newSiteName: string): ExtendedEmployee => {
     const today = new Date().toISOString().split('T')[0];
@@ -846,9 +864,15 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
   }, [selectedEmployees, sortedEmployees]);
 
   // ─── Edit Handlers ──────────────────────────────────────────────────
-
   const handleEditEmployee = (employee: ExtendedEmployee) => {
     setSelectedEmployeeForEdit(employee);
+
+    const dateOfJoiningFormatted = employee.dateOfJoining
+      ? new Date(employee.dateOfJoining).toISOString().split('T')[0]
+      : employee.joinDate
+        ? new Date(employee.joinDate).toISOString().split('T')[0]
+        : '';
+
     setEditFormData({
       employeeId: employee.employeeId || '',
       name: employee.name || "",
@@ -863,20 +887,19 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
       gender: employee.gender || "",
       maritalStatus: employee.maritalStatus || "",
       permanentAddress: employee.permanentAddress || "",
-      permanentPincode: employee.permanentPincode || "",
       localAddress: employee.localAddress || "",
-      localPincode: employee.localPincode || "",
       bankName: employee.bankName || "",
       accountNumber: employee.accountNumber || "",
       ifscCode: employee.ifscCode || "",
       branchName: employee.branchName || "",
-      fatherName: employee.fatherName || "",
-      motherName: employee.motherName || "",
-      spouseName: employee.spouseName || "",
+      relativeName: employee.relativeName || "",
+      relation: employee.relation || "",
+      dateOfJoining: dateOfJoiningFormatted,
       numberOfChildren: employee.numberOfChildren?.toString() || "0",
-      emergencyContactName: employee.emergencyContactName || "",
+     
       emergencyContactPhone: employee.emergencyContactPhone || "",
-      emergencyContactRelation: employee.emergencyContactRelation || "",
+      emergencyPhone2: employee.emergencyPhone2 || "",
+
       nomineeName: employee.nomineeName || "",
       nomineeRelation: employee.nomineeRelation || "",
       pantSize: employee.pantSize || "",
@@ -921,6 +944,7 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
       { field: editFormData.position, name: 'Position' },
       { field: editFormData.department, name: 'Department' },
       { field: editFormData.siteName, name: 'Site Name' },
+      { field: editFormData.dateOfJoining, name: 'Date of Joining' },
     ];
 
     const missingFields = requiredFields
@@ -956,7 +980,7 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
       const employeeId = selectedEmployeeForEdit.id || selectedEmployeeForEdit._id;
 
       const apiData = {
-        employeeId: editFormData.employeeId.trim(), // ✅ Include Employee ID
+        employeeId: editFormData.employeeId.trim(),
         ...editFormData,
         email: editFormData.email?.trim() || null,
         panNumber: editFormData.panNumber?.trim() || null,
@@ -967,28 +991,28 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
         gender: editFormData.gender || null,
         maritalStatus: editFormData.maritalStatus || null,
         permanentAddress: editFormData.permanentAddress?.trim() || null,
-        permanentPincode: editFormData.permanentPincode?.trim() || null,
+        // ← This should be preserved
         localAddress: editFormData.localAddress?.trim() || null,
-        localPincode: editFormData.localPincode?.trim() || null,
+        // ← This should be preserved
         bankName: editFormData.bankName?.trim() || null,
         accountNumber: editFormData.accountNumber?.trim() || null,
         ifscCode: editFormData.ifscCode?.trim().toUpperCase() || null,
         branchName: editFormData.branchName?.trim() || null,
-        fatherName: editFormData.fatherName?.trim() || null,
-        motherName: editFormData.motherName?.trim() || null,
-        spouseName: editFormData.spouseName?.trim() || null,
+        relativeName: editFormData.relativeName?.trim() || null,
+        relation: editFormData.relation?.trim() || null,
         numberOfChildren: editFormData.numberOfChildren?.toString() || "0",
-        emergencyContactName: editFormData.emergencyContactName?.trim() || null,
+       
         emergencyContactPhone: editFormData.emergencyContactPhone?.trim() || null,
-        emergencyContactRelation: editFormData.emergencyContactRelation?.trim() || null,
+        emergencyPhone2: editFormData.emergencyPhone2?.trim() || null,
+
         nomineeName: editFormData.nomineeName?.trim() || null,
         nomineeRelation: editFormData.nomineeRelation?.trim() || null,
-        pantSize: editFormData.pantSize || null,
-        shirtSize: editFormData.shirtSize || null,
-        capSize: editFormData.capSize || null,
-        idCardIssued: editFormData.idCardIssued === true,
-        westcoatIssued: editFormData.westcoatIssued === true,
-        apronIssued: editFormData.apronIssued === true,
+        pantSize: editFormData.pantSize || null,          // ← This should be preserved
+        shirtSize: editFormData.shirtSize || null,        // ← This should be preserved
+        capSize: editFormData.capSize || null,            // ← This should be preserved
+        idCardIssued: editFormData.idCardIssued === true, // ← This should be preserved
+        westcoatIssued: editFormData.westcoatIssued === true, // ← This should be preserved
+        apronIssued: editFormData.apronIssued === true,   // ← This should be preserved
         salary: typeof editFormData.salary === 'string' ? parseFloat(editFormData.salary) : editFormData.salary,
       };
 
@@ -1047,7 +1071,6 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
   };
 
   // ─── Bulk Actions ────────────────────────────────────────────────────
-
   const handleBulkSiteAssignment = async () => {
     if (!selectedSiteForBulk) {
       toast.error("Please select a site");
@@ -1061,41 +1084,17 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
 
     const employeesToAssign = employees.filter(emp => selectedEmployees.includes(emp.id || emp._id || ''));
 
-    const capacityCheck = canAssignToSite(selectedSiteForBulk, employeesToAssign);
-
-    if (!capacityCheck.allowed) {
-      toast.error(
-        <div className="space-y-2">
-          <div className="flex items-centergap-2">
-            <AlertCircle className="h-4 w-4 text-red-500" />
-            <span className="font-medium">Site Capacity Exceeded</span>
-          </div>
-          <div className="text-sm text-red-600 max-h-40 overflow-y-auto">
-            {capacityCheck.violations.map((violation, index) => (
-              <div key={index} className="mb-1">
-                • {violation.employee.name}: {violation.reason}
-              </div>
-            ))}
-          </div>
-          <div className="text-xs text-muted-foreground mt-2">
-            Please select different employees or adjust site requirements.
-          </div>
-        </div>,
-        { duration: 8000 }
-      );
-      return;
-    }
-
     try {
       setIsBulkUpdating(true);
 
       const employeeIds = employeesToAssign.map(emp => emp._id || emp.id);
 
-      console.log('Sending bulk site update:', { employeeIds, siteName: selectedSiteForBulk });
+      console.log('Sending bulk site update:', { employeeIds, siteId: selectedSiteForBulk });
 
+      // ✅ Send siteId instead of siteName
       const response = await apiClient.patch('/employees/bulk/site', {
         employeeIds: employeeIds,
-        siteName: selectedSiteForBulk
+        siteId: selectedSiteForBulk   // ← changed from siteName to siteId
       });
 
       if (response.data.success) {
@@ -1140,6 +1139,7 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
       setIsBulkUpdating(false);
     }
   };
+
 
   const handleBulkDelete = async () => {
     if (selectedEmployees.length === 0) {
@@ -1321,7 +1321,8 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
         'Adhaar Number': emp.aadharNumber || '',
         'Mobile Number': emp.phone || '',
         'PAN NO': emp.panNumber || '',
-        'Father / Husband Name': emp.fatherName || '',
+        'Father / Husband Name': emp.relativeName || '',
+
         'Relation': emp.relation || emp.emergencyContactRelation || '',
         'Bank A/c Number': emp.accountNumber || '',
         'IFSC Code': emp.ifscCode || '',
@@ -1329,17 +1330,16 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
         'Nominee Name': emp.nomineeName || '',
         'Nominee Relation': emp.nomineeRelation || '',
         'Emergency Contact 1': emp.emergencyContactPhone || '',
-        'Emergency Contact 2': '', // add if you have second emergency contact
+        'Emergency Contact 2': emp.emergencyPhone2 || '',
         'Local Address': emp.localAddress || '',
         'Permannt Address': emp.permanentAddress || '',
         'Remark': '',
         'Email': emp.email || '',
-        'Spouse Name': emp.spouseName || '',
+
         'Number of Children': emp.numberOfChildren || '',
         'Department': emp.department || '',
         'Salary': emp.salary || '',
-        'Permanent Pincode': emp.permanentPincode || '',
-        'Local Pincode': emp.localPincode || '',
+
       }));
 
       const wb = XLSX.utils.book_new();
@@ -1497,8 +1497,17 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
         'OWC OPRETER': 'OWC OPERATOR',
         'GOLBAL SQUARE': 'GLOBAL SQUARE',
         'GOLBAL LIFE STYLE': 'GLOBAL LIFE STYLE',
-        'GANGA TRUENO': 'GANGA TRUENO', // adjust to your actual DB name
-        // Add more as you find them
+
+        'SOLITURE BUSINESS HUB': 'SOILTURE BUSINESS HUB',   // typo: Soliture → Soilture
+        'GLOBAL INSPIRA': 'GLOBAL INSPERIA HK',              // typo: Inspira → Insperia
+        'WESTEND MALL': 'WESTEND MALL HK',
+        'SATURO': 'SATURO TECHNOLOGIES',
+        'ESPATH': 'ESPATH COMPANY',
+        'GHS MALL': 'GRAND HIGH STREET MALL',
+        'BHAIRAT': 'BHAIRAT HK',
+        'BRAMHA': 'BRAHMA CITY HK',
+        'BHRAMA': 'BRAHMA CITY HK',      // another typo of Bramha
+        'BHRMA': 'BRAHMA CITY HK',       // another typo of Bramha
       };
       // Build a map from normalised DB site name → original DB site name
 
@@ -1506,6 +1515,7 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
       for (const siteName of siteCapacityMap.keys()) {
         dbSiteNormalizedMap.set(normalizeSiteName(siteName), siteName);
       }
+      console.log('📍 DB Sites available:', sites.map(s => s.name).join(' | '));
       const arrayBuffer = await file.arrayBuffer();
       const workbook = XLSX.read(arrayBuffer, {
         type: 'array',
@@ -1550,7 +1560,7 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
       if (col.site === -1) requiredMissing.push('Site');
       if (col.name === -1) requiredMissing.push('Name');
       if (col.aadhar === -1) requiredMissing.push('Aadhar');
-      if (col.employeeCode === -1) requiredMissing.push('Emp Code / Employee ID');
+
 
       if (requiredMissing.length > 0) {
         toast.error(
@@ -1722,11 +1732,7 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
         const uanNumber = col.uan !== -1 ? safeNumericString(row[col.uan]) : '';
         const esicNumber = col.esic !== -1 ? safeNumericString(row[col.esic]) : '';
         const employeeCode = safeNumericString(row[col.employeeCode]);
-        if (!employeeCode) {
-          skippedCount++;
-          skippedReasons.push(`Row ${rowIndex}: Missing Employee ID`);
-          continue;
-        }
+
         const position = col.position !== -1 && row[col.position] ? String(row[col.position]).trim() : '';
         const name = row[col.name] ? String(row[col.name]).trim() : '';
         let gender = '';
@@ -1758,7 +1764,7 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
         seenInFileAadhar.add(paddedAadhar);
 
         // Check if employee already exists (by Aadhar or Employee ID)
-        const matchedExisting = existingByAadhar.get(paddedAadhar) || existingByEmpId.get(employeeCode);
+        const matchedExisting = existingByAadhar.get(paddedAadhar) || (employeeCode ? existingByEmpId.get(employeeCode) : undefined);
         const contact = col.mobile !== -1 ? safeNumericString(row[col.mobile]) : '';
         const pan = col.pan !== -1 ? safeNumericString(row[col.pan]).toUpperCase() : '';
         const bloodGroup = col.bloodGroup !== -1 && row[col.bloodGroup] ? String(row[col.bloodGroup]).trim() : '';
@@ -1770,6 +1776,7 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
         const nomineeName = col.nomineeName !== -1 && row[col.nomineeName] ? String(row[col.nomineeName]).trim() : '';
         const nomineeRelation = col.nomineeRelation !== -1 && row[col.nomineeRelation] ? String(row[col.nomineeRelation]).trim() : '';
         const emergencyContactPhone = col.emergencyPhone !== -1 && row[col.emergencyPhone] ? String(row[col.emergencyPhone]).trim() : '';
+        const emergencyPhone2 = col.emergencyPhone2 !== -1 && row[col.emergencyPhone2] ? safeNumericString(row[col.emergencyPhone2]) : '';
         const localAddress = col.localAddress !== -1 && row[col.localAddress] ? String(row[col.localAddress]).trim() : '';
         const permanentAddress = col.permanentAddress !== -1 && row[col.permanentAddress] ? String(row[col.permanentAddress]).trim() : '';
         const rawMaritalStatus = col.maritalStatus !== -1 && row[col.maritalStatus] ? String(row[col.maritalStatus]).trim().toLowerCase() : '';
@@ -1998,16 +2005,16 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
           branchName: bankBranch || null,
           accountNumber: accountNumber || null,
           ifscCode: ifscCode || null,
-          fatherName: isFatherRelation ? relativeName : null,
-          spouseName: isSpouseRelation ? relativeName : null,
-          motherName: isMotherRelation ? relativeName : null,
+          relativeName: relativeName || null,
+          relation: relation || null,
           permanentAddress: permanentAddress || null,
           localAddress: localAddress || null,
           nomineeName: nomineeName || null,
           nomineeRelation: nomineeRelation || null,
-          emergencyContactName: null,
+        
           emergencyContactPhone: emergencyContactPhone || null,
-          emergencyContactRelation: null,
+          emergencyPhone2: emergencyPhone2 || null,
+
           pantSize: null,
           shirtSize: null,
           capSize: null,
@@ -2248,13 +2255,9 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
         errors: data.errors || []
       });
 
-      if (data.status === 'processing') {
-        // Poll again after 2 seconds
-        setTimeout(() => pollStatus(id), 2000);
-      } else if (data.status === 'completed') {
+      if (data.status === 'completed') {
         setJobStatus('completed');
         toast.success(`Import complete: ${data.createdCount} created, ${data.updatedCount} updated`);
-        // Refresh employee list and site data
         await fetchEmployees();
         await fetchSites();
         calculateSiteDeploymentStatus();
@@ -2262,6 +2265,9 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
       } else if (data.status === 'failed') {
         setJobStatus('failed');
         toast.error(`Import failed: ${data.errors?.[0]?.message || 'Unknown error'}`);
+      } else {
+        // 'pending' or 'processing' (or anything else not-yet-final) — keep polling
+        setTimeout(() => pollStatus(id), 2000);
       }
     } catch (err: any) {
       setJobStatus('failed');
@@ -2380,6 +2386,7 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
     nomineeName: ['nominee name'],
     nomineeRelation: ['nominee relation', 'relation2'],
     emergencyPhone: ['emergency contact no', 'emer no', 'emergency contact', 'emergency no', 'emergency contact 1'],
+    emergencyPhone2: ['emergency contact 2', 'emergency phone 2', 'second emergency phone'],
     localAddress: ['local address', 'present add'],
     permanentAddress: ['permanent address', 'adhar add', 'aadhar address', 'permannt address'], // ✅ added 'permannt address'
     maritalStatus: ['married unmarried', 'marital status'],
@@ -2389,8 +2396,7 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
     numberOfChildren: ['number of children', 'no of children', 'children'],
     department: ['department'],
     salary: ['salary', 'basic salary'],
-    permanentPincode: ['permanent pincode', 'permanent pin code'],
-    localPincode: ['local pincode', 'local pin code'],
+
   };
 
   interface ImportColumnMap {
@@ -2400,7 +2406,7 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
     relativeName: number; relation: number; mobile: number; accountNumber: number;
     ifsc: number; bankBranch: number; nomineeName: number; nomineeRelation: number;
     emergencyPhone: number; localAddress: number; permanentAddress: number;
-    maritalStatus: number; pfNo: number;
+    maritalStatus: number; pfNo: number; emergencyPhone2: number;
   }
 
   // Builds { fieldKey: columnIndex } by matching each sheet header (by name) against
@@ -2444,10 +2450,19 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
   const handleOpenEPFForm11 = (employee: ExtendedEmployee) => {
     setSelectedEmployeeForEPF(employee);
 
+
+    const fatherOrSpouseName = employee.relativeName || '';
+    let relationshipType: "father" | "spouse" = "spouse";
+    if (employee.relation === 'Father' || employee.relation === 'Mother') {
+      relationshipType = 'father';
+    } else if (employee.relation === 'Spouse' || employee.relation === 'Husband' || employee.relation === 'Wife') {
+      relationshipType = 'spouse';
+    }
+
     setEpfFormData({
       memberName: employee.name || "",
-      fatherOrSpouseName: employee.fatherName || employee.spouseName || "",
-      relationshipType: employee.fatherName ? "father" : "spouse",
+      fatherOrSpouseName: fatherOrSpouseName,
+      relationshipType: relationshipType,
       dateOfBirth: employee.dateOfBirth || "",
       gender: employee.gender || "",
       maritalStatus: employee.maritalStatus || "",
@@ -2542,7 +2557,7 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
     }
   };
   // ─── Print Joining Form ──────────────────────────────────────────────
-  const printJoiningForm = (employee: Employee) => {
+  const printJoiningForm = (employee: ExtendedEmployee) => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
       toast.error("Please allow popups to print the form");
@@ -2551,198 +2566,416 @@ const canAssignToSite = (siteName: string, employeesToAssign: ExtendedEmployee[]
 
     const photoUrl = employee.photo || '';
 
+    // --- KYC Documents ---
+    const documents = employee.kycDocuments || [];
+
+    const isImageDoc = (doc: any) =>
+      (doc.fileType && doc.fileType.startsWith('image/')) ||
+      /\.(jpe?g|png|gif|webp)$/i.test(doc.fileUrl || '');
+
+    const imageDocs = documents.filter(isImageDoc);
+    const otherDocs = documents.filter((d: any) => !isImageDoc(d));
+
+    // One printable page per scanned image document
+    const documentImagePages = imageDocs.map((doc: any) => `
+    <div class="page doc-page">
+      <div class="doc-header">
+        <h2>${doc.documentName}${doc.documentNumber ? ' — ' + doc.documentNumber : ''}</h2>
+      </div>
+      <div class="doc-image-wrap">
+        <img src="${doc.fileUrl}" class="doc-image" />
+      </div>
+    </div>
+  `).join('');
+
+    // Non-image files (PDF/Word/etc.) can't be reliably embedded in a print popup —
+    // list them instead so nothing silently gets left out.
+    const otherDocsListPage = otherDocs.length > 0 ? `
+    <div class="page doc-page">
+      <div class="doc-header"><h2>Other Attached Documents</h2></div>
+      <ul class="doc-list">
+        ${otherDocs.map((doc: any) => `
+          <li>${doc.documentName}${doc.documentNumber ? ' — ' + doc.documentNumber : ''} (${doc.fileType || 'file'})</li>
+        `).join('')}
+      </ul>
+      <p class="doc-note">These files are not images and were not auto-printed. Open them from the Documents tab to print separately.</p>
+    </div>
+  ` : '';
+
     const formContent = `
-  <!DOCTYPE html>
-  <html>
-  <head>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Joining Form - ${employee.name}</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 12mm 15mm;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Times New Roman', Georgia, serif;
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      color: #000;
+    }
+    .page {
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      page-break-after: always;
+    }
+    .page:last-child {
+      page-break-after: auto;
+    }
 
-    <title>Joining Form - ${employee.name}</title>
-    <style>
-@page {
-  size: A4 portrait;
-  margin: 12mm 15mm;
-}
-* {
-  box-sizing: border-box;
-}
-body {
-  font-family: 'Times New Roman', Georgia, serif;
-  margin: 0;
-  padding: 0;
-  background: #fff;
-  color: #000;
-}
-.page {
-  width: 100%;
-  max-width: 100%;
-  margin: 0;
-  padding: 0;
-  background: #fff;
-  page-break-after: always;
-}
-.page:last-child {
-  page-break-after: auto;
-}
-/* Keep all your existing styles for .header, .field-row, etc. */
+    /* ---------- PAGE 1: JOINING FORM ---------- */
+    .header {
+      position: relative;
+      border-bottom: 2px solid #000;
+      padding-bottom: 8px;
+      margin-bottom: 10px;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 30px;
+      letter-spacing: 3px;
+      font-weight: bold;
+    }
+    .header .subtitle {
+      font-size: 12px;
+      margin-top: 2px;
+    }
+    .header .form-title {
+      font-size: 17px;
+      font-weight: bold;
+      text-align: center;
+      margin-top: 6px;
+      text-decoration: underline;
+    }
+    .photo-box {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 95px;
+      height: 110px;
+      border: 1px solid #000;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: #999;
+    }
+    .photo-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
 
-      /* ---------- PAGE 1: JOINING FORM ---------- */
-      .header { position: relative; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 10px; }
-      .header h1 { margin:0; font-size: 30px; letter-spacing: 3px; font-weight: bold; }
-      .header .subtitle { font-size: 12px; margin-top: 2px; }
-      .header .form-title { font-size: 17px; font-weight: bold; text-align:center; margin-top: 6px; text-decoration: underline; }
-      .photo-box { position: absolute; top: 0; right: 0; width: 95px; height: 110px; border: 1px solid #000; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:10px; color:#999; }
-      .photo-box img { width:100%; height:100%; object-fit:cover; }
+    .field-row {
+      display: flex;
+      align-items: baseline;
+      border-bottom: 1px solid #000;
+      padding: 5px 0;
+      min-height: 24px;
+    }
+    .field-row .label {
+      font-size: 13px;
+      width: 150px;
+      flex-shrink: 0;
+    }
+    .field-row .colon {
+      width: 14px;
+      flex-shrink: 0;
+    }
+    .field-row .value {
+      font-size: 13px;
+      flex: 1;
+    }
+    .field-row .pin {
+      display: flex;
+      align-items: baseline;
+      margin-left: 20px;
+      flex-shrink: 0;
+    }
+    .field-row .pin .plabel {
+      font-size: 13px;
+      margin-right: 4px;
+    }
+    .field-row .pin .pvalue {
+      font-size: 13px;
+      min-width: 90px;
+      border-bottom: 1px solid #000;
+    }
+    .cont-row {
+      border-bottom: 1px solid #000;
+      min-height: 22px;
+    }
 
-      .field-row { display:flex; align-items:baseline; border-bottom:1px solid #000; padding: 5px 0; min-height: 24px; }
-      .field-row .label { font-size: 13px; width: 150px; flex-shrink:0; }
-      .field-row .colon { width: 14px; flex-shrink:0; }
-      .field-row .value { font-size: 13px; flex:1; }
-      .field-row .pin { display:flex; align-items:baseline; margin-left: 20px; flex-shrink:0; }
-      .field-row .pin .plabel { font-size:13px; margin-right:4px; }
-      .field-row .pin .pvalue { font-size:13px; min-width: 90px; border-bottom:1px solid #000; }
-      .cont-row { border-bottom: 1px solid #000; min-height: 22px; }
+    .uniform-row {
+      border-bottom: 1px solid #000;
+      padding: 6px 0;
+      font-size: 13px;
+    }
+    .uniform-row .label {
+      display: inline-block;
+      width: 150px;
+    }
+    .uniform-row .issued {
+      font-weight: bold;
+      text-decoration: underline;
+    }
 
-      .uniform-row { border-bottom: 1px solid #000; padding: 6px 0; font-size: 13px; }
-      .uniform-row .label { display:inline-block; width:150px; }
-      .uniform-row .issued { font-weight: bold; text-decoration: underline; }
+    .signature-section {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 45px;
+    }
+    .signature-box {
+      text-align: center;
+      width: 45%;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    .signature-box .line {
+      border-top: 1px solid #000;
+      margin-top: 4px;
+      padding-top: 4px;
+    }
 
-      .signature-section { display:flex; justify-content:space-between; margin-top: 45px; }
-      .signature-box { text-align:center; width:45%; font-size: 13px; font-weight:bold; }
-      .signature-box .line { border-top: 1px solid #000; margin-top: 4px; padding-top: 4px; }
+    .footer {
+      text-align: center;
+      font-size: 9px;
+      color: #666;
+      margin-top: 15px;
+    }
 
-      .footer { text-align:center; font-size: 9px; color:#666; margin-top: 15px; }
+    /* ---------- PAGE 2: DECLARATION (BACKSIDE) ---------- */
+    .declaration-title {
+      text-align: center;
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 22px;
+    }
+    .declaration-intro {
+      font-size: 13.5px;
+      line-height: 1.9;
+      margin-bottom: 10px;
+    }
+    .declaration-name-line {
+      border-bottom: 1px solid #000;
+      display: inline-block;
+      min-width: 320px;
+    }
+    .declaration-list {
+      font-size: 13.5px;
+      line-height: 1.9;
+      margin: 0;
+      padding-left: 0;
+      list-style: none;
+    }
+    .declaration-list li {
+      margin-bottom: 14px;
+      display: flex;
+    }
+    .declaration-list .num {
+      flex-shrink: 0;
+      width: 26px;
+    }
+    .declaration-list .txt {
+      flex: 1;
+      text-align: justify;
+    }
+    .declaration-closing {
+      font-size: 13.5px;
+      line-height: 1.9;
+      margin-top: 20px;
+      text-align: justify;
+    }
+    .declaration-sign {
+      margin-top: 50px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 13.5px;
+    }
 
-      /* ---------- PAGE 2: DECLARATION (BACKSIDE) ---------- */
-      .declaration-title { text-align:center; font-size:20px; font-weight:bold; margin-bottom: 22px; }
-      .declaration-intro { font-size: 13.5px; line-height: 1.9; margin-bottom: 10px; }
-      .declaration-name-line { border-bottom: 1px solid #000; display:inline-block; min-width: 320px; }
-      .declaration-list { font-size: 13.5px; line-height: 1.9; margin: 0; padding-left: 0; list-style: none; }
-      .declaration-list li { margin-bottom: 14px; display:flex; }
-      .declaration-list .num { flex-shrink:0; width: 26px; }
-      .declaration-list .txt { flex:1; text-align: justify; }
-      .declaration-closing { font-size: 13.5px; line-height: 1.9; margin-top: 20px; text-align: justify; }
-      .declaration-sign { margin-top: 50px; display:flex; justify-content:space-between; font-size:13.5px; }
+    /* ---------- DOCUMENT PAGES ---------- */
+    .doc-page {
+      display: flex;
+      flex-direction: column;
+      padding: 10mm;
+    }
+    .doc-header h2 {
+      font-size: 14px;
+      margin-bottom: 8mm;
+      border-bottom: 1px solid #000;
+      padding-bottom: 4mm;
+    }
+    .doc-image-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .doc-image {
+      max-width: 100%;
+      max-height: 250mm;
+      object-fit: contain;
+    }
+    .doc-list {
+      font-size: 13px;
+      line-height: 1.8;
+    }
+    .doc-note {
+      font-size: 11px;
+      color: #666;
+      margin-top: 10mm;
+    }
 
-      @media print {
-        body { padding: 0; }
-        .page { margin: 0 auto; padding: 15mm; }
+    @media print {
+      body {
+        padding: 0;
       }
-    </style>
-  </head>
-  <body>
+      .page {
+        margin: 0 auto;
+        padding: 15mm;
+      }
+    }
+  </style>
+</head>
+<body>
 
-    <!-- PAGE 1: JOINING FORM -->
-    <div class="page">
-      <div class="header">
-        <h1>SK ENTERPRISES</h1>
-        <div class="subtitle">▪ Housekeeping &nbsp;▪ Parking &nbsp;▪ Waste Management</div>
-        <div class="form-title">Employee Joining Form</div>
-        <div class="photo-box">
-          ${photoUrl ? `<img src="${photoUrl}" alt="Photo" />` : 'Photo'}
-        </div>
+  <!-- PAGE 1: JOINING FORM -->
+  <div class="page">
+    <div class="header">
+      <h1>SK ENTERPRISES</h1>
+      <div class="subtitle">▪ Housekeeping &nbsp;▪ Parking &nbsp;▪ Waste Management</div>
+      <div class="form-title">Employee Joining Form</div>
+      <div class="photo-box">
+        ${photoUrl ? `<img src="${photoUrl}" alt="Photo" />` : 'Photo'}
       </div>
+    </div>
 
-      <div class="field-row"><span class="label">Site Name</span><span class="colon">:</span><span class="value">${employee.siteName || ''}</span></div>
-      <div class="field-row"><span class="label">Name</span><span class="colon">:</span><span class="value">${employee.name || ''}</span></div>
-      <div class="field-row"><span class="label">Date of Birth</span><span class="colon">:</span><span class="value">${employee.dateOfBirth || ''}</span></div>
-      <div class="field-row"><span class="label">Date of Joining</span><span class="colon">:</span><span class="value">${employee.joinDate || employee.joinDate || ''}</span></div>
-      <div class="field-row"><span class="label">Contact No.</span><span class="colon">:</span><span class="value">${employee.phone || ''}</span></div>
-      <div class="field-row"><span class="label">Blood Group</span><span class="colon">:</span><span class="value">${employee.bloodGroup || ''}</span></div>
+    <div class="field-row"><span class="label">Site Name</span><span class="colon">:</span><span class="value">${employee.siteName || ''}</span></div>
+    <div class="field-row"><span class="label">Name</span><span class="colon">:</span><span class="value">${employee.name || ''}</span></div>
+    <div class="field-row"><span class="label">Date of Birth</span><span class="colon">:</span><span class="value">${employee.dateOfBirth || ''}</span></div>
+    <div class="field-row"><span class="label">Date of Joining</span><span class="colon">:</span><span class="value">${employee.joinDate || employee.dateOfJoining || ''}</span></div>
+    <div class="field-row"><span class="label">Contact No.</span><span class="colon">:</span><span class="value">${employee.phone || ''}</span></div>
+    <div class="field-row"><span class="label">Blood Group</span><span class="colon">:</span><span class="value">${employee.bloodGroup || ''}</span></div>
 
-      <div class="field-row">
-        <span class="label">Permanent Address</span><span class="colon">:</span><span class="value">${employee.permanentAddress || ''}</span>
-        <span class="pin"><span class="plabel">Pin Code:</span><span class="pvalue">${employee.permanentPincode || ''}</span></span>
-      </div>
-      <div class="cont-row"></div>
+   
 
-      <div class="field-row">
-        <span class="label">Local Address</span><span class="colon">:</span><span class="value">${employee.localAddress || ''}</span>
-        <span class="pin"><span class="plabel">Pin Code:</span><span class="pvalue">${employee.localPincode || ''}</span></span>
-      </div>
-      <div class="cont-row"></div>
-
-      <div class="field-row"><span class="label">Nominee Name</span><span class="colon">:</span><span class="value">${employee.nomineeName || ''}</span></div>
-      <div class="field-row"><span class="label">Employee Relation</span><span class="colon">:</span><span class="value">${employee.nomineeRelation || ''}</span></div>
-      <div class="field-row"><span class="label">Aadhaar Card No.</span><span class="colon">:</span><span class="value">${employee.aadharNumber || ''}</span></div>
-      <div class="field-row"><span class="label">ID No.</span><span class="colon">:</span><span class="value">${employee.employeeId || ''}</span></div>
-<div class="field-row">
+    <div class="field-row"><span class="label">Nominee Name</span><span class="colon">:</span><span class="value">${employee.nomineeName || ''}</span></div>
+    <div class="field-row"><span class="label">Employee Relation</span><span class="colon">:</span><span class="value">${employee.nomineeRelation || ''}</span></div>
+    <div class="field-row"><span class="label">Aadhaar Card No.</span><span class="colon">:</span><span class="value">${employee.aadharNumber || ''}</span></div>
+    <div class="field-row"><span class="label">ID No.</span><span class="colon">:</span><span class="value">${employee.employeeId || ''}</span></div>
+    <div class="field-row">
   <span class="label">Emergency Cont. No.</span><span class="colon">:</span>
   <span class="value">
-    1)&nbsp;<span class="underline-fill">${employee.emergencyContactPhone || ''}</span>
-    &nbsp;&nbsp;&nbsp;&nbsp;
-    2)&nbsp;<span class="underline-fill"></span>
+    ${employee.emergencyContactPhone ? `<span class="underline-fill">${employee.emergencyContactPhone}</span>` : 'Not provided'}
   </span>
 </div>
-      <div class="field-row">
-        <span class="label">Bank Name</span><span class="colon">:</span><span class="value">${employee.bankName || ''}</span>
-        <span class="pin"><span class="plabel">IFSC Code:</span><span class="pvalue">${employee.ifscCode || ''}</span></span>
-      </div>
-      <div class="field-row"><span class="label">Branch</span><span class="colon">:</span><span class="value">${employee.branchName || ''}</span></div>
-      <div class="field-row"><span class="label">Account No.</span><span class="colon">:</span><span class="value">${employee.accountNumber || ''}</span></div>
+<div class="field-row">
+  <span class="label">Emergency Cont. No. 2</span><span class="colon">:</span>
+  <span class="value">
+    ${employee.emergencyPhone2 ? `<span class="underline-fill">${employee.emergencyPhone2}</span>` : 'Not provided'}
+  </span>
+</div>
+    <div class="field-row">
+      <span class="label">Bank Name</span><span class="colon">:</span><span class="value">${employee.bankName || ''}</span>
+      <span class="pin"><span class="plabel">IFSC Code:</span><span class="pvalue">${employee.ifscCode || ''}</span></span>
+    </div>
+    <div class="field-row"><span class="label">Branch</span><span class="colon">:</span><span class="value">${employee.branchName || ''}</span></div>
+    <div class="field-row"><span class="label">Account No.</span><span class="colon">:</span><span class="value">${employee.accountNumber || ''}</span></div>
 
-      <div class="uniform-row">
-        <span class="label">Uniform</span>:
-        <span class="${employee.pantSize ? 'issued' : ''}">Pant</span> /
-        <span class="${employee.shirtSize ? 'issued' : ''}">Shirt</span> /
-        <span class="${employee.capSize ? 'issued' : ''}">Cap</span> /
-        <span class="${employee.idCardIssued ? 'issued' : ''}">ID</span> /
-        <span class="${employee.westcoatIssued ? 'issued' : ''}">Westcoat</span> /
-        <span class="${employee.apronIssued ? 'issued' : ''}">Apron</span>
-      </div>
-
-      <div class="signature-section">
-        <div class="signature-box"><div class="line">Authorized Signature</div></div>
-        <div class="signature-box"><div class="line">Employee Signature</div></div>
-      </div>
-
-      <div class="footer">This is a computer-generated form. Printed on ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+    <div class="uniform-row">
+      <span class="label">Uniform</span>:
+      <span class="${employee.pantSize ? 'issued' : ''}">Pant</span> /
+      <span class="${employee.shirtSize ? 'issued' : ''}">Shirt</span> /
+      <span class="${employee.capSize ? 'issued' : ''}">Cap</span> /
+      <span class="${employee.idCardIssued ? 'issued' : ''}">ID</span> /
+      <span class="${employee.westcoatIssued ? 'issued' : ''}">Westcoat</span> /
+      <span class="${employee.apronIssued ? 'issued' : ''}">Apron</span>
     </div>
 
-    <!-- PAGE 2: DECLARATION (BACKSIDE) -->
-    <div class="page">
-      <div class="declaration-title">प्रतिज्ञापत्र</div>
-
-      <div class="declaration-intro">
-        मी <span class="declaration-name-line">&nbsp;${employee.name || ''}&nbsp;</span><br/><br/>
-        खालील लिहिलेल्या अटी व सूचना पूर्णपणे समजून घेतल्या आहेत व मी त्यांना मनापासून मान्य करतो. खालील अटी मी न पाळल्यास त्याचा माझ्यावर आकारण्यात आल्यास माझी हरकत नाही.
-      </div>
-
-      <ol class="declaration-list">
-        <li><span class="num">१)</span><span class="txt">मी काम सोडण्याआधी एस.के. एंटरप्रायझेस यांना लिखितमध्ये १ महिना (३० दिवस) / ३ महिने (९० दिवस) पूर्वी सूचना देणे माझ्यावर बंधनकारक आहे. अन्यथा मी कुठलाही पगार मागणार नाही/घेण्यास पात्र नाही.</span></li>
-        <li><span class="num">२)</span><span class="txt">मी सुट्टी घेण्याआधी सुट्टीचा अर्ज मी लिखित देईल, अर्ज न दिल्यास, न कळवता सुट्टी घेतल्यास आकारलेला दंड मला मान्य आहे.</span></li>
-        <li><span class="num">३)</span><span class="txt">मी माझ्या कामाचे पुढील महिन्यातले १० दिवस भरल्याशिवाय माझ्या महिन्याचा पगार मला देऊ नये.</span></li>
-        <li><span class="num">४)</span><span class="txt">मला दिलेला युनिफॉर्म मी नीट व स्वच्छ ठेवेल. युनिफॉर्म फाटल्यास किंवा खराब झाल्यास नवीन युनिफॉर्म घ्यावा लागेल किंवा कंपनीने तो दिल्यास त्याचे शुल्क माझ्या पगारातून कपावे.</span></li>
-        <li><span class="num">५)</span><span class="txt">कंपनीमध्ये काम करत असताना जर असे दिसून आले की, तुम्ही कंपनीच्या विरोधात किंवा कंपनीच्या नियमांच्याविरुद्ध काम करत आहात, तर तुम्हाला कामावरून कमी करण्याचा अधिकार कंपनीला राहील. (कोणतीही पूर्वसूचना न देता)</span></li>
-        <li><span class="num">६)</span><span class="txt">मी माझे आधार कार्ड, पॅन कार्ड, ४ फोटो, बँक पासबुक व राहत असलेले लाईट बिल याच्या झेरॉक्स प्रती कंपनीला देणे माझ्यावर बंधनकारक आहे.</span></li>
-        <li><span class="num">७)</span><span class="txt">मी कामाला लागल्यापासून ७ दिवसांच्या आत काम सोडले तर मी पगार घेण्यास पात्र राहणार नाही.</span></li>
-      </ol>
-
-      <div class="declaration-closing">
-        वरील सर्व माहिती मी वाचली असून त्याच्या सत्यतेसाठी मी आज रोजी पुणे मुक्कामी माझी सही केली आहे.
-      </div>
-
-      <div class="declaration-sign">
-        <span>दिनांक : __________________</span>
-        <span>अर्जदाराची सही __________________</span>
-      </div>
+    <div class="signature-section">
+      <div class="signature-box"><div class="line">Authorized Signature</div></div>
+      <div class="signature-box"><div class="line">Employee Signature</div></div>
     </div>
 
-  </body>
-  </html>
-  `;
+    <div class="footer">This is a computer-generated form. Printed on ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+  </div>
+
+  <!-- PAGE 2: DECLARATION (BACKSIDE) -->
+  <div class="page">
+    <div class="declaration-title">प्रतिज्ञापत्र</div>
+
+    <div class="declaration-intro">
+      मी <span class="declaration-name-line">&nbsp;${employee.name || ''}&nbsp;</span><br/><br/>
+      खालील लिहिलेल्या अटी व सूचना पूर्णपणे समजून घेतल्या आहेत व मी त्यांना मनापासून मान्य करतो. खालील अटी मी न पाळल्यास त्याचा माझ्यावर आकारण्यात आल्यास माझी हरकत नाही.
+    </div>
+
+    <ol class="declaration-list">
+      <li><span class="num">१)</span><span class="txt">मी काम सोडण्याआधी एस.के. एंटरप्रायझेस यांना लिखितमध्ये १ महिना (३० दिवस) / ३ महिने (९० दिवस) पूर्वी सूचना देणे माझ्यावर बंधनकारक आहे. अन्यथा मी कुठलाही पगार मागणार नाही/घेण्यास पात्र नाही.</span></li>
+      <li><span class="num">२)</span><span class="txt">मी सुट्टी घेण्याआधी सुट्टीचा अर्ज मी लिखित देईल, अर्ज न दिल्यास, न कळवता सुट्टी घेतल्यास आकारलेला दंड मला मान्य आहे.</span></li>
+      <li><span class="num">३)</span><span class="txt">मी माझ्या कामाचे पुढील महिन्यातले १० दिवस भरल्याशिवाय माझ्या महिन्याचा पगार मला देऊ नये.</span></li>
+      <li><span class="num">४)</span><span class="txt">मला दिलेला युनिफॉर्म मी नीट व स्वच्छ ठेवेल. युनिफॉर्म फाटल्यास किंवा खराब झाल्यास नवीन युनिफॉर्म घ्यावा लागेल किंवा कंपनीने तो दिल्यास त्याचे शुल्क माझ्या पगारातून कपावे.</span></li>
+      <li><span class="num">५)</span><span class="txt">कंपनीमध्ये काम करत असताना जर असे दिसून आले की, तुम्ही कंपनीच्या विरोधात किंवा कंपनीच्या नियमांच्याविरुद्ध काम करत आहात, तर तुम्हाला कामावरून कमी करण्याचा अधिकार कंपनीला राहील. (कोणतीही पूर्वसूचना न देता)</span></li>
+      <li><span class="num">६)</span><span class="txt">मी माझे आधार कार्ड, पॅन कार्ड, ४ फोटो, बँक पासबुक व राहत असलेले लाईट बिल याच्या झेरॉक्स प्रती कंपनीला देणे माझ्यावर बंधनकारक आहे.</span></li>
+      <li><span class="num">७)</span><span class="txt">मी कामाला लागल्यापासून ७ दिवसांच्या आत काम सोडले तर मी पगार घेण्यास पात्र राहणार नाही.</span></li>
+    </ol>
+
+    <div class="declaration-closing">
+      वरील सर्व माहिती मी वाचली असून त्याच्या सत्यतेसाठी मी आज रोजी पुणे मुक्कामी माझी सही केली आहे.
+    </div>
+
+    <div class="declaration-sign">
+      <span>दिनांक : __________________</span>
+      <span>अर्जदाराची सही __________________</span>
+    </div>
+  </div>
+
+  ${documentImagePages}
+  ${otherDocsListPage}
+
+</body>
+</html>
+`;
 
     printWindow.document.write(formContent);
     printWindow.document.close();
 
-    // Wait for both pages (and photo, if any) to render, then print once for both pages
-    printWindow.onload = () => {
-      setTimeout(() => {
+    // Wait for every image (form photo + scanned docs) to actually finish
+    // loading before printing — fixes documents printing blank on slower loads.
+    const waitAndPrint = () => {
+      const imgs = Array.from(printWindow.document.images);
+      if (imgs.length === 0) {
         printWindow.print();
-        setTimeout(() => printWindow.close(), 1000);
-      }, 300);
+        return;
+      }
+      let remaining = imgs.length;
+      let printed = false;
+      const done = () => {
+        remaining--;
+        if (remaining <= 0 && !printed) {
+          printed = true;
+          setTimeout(() => printWindow.print(), 200);
+        }
+      };
+      imgs.forEach((img) => (img.complete ? done() : (img.addEventListener('load', done), img.addEventListener('error', done))));
+      // safety net in case a Cloudinary image hangs
+      setTimeout(() => { if (!printed) { printed = true; printWindow.print(); } }, 8000);
     };
-  };
 
+    printWindow.onload = waitAndPrint;
+    printWindow.onafterprint = () => printWindow.close();
+  };
 
   const handlePrintEPFForm = () => {
     if (!selectedEmployeeForEPF) {
@@ -3230,6 +3463,9 @@ body {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1 flex-wrap">
               <span className="font-semibold text-sm truncate max-w-[120px]">{employee.name}</span>
+              {employee.profileStatus === 'complete' && (
+                <Badge className="bg-green-100 text-green-800 text-[10px]">Complete</Badge>
+              )}
               {employee.profileStatus === 'incomplete' && (
                 <Badge className="bg-amber-100 text-amber-800 text-[10px]">Incomplete</Badge>
               )}
@@ -3332,136 +3568,205 @@ body {
 
     const photoUrl = getPhotoUrl(employee);
 
+    // ✅ Site-based color: red for Elpro Mall, blue for everyone else
+    const siteName = (employee.siteName || "").trim().toLowerCase();
+    const isElproMall = siteName.includes("elpro");
+    const themeColor = isElproMall ? "#c0392b" : "#1e3a8a"; // red vs blue
+
+
     printWindow.document.write(`
     <!DOCTYPE html>
     <html>
       <head>
         <title>ID Card - ${employee.name}</title>
         <style>
-          body { 
-            font-family: Arial, sans-serif; 
-            margin: 0; 
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            background: #f5f5f5;
+          @page {
+            size: 51mm 85mm;   /* width 5.1cm, height 8.5cm — matches physical card stock */
+            margin: 0;
+          }
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+         html, body {
+  width: 51mm;
+  height: 85mm;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+          body {
+            font-family: Arial, sans-serif;
+            background: white;
           }
           .id-card {
-            width: 420px;
+            width: 51mm;
+  height: 85mm;
+  min-width: 51mm;
+  min-height: 85mm;
+  max-width: 51mm;
+  max-height: 85mm;
+  overflow: hidden;
+  page-break-inside: avoid;
+  page-break-after: avoid;
             background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            overflow: hidden;
-            border: 2px solid #e11d48;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 0.5mm solid ${themeColor};
           }
           .header {
-            background: linear-gradient(135deg, #e11d48, #be123c);
-            color: white;
-            padding: 20px;
+            width: 100%;
+            padding: 3mm 2mm 2mm 2mm;
             text-align: center;
+            border-bottom: 0.6mm solid ${themeColor};
           }
           .header h1 {
-            margin: 0;
-            font-size: 24px;
+            font-size: 12pt;
             font-weight: bold;
+            color: ${themeColor};
+            letter-spacing: 0.3px;
           }
           .header .subtitle {
-            font-size: 12px;
-            opacity: 0.9;
+            font-size: 6pt;
+            color: #555;
+            margin-top: 0.5mm;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
           }
           .photo-section {
-            padding: 25px 20px 15px 20px;
-            text-align: center;
-            background: white;
+            padding: 3mm 0 2mm 0;
           }
           .employee-photo {
-            width: 160px;
-            height: 160px;
-            border-radius: 50%;
-            border: 4px solid #e11d48;
+            width: 22mm;
+            height: 22mm;
             object-fit: cover;
-            margin: 0 auto;
+            border: 0.5mm solid ${themeColor};
             background: #f5f5f5;
+            /* square photo — no border-radius */
           }
           .no-photo {
-            width: 160px;
-            height: 160px;
-            border-radius: 50%;
-            border: 4px solid #e11d48;
+            width: 22mm;
+            height: 22mm;
+            border: 0.5mm solid ${themeColor};
             background: #e5e7eb;
             display: flex;
             align-items: center;
             justify-content: center;
             color: #6b7280;
-            font-size: 14px;
-            margin: 0 auto;
+            font-size: 7pt;
           }
-          .details {
-            padding: 15px 25px 25px 25px;
-            background: white;
-          }
-          .detail-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 6px 0;
-            border-bottom: 1px solid #f0f0f0;
-          }
+         .details {
+  width: 100%;
+  padding: 0 3mm;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+         .detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1mm;
+  padding: 0.7mm 0;
+  border-bottom: 0.15mm solid #eee;
+  min-height: 4.5mm;
+}
           .detail-row:last-child {
             border-bottom: none;
           }
           .label {
-            font-weight: 600;
-            color: #6b7280;
-            font-size: 12px;
-            min-width: 100px;
+            font-weight: 700;
+            color: #333;
+            font-size: 6.5pt;
+            white-space: nowrap;
           }
           .value {
-            color: #1f2937;
-            font-size: 13px;
+            color: #111;
+            font-size: 6.5pt;
             font-weight: 500;
             text-align: right;
             word-break: break-word;
           }
-          .footer {
-            background: #f8f9fa;
-            padding: 12px 15px;
-            text-align: center;
-            border-top: 1px solid #e9ecef;
-          }
-          .footer-text {
-            font-size: 10px;
-            color: #6b7280;
-          }
+         .footer {
+  width: 100%;
+  padding: 1.5mm 2mm 2mm 2mm;
+  border-top: 0.4mm solid ${themeColor};
+  flex-shrink: 0;
+}
           .signature-area {
             display: flex;
             justify-content: space-between;
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid #e5e7eb;
+            gap: 2mm;
           }
           .signature-item {
+            flex: 1;
             text-align: center;
-            font-size: 10px;
-            color: #6b7280;
+            font-size: 5.5pt;
+            color: #555;
           }
           .signature-line {
-            width: 100px;
-            border-top: 1px solid #1f2937;
-            margin: 4px auto 0 auto;
+            border-top: 0.3mm solid #333;
+            margin-top: 6mm;
+            padding-top: 1mm;
           }
-          @media print {
-            body { background: white; }
-            .id-card { box-shadow: none; }
+          .footer-text {
+            margin-top: 2mm;
+            font-size: 5pt;
+            color: #777;
+            text-align: center;
           }
+        @media print {
+  html, body {
+    width: 51mm;
+    height: 85mm;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  body {
+    background: white;
+  }
+
+  .id-card {
+    width: 51mm;
+    height: 85mm;
+    overflow: hidden;
+    box-shadow: none;
+    page-break-inside: avoid;
+    page-break-after: avoid;
+  }
+}
+
+.authority-signature {
+  width: 100%;
+  text-align: right;
+  padding-right: 3mm;
+}
+
+.authority-signature img {
+  width: 18mm;
+  height: 8mm;
+  object-fit: contain;
+  display: block;
+  margin-left: auto;
+}
+
+.authority-signature div {
+  font-size: 5.5pt;
+  color: #555;
+  text-align: center;
+  width: 18mm;
+  margin-left: auto;
+}
         </style>
       </head>
       <body>
         <div class="id-card">
           <div class="header">
             <h1>SK ENTERPRISES</h1>
-            <div class="subtitle">EMPLOYEE IDENTIFICATION CARD</div>
+           
           </div>
           <div class="photo-section">
             ${photoUrl
@@ -3470,55 +3775,58 @@ body {
         : '<div class="no-photo">No Photo</div>'
       }
           </div>
-          <div class="details">
-            <div class="detail-row">
-              <span class="label">Employee Name</span>
-              <span class="value">${employee.name}</span>
-            </div>
-            <div class="detail-row">
-              <span class="label">Employee ID</span>
-              <span class="value">${employee.employeeId}</span>
-            </div>
-            <div class="detail-row">
-              <span class="label">Designation</span>
-              <span class="value">${employee.position || "N/A"}</span>
-            </div>
-            <div class="detail-row">
-              <span class="label">Site Name</span>
-              <span class="value">${employee.siteName || "N/A"}</span>
-            </div>
-            <div class="detail-row">
-              <span class="label">Date of Birth</span>
-              <span class="value">${employee.dateOfBirth || "N/A"}</span>
-            </div>
-            <div class="detail-row">
-              <span class="label">Aadhaar Number</span>
-              <span class="value">${employee.aadharNumber ? employee.aadharNumber.replace(/(\d{4})(\d{4})(\d{4})/, '$1-$2-$3') : "N/A"}</span>
-            </div>
-            <div class="detail-row">
-              <span class="label">Blood Group</span>
-              <span class="value">${employee.bloodGroup || "N/A"}</span>
-            </div>
-            <div class="detail-row">
-              <span class="label">Join Date</span>
-              <span class="value">${employee.joinDate || "N/A"}</span>
-            </div>
-          </div>
-          <div class="footer">
-            <div class="signature-area">
-              <div class="signature-item">
-                <div>Employee Signature</div>
-                <div class="signature-line"></div>
-              </div>
-              <div class="signature-item">
-                <div>Authorized Signature</div>
-                <div class="signature-line"></div>
-              </div>
-            </div>
-            <div class="footer-text" style="margin-top: 8px;">
-              This card is the property of SK Enterprises • Valid until employment
-            </div>
-          </div>
+         <div class="details">
+  <div class="detail-row">
+    <span class="label">Name</span>
+    <span class="value">${employee.name || ''}</span>
+  </div>
+   <div class="detail-row">
+    <span class="label">Designation</span>
+    <span class="value">${employee.position || "N/A"}</span>
+  </div>
+   <div class="detail-row">
+    <span class="label">DOB</span>
+    <span class="value">${employee.dateOfBirth || "N/A"}</span>
+  </div>
+  <div class="detail-row">
+    <span class="label">Join Date</span>
+    <span class="value">${employee.joinDate || "N/A"}</span>
+  </div>
+  <div class="detail-row">
+    <span class="label">Employee ID</span>
+    <span class="value">${employee.employeeId || ''}</span>
+  </div>
+  <div class="detail-row">
+    <span class="label">Contact No.</span>
+    <span class="value">${employee.phone || "N/A"}</span>
+  </div>
+  <div class="detail-row">
+    <span class="label">Aadhaar</span>
+    <span class="value">${employee.aadharNumber ? employee.aadharNumber.replace(/(\d{4})(\d{4})(\d{4})/, '$1-$2-$3') : "N/A"}</span>
+  </div>
+
+  <div class="detail-row">
+    <span class="label">Site Name</span>
+    <span class="value">${employee.siteName || "N/A"}</span>
+  </div>
+ 
+ 
+  
+  
+</div>
+         <div class="footer">
+  <div class="authority-signature">
+    <img
+      src="/images/authority-signature.png"
+      alt="Authorized Signature"
+    />
+    <div>Authorized</div>
+  </div>
+
+  <div class="footer-text">
+    Property of SK Enterprises • Valid until employment
+  </div>
+</div>
         </div>
         <script>
           window.onload = function() {
@@ -3961,14 +4269,12 @@ body {
                   <th>Address</th>
                 </tr>
               </thead>
-              <tbody>
-                ${employee.fatherName ? `<tr><td>${employee.fatherName}</td><td>Father</td><td>________________</td><td>________________</td></tr>` : ""}
-                ${employee.motherName ? `<tr><td>${employee.motherName}</td><td>Mother</td><td>________________</td><td>________________</td></tr>` : ""}
-                ${employee.spouseName ? `<tr><td>${employee.spouseName}</td><td>Spouse</td><td>________________</td><td>________________</td></tr>` : ""}
-                ${employee.numberOfChildren ? Array(parseInt(employee.numberOfChildren) || 0).fill(0).map((_, i) =>
-      `<tr><td>________________</td><td>Child ${i + 1}</td><td>________________</td><td>________________</td></tr>`
-    ).join("") : ""}
-              </tbody>
+           <tbody>
+  ${employee.relation === 'Father' && employee.relativeName ? `<tr><td>${employee.relativeName}</td><td>Father</td><td>________________</td><td>________________</td></tr>` : ''}
+  ${employee.relation === 'Mother' && employee.relativeName ? `<tr><td>${employee.relativeName}</td><td>Mother</td><td>________________</td><td>________________</td></tr>` : ''}
+  ${(employee.relation === 'Spouse' || employee.relation === 'Husband' || employee.relation === 'Wife') && employee.relativeName ? `<tr><td>${employee.relativeName}</td><td>Spouse</td><td>________________</td><td>________________</td></tr>` : ''}
+  ${employee.numberOfChildren ? Array(parseInt(employee.numberOfChildren) || 0).fill(0).map((_, i) => `<tr><td>________________</td><td>Child ${i + 1}</td><td>________________</td><td>________________</td></tr>`).join('') : ''}
+</tbody>
             </table>
           </div>
 
@@ -4116,6 +4422,7 @@ body {
             </SelectContent>
           </Select>
           <div className="flex flex-wrap gap-2 w-full">
+            {/* Assign Site - Always visible */}
             <Button
               variant="outline"
               onClick={() => setBulkSiteDialogOpen(true)}
@@ -4126,6 +4433,8 @@ body {
               <span className="hidden sm:inline">Assign Site </span>
               {selectedEmployees.length > 0 && `(${selectedEmployees.length})`}
             </Button>
+
+            {/* Bulk Delete - Only for admins/superadmins */}
             {!isSupervisor && (
               <Button
                 variant="outline"
@@ -4138,40 +4447,50 @@ body {
                 {selectedEmployees.length > 0 && `(${selectedEmployees.length})`}
               </Button>
             )}
+
+            {/* Import - HIDE for supervisors */}
+            {!isSupervisor && (
+              <Button
+                variant="outline"
+                onClick={() => setImportDialogOpen(true)}
+                className="flex-1 sm:flex-none"
+                disabled={isImporting}
+              >
+                {isImporting ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4 mr-1" />
+                )}
+                {isImporting ? "Importing..." : "Import"}
+              </Button>
+            )}
+
+            {/* Export - HIDE for supervisors */}
+            {!isSupervisor && (
+              <Button
+                variant="outline"
+                onClick={handleExportEmployees}
+                className="flex-1 sm:flex-none"
+                disabled={isExporting}
+              >
+                {isExporting ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-1" />
+                )}
+                {isExporting ? "Exporting..." : "Export"}
+              </Button>
+            )}
+
+            {/* Add Employee - Always visible */}
             <Button
-              variant="outline"
-              onClick={() => setImportDialogOpen(true)}
+              onClick={() => (onAddEmployee ? onAddEmployee() : setActiveTab?.("onboarding"))}
               className="flex-1 sm:flex-none"
-              disabled={isImporting}
             >
-              {isImporting ? (
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-              ) : (
-                <Upload className="h-4 w-4 mr-1" />
-              )}
-              {isImporting ? "Importing..." : "Import"}
+              <Plus className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Add Employee</span>
+              <span className="sm:hidden">Add</span>
             </Button>
-            <Button
-              variant="outline"
-              onClick={handleExportEmployees}
-              className="flex-1 sm:flex-none"
-              disabled={isExporting}
-            >
-              {isExporting ? (
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4 mr-1" />
-              )}
-              {isExporting ? "Exporting..." : "Export"}
-            </Button>
-           <Button 
-  onClick={() => (onAddEmployee ? onAddEmployee() : setActiveTab?.("onboarding"))} 
-  className="flex-1 sm:flex-none"
->
-  <Plus className="h-4 w-4 mr-1" />
-  <span className="hidden sm:inline">Add Employee</span>
-  <span className="sm:hidden">Add</span>
-</Button>
           </div>
         </div>
       </div>
@@ -5224,16 +5543,7 @@ body {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="edit-permanentPincode">Permanent Pin Code</Label>
-                <Input
-                  id="edit-permanentPincode"
-                  value={editFormData.permanentPincode}
-                  onChange={(e) => handleEditFormChange('permanentPincode', e.target.value)}
-                  placeholder="Enter pin code"
-                  maxLength={6}
-                />
-              </div>
+
 
               <div className="space-y-2">
                 <Label htmlFor="edit-localAddress">Local Address</Label>
@@ -5246,16 +5556,6 @@ body {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="edit-localPincode">Local Pin Code</Label>
-                <Input
-                  id="edit-localPincode"
-                  value={editFormData.localPincode}
-                  onChange={(e) => handleEditFormChange('localPincode', e.target.value)}
-                  placeholder="Enter pin code"
-                  maxLength={6}
-                />
-              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="edit-bankName">Bank Name</Label>
@@ -5299,32 +5599,34 @@ body {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="edit-fatherName">Father's Name</Label>
+                <Label htmlFor="edit-relativeName">Relative Name</Label>
                 <Input
-                  id="edit-fatherName"
-                  value={editFormData.fatherName}
-                  onChange={(e) => handleEditFormChange('fatherName', e.target.value)}
-                  placeholder="Enter father's name"
+                  id="edit-relativeName"
+                  value={editFormData.relativeName}
+                  onChange={(e) => handleEditFormChange('relativeName', e.target.value)}
+                  placeholder="Enter father/mother/spouse name"
                 />
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="edit-motherName">Mother's Name</Label>
-                <Input
-                  id="edit-motherName"
-                  value={editFormData.motherName}
-                  onChange={(e) => handleEditFormChange('motherName', e.target.value)}
-                  placeholder="Enter mother's name"
-                />
+                <Label htmlFor="edit-relation">Relation</Label>
+                <Select value={editFormData.relation} onValueChange={(value) => handleEditFormChange('relation', value)}>
+                  <SelectTrigger><SelectValue placeholder="Select relation" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Father">Father</SelectItem>
+                    <SelectItem value="Mother">Mother</SelectItem>
+                    <SelectItem value="Spouse">Spouse</SelectItem>
+                    <SelectItem value="Husband">Husband</SelectItem>
+                    <SelectItem value="Wife">Wife</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="edit-spouseName">Spouse Name</Label>
+                <Label htmlFor="edit-doj">Date of Joining</Label>
                 <Input
-                  id="edit-spouseName"
-                  value={editFormData.spouseName}
-                  onChange={(e) => handleEditFormChange('spouseName', e.target.value)}
-                  placeholder="Enter spouse name"
+                  id="edit-doj"
+                  type="date"
+                  value={editFormData.dateOfJoining}
+                  onChange={(e) => handleEditFormChange('dateOfJoining', e.target.value)}
                 />
               </div>
 
@@ -5340,15 +5642,7 @@ body {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="edit-emergencyContactName">Emergency Contact Name</Label>
-                <Input
-                  id="edit-emergencyContactName"
-                  value={editFormData.emergencyContactName}
-                  onChange={(e) => handleEditFormChange('emergencyContactName', e.target.value)}
-                  placeholder="Enter emergency contact name"
-                />
-              </div>
+             
 
               <div className="space-y-2">
                 <Label htmlFor="edit-emergencyContactPhone">Emergency Contact Phone</Label>
@@ -5361,16 +5655,16 @@ body {
                 />
               </div>
 
+
               <div className="space-y-2">
-                <Label htmlFor="edit-emergencyContactRelation">Relation</Label>
+                <Label htmlFor="edit-emergencyPhone2">Emergency Contact 2 (Phone Only)</Label>
                 <Input
-                  id="edit-emergencyContactRelation"
-                  value={editFormData.emergencyContactRelation}
-                  onChange={(e) => handleEditFormChange('emergencyContactRelation', e.target.value)}
-                  placeholder="Enter relation"
+                  id="edit-emergencyPhone2"
+                  value={editFormData.emergencyPhone2 || ''}
+                  onChange={(e) => handleEditFormChange('emergencyPhone2', e.target.value)}
+                  maxLength={10}
                 />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="edit-nomineeName">Nominee Name</Label>
                 <Input
@@ -5990,6 +6284,9 @@ body {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2 mb-1">
                           <h4 className="font-semibold truncate">{employee.name}</h4>
+                          {employee.profileStatus === "complete" && (
+                            <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">Complete</Badge>
+                          )}
                           {employee.profileStatus === "incomplete" && (
                             <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-xs">Incomplete</Badge>
                           )}
@@ -6271,19 +6568,25 @@ body {
                     </div>
                   ) : (
                     <>
-                      {Array.from(siteDeploymentStatus.values()).map(status => (
-                        <SelectItem key={status.siteName} value={status.siteName}>
-                          <div className="flex flex-col items-start">
-                            <span>{status.siteName}</span>
-                            <span className="text-xs text-muted-foreground">
-                              Managers: {status.managerCount}/{status.managerRequirement} |
-                              Supervisors: {status.supervisorCount}/{status.supervisorRequirement} |
-                              Staff: {status.staffCount}/{status.staffRequirement}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                      {allSiteNames.length === 0 && (
+                      {/* ✅ Use sitesFromAPI with _id as value */}
+                      {sitesFromAPI.length > 0 ? (
+                        sitesFromAPI.map((site) => (
+                          <SelectItem key={site._id} value={site._id}>
+                            <div className="flex flex-col items-start">
+                              <span>{site.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {siteDeploymentStatus.has(site.name) && (
+                                  <>
+                                    Managers: {siteDeploymentStatus.get(site.name)?.managerCount || 0}/{site.managerCount || 0} |
+                                    Supervisors: {siteDeploymentStatus.get(site.name)?.supervisorCount || 0}/{site.supervisorCount || 0} |
+                                    Staff: {siteDeploymentStatus.get(site.name)?.staffCount || 0}/{site.staffRequirement || 0}
+                                  </>
+                                )}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      ) : (
                         <div className="p-4 text-center text-muted-foreground">
                           No sites available
                         </div>
@@ -6292,7 +6595,7 @@ body {
                   )}
                 </SelectContent>
               </Select>
-              {allSiteNames.length === 0 && !loadingSites && (
+              {sitesFromAPI.length === 0 && !loadingSites && (
                 <p className="text-xs text-amber-600 mt-1">
                   No sites found. Please add sites in the Sites page or import employees with sites.
                 </p>

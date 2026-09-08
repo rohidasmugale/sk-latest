@@ -24,20 +24,20 @@ export interface Employee {
   maritalStatus?: string;
   bloodGroup?: string;
   permanentAddress?: string;
-  permanentPincode?: string;
+  
   localAddress?: string;
-  localPincode?: string;
+  
   bankName?: string;
   accountNumber?: string;
   ifscCode?: string;
   branchName?: string;
-  fatherName?: string;
-  motherName?: string;
-  spouseName?: string;
+  relativeName?: string;
+  relation?: string; // "Father" | "Mother" | "Spouse" | "Husband" | "Wife"
+  
   numberOfChildren?: number;
-  emergencyContactName?: string;
+
   emergencyContactPhone?: string;
-  emergencyContactRelation?: string;
+ emergencyPhone2?: string;
   nomineeName?: string;
   nomineeRelation?: string;
   pantSize?: string;

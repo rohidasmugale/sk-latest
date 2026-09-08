@@ -36,9 +36,9 @@ export interface Employee {
   panNumber?: string; // Added
   
   // Personal details - Added
-  fatherName?: string;
-  motherName?: string;
-  spouseName?: string;
+ relativeName?: string;
+  relation?: string; // "Father" | "Mother" | "Spouse" | "Husband" | "Wife"
+ 
   numberOfChildren?: string;
   nomineeName?: string;
   nomineeRelation?: string;
@@ -53,7 +53,7 @@ export interface Employee {
   localAddress?: string;
   
   // Emergency contact - Added
-  emergencyContactName?: string;
+ 
   emergencyContactPhone?: string;
   emergencyContactRelation?: string;
   
@@ -61,8 +61,7 @@ export interface Employee {
   bloodGroup?: string;
   gender?: string;
   maritalStatus?: string;
-  permanentPincode?: string;
-  localPincode?: string;
+ 
   bankBranch?: string;
   branchName?: string;
   role?: string;
@@ -215,19 +214,19 @@ export interface NewEmployeeForm {
   dateOfExit: string;
   bloodGroup: string;
   permanentAddress: string;
-  permanentPincode: string;
+
   localAddress: string;
-  localPincode: string;
+  
   bankName: string;
   accountNumber: string;
   ifscCode: string;
   branchName: string;
-  fatherName: string;
-  motherName: string;
-  spouseName: string;
+ relativeName: string;
+relation: string;   // "Father" | "Mother" | "Spouse" | "Husband" | "Wife"
   numberOfChildren: string;
-  emergencyContactName: string;
+  
   emergencyContactPhone: string;
+emergencyPhone2: string;
   emergencyContactRelation: string;
   nomineeName: string;
   nomineeRelation: string;
@@ -302,7 +301,8 @@ export interface ImportResult {
   success: boolean;
   message: string;
   importedCount: number;
-  errorCount?: number;
+  import { relative } from 'path';
+errorCount?: number;
   errors?: Array<{
     row: number;
     employeeId: string;

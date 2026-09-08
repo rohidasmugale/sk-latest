@@ -11,8 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import * as XLSX from 'xlsx';
 import { Badge } from "@/components/ui/badge";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { DOCUMENT_TYPES } from "../../pages/superadmin/DocumentUpload";
 // Define the API Base URL
 const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
@@ -46,20 +47,19 @@ interface Employee {
   gender?: string;
   maritalStatus?: string;
   permanentAddress?: string;
-  permanentPincode?: string;
+
   localAddress?: string;
-  localPincode?: string;
+
   bankName?: string;
   accountNumber?: string;
   ifscCode?: string;
   branchName?: string;
-  fatherName?: string;
-  motherName?: string;
-  spouseName?: string;
+  relativeName?: string;
+  relation?: string;
   numberOfChildren?: string | number;
-  emergencyContactName?: string;
+
   emergencyContactPhone?: string;
-  emergencyContactRelation?: string;
+
   nomineeName?: string;
   nomineeRelation?: string;
   pantSize?: string;
@@ -142,12 +142,11 @@ interface NewEmployeeForm {
   bloodGroup: string;
   gender?: string;
   maritalStatus?: string;
-
+  status: "active" | "inactive" | "left";   // ADD
   // Address
   permanentAddress: string;
-  permanentPincode: string;
+
   localAddress: string;
-  localPincode: string;
 
   // Bank Details
   bankName: string;
@@ -156,15 +155,15 @@ interface NewEmployeeForm {
   branchName: string;
 
   // Family Details
-  fatherName: string;
-  motherName: string;
-  spouseName: string;
+  relativeName: string;
+  relation: string;   // "Father" | "Mother" | "Spouse" | "Husband" | "Wife"
   numberOfChildren: string;
 
   // Emergency Contact
-  emergencyContactName: string;
+
   emergencyContactPhone: string;
-  emergencyContactRelation: string;
+  emergencyPhone2: string;
+
 
   // Nominee Details
   nomineeName: string;
@@ -269,16 +268,17 @@ const departments = [
   "Maintenance",
   "Other"
 ];
-// Fields that must be filled for a "complete" profile (exclude panNumber, email, numberOfChildren)
+
 const FIELDS_REQUIRED_FOR_COMPLETE: (keyof NewEmployeeForm)[] = [
-  'employeeId', 'name', 'phone', 'aadharNumber', 'esicNumber', 'uanNumber',
+  'employeeId', 'name', 'phone', 'aadharNumber',
+
+
   'siteName', 'dateOfBirth', 'dateOfJoining', 'bloodGroup', 'gender', 'maritalStatus',
-  'permanentAddress', 'permanentPincode', 'localAddress', 'localPincode',
+  'permanentAddress', 'localAddress',
   'bankName', 'accountNumber', 'ifscCode', 'branchName',
-  'fatherName', 'motherName',
-  'emergencyContactName', 'emergencyContactPhone', 'emergencyContactRelation',
+  'relativeName', 'relation',
+  'emergencyContactPhone', 'emergencyPhone2',
   'nomineeName', 'nomineeRelation',
-  'pantSize', 'shirtSize', 'capSize',
   'department', 'position', 'salary',
 ];
 
@@ -314,7 +314,7 @@ const FormField = ({
 );
 
 // Reset form function
-const resetNewEmployeeForm = () => ({
+const resetNewEmployeeForm = (): NewEmployeeForm => ({
   employeeId: "",  // ADD THIS
   name: "",
   email: "",
@@ -328,21 +328,22 @@ const resetNewEmployeeForm = () => ({
   dateOfJoining: new Date().toISOString().split("T")[0],
   dateOfExit: "",
   bloodGroup: "",
+  status: "active",   // ADD
   permanentAddress: "",
-  permanentPincode: "",
+
   localAddress: "",
-  localPincode: "",
+
   bankName: "",
   accountNumber: "",
   ifscCode: "",
   branchName: "",
-  fatherName: "",
-  motherName: "",
-  spouseName: "",
+  relativeName: "",
+  relation: "",
   numberOfChildren: "",
-  emergencyContactName: "",
+
   emergencyContactPhone: "",
-  emergencyContactRelation: "",
+  emergencyPhone2: "",
+
   nomineeName: "",
   nomineeRelation: "",
   pantSize: "",
@@ -376,7 +377,7 @@ const OnboardingTab = ({
   const [isSavingEPF, setIsSavingEPF] = useState(false);
   const [activeTab, setActiveTab] = useState("onboarding");
   const [newEmployee, setNewEmployee] = useState<NewEmployeeForm>(resetNewEmployeeForm());
-  const [uploadedDocuments, setUploadedDocuments] = useState<File[]>([]);
+  const [uploadedDocuments, setUploadedDocuments] = useState<{ documentType: string; file: File }[]>([]);
   const [showCamera, setShowCamera] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -452,12 +453,12 @@ const OnboardingTab = ({
   const excelImportRef = useRef<HTMLInputElement>(null);
   const siteSearchRef = useRef<HTMLInputElement>(null);
   const [currentStep, setCurrentStep] = useState(0);
-  const [savedData, setSavedData] = useState<NewEmployeeForm>(resetNewEmployeeForm());
+
   const steps = [
     { title: "Personal Info", fields: ["name", "dateOfBirth", "gender", "maritalStatus", "photo"] },
-    { title: "Contact & Address", fields: ["phone", "email", "permanentAddress", "permanentPincode", "localAddress", "localPincode"] },
+    { title: "Contact & Address", fields: ["phone", "email", "permanentAddress", "localAddress"] },
     { title: "Employment & Bank", fields: ["department", "position", "salary", "bankName", "accountNumber", "ifscCode", "branchName"] },
-    { title: "Family & Emergency", fields: ["fatherName", "motherName", "spouseName", "numberOfChildren", "emergencyContactName", "emergencyContactPhone", "emergencyContactRelation", "nomineeName", "nomineeRelation"] },
+    { title: "Family & Emergency", fields: ["relativeName", "relation", "numberOfChildren", "emergencyContactPhone", "emergencyPhone2", "nomineeName", "nomineeRelation"] },
     { title: "Uniform & Documents", fields: ["pantSize", "shirtSize", "capSize", "idCardIssued", "westcoatIssued", "apronIssued", "employeeSignature", "authorizedSignature", "uploadedDocuments"] }
   ];
   useEffect(() => {
@@ -820,7 +821,7 @@ const OnboardingTab = ({
                             {site.status === 'active' ? 'Active' : 'Inactive'}
                           </Badge>
 
-                        
+
                         </div>
                       </div>
 
@@ -837,7 +838,7 @@ const OnboardingTab = ({
                         </div>
                       )}
 
-                   
+
                     </div>
                   );
                 })}
@@ -905,7 +906,7 @@ const OnboardingTab = ({
             </div>
           </div>
 
-         
+
         </div>
       )}
 
@@ -1025,6 +1026,17 @@ const OnboardingTab = ({
                   case 'Site Name':
                     employeeData.siteName = String(cellValue);
                     break;
+                  case 'Status': {                                  // ADD — matches client column exactly
+                    const raw = String(cellValue).trim().toLowerCase();
+                    if (['left', 'resigned', 'terminated', 'exit', 'relieved'].some(v => raw.includes(v))) {
+                      employeeData.status = 'left';
+                    } else if (['inactive', 'hold', 'suspended'].some(v => raw.includes(v))) {
+                      employeeData.status = 'inactive';
+                    } else {
+                      employeeData.status = 'active';
+                    }
+                    break;
+                  }
                   case 'Employee Name':
                     employeeData.name = String(cellValue);
                     break;
@@ -1061,15 +1073,11 @@ const OnboardingTab = ({
                   case 'Permanent Address':
                     employeeData.permanentAddress = String(cellValue);
                     break;
-                  case 'Permanent Pin Code':
-                    employeeData.permanentPincode = String(cellValue).replace(/\D/g, '').slice(0, 6);
-                    break;
+
                   case 'Local Address':
                     employeeData.localAddress = String(cellValue);
                     break;
-                  case 'Local Pin Code':
-                    employeeData.localPincode = String(cellValue).replace(/\D/g, '').slice(0, 6);
-                    break;
+
                   case 'Bank Name':
                     employeeData.bankName = String(cellValue);
                     break;
@@ -1082,26 +1090,21 @@ const OnboardingTab = ({
                   case 'Branch Name':
                     employeeData.branchName = String(cellValue);
                     break;
-                  case "Father's Name":
-                    employeeData.fatherName = String(cellValue);
+                  case 'Relative Name':
+                    employeeData.relativeName = String(cellValue);
                     break;
-                  case "Mother's Name":
-                    employeeData.motherName = String(cellValue);
-                    break;
-                  case 'Spouse Name':
-                    employeeData.spouseName = String(cellValue);
+                  case 'Relation':
+                    employeeData.relation = String(cellValue);
                     break;
                   case 'Number of Children':
                     employeeData.numberOfChildren = isNaN(Number(cellValue)) ? '' : String(Number(cellValue));
                     break;
-                  case 'Emergency Contact Name':
-                    employeeData.emergencyContactName = String(cellValue);
-                    break;
+
                   case 'Emergency Contact Phone':
                     employeeData.emergencyContactPhone = String(cellValue).replace(/\D/g, '').slice(0, 10);
                     break;
-                  case 'Relation':
-                    employeeData.emergencyContactRelation = String(cellValue);
+                  case 'Emergency Phone 2':
+                    employeeData.emergencyPhone2 = String(cellValue).replace(/\D/g, '').slice(0, 10);
                     break;
                   case 'Nominee Name':
                     employeeData.nomineeName = String(cellValue);
@@ -1178,7 +1181,7 @@ const OnboardingTab = ({
       return;
     }
 
-   
+
 
     const employeesBySite: { [key: string]: NewEmployeeForm[] } = {};
     excelData.forEach(emp => {
@@ -1210,7 +1213,7 @@ const OnboardingTab = ({
       }
     }
 
-  
+
     setImporting(true);
     setImportProgress(0);
 
@@ -1268,20 +1271,19 @@ const OnboardingTab = ({
             gender: employeeData.gender || '',
             maritalStatus: employeeData.maritalStatus || '',
             permanentAddress: employeeData.permanentAddress || '',
-            permanentPincode: employeeData.permanentPincode || '',
+
             localAddress: employeeData.localAddress || '',
-            localPincode: employeeData.localPincode || '',
+
             bankName: employeeData.bankName || '',
             accountNumber: employeeData.accountNumber || '',
             ifscCode: employeeData.ifscCode || '',
             branchName: employeeData.branchName || '',
-            fatherName: employeeData.fatherName || '',
-            motherName: employeeData.motherName || '',
-            spouseName: employeeData.spouseName || '',
+            relativeName: employeeData.relativeName || '',
+            relation: employeeData.relation || '',
             numberOfChildren: employeeData.numberOfChildren || '',
-            emergencyContactName: employeeData.emergencyContactName || '',
+
             emergencyContactPhone: employeeData.emergencyContactPhone || '',
-            emergencyContactRelation: employeeData.emergencyContactRelation || '',
+            emergencyPhone2: employeeData.emergencyPhone2 || '',
             nomineeName: employeeData.nomineeName || '',
             nomineeRelation: employeeData.nomineeRelation || '',
             pantSize: employeeData.pantSize || '',
@@ -1293,7 +1295,7 @@ const OnboardingTab = ({
             department: employeeData.department || '',
             position: employeeData.position || '',
             salary: employeeData.salary || '0',
-            status: 'active',
+            status: (employeeData.status || 'active') as "active" | "inactive" | "left",
             profileStatus: profileStatus,
             missingFields: isComplete ? [] : missingFields,
           };
@@ -1419,10 +1421,19 @@ const OnboardingTab = ({
     }
 
     // Safely get other properties with fallbacks
+    // Derive fatherOrSpouseName and relationshipType from relativeName & relation
+    const fatherOrSpouseName = employee.relativeName || "";
+    let relationshipType: "father" | "spouse" = "spouse";
+    if (employee.relation === 'Father' || employee.relation === 'Mother') {
+      relationshipType = 'father';
+    } else if (employee.relation === 'Spouse' || employee.relation === 'Husband' || employee.relation === 'Wife') {
+      relationshipType = 'spouse';
+    }
+
     const epfData: EPFForm11Data = {
       memberName: employee.name || "",
-      fatherOrSpouseName: employee.fatherName || employee.spouseName || "",
-      relationshipType: employee.fatherName ? "father" : "spouse",
+      fatherOrSpouseName,
+      relationshipType,
       dateOfBirth: employee.dateOfBirth || "",
       gender: employee.gender || "",
       maritalStatus: employee.maritalStatus || "",
@@ -1661,6 +1672,7 @@ const OnboardingTab = ({
       { field: newEmployee.dateOfBirth, name: 'Date of Birth' },  // ✅ Added
       { field: newEmployee.department, name: 'Department' },
       { field: newEmployee.siteName, name: 'Site Name' },
+      { field: newEmployee.dateOfJoining, name: 'Date of Joining' },
 
     ];
     // Validate Employee ID – user must provide a non‑empty, unique ID
@@ -1750,7 +1762,7 @@ const OnboardingTab = ({
 
     // Validate site capacity
     // Validate site capacity – only enforce if the site has a real staff requirement set
-   
+
     // ----- Compute profile completeness -----
     const { isComplete, missingFields: missingCompleteFields } = checkEmployeeCompleteness(newEmployee);
     const profileStatus = isComplete ? 'complete' : 'incomplete';
@@ -1801,20 +1813,20 @@ const OnboardingTab = ({
         gender: newEmployee.gender || '',
         maritalStatus: newEmployee.maritalStatus || '',
         permanentAddress: newEmployee.permanentAddress?.trim() || '',
-        permanentPincode: newEmployee.permanentPincode?.trim() || '',
+
         localAddress: newEmployee.localAddress?.trim() || '',
-        localPincode: newEmployee.localPincode?.trim() || '',
+
         bankName: newEmployee.bankName?.trim() || '',
         accountNumber: newEmployee.accountNumber?.replace(/\s/g, '') || '',
         ifscCode: newEmployee.ifscCode?.toUpperCase().replace(/\s/g, '') || '',
         branchName: newEmployee.branchName?.trim() || '',
-        fatherName: newEmployee.fatherName?.trim() || '',
-        motherName: newEmployee.motherName?.trim() || '',
-        spouseName: newEmployee.spouseName?.trim() || '',
+        relativeName: newEmployee.relativeName?.trim() || '',
+        relation: newEmployee.relation?.trim() || '',
         numberOfChildren: newEmployee.numberOfChildren?.trim() || '',
-        emergencyContactName: newEmployee.emergencyContactName?.trim() || '',
+
         emergencyContactPhone: newEmployee.emergencyContactPhone?.trim() || '',
-        emergencyContactRelation: newEmployee.emergencyContactRelation?.trim() || '',
+        emergencyPhone2: newEmployee.emergencyPhone2?.trim() || null,
+
         nomineeName: newEmployee.nomineeName?.trim() || '',
         nomineeRelation: newEmployee.nomineeRelation?.trim() || '',
         pantSize: newEmployee.pantSize || '',
@@ -1826,7 +1838,7 @@ const OnboardingTab = ({
         department: newEmployee.department.trim(),
         position: newEmployee.position.trim(),
         salary: salaryValue.toString(),
-        status: 'active',                                    // ✅ ADD THIS
+        status: (newEmployee.status || 'active') as "active" | "inactive" | "left",                           // ✅ ADD THIS
         profileStatus: profileStatus,                        // ✅ ADD THIS
         missingFields: isComplete ? [] : missingCompleteFields,
       };
@@ -1895,20 +1907,19 @@ const OnboardingTab = ({
         gender: createdEmployee.gender,
         maritalStatus: createdEmployee.maritalStatus,
         permanentAddress: createdEmployee.permanentAddress,
-        permanentPincode: createdEmployee.permanentPincode,
+
         localAddress: createdEmployee.localAddress,
-        localPincode: createdEmployee.localPincode,
+
         bankName: createdEmployee.bankName,
         accountNumber: createdEmployee.accountNumber,
         ifscCode: createdEmployee.ifscCode,
         branchName: createdEmployee.branchName,
-        fatherName: createdEmployee.fatherName,
-        motherName: createdEmployee.motherName,
-        spouseName: createdEmployee.spouseName,
+        relativeName: createdEmployee.relativeName || '',
+        relation: createdEmployee.relation || '',
         numberOfChildren: createdEmployee.numberOfChildren,
-        emergencyContactName: createdEmployee.emergencyContactName,
+
         emergencyContactPhone: createdEmployee.emergencyContactPhone,
-        emergencyContactRelation: createdEmployee.emergencyContactRelation,
+        emergencyPhone2: createdEmployee.emergencyPhone2,
         nomineeName: createdEmployee.nomineeName,
         nomineeRelation: createdEmployee.nomineeRelation,
         pantSize: createdEmployee.pantSize,
@@ -1945,8 +1956,67 @@ const OnboardingTab = ({
         }
       }
 
-      // Then initialize EPF Form and switch tabs
-      initializeEPFForm(processedEmployee);
+      // ─── Upload documents from Step 4 — now that employee exists ───
+      const hadDocs = uploadedDocuments.length > 0;
+
+      if (hadDocs) {
+        toast.loading(`Uploading ${uploadedDocuments.length} document(s)...`, { id: 'doc-upload' });
+
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const doc of uploadedDocuments) {
+          try {
+            const docFormData = new FormData();
+            docFormData.append('document', doc.file);
+            docFormData.append('documentType', doc.documentType);
+            // Use the actual document type label as the document name
+            const typeLabel = DOCUMENT_TYPES.find(t => t.value === doc.documentType)?.label || doc.documentType;
+            docFormData.append('documentName', typeLabel);
+
+            const res = await fetch(`${API_URL}/employees/${processedEmployee._id}/documents`, {
+              method: 'POST',
+              body: docFormData
+            });
+
+            if (res.ok) {
+              successCount++;
+            } else {
+              failCount++;
+            }
+          } catch (err) {
+            console.error('Document upload failed:', file.name, err);
+            failCount++;
+          }
+        }
+
+        toast.dismiss('doc-upload');
+        if (successCount > 0) {
+          toast.success(`${successCount} document(s) saved to employee record`);
+        }
+        if (failCount > 0) {
+          toast.error(`${failCount} document(s) failed to upload`);
+        }
+
+        setUploadedDocuments([]); // Clear local state
+      }
+
+      // ─── Refresh employee data so kycDocuments are included ───
+      let employeeForEPF = processedEmployee;
+      if (hadDocs && successCount > 0) {
+        try {
+          const refreshRes = await fetch(`${API_URL}/employees/${processedEmployee._id}`);
+          const refreshData = await refreshRes.json();
+          if (refreshRes.ok && (refreshData.employee || refreshData.data)) {
+            employeeForEPF = refreshData.employee || refreshData.data;
+          }
+        } catch (err) {
+          console.error('Could not refresh employee after document upload:', err);
+        }
+      }
+
+      // Then initialize EPF Form and switch tabs with the refreshed employee
+      initializeEPFForm(employeeForEPF);
 
     } catch (error: any) {
       console.error("Error creating employee:", error);
@@ -1974,8 +2044,8 @@ const OnboardingTab = ({
     }
   };
 
-  const handleRemoveDocument = (index: number) => {
-    setUploadedDocuments(prev => prev.filter((_, i) => i !== index));
+  const handleRemoveDocument = (documentType: string) => {
+    setUploadedDocuments(prev => prev.filter(d => d.documentType !== documentType));
   };
 
   // Handle signature upload
@@ -2115,10 +2185,46 @@ const OnboardingTab = ({
 
     const photoUrl = employee.photo || '';
 
+    // --- KYC Documents ---
+    const documents = employee.kycDocuments || [];
+
+    const isImageDoc = (doc: any) =>
+      (doc.fileType && doc.fileType.startsWith('image/')) ||
+      /\.(jpe?g|png|gif|webp)$/i.test(doc.fileUrl || '');
+
+    const imageDocs = documents.filter(isImageDoc);
+    const otherDocs = documents.filter((d: any) => !isImageDoc(d));
+
+    // One printable page per scanned image document
+    const documentImagePages = imageDocs.map((doc: any) => `
+    <div class="page doc-page">
+      <div class="doc-header">
+        <h2>${doc.documentName}${doc.documentNumber ? ' — ' + doc.documentNumber : ''}</h2>
+      </div>
+      <div class="doc-image-wrap">
+        <img src="${doc.fileUrl}" class="doc-image" />
+      </div>
+    </div>
+  `).join('');
+
+    // Non-image files (PDF/Word/etc.) can't be reliably embedded in a print popup —
+    // list them instead so nothing silently gets left out.
+    const otherDocsListPage = otherDocs.length > 0 ? `
+    <div class="page doc-page">
+      <div class="doc-header"><h2>Other Attached Documents</h2></div>
+      <ul class="doc-list">
+        ${otherDocs.map((doc: any) => `
+          <li>${doc.documentName}${doc.documentNumber ? ' — ' + doc.documentNumber : ''} (${doc.fileType || 'file'})</li>
+        `).join('')}
+      </ul>
+      <p class="doc-note">These files are not images and were not auto-printed. Open them from the Documents tab to print separately.</p>
+    </div>
+  ` : '';
+
     const formContent = `
-  <!DOCTYPE html>
-  <html>
-  <head>
+<!DOCTYPE html>
+<html>
+<head>
   <title>Joining Form - ${employee.name}</title>
   <style>
     @page {
@@ -2146,152 +2252,349 @@ const OnboardingTab = ({
     .page:last-child {
       page-break-after: auto;
     }
+
     /* ---------- PAGE 1: JOINING FORM ---------- */
-    .header { position: relative; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 10px; }
-    .header h1 { margin:0; font-size: 30px; letter-spacing: 3px; font-weight: bold; }
-    .header .subtitle { font-size: 12px; margin-top: 2px; }
-    .header .form-title { font-size: 17px; font-weight: bold; text-align:center; margin-top: 6px; text-decoration: underline; }
-    .photo-box { position: absolute; top: 0; right: 0; width: 95px; height: 110px; border: 1px solid #000; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:10px; color:#999; }
-    .photo-box img { width:100%; height:100%; object-fit:cover; }
-    .field-row { display:flex; align-items:baseline; border-bottom:1px solid #000; padding: 5px 0; min-height: 24px; }
-    .field-row .label { font-size: 13px; width: 150px; flex-shrink:0; }
-    .field-row .colon { width: 14px; flex-shrink:0; }
-    .field-row .value { font-size: 13px; flex:1; }
-    .field-row .pin { display:flex; align-items:baseline; margin-left: 20px; flex-shrink:0; }
-    .field-row .pin .plabel { font-size:13px; margin-right:4px; }
-    .field-row .pin .pvalue { font-size:13px; min-width: 90px; border-bottom:1px solid #000; }
-    .cont-row { border-bottom: 1px solid #000; min-height: 22px; }
-    .uniform-row { border-bottom: 1px solid #000; padding: 6px 0; font-size: 13px; }
-    .uniform-row .label { display:inline-block; width:150px; }
-    .uniform-row .issued { font-weight: bold; text-decoration: underline; }
-    .signature-section { display:flex; justify-content:space-between; margin-top: 45px; }
-    .signature-box { text-align:center; width:45%; font-size: 13px; font-weight:bold; }
-    .signature-box .line { border-top: 1px solid #000; margin-top: 4px; padding-top: 4px; }
-    .footer { text-align:center; font-size: 9px; color:#666; margin-top: 15px; }
+    .header {
+      position: relative;
+      border-bottom: 2px solid #000;
+      padding-bottom: 8px;
+      margin-bottom: 10px;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 30px;
+      letter-spacing: 3px;
+      font-weight: bold;
+    }
+    .header .subtitle {
+      font-size: 12px;
+      margin-top: 2px;
+    }
+    .header .form-title {
+      font-size: 17px;
+      font-weight: bold;
+      text-align: center;
+      margin-top: 6px;
+      text-decoration: underline;
+    }
+    .photo-box {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 95px;
+      height: 110px;
+      border: 1px solid #000;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: #999;
+    }
+    .photo-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .field-row {
+      display: flex;
+      align-items: baseline;
+      border-bottom: 1px solid #000;
+      padding: 5px 0;
+      min-height: 24px;
+    }
+    .field-row .label {
+      font-size: 13px;
+      width: 150px;
+      flex-shrink: 0;
+    }
+    .field-row .colon {
+      width: 14px;
+      flex-shrink: 0;
+    }
+    .field-row .value {
+      font-size: 13px;
+      flex: 1;
+    }
+    .field-row .pin {
+      display: flex;
+      align-items: baseline;
+      margin-left: 20px;
+      flex-shrink: 0;
+    }
+    .field-row .pin .plabel {
+      font-size: 13px;
+      margin-right: 4px;
+    }
+    .field-row .pin .pvalue {
+      font-size: 13px;
+      min-width: 90px;
+      border-bottom: 1px solid #000;
+    }
+    .cont-row {
+      border-bottom: 1px solid #000;
+      min-height: 22px;
+    }
+
+    .uniform-row {
+      border-bottom: 1px solid #000;
+      padding: 6px 0;
+      font-size: 13px;
+    }
+    .uniform-row .label {
+      display: inline-block;
+      width: 150px;
+    }
+    .uniform-row .issued {
+      font-weight: bold;
+      text-decoration: underline;
+    }
+
+    .signature-section {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 45px;
+    }
+    .signature-box {
+      text-align: center;
+      width: 45%;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    .signature-box .line {
+      border-top: 1px solid #000;
+      margin-top: 4px;
+      padding-top: 4px;
+    }
+
+    .footer {
+      text-align: center;
+      font-size: 9px;
+      color: #666;
+      margin-top: 15px;
+    }
+
     /* ---------- PAGE 2: DECLARATION (BACKSIDE) ---------- */
-    .declaration-title { text-align:center; font-size:20px; font-weight:bold; margin-bottom: 22px; }
-    .declaration-intro { font-size: 13.5px; line-height: 1.9; margin-bottom: 10px; }
-    .declaration-name-line { border-bottom: 1px solid #000; display:inline-block; min-width: 320px; }
-    .declaration-list { font-size: 13.5px; line-height: 1.9; margin: 0; padding-left: 0; list-style: none; }
-    .declaration-list li { margin-bottom: 14px; display:flex; }
-    .declaration-list .num { flex-shrink:0; width: 26px; }
-    .declaration-list .txt { flex:1; text-align: justify; }
-    .declaration-closing { font-size: 13.5px; line-height: 1.9; margin-top: 20px; text-align: justify; }
-    .declaration-sign { margin-top: 50px; display:flex; justify-content:space-between; font-size:13.5px; }
+    .declaration-title {
+      text-align: center;
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 22px;
+    }
+    .declaration-intro {
+      font-size: 13.5px;
+      line-height: 1.9;
+      margin-bottom: 10px;
+    }
+    .declaration-name-line {
+      border-bottom: 1px solid #000;
+      display: inline-block;
+      min-width: 320px;
+    }
+    .declaration-list {
+      font-size: 13.5px;
+      line-height: 1.9;
+      margin: 0;
+      padding-left: 0;
+      list-style: none;
+    }
+    .declaration-list li {
+      margin-bottom: 14px;
+      display: flex;
+    }
+    .declaration-list .num {
+      flex-shrink: 0;
+      width: 26px;
+    }
+    .declaration-list .txt {
+      flex: 1;
+      text-align: justify;
+    }
+    .declaration-closing {
+      font-size: 13.5px;
+      line-height: 1.9;
+      margin-top: 20px;
+      text-align: justify;
+    }
+    .declaration-sign {
+      margin-top: 50px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 13.5px;
+    }
+
+    /* ---------- DOCUMENT PAGES ---------- */
+    .doc-page {
+      display: flex;
+      flex-direction: column;
+      padding: 10mm;
+    }
+    .doc-header h2 {
+      font-size: 14px;
+      margin-bottom: 8mm;
+      border-bottom: 1px solid #000;
+      padding-bottom: 4mm;
+    }
+    .doc-image-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .doc-image {
+      max-width: 100%;
+      max-height: 250mm;
+      object-fit: contain;
+    }
+    .doc-list {
+      font-size: 13px;
+      line-height: 1.8;
+    }
+    .doc-note {
+      font-size: 11px;
+      color: #666;
+      margin-top: 10mm;
+    }
+
     @media print {
-      body { padding: 0; }
-      .page { margin: 0 auto; padding: 15mm; }
+      body {
+        padding: 0;
+      }
+      .page {
+        margin: 0 auto;
+        padding: 15mm;
+      }
     }
   </style>
 </head>
-  <body>
+<body>
 
-    <!-- PAGE 1: JOINING FORM -->
-    <div class="page">
-      <div class="header">
-        <h1>SK ENTERPRISES</h1>
-        <div class="subtitle">▪ Housekeeping &nbsp;▪ Parking &nbsp;▪ Waste Management</div>
-        <div class="form-title">Employee Joining Form</div>
-        <div class="photo-box">
-          ${photoUrl ? `<img src="${photoUrl}" alt="Photo" />` : 'Photo'}
-        </div>
-      </div>
-
-      <div class="field-row"><span class="label">Site Name</span><span class="colon">:</span><span class="value">${employee.siteName || ''}</span></div>
-      <div class="field-row"><span class="label">Name</span><span class="colon">:</span><span class="value">${employee.name || ''}</span></div>
-      <div class="field-row"><span class="label">Date of Birth</span><span class="colon">:</span><span class="value">${employee.dateOfBirth || ''}</span></div>
-      <div class="field-row"><span class="label">Date of Joining</span><span class="colon">:</span><span class="value">${employee.joinDate || employee.dateOfJoining || ''}</span></div>
-      <div class="field-row"><span class="label">Contact No.</span><span class="colon">:</span><span class="value">${employee.phone || ''}</span></div>
-      <div class="field-row"><span class="label">Blood Group</span><span class="colon">:</span><span class="value">${employee.bloodGroup || ''}</span></div>
-
-      <div class="field-row">
-        <span class="label">Permanent Address</span><span class="colon">:</span><span class="value">${employee.permanentAddress || ''}</span>
-        <span class="pin"><span class="plabel">Pin Code:</span><span class="pvalue">${employee.permanentPincode || ''}</span></span>
-      </div>
-      <div class="cont-row"></div>
-
-      <div class="field-row">
-        <span class="label">Local Address</span><span class="colon">:</span><span class="value">${employee.localAddress || ''}</span>
-        <span class="pin"><span class="plabel">Pin Code:</span><span class="pvalue">${employee.localPincode || ''}</span></span>
-      </div>
-      <div class="cont-row"></div>
-
-      <div class="field-row"><span class="label">Nominee Name</span><span class="colon">:</span><span class="value">${employee.nomineeName || ''}</span></div>
-      <div class="field-row"><span class="label">Employee Relation</span><span class="colon">:</span><span class="value">${employee.nomineeRelation || ''}</span></div>
-      <div class="field-row"><span class="label">Aadhaar Card No.</span><span class="colon">:</span><span class="value">${employee.aadharNumber || ''}</span></div>
-      <div class="field-row"><span class="label">ID No.</span><span class="colon">(&nbsp;&nbsp;)</span><span class="value">${employee.employeeId || ''}</span></div>
-      <div class="field-row"><span class="label">Emergency Cont. No.</span><span class="colon">:</span><span class="value">1) ${employee.emergencyContactPhone || ''}&nbsp;&nbsp;&nbsp;&nbsp;2)</span></div>
-
-      <div class="field-row">
-        <span class="label">Bank Name</span><span class="colon">:</span><span class="value">${employee.bankName || ''}</span>
-        <span class="pin"><span class="plabel">IFSC Code:</span><span class="pvalue">${employee.ifscCode || ''}</span></span>
-      </div>
-      <div class="field-row"><span class="label">Branch</span><span class="colon">:</span><span class="value">${employee.branchName || ''}</span></div>
-      <div class="field-row"><span class="label">Account No.</span><span class="colon">:</span><span class="value">${employee.accountNumber || ''}</span></div>
-
-      <div class="uniform-row">
-        <span class="label">Uniform</span>:
-        <span class="${employee.pantSize ? 'issued' : ''}">Pant</span> /
-        <span class="${employee.shirtSize ? 'issued' : ''}">Shirt</span> /
-        <span class="${employee.capSize ? 'issued' : ''}">Cap</span> /
-        <span class="${employee.idCardIssued ? 'issued' : ''}">ID</span> /
-        <span class="${employee.westcoatIssued ? 'issued' : ''}">Westcoat</span> /
-        <span class="${employee.apronIssued ? 'issued' : ''}">Apron</span>
-      </div>
-
-      <div class="signature-section">
-        <div class="signature-box"><div class="line">Authorized Signature</div></div>
-        <div class="signature-box"><div class="line">Employee Signature</div></div>
-      </div>
-
-      <div class="footer">This is a computer-generated form. Printed on ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
-    </div>
-
-    <!-- PAGE 2: DECLARATION (BACKSIDE) -->
-    <div class="page">
-      <div class="declaration-title">प्रतिज्ञापत्र</div>
-
-      <div class="declaration-intro">
-        मी <span class="declaration-name-line">&nbsp;${employee.name || ''}&nbsp;</span><br/><br/>
-        खालील लिहिलेल्या अटी व सूचना पूर्णपणे समजून घेतल्या आहेत व मी त्यांना मनापासून मान्य करतो. खालील अटी मी न पाळल्यास त्याचा माझ्यावर आकारण्यात आल्यास माझी हरकत नाही.
-      </div>
-
-      <ol class="declaration-list">
-        <li><span class="num">१)</span><span class="txt">मी काम सोडण्याआधी एस.के. एंटरप्रायझेस यांना लिखितमध्ये १ महिना (३० दिवस) / ३ महिने (९० दिवस) पूर्वी सूचना देणे माझ्यावर बंधनकारक आहे. अन्यथा मी कुठलाही पगार मागणार नाही/घेण्यास पात्र नाही.</span></li>
-        <li><span class="num">२)</span><span class="txt">मी सुट्टी घेण्याआधी सुट्टीचा अर्ज मी लिखित देईल, अर्ज न दिल्यास, न कळवता सुट्टी घेतल्यास आकारलेला दंड मला मान्य आहे.</span></li>
-        <li><span class="num">३)</span><span class="txt">मी माझ्या कामाचे पुढील महिन्यातले १० दिवस भरल्याशिवाय माझ्या महिन्याचा पगार मला देऊ नये.</span></li>
-        <li><span class="num">४)</span><span class="txt">मला दिलेला युनिफॉर्म मी नीट व स्वच्छ ठेवेल. युनिफॉर्म फाटल्यास किंवा खराब झाल्यास नवीन युनिफॉर्म घ्यावा लागेल किंवा कंपनीने तो दिल्यास त्याचे शुल्क माझ्या पगारातून कपावे.</span></li>
-        <li><span class="num">५)</span><span class="txt">कंपनीमध्ये काम करत असताना जर असे दिसून आले की, तुम्ही कंपनीच्या विरोधात किंवा कंपनीच्या नियमांच्याविरुद्ध काम करत आहात, तर तुम्हाला कामावरून कमी करण्याचा अधिकार कंपनीला राहील. (कोणतीही पूर्वसूचना न देता)</span></li>
-        <li><span class="num">६)</span><span class="txt">मी माझे आधार कार्ड, पॅन कार्ड, ४ फोटो, बँक पासबुक व राहत असलेले लाईट बिल याच्या झेरॉक्स प्रती कंपनीला देणे माझ्यावर बंधनकारक आहे.</span></li>
-        <li><span class="num">७)</span><span class="txt">मी कामाला लागल्यापासून ७ दिवसांच्या आत काम सोडले तर मी पगार घेण्यास पात्र राहणार नाही.</span></li>
-      </ol>
-
-      <div class="declaration-closing">
-        वरील सर्व माहिती मी वाचली असून त्याच्या सत्यतेसाठी मी आज रोजी पुणे मुक्कामी माझी सही केली आहे.
-      </div>
-
-      <div class="declaration-sign">
-        <span>दिनांक : __________________</span>
-        <span>अर्जदाराची सही __________________</span>
+  <!-- PAGE 1: JOINING FORM -->
+  <div class="page">
+    <div class="header">
+      <h1>SK ENTERPRISES</h1>
+      <div class="subtitle">▪ Housekeeping &nbsp;▪ Parking &nbsp;▪ Waste Management</div>
+      <div class="form-title">Employee Joining Form</div>
+      <div class="photo-box">
+        ${photoUrl ? `<img src="${photoUrl}" alt="Photo" />` : 'Photo'}
       </div>
     </div>
 
-  </body>
-  </html>
-  `;
+    <div class="field-row"><span class="label">Site Name</span><span class="colon">:</span><span class="value">${employee.siteName || ''}</span></div>
+    <div class="field-row"><span class="label">Name</span><span class="colon">:</span><span class="value">${employee.name || ''}</span></div>
+    <div class="field-row"><span class="label">Date of Birth</span><span class="colon">:</span><span class="value">${employee.dateOfBirth || ''}</span></div>
+    <div class="field-row"><span class="label">Date of Joining</span><span class="colon">:</span><span class="value">${employee.joinDate || employee.dateOfJoining || ''}</span></div>
+    <div class="field-row"><span class="label">Contact No.</span><span class="colon">:</span><span class="value">${employee.phone || ''}</span></div>
+    <div class="field-row"><span class="label">Blood Group</span><span class="colon">:</span><span class="value">${employee.bloodGroup || ''}</span></div>
+
+   
+
+    <div class="field-row"><span class="label">Nominee Name</span><span class="colon">:</span><span class="value">${employee.nomineeName || ''}</span></div>
+    <div class="field-row"><span class="label">Employee Relation</span><span class="colon">:</span><span class="value">${employee.nomineeRelation || ''}</span></div>
+    <div class="field-row"><span class="label">Aadhaar Card No.</span><span class="colon">:</span><span class="value">${employee.aadharNumber || ''}</span></div>
+    <div class="field-row"><span class="label">ID No.</span><span class="colon">:</span><span class="value">${employee.employeeId || ''}</span></div>
+    <div class="field-row">
+  <span class="label">Emergency Cont. No.</span><span class="colon">:</span>
+  <span class="value">
+    ${employee.emergencyContactPhone ? `<span class="underline-fill">${employee.emergencyContactPhone}</span>` : 'Not provided'}
+  </span>
+</div>
+<div class="field-row">
+  <span class="label">Emergency Cont. No. 2</span><span class="colon">:</span>
+  <span class="value">
+    ${employee.emergencyPhone2 ? `<span class="underline-fill">${employee.emergencyPhone2}</span>` : 'Not provided'}
+  </span>
+</div>
+    <div class="field-row">
+      <span class="label">Bank Name</span><span class="colon">:</span><span class="value">${employee.bankName || ''}</span>
+      <span class="pin"><span class="plabel">IFSC Code:</span><span class="pvalue">${employee.ifscCode || ''}</span></span>
+    </div>
+    <div class="field-row"><span class="label">Branch</span><span class="colon">:</span><span class="value">${employee.branchName || ''}</span></div>
+    <div class="field-row"><span class="label">Account No.</span><span class="colon">:</span><span class="value">${employee.accountNumber || ''}</span></div>
+
+    <div class="uniform-row">
+      <span class="label">Uniform</span>:
+      <span class="${employee.pantSize ? 'issued' : ''}">Pant</span> /
+      <span class="${employee.shirtSize ? 'issued' : ''}">Shirt</span> /
+      <span class="${employee.capSize ? 'issued' : ''}">Cap</span> /
+      <span class="${employee.idCardIssued ? 'issued' : ''}">ID</span> /
+      <span class="${employee.westcoatIssued ? 'issued' : ''}">Westcoat</span> /
+      <span class="${employee.apronIssued ? 'issued' : ''}">Apron</span>
+    </div>
+
+    <div class="signature-section">
+      <div class="signature-box"><div class="line">Authorized Signature</div></div>
+      <div class="signature-box"><div class="line">Employee Signature</div></div>
+    </div>
+
+    <div class="footer">This is a computer-generated form. Printed on ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+  </div>
+
+  <!-- PAGE 2: DECLARATION (BACKSIDE) -->
+  <div class="page">
+    <div class="declaration-title">प्रतिज्ञापत्र</div>
+
+    <div class="declaration-intro">
+      मी <span class="declaration-name-line">&nbsp;${employee.name || ''}&nbsp;</span><br/><br/>
+      खालील लिहिलेल्या अटी व सूचना पूर्णपणे समजून घेतल्या आहेत व मी त्यांना मनापासून मान्य करतो. खालील अटी मी न पाळल्यास त्याचा माझ्यावर आकारण्यात आल्यास माझी हरकत नाही.
+    </div>
+
+    <ol class="declaration-list">
+      <li><span class="num">१)</span><span class="txt">मी काम सोडण्याआधी एस.के. एंटरप्रायझेस यांना लिखितमध्ये १ महिना (३० दिवस) / ३ महिने (९० दिवस) पूर्वी सूचना देणे माझ्यावर बंधनकारक आहे. अन्यथा मी कुठलाही पगार मागणार नाही/घेण्यास पात्र नाही.</span></li>
+      <li><span class="num">२)</span><span class="txt">मी सुट्टी घेण्याआधी सुट्टीचा अर्ज मी लिखित देईल, अर्ज न दिल्यास, न कळवता सुट्टी घेतल्यास आकारलेला दंड मला मान्य आहे.</span></li>
+      <li><span class="num">३)</span><span class="txt">मी माझ्या कामाचे पुढील महिन्यातले १० दिवस भरल्याशिवाय माझ्या महिन्याचा पगार मला देऊ नये.</span></li>
+      <li><span class="num">४)</span><span class="txt">मला दिलेला युनिफॉर्म मी नीट व स्वच्छ ठेवेल. युनिफॉर्म फाटल्यास किंवा खराब झाल्यास नवीन युनिफॉर्म घ्यावा लागेल किंवा कंपनीने तो दिल्यास त्याचे शुल्क माझ्या पगारातून कपावे.</span></li>
+      <li><span class="num">५)</span><span class="txt">कंपनीमध्ये काम करत असताना जर असे दिसून आले की, तुम्ही कंपनीच्या विरोधात किंवा कंपनीच्या नियमांच्याविरुद्ध काम करत आहात, तर तुम्हाला कामावरून कमी करण्याचा अधिकार कंपनीला राहील. (कोणतीही पूर्वसूचना न देता)</span></li>
+      <li><span class="num">६)</span><span class="txt">मी माझे आधार कार्ड, पॅन कार्ड, ४ फोटो, बँक पासबुक व राहत असलेले लाईट बिल याच्या झेरॉक्स प्रती कंपनीला देणे माझ्यावर बंधनकारक आहे.</span></li>
+      <li><span class="num">७)</span><span class="txt">मी कामाला लागल्यापासून ७ दिवसांच्या आत काम सोडले तर मी पगार घेण्यास पात्र राहणार नाही.</span></li>
+    </ol>
+
+    <div class="declaration-closing">
+      वरील सर्व माहिती मी वाचली असून त्याच्या सत्यतेसाठी मी आज रोजी पुणे मुक्कामी माझी सही केली आहे.
+    </div>
+
+    <div class="declaration-sign">
+      <span>दिनांक : __________________</span>
+      <span>अर्जदाराची सही __________________</span>
+    </div>
+  </div>
+
+  ${documentImagePages}
+  ${otherDocsListPage}
+
+</body>
+</html>
+`;
 
     printWindow.document.write(formContent);
     printWindow.document.close();
 
-    // Wait for both pages (and photo, if any) to render, then print once for both pages
-    printWindow.onload = () => {
-      setTimeout(() => {
+    // Wait for every image (form photo + scanned docs) to actually finish
+    // loading before printing — fixes documents printing blank on slower loads.
+    const waitAndPrint = () => {
+      const imgs = Array.from(printWindow.document.images);
+      if (imgs.length === 0) {
         printWindow.print();
-        setTimeout(() => printWindow.close(), 1000);
-      }, 300);
+        return;
+      }
+      let remaining = imgs.length;
+      let printed = false;
+      const done = () => {
+        remaining--;
+        if (remaining <= 0 && !printed) {
+          printed = true;
+          setTimeout(() => printWindow.print(), 200);
+        }
+      };
+      imgs.forEach((img) => (img.complete ? done() : (img.addEventListener('load', done), img.addEventListener('error', done))));
+      // safety net in case a Cloudinary image hangs
+      setTimeout(() => { if (!printed) { printed = true; printWindow.print(); } }, 8000);
     };
-  };
 
+    printWindow.onload = waitAndPrint;
+    printWindow.onafterprint = () => printWindow.close();
+  };
 
   // Handle print EPF form
   const handlePrintEPFForm = () => {
@@ -3143,7 +3446,34 @@ const OnboardingTab = ({
                         </Select>
                       </FormField>
 
-
+                      <FormField label="Date of Joining" required>
+                        <Input
+                          type="date"
+                          value={newEmployee.dateOfJoining}
+                          onChange={(e) => setNewEmployee({ ...newEmployee, dateOfJoining: e.target.value })}
+                        />
+                      </FormField>
+                      <FormField label="Blood Group" required>
+                        <Select value={newEmployee.bloodGroup} onValueChange={(v) => setNewEmployee({ ...newEmployee, bloodGroup: v })}>
+                          <SelectTrigger><SelectValue placeholder="Select blood group" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="A+">A +ve</SelectItem><SelectItem value="A-">A -ve</SelectItem>
+                            <SelectItem value="B+">B +ve</SelectItem><SelectItem value="B-">B -ve</SelectItem>
+                            <SelectItem value="O+">O +ve</SelectItem><SelectItem value="O-">O -ve</SelectItem>
+                            <SelectItem value="AB+">AB +ve</SelectItem><SelectItem value="AB-">AB -ve</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormField>
+                      <FormField label="Status" required>
+                        <Select value={newEmployee.status} onValueChange={(v: "active" | "inactive" | "left") => setNewEmployee({ ...newEmployee, status: v })}>
+                          <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="inactive">Inactive</SelectItem>
+                            <SelectItem value="left">Left</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormField>
                     </div>
                   </div>
                 )}
@@ -3173,15 +3503,11 @@ const OnboardingTab = ({
                       <FormField label="Permanent Address">
                         <Textarea rows={2} value={newEmployee.permanentAddress} onChange={(e) => setNewEmployee({ ...newEmployee, permanentAddress: e.target.value })} />
                       </FormField>
-                      <FormField label="Permanent Pin Code">
-                        <Input value={newEmployee.permanentPincode} onChange={(e) => setNewEmployee({ ...newEmployee, permanentPincode: e.target.value })} maxLength={6} />
-                      </FormField>
+
                       <FormField label="Local Address">
                         <Textarea rows={2} value={newEmployee.localAddress} onChange={(e) => setNewEmployee({ ...newEmployee, localAddress: e.target.value })} />
                       </FormField>
-                      <FormField label="Local Pin Code">
-                        <Input value={newEmployee.localPincode} onChange={(e) => setNewEmployee({ ...newEmployee, localPincode: e.target.value })} maxLength={6} />
-                      </FormField>
+
                     </div>
                   </div>
                 )}
@@ -3224,27 +3550,44 @@ const OnboardingTab = ({
                   <div className="space-y-6">
                     <h3 className="text-lg font-semibold border-b pb-2">Family & Emergency Contact</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField label="Father's Name">
-                        <Input value={newEmployee.fatherName} onChange={(e) => setNewEmployee({ ...newEmployee, fatherName: e.target.value })} />
+                      <FormField label="Relative Name">
+                        <Input
+                          value={newEmployee.relativeName}
+                          onChange={(e) => setNewEmployee({ ...newEmployee, relativeName: e.target.value })}
+                          placeholder="Enter father/mother/spouse name"
+                        />
                       </FormField>
-                      <FormField label="Mother's Name">
-                        <Input value={newEmployee.motherName} onChange={(e) => setNewEmployee({ ...newEmployee, motherName: e.target.value })} />
-                      </FormField>
-                      <FormField label="Spouse Name">
-                        <Input value={newEmployee.spouseName} onChange={(e) => setNewEmployee({ ...newEmployee, spouseName: e.target.value })} />
+                      <FormField label="Relation">
+                        <Select
+                          value={newEmployee.relation}
+                          onValueChange={(v) => setNewEmployee({ ...newEmployee, relation: v })}
+                        >
+                          <SelectTrigger><SelectValue placeholder="Select relation" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Father">Father</SelectItem>
+                            <SelectItem value="Mother">Mother</SelectItem>
+                            <SelectItem value="Spouse">Spouse</SelectItem>
+                            <SelectItem value="Husband">Husband</SelectItem>
+                            <SelectItem value="Wife">Wife</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </FormField>
                       <FormField label="Number of Children">
                         <Input type="number" min="0" value={newEmployee.numberOfChildren} onChange={(e) => setNewEmployee({ ...newEmployee, numberOfChildren: e.target.value })} />
                       </FormField>
-                      <FormField label="Emergency Contact Name">
-                        <Input value={newEmployee.emergencyContactName} onChange={(e) => setNewEmployee({ ...newEmployee, emergencyContactName: e.target.value })} />
-                      </FormField>
+
                       <FormField label="Emergency Contact Phone">
                         <Input value={newEmployee.emergencyContactPhone} onChange={(e) => setNewEmployee({ ...newEmployee, emergencyContactPhone: e.target.value })} maxLength={10} />
                       </FormField>
-                      <FormField label="Relation">
-                        <Input value={newEmployee.emergencyContactRelation} onChange={(e) => setNewEmployee({ ...newEmployee, emergencyContactRelation: e.target.value })} />
+                      <FormField label="Emergency Contact 2 (Phone Only)">
+                        <Input
+                          value={newEmployee.emergencyPhone2}
+                          onChange={(e) => setNewEmployee({ ...newEmployee, emergencyPhone2: e.target.value })}
+                          placeholder="Enter second emergency phone number"
+                          maxLength={10}
+                        />
                       </FormField>
+
                       <FormField label="Nominee Name">
                         <Input value={newEmployee.nomineeName} onChange={(e) => setNewEmployee({ ...newEmployee, nomineeName: e.target.value })} />
                       </FormField>
@@ -3308,23 +3651,73 @@ const OnboardingTab = ({
                         <Input ref={signatureAuthorizedRef} type="file" accept="image/*" onChange={(e) => handleSignatureUpload('authorized', e)} className="hidden" />
                       </div>
                       <div className="col-span-2">
-                        <FormField label="Document Upload">
-                          <div className="border-2 border-dashed rounded-lg p-6 text-center">
-                            <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
-                            <Button variant="outline" className="mt-4" onClick={() => documentUploadRef.current?.click()}>Browse Files</Button>
-                            {uploadedDocuments.length > 0 && (
-                              <div className="mt-4 space-y-2">
-                                {uploadedDocuments.map((doc, idx) => (
-                                  <div key={idx} className="flex justify-between items-center p-2 border rounded">
-                                    <span className="text-sm">{doc.name}</span>
-                                    <Button size="sm" variant="destructive" onClick={() => handleRemoveDocument(idx)}><Trash2 className="h-3 w-3" /></Button>
+                        <FormField label="KYC Documents">
+                          <div className="space-y-3">
+                            {DOCUMENT_TYPES.map((docType) => {
+                              const file = uploadedDocuments.find((_, idx) =>
+                                // We need to track which file is for which type - let's use a different approach
+                                // For now, we'll just use the index
+                                false
+                              );
+                              // Actually, let's simplify - we'll just show all uploaded files
+                              return (
+                                <div key={docType.value} className="flex items-center gap-3 border rounded-lg p-3">
+                                  <span className="text-xl">{docType.icon}</span>
+                                  <div className="flex-1">
+                                    <div className="text-sm font-medium">
+                                      {docType.label}
+                                      {docType.required && <span className="text-red-500 ml-1">*</span>}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {docType.required ? 'Required' : 'Optional'}
+                                    </div>
                                   </div>
-                                ))}
-                              </div>
-                            )}
+                                  <input
+                                    type="file"
+                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                                    className="hidden"
+                                    id={`doc-${docType.value}`}
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (!file) return;
+                                      // Store with document type info
+                                      setUploadedDocuments(prev => [
+                                        ...prev.filter(d => d.documentType !== docType.value),
+                                        { documentType: docType.value, file }
+                                      ]);
+                                    }}
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => document.getElementById(`doc-${docType.value}`)?.click()}
+                                  >
+                                    Upload {docType.label}
+                                  </Button>
+                                </div>
+                              );
+                            })}
                           </div>
+                          {uploadedDocuments.length > 0 && (
+                            <div className="mt-4 space-y-2">
+                              <p className="text-sm font-medium">Uploaded files:</p>
+                              {uploadedDocuments.map((doc, idx) => {
+                                const typeLabel = DOCUMENT_TYPES.find(t => t.value === doc.documentType)?.label || doc.documentType;
+                                return (
+                                  <div key={idx} className="flex justify-between items-center p-2 border rounded">
+                                    <span className="text-sm">
+                                      <span className="font-medium">{typeLabel}:</span> {doc.file.name}
+                                    </span>
+                                    <Button size="sm" variant="destructive" onClick={() => handleRemoveDocument(doc.documentType)}>
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </FormField>
-                        <Input ref={documentUploadRef} type="file" multiple onChange={handleDocumentUpload} className="hidden" />
                       </div>
                     </div>
                   </div>

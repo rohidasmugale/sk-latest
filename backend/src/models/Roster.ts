@@ -100,10 +100,7 @@ const RosterSchema: Schema = new Schema(
       type: String,
       required: true,
     },
-    siteId: {
-      type: String,
-      required: true,
-    },
+     siteId: { type: mongoose.Schema.Types.ObjectId, ref: 'Site', index: true },
     supervisors: {
       type: [SupervisorSchema],
       default: [],

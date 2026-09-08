@@ -1101,6 +1101,7 @@ const InventoryPage = () => {
         status: newMachine.status || 'operational',
         location: newMachine.location, // This will store the site NAME, not city
         model: newMachine.model,
+        siteId: newMachine.siteId || undefined,
         department: newMachine.department,
         assignedTo: assignedTo,
         lastMaintenanceDate: newMachine.lastMaintenanceDate,
@@ -1146,6 +1147,7 @@ const InventoryPage = () => {
       description: machine.description,
       status: machine.status,
       location: machine.location,
+      siteId: machine.siteId,
       model: machine.model,
       department: machine.department,
       assignedTo: machine.assignedTo,
@@ -1444,6 +1446,7 @@ const InventoryPage = () => {
       description: "",
       status: 'operational',
       location: "",
+      siteId: undefined,
       model: "",
       department: "",
       assignedTo: "",
@@ -1650,7 +1653,7 @@ const InventoryPage = () => {
 
             {role === 'supervisor' && user && (
               <div className="flex flex-wrap items-center gap-2 mt-2">
-               
+
                 <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
                   <UserCheck className="h-3 w-3 mr-1" />
                   {user.name}
@@ -2145,7 +2148,13 @@ const InventoryPage = () => {
               {/* Location/Site dropdown - Now fetches from database */}
               <div className="space-y-2">
                 <Label>Location/Site *</Label>
-                <Select value={newMachine.location} onValueChange={(value) => setNewMachine({ ...newMachine, location: value })}>
+                <Select
+                  value={newMachine.location}
+                  onValueChange={(value) => {
+                    const site = allSites.find(s => s.name === value);
+                    setNewMachine({ ...newMachine, location: value, siteId: site?._id });
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select site" />
                   </SelectTrigger>

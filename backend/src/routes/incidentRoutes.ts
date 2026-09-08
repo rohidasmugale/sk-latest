@@ -4,6 +4,7 @@ import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 import Incident from '../models/Incident';
 import { auth } from '../middleware/auth';
 import mongoose from 'mongoose';
+import Site from '../models/Site'; // ✅ ADD THIS
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -11,10 +12,21 @@ const upload = multer({ storage: multer.memoryStorage() });
 // POST /api/incidents – create incident with optional photo
 router.post('/', auth, upload.single('photo'), async (req: Request, res: Response) => {
   try {
-    const { site, employeeId, type, description, date } = req.body;
+    // ❌ CHANGE: Accept siteId instead of site
+    // const { site, employeeId, type, description, date } = req.body;
+    const { siteId, employeeId, type, description, date } = req.body; // ✅ CHANGED
     const reportedBy = req.user._id;
 
-    if (!site || !type || !description) {
+    // ✅ Validate siteId exists
+    if (!siteId) {
+      return res.status(400).json({ success: false, message: 'Site ID is required' });
+    }
+    const site = await Site.findById(siteId);
+    if (!site) {
+      return res.status(400).json({ success: false, message: 'Invalid site' });
+    }
+
+    if (!type || !description) {
       return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
 
@@ -34,7 +46,8 @@ router.post('/', auth, upload.single('photo'), async (req: Request, res: Respons
     }
 
     const incident = new Incident({
-      site,
+      site: site.name, // ✅ Keep site name for display
+      siteId: site._id, // ✅ ADD THIS
       employeeId: employeeId || null,
       type,
       description,
@@ -52,13 +65,15 @@ router.post('/', auth, upload.single('photo'), async (req: Request, res: Respons
   }
 });
 
-// GET /api/incidents?site=xxx – fetch incidents by site (admin/superadmin)
+// GET /api/incidents?siteId=xxx – fetch incidents by siteId
 router.get('/', auth, async (req: Request, res: Response) => {
   try {
-    const { site } = req.query;
+    // ❌ CHANGE: Use siteId instead of site
+    // const { site } = req.query;
+    const { siteId } = req.query; // ✅ CHANGED
     const filter: any = {};
-    if (site && typeof site === 'string') {
-      filter.site = site;
+    if (siteId && typeof siteId === 'string') {
+      filter.siteId = siteId; // ✅ CHANGED
     }
     const incidents = await Incident.find(filter).sort({ createdAt: -1 });
     res.json({ success: true, data: incidents });
@@ -68,7 +83,7 @@ router.get('/', auth, async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/incidents/supervisor – fetch incidents for logged‑in supervisor
+// GET /api/incidents/supervisor – fetch incidents for logged-in supervisor
 router.get('/supervisor', auth, async (req: Request, res: Response) => {
   try {
     let userId = req.user._id;

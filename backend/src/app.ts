@@ -8,7 +8,7 @@ import path from 'path';
 import fs from 'fs';
 import { v2 as cloudinary, UploadApiResponse } from "cloudinary";
 import User, { IUser } from './models/User';
-import excelImportRoutes from './routes/employeeImportExport.routes';
+
 import { PasswordFixer } from './utils/passwordFixer';
 import groomingRoutes from './routes/groomingRoutes';
 // Import all routes
@@ -52,10 +52,9 @@ import communicationRoutes from './routes/communicationRoutes';
 // ... other imports ...
 // Add this with other imports
 import rosterRoutes from './routes/rosterRoutes';
+import paymentRoutes from './routes/paymentsRoute';  // Import the payments route
 
-// After other route registrations, add:
-
-
+import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 const app: Application = express();
@@ -283,6 +282,7 @@ app.use('/api/alerts',alertRoutes);
 app.use('/api/machines', machineRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/invoices', invoiceRoutes);
+app.use('/api/payments', paymentRoutes); 
 app.use('/api/manager-leaves', managerLeaveRoutes); 
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/supervisors', supervisorRoutes);
@@ -512,32 +512,67 @@ app.patch('/api/users/:id/toggle-status', async (req: Request, res: Response) =>
   }
 });
 
-app.put('/api/users/:id', async (req: Request, res: Response) => {
+app.put('/api/users/:id', simpleUpload.single('profilePhoto'), async (req: Request, res: Response) => {
   try {
+    // req.body is now populated by multer (multipart/form-data)
     const updates = req.body;
+
+    // ----- Parse `assignedSites` if it comes as a JSON string -----
+    if (updates.assignedSites && typeof updates.assignedSites === 'string') {
+      try {
+        const parsed = JSON.parse(updates.assignedSites);
+        updates.assignedSites = Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        // If parsing fails, keep as string (or fallback to empty array)
+        console.warn('⚠️ Failed to parse assignedSites, leaving as string');
+      }
+    }
+
+    // ----- Handle name split (optional) -----
     if (updates.name) {
       const [firstName, ...lastNameParts] = updates.name.split(' ');
       updates.firstName = firstName;
       updates.lastName = lastNameParts.join(' ');
       delete updates.name;
     }
+
+    // ----- Hash password only if provided and non-empty -----
+    if (updates.password) {
+      updates.password = await bcrypt.hash(updates.password, 10);
+    } else {
+      // Never store an empty string – remove it from update object
+      delete updates.password;
+    }
+
+    // ----- Update the user -----
     const user = await User.findByIdAndUpdate(
       req.params.id,
       { ...updates, updatedAt: new Date() },
       { new: true, runValidators: true }
     );
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // ----- Build response -----
     const userObj = user.toJSON();
     const userResponse = {
       ...userObj,
       id: userObj._id.toString().slice(-6),
       _id: userObj._id.toString(),
       status: userObj.isActive ? 'active' : 'inactive',
-      joinDate: user.joinDate.toISOString().split('T')[0]
+      joinDate: user.joinDate.toISOString().split('T')[0],
     };
-    res.status(200).json({ success: true, message: 'User updated successfully', user: userResponse });
+
+    res.status(200).json({
+      success: true,
+      message: 'User updated successfully',
+      user: userResponse,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Error updating user';
+    console.error('❌ Error updating user:', error);
     res.status(400).json({ success: false, message });
   }
 });
@@ -707,20 +742,6 @@ const notificationLimiter = rateLimit({
   }
 });
 
-// Rate limited notifications endpoint
-app.get('/api/notifications', notificationLimiter, (req: Request, res: Response) => {
-  res.set('Cache-Control', 'no-store');
-  res.json({ success: true, data: [] });
-});
-app.patch('/api/notifications/:id/read', (req: Request, res: Response) => {
-  res.json({ success: true });
-});
-app.patch('/api/notifications/read-all', (req: Request, res: Response) => {
-  res.json({ success: true });
-});
-app.delete('/api/notifications/:id', (req: Request, res: Response) => {
-  res.json({ success: true });
-});
 app.use('/api/roster', rosterRoutes);
 // In your main server file
 

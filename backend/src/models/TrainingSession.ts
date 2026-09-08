@@ -38,6 +38,7 @@ export interface ITrainingSession extends Document {
   trainer: string;
   supervisor?: string;
   site: string;
+    siteId?: mongoose.Types.ObjectId;  // ✅ ADD THIS
   department: string;
   attendees: string[];
   maxAttendees: number;
@@ -119,6 +120,7 @@ const TrainingSessionSchema: Schema = new Schema(
       type: String,
       default: ''
     },
+    siteId: { type: Schema.Types.ObjectId, ref: 'Site', index: true }, 
     department: {
       type: String,
       default: 'All Departments'
@@ -174,7 +176,7 @@ managers: {
 // Create indexes
 TrainingSessionSchema.index({ date: 1, status: 1 });
 TrainingSessionSchema.index({ department: 1 });
-TrainingSessionSchema.index({ site: 1 });
+TrainingSessionSchema.index({ siteId: 1 });
 TrainingSessionSchema.index({ type: 1 });
 TrainingSessionSchema.index({ trainer: 1 });
 TrainingSessionSchema.index({ "supervisors.id": 1 });

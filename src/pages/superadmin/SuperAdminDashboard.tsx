@@ -97,18 +97,17 @@ interface Employee {
   gender?: string;
   maritalStatus?: string;
   permanentAddress?: string;
-  permanentPincode?: string;
+
   localAddress?: string;
-  localPincode?: string;
+
   bankName?: string;
   accountNumber?: string;
   ifscCode?: string;
   branchName?: string;
-  fatherName?: string;
-  motherName?: string;
-  spouseName?: string;
+  relativeName?: string;
+  relation?: string;
   numberOfChildren?: string | number;
-  emergencyContactName?: string;
+ 
   emergencyContactPhone?: string;
   emergencyContactRelation?: string;
   nomineeName?: string;
@@ -151,7 +150,8 @@ interface SalaryStructure {
 // API URL
 const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
-// Chart color constants
+// import { relative } from 'path';
+
 const CHART_COLORS = {
   present: '#10b981',
   absent: '#ef4444',

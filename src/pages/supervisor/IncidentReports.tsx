@@ -11,8 +11,9 @@ import { toast } from "sonner";
 import axios from "axios";
 import { useRole } from "@/context/RoleContext";
 import CameraCapture from "./CameraCapture";
+import { notifyIncidentReported } from "@/lib/notificationHelper";
 
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 const apiClient = axios.create({ baseURL: API_URL });
@@ -26,12 +27,13 @@ export default function IncidentReports() {
   const { user: currentUser, role } = useRole();
   const [incidents, setIncidents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [supervisorSite, setSupervisorSite] = useState("");
+  const [supervisorSiteId, setSupervisorSiteId] = useState("");
+  const [supervisorSiteName, setSupervisorSiteName] = useState("");
   const [cameraOpen, setCameraOpen] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [form, setForm] = useState({
-    site: "",
+    siteId: "",
     employeeId: "",
     type: "accident",
     description: "",
@@ -39,34 +41,27 @@ export default function IncidentReports() {
   });
   const [submitting, setSubmitting] = useState(false);
 
+  // ✅ CHANGED: Fetch siteId from auth endpoint
   const fetchSupervisorSite = useCallback(async () => {
     if (!currentUser || role !== "supervisor") return;
-    const supervisorId = currentUser._id || currentUser.id;
     try {
-      const res = await apiClient.get('/tasks', { params: { limit: 1000 } });
-      let tasks = res.data?.data || res.data || [];
-      if (!Array.isArray(tasks)) tasks = [];
-      const siteSet = new Set<string>();
-      tasks.forEach((task: any) => {
-        const assigned = task.assignedUsers?.some((u: any) => u.userId === supervisorId);
-        const assignedOld = task.assignedTo === supervisorId;
-        if ((assigned || assignedOld) && task.siteName) {
-          siteSet.add(task.siteName);
-        }
-      });
-      const siteArray = Array.from(siteSet);
-      if (siteArray.length > 0) {
-        setSupervisorSite(siteArray[0]);
-        setForm(prev => ({ ...prev, site: siteArray[0] }));
+      const res = await apiClient.get('/auth/supervisor-site');
+      if (res.data.success && res.data.siteId) {
+        setSupervisorSiteId(res.data.siteId);
+        setSupervisorSiteName(res.data.siteName);
+        setForm(prev => ({ ...prev, siteId: res.data.siteId }));
       }
     } catch (error) {
       console.error("Error fetching supervisor site:", error);
     }
   }, [currentUser, role]);
 
+  // ✅ CHANGED: Use siteId in API call
   const fetchIncidents = useCallback(async () => {
     try {
-      const res = await apiClient.get('/incidents/supervisor');
+      const res = await apiClient.get('/incidents', {
+        params: { siteId: supervisorSiteId }
+      });
       setIncidents(res.data.data || []);
     } catch (error: any) {
       console.error("Fetch incidents error:", error);
@@ -74,7 +69,7 @@ export default function IncidentReports() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [supervisorSiteId]);
 
   useEffect(() => {
     if (role === "supervisor" && currentUser) {
@@ -98,9 +93,10 @@ export default function IncidentReports() {
     setPhotoPreview(null);
   };
 
+  // ✅ CHANGED: Use siteId in submit + send notification
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.site) {
+    if (!form.siteId) {
       toast.error("No site assigned");
       return;
     }
@@ -112,16 +108,26 @@ export default function IncidentReports() {
     setSubmitting(true);
     try {
       const formData = new FormData();
-      formData.append("site", form.site);
+      formData.append("siteId", form.siteId);
       formData.append("employeeId", form.employeeId || "");
       formData.append("type", form.type);
       formData.append("description", form.description);
       formData.append("date", form.date);
       if (selectedPhoto) formData.append("photo", selectedPhoto);
 
-      await apiClient.post('/incidents', formData, {
+      // ✅ Store the response to get incident ID
+      const response = await apiClient.post('/incidents', formData, {
         headers: { "Content-Type": "multipart/form-data" }
       });
+
+      // 🔔 Notify admins/managers/superadmins
+      notifyIncidentReported(
+        supervisorSiteName,
+        form.type,
+        form.description,
+        response.data?.data?._id || response.data?._id
+      ).catch(() => { }); // fire-and-forget
+
       toast.success("Incident reported");
       setForm(prev => ({ ...prev, employeeId: "", description: "" }));
       removePhoto();
@@ -134,7 +140,6 @@ export default function IncidentReports() {
     }
   };
 
-  // Filter today's incidents + export old
   const today = new Date().toISOString().split('T')[0];
   const todaysIncidents = incidents.filter(inc => inc.date?.startsWith(today));
   const oldIncidents = incidents.filter(inc => !inc.date?.startsWith(today));
@@ -164,7 +169,7 @@ export default function IncidentReports() {
   };
 
   if (loading) return <div className="p-4 flex justify-center"><Loader2 className="animate-spin" /></div>;
-  if (!supervisorSite && !loading) {
+  if (!supervisorSiteId && !loading) {
     return (
       <div className="p-4">
         <BackButton />
@@ -194,17 +199,17 @@ export default function IncidentReports() {
         <CardHeader className="p-3 pb-0"><CardTitle className="text-sm font-semibold">Report New Incident</CardTitle></CardHeader>
         <CardContent className="p-3">
           <form onSubmit={handleSubmit} className="space-y-2">
-            <Input value={form.site} readOnly className="bg-gray-50 text-sm h-9" />
-            <Input placeholder="Employee ID (optional)" value={form.employeeId} onChange={e => setForm({...form, employeeId: e.target.value})} className="text-sm h-9" />
-            <Select value={form.type} onValueChange={v => setForm({...form, type: v})}>
+            <Input value={supervisorSiteName} readOnly className="bg-gray-50 text-sm h-9" />
+            <Input placeholder="Employee ID (optional)" value={form.employeeId} onChange={e => setForm({ ...form, employeeId: e.target.value })} className="text-sm h-9" />
+            <Select value={form.type} onValueChange={v => setForm({ ...form, type: v })}>
               <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="accident">Accident</SelectItem>
                 <SelectItem value="issue">Issue</SelectItem>
               </SelectContent>
             </Select>
-            <Input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className="text-sm h-9" />
-            <Textarea placeholder="Description" value={form.description} onChange={e => setForm({...form, description: e.target.value})} rows={2} className="text-sm" />
+            <Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="text-sm h-9" />
+            <Textarea placeholder="Description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={2} className="text-sm" />
             <div className="space-y-2">
               <div className="flex gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={() => setCameraOpen(true)}>

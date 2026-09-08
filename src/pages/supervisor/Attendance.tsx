@@ -1062,6 +1062,7 @@ const Attendance = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Sr No</TableHead>
                   <TableHead>Employee</TableHead>
                   <TableHead>ID</TableHead>
                   <TableHead>Department</TableHead>
@@ -1076,11 +1077,13 @@ const Attendance = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredEmployees.map(emp => {
+                {filteredEmployees.map((emp, index) => {
                   const record = getEmployeeAttendance(emp);
                   const derived = getDerivedAttendanceStatus(record, record?.checkInTime || null);
+                  const srNo = index + 1;
                   return (
                     <TableRow key={emp._id}>
+                      <TableCell className="text-center font-medium text-xs">{srNo}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           {emp.name}
@@ -1090,7 +1093,6 @@ const Attendance = () => {
                             </Badge>
                           )}
                         </div>
-
                       </TableCell>
                       <TableCell>{emp.employeeId}</TableCell>
                       <TableCell>{emp.department}</TableCell>

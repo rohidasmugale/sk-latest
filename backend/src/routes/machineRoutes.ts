@@ -9,7 +9,8 @@ router.get('/', machineController.getMachines.bind(machineController));
 router.get('/stats', machineController.getMachineStats.bind(machineController));
 router.get('/search', machineController.searchMachines.bind(machineController));
 router.get('/pending-maintenance', machineController.getPendingMaintenanceRecords.bind(machineController));
-router.get('/supervisor',auth,machineController.getMachinesForSupervisor.bind(machineController)); 
+// ✅ GET /supervisor – uses siteId from auth middleware
+router.get('/supervisor', auth, machineController.getMachinesForSupervisor.bind(machineController)); 
 router.get('/:id', machineController.getMachineById.bind(machineController));
 
 // POST routes

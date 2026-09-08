@@ -11,7 +11,7 @@ import LeaveManagementTab from "./LeaveManagementTab";
 import PayrollTab from "./PayrollTab";
 import PerformanceTab from "./PerformanceTab";
 import ReportsTab from "./ReportsTab";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   LeaveRequest,
   Attendance,

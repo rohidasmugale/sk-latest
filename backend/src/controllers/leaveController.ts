@@ -208,7 +208,22 @@ export const applyForLeave = async (req: Request, res: Response) => {
       // SUPERVISOR LEAVE - Skip validation, just log it
       console.log('👑 Supervisor leave application - skipping employee validation');
     }
+// ========== INSERT DUPLICATE CHECK HERE ==========
+const existing = await Leave.findOne({
+  employeeId: employeeId,
+  leaveType,
+  fromDate: from,
+  toDate: to,
+  status: { $in: ['pending', 'approved'] }
+});
 
+if (existing) {
+  return res.status(409).json({
+    success: false,
+    message: `A ${leaveType} leave request for these exact dates (${fromDate} to ${toDate}) already exists (status: ${existing.status}).`,
+    data: existing
+  });
+}
     // Create new leave request - EXACTLY LIKE ATTENDANCE SYSTEM
     const leaveData: any = {
       employeeId,

@@ -10,13 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 export const DOCUMENT_TYPES = [
   { value: 'aadhar', label: 'Aadhaar Card', icon: '🆔', required: true, pattern: '^[0-9]{12}$', patternMessage: 'Enter 12-digit Aadhar number' },
   { value: 'pan', label: 'PAN Card', icon: '💳', required: true, pattern: '^[A-Z]{5}[0-9]{4}[A-Z]{1}$', patternMessage: 'Enter PAN (e.g., ABCDE1234F)' },
-  { value: 'police', label: 'Police Verification', icon: '👮', required: true, pattern: null },
+  { value: 'police', label: 'Police Verification', icon: '👮', required: false, pattern: null },  // ← CHANGED to false
   { value: 'driving', label: 'Driving License', icon: '🚗', required: false, pattern: null },
   { value: 'electricity', label: 'Electricity Bill', icon: '⚡', required: false, pattern: null },
   { value: 'voter', label: 'Voter ID', icon: '🗳️', required: false, pattern: null },
@@ -47,11 +47,11 @@ interface DocumentUploadProps {
   existingDocuments?: Document[];
 }
 
-const DocumentUpload: React.FC<DocumentUploadProps> = ({ 
+const DocumentUpload: React.FC<DocumentUploadProps> = ({
   employeeId,
   employeeName,
   onDocumentUploaded,
-  existingDocuments = [] 
+  existingDocuments = []
 }) => {
   const [selectedType, setSelectedType] = useState<string>('');
   const [documentNumber, setDocumentNumber] = useState('');
@@ -64,7 +64,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   const [documents, setDocuments] = useState<Document[]>(existingDocuments);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<any>(null);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -123,7 +123,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       }
 
       setSelectedFile(file);
-      
+
       // Create preview URL for images
       if (file.type.startsWith('image/')) {
         const url = URL.createObjectURL(file);
@@ -136,10 +136,10 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
   const validateDocumentNumber = () => {
     if (!documentNumber) return true;
-    
+
     const docType = DOCUMENT_TYPES.find(d => d.value === selectedType);
     if (!docType || !docType.pattern) return true;
-    
+
     const regex = new RegExp(docType.pattern);
     return regex.test(documentNumber);
   };
@@ -168,17 +168,17 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       formData.append('document', selectedFile);
       formData.append('documentType', selectedType);
       formData.append('documentName', DOCUMENT_TYPES.find(d => d.value === selectedType)?.label || selectedType);
-      
+
       if (documentNumber) {
         formData.append('documentNumber', documentNumber);
       }
-      
+
       if (expiryDate) {
         formData.append('expiryDate', expiryDate);
       }
 
       console.log('Uploading to:', `${API_URL}/employees/${employeeId}/documents`);
-      
+
       const response = await fetch(`${API_URL}/employees/${employeeId}/documents`, {
         method: 'POST',
         body: formData
@@ -199,19 +199,19 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       }
 
       toast.success('Document uploaded successfully');
-      
+
       setSelectedType('');
       setDocumentNumber('');
       setExpiryDate('');
       setSelectedFile(null);
       setPreviewUrl(null);
-      
+
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-      
+
       await fetchDocuments();
-      
+
       if (onDocumentUploaded) {
         onDocumentUploaded();
       }
@@ -260,9 +260,9 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       }
 
       toast.success('Document deleted successfully');
-      
+
       fetchDocuments();
-      
+
       if (onDocumentUploaded) {
         onDocumentUploaded();
       }
@@ -286,9 +286,9 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       }
 
       toast.success('Document verified successfully');
-      
+
       fetchDocuments();
-      
+
       if (onDocumentUploaded) {
         onDocumentUploaded();
       }
@@ -362,7 +362,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
             <div className="flex justify-between items-center mb-2">
               <span className="text-sm font-medium">KYC Progress</span>
               <span className="text-sm text-gray-600">
-                {stats.uploadedRequired}/3 Required
+                {stats.uploadedRequired}/2 Required
               </span>
             </div>
             <Progress value={stats.completionPercentage} className="h-2" />
@@ -373,7 +373,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="upload">Upload</TabsTrigger>
             <TabsTrigger value="view">
-              Documents 
+              Documents
               {documents.length > 0 && (
                 <Badge variant="secondary" className="ml-2">
                   {documents.length}
@@ -401,8 +401,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                             <span>{type.label}</span>
                             {type.required && <span className="text-red-500 text-xs">*</span>}
                             {uploaded && (
-                              verified ? 
-                                <CheckCircle className="h-3 w-3 text-green-500" /> : 
+                              verified ?
+                                <CheckCircle className="h-3 w-3 text-green-500" /> :
                                 <AlertCircle className="h-3 w-3 text-amber-500" />
                             )}
                           </span>
@@ -421,10 +421,10 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                     value={documentNumber}
                     onChange={(e) => setDocumentNumber(e.target.value.toUpperCase())}
                     placeholder={
-                      selectedType === 'aadhar' ? 'Enter 12-digit Aadhar number' : 
-                      selectedType === 'pan' ? 'Enter PAN number (e.g., ABCDE1234F)' : 
-                      selectedType === 'driving' ? 'Enter driving license number' :
-                      'Enter passport number'
+                      selectedType === 'aadhar' ? 'Enter 12-digit Aadhar number' :
+                        selectedType === 'pan' ? 'Enter PAN number (e.g., ABCDE1234F)' :
+                          selectedType === 'driving' ? 'Enter driving license number' :
+                            'Enter passport number'
                     }
                     maxLength={selectedType === 'aadhar' ? 12 : selectedType === 'pan' ? 10 : undefined}
                   />
@@ -446,7 +446,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
               <div className="space-y-2">
                 <Label htmlFor="file-upload">Upload File <span className="text-red-500">*</span></Label>
-                <div 
+                <div
                   className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-gray-400 transition-colors bg-gray-50"
                   onClick={() => fileInputRef.current?.click()}
                 >
@@ -484,8 +484,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                 </div>
               )}
 
-              <Button 
-                onClick={handleUpload} 
+              <Button
+                onClick={handleUpload}
                 disabled={!selectedType || !selectedFile || uploading}
                 className="w-full"
               >
@@ -517,11 +517,10 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
             ) : (
               <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                 {documents.map((doc, index) => (
-                  <div 
-                    key={index} 
-                    className={`border rounded-lg p-2 ${
-                      doc.verified ? 'bg-green-50 border-green-200' : 'bg-white'
-                    }`}
+                  <div
+                    key={index}
+                    className={`border rounded-lg p-2 ${doc.verified ? 'bg-green-50 border-green-200' : 'bg-white'
+                      }`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-start gap-2 flex-1 min-w-0">
@@ -554,21 +553,21 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                           </p>
                         </div>
                       </div>
-                      
+
                       <div className="flex gap-1 ml-1">
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="h-7 w-7 p-0" 
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0"
                           onClick={() => openDocumentPreview(doc)}
                           title="Preview"
                         >
                           <Eye className="h-3 w-3" />
                         </Button>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="h-7 w-7 p-0" 
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0"
                           onClick={() => {
                             // Open in new tab for download
                             window.open(doc.fileUrl, '_blank');
@@ -578,20 +577,20 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                           <Download className="h-3 w-3" />
                         </Button>
                         {!doc.verified && (
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-7 w-7 p-0 text-green-600" 
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-green-600"
                             onClick={() => handleVerifyDocument(index)}
                             title="Verify"
                           >
                             <CheckCircle className="h-3 w-3" />
                           </Button>
                         )}
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="h-7 w-7 p-0 text-red-600" 
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-red-600"
                           onClick={() => handleDeleteDocument(index)}
                           title="Delete"
                         >
@@ -622,14 +621,14 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           {selectedDocument && (
             <div className="mt-4 h-[60vh] overflow-auto">
               {selectedDocument.fileType?.includes('pdf') ? (
-                <iframe 
-                  src={`${selectedDocument.fileUrl}#toolbar=0&navpanes=0`} 
+                <iframe
+                  src={`${selectedDocument.fileUrl}#toolbar=0&navpanes=0`}
                   className="w-full h-full border rounded-lg"
                   title="PDF Preview"
                 />
               ) : selectedDocument.fileType?.includes('image') ? (
-                <img 
-                  src={selectedDocument.fileUrl} 
+                <img
+                  src={selectedDocument.fileUrl}
                   alt={selectedDocument.documentName}
                   className="max-w-full max-h-full mx-auto object-contain"
                 />
@@ -652,9 +651,9 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                       variant="outline"
                       onClick={() => {
                         // Try to open in a new tab with Google Docs Viewer for office documents
-                        if (selectedDocument.fileType?.includes('word') || 
-                            selectedDocument.fileType?.includes('excel') ||
-                            selectedDocument.fileType?.includes('presentation')) {
+                        if (selectedDocument.fileType?.includes('word') ||
+                          selectedDocument.fileType?.includes('excel') ||
+                          selectedDocument.fileType?.includes('presentation')) {
                           const viewerUrl = `http://docs.google.com/gview?url=${encodeURIComponent(selectedDocument.fileUrl)}&embedded=true`;
                           window.open(viewerUrl, '_blank');
                         } else {

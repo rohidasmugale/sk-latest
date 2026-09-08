@@ -101,7 +101,7 @@ const SupervisorHRMS = () => {
   const handleAddEmployee = () => {
     // Option A: Navigate to onboarding route (uncomment if you have a dedicated route)
     // navigate("/supervisor/onboarding");
-    
+
     // Option B: Open the onboarding modal (currently using this approach)
     setShowOnboardingModal(true);
   };
@@ -152,35 +152,7 @@ const SupervisorHRMS = () => {
         animate={{ opacity: 1, y: 0 }}
         className="p-6 space-y-6"
       >
-        {/* Site Filter */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Building className="h-4 w-4 text-gray-500" />
-            <select
-              value={selectedSite}
-              onChange={(e) => setSelectedSite(e.target.value)}
-              disabled={isLoadingSites || allSites.length === 0}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white text-sm min-w-[180px]"
-            >
-              <option value="all">🏢 All My Sites</option>
-              {allSites.map((site) => (
-                <option key={site._id} value={site._id}>
-                  {site.name}
-                </option>
-              ))}
-            </select>
-            {isLoadingSites && (
-              <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
-            )}
-          </div>
-          <span className="text-xs text-muted-foreground">
-            {allSites.length === 0
-              ? "No sites assigned yet"
-              : selectedSite !== 'all'
-                ? `Showing: ${getSiteDisplayName()}`
-                : `Showing all ${allSites.length} sites`}
-          </span>
-        </div>
+
 
         {/* Employee List */}
         <div className="space-y-4">
@@ -200,7 +172,7 @@ const SupervisorHRMS = () => {
           <EmployeesTab
             employees={filteredEmployees as any}
             setEmployees={setEmployees as any}
-            setActiveTab={() => {}}
+            setActiveTab={() => { }}
             onAddEmployee={handleAddEmployee}
             selectedSite={selectedSite}
             sites={allSites}
@@ -220,11 +192,11 @@ const SupervisorHRMS = () => {
               employees={filteredEmployees as any}
               setEmployees={setEmployees as any}
               salaryStructures={[]}
-              setSalaryStructures={() => {}}
+              setSalaryStructures={() => { }}
               onEmployeeUpdate={(updatedEmployee) => {
                 // Update the employee in the list if needed
-                setEmployees(prev => 
-                  prev.map(emp => 
+                setEmployees(prev =>
+                  prev.map(emp =>
                     emp._id === updatedEmployee._id ? updatedEmployee : emp
                   )
                 );
@@ -233,7 +205,7 @@ const SupervisorHRMS = () => {
                 // Handle bulk updates if needed
                 setEmployees(prev => {
                   const updatedIds = new Set(updatedEmployees.map(e => e._id));
-                  return prev.map(emp => 
+                  return prev.map(emp =>
                     updatedIds.has(emp._id) ? updatedEmployees.find(e => e._id === emp._id) || emp : emp
                   );
                 });

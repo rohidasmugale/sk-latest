@@ -1,39 +1,33 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
-let cachedSuperadminId: string | null = null;
+const cachedRoleIds: Record<string, string[]> = {};
 
-export const getSuperadminId = async (): Promise<string> => {
-  if (cachedSuperadminId) return cachedSuperadminId;
-  
-  const stored = localStorage.getItem('superadminId');
-  if (stored) {
-    cachedSuperadminId = stored;
-    return stored;
-  }
-  
+const getUserIdsByRole = async (role: string): Promise<string[]> => {
+  if (cachedRoleIds[role]) return cachedRoleIds[role];
+
   try {
-    const response = await axios.get(`${API_URL}/users?role=superadmin&limit=1`);
-    const users = response.data.data || response.data || [];
-    if (users.length > 0) {
-      const superadmin = users[0];
-      const id = superadmin._id || superadmin.id;
-      if (id) {
-        cachedSuperadminId = id;
-        localStorage.setItem('superadminId', id);
-        return id;
-      }
-    }
-    throw new Error('Superadmin not found');
+    const token = localStorage.getItem('sk_token');
+    const response = await axios.get(`${API_URL}/users`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+
+    
+    const usersForRole = response.data?.groupedByRole?.[role] || [];
+    const ids = usersForRole.map((u: any) => u._id).filter(Boolean);
+
+    cachedRoleIds[role] = ids;
+    return ids;
   } catch (error) {
-    console.error('Failed to fetch superadmin ID:', error);
-    throw error;
+    console.error(`Failed to fetch users with role ${role}:`, error);
+    return [];
   }
 };
 
-export const createNotificationForSuperadmin = async (
+export const notifyRoles = async (
+  roles: string[],
   title: string,
   message: string,
   type: 'success' | 'warning' | 'info' | 'urgent' = 'info',
@@ -42,18 +36,63 @@ export const createNotificationForSuperadmin = async (
   notificationType?: string
 ) => {
   try {
-    const superadminId = await getSuperadminId();
-    await axios.post(`${API_URL}/notifications`, {
-      userId: superadminId,
-      title,
-      message,
-      type,
-      priority,
-      notificationType,
-      metadata
-    });
-    console.log('✅ Superadmin notification sent:', title);
+    const token = localStorage.getItem('sk_token');
+    const idLists = await Promise.all(roles.map(r => getUserIdsByRole(r)));
+    const userIds = Array.from(new Set(idLists.flat()));
+
+    if (userIds.length === 0) {
+      console.warn(`No users found for roles [${roles.join(', ')}] — notification not sent`);
+      return;
+    }
+
+    await Promise.allSettled(
+      userIds.map(userId =>
+        axios.post(
+          `${API_URL}/notifications`,
+          { userId, title, message, type, priority, notificationType, metadata },
+          { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+        )
+      )
+    );
+    console.log(`✅ Notified ${userIds.length} user(s) across [${roles.join(', ')}]:`, title);
   } catch (error) {
-    console.error('❌ Failed to send superadmin notification:', error);
+    console.error('❌ Failed to send role notifications:', error);
   }
+};
+
+// ✅ Backward‑compatible wrapper for superadmin only
+export const createNotificationForSuperadmin = async (
+  title: string,
+  message: string,
+  type: 'success' | 'warning' | 'info' | 'urgent' = 'info',
+  priority: 'low' | 'medium' | 'high' = 'medium',
+  metadata: Record<string, any> = {},
+  notificationType?: string
+) => {
+  return notifyRoles(
+    ['superadmin'],
+    title,
+    message,
+    type,
+    priority,
+    metadata,
+    notificationType
+  );
+};
+
+export const notifyIncidentReported = (
+  siteName: string,
+  incidentType: string,
+  description: string,
+  incidentId?: string
+) => {
+  return notifyRoles(
+    ['superadmin', 'admin', 'manager'],
+    `🚨 New Incident Reported`,
+    `${incidentType === 'accident' ? 'Accident' : 'Issue'} at ${siteName}: ${description.slice(0, 80)}`,
+    incidentType === 'accident' ? 'urgent' : 'warning',
+    incidentType === 'accident' ? 'high' : 'medium',
+    { incidentId, siteName, incidentType, notificationType: 'incident_report' },
+    'incident_report'
+  );
 };

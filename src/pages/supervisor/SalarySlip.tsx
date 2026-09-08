@@ -9,6 +9,7 @@ import { salarySlipApi, salaryStructureApi } from '@/services/payrollApi';
 import axios from 'axios';
 import { BackButton } from '@/components/shared/BackButton';
 import { DashboardHeader } from "@/components/shared/DashboardHeader";
+
 const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
@@ -18,18 +19,13 @@ interface Employee {
   name: string;
   department?: string;
   email?: string;
+  siteId?: string;
   siteName?: string;
   accountNumber?: string;
   bankName?: string;
   bankBranch?: string;
   aadharNumber?: string;
   panNumber?: string;
-}
-
-interface Site {
-  _id: string;
-  name: string;
-  clientName?: string;
 }
 
 interface SalaryStructure {
@@ -59,57 +55,52 @@ export default function SupervisorSalarySlip() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
   const [myEmployeeId, setMyEmployeeId] = useState<string | null>(null);
-  const [supervisorSites, setSupervisorSites] = useState<Site[]>([]);
+  const [supervisorSiteIds, setSupervisorSiteIds] = useState<string[]>([]);
   const [fetching, setFetching] = useState(true);
 
-  // Fetch supervisor's assigned sites (same as Attendance)
-  const fetchSupervisorSites = useCallback(async () => {
-    if (!user) return [];
+  // Fetch supervisor's site IDs from auth endpoint
+  const fetchSupervisorSiteIds = useCallback(async () => {
     try {
-      const supervisorId = user._id || user.id;
-      const response = await axios.get(`${API_URL}/tasks`, { params: { limit: 1000 } });
-      let allTasks = response.data?.data || response.data || [];
-      if (!Array.isArray(allTasks)) allTasks = [];
-      const siteSet = new Set<string>();
-      allTasks.forEach((task: any) => {
-        if (task.assignedUsers?.some((u: any) => u.userId === supervisorId)) {
-          if (task.siteName) siteSet.add(task.siteName);
-        }
-        if (task.assignedTo === supervisorId && task.siteName) siteSet.add(task.siteName);
+      const token = localStorage.getItem('sk_token');
+      const res = await axios.get(`${API_URL}/auth/supervisor-sites`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      const siteNames = Array.from(siteSet);
-      const sitesRes = await axios.get(`${API_URL}/sites`);
-      let allSites = sitesRes.data?.data || sitesRes.data || [];
-      if (!Array.isArray(allSites)) allSites = [];
-      const filtered = allSites.filter((s: any) => siteNames.includes(s.name));
-      setSupervisorSites(filtered);
-      return filtered;
+      if (res.data.success) {
+        setSupervisorSiteIds(res.data.siteIds || []);
+        return res.data.siteIds || [];
+      }
+      return [];
     } catch (error) {
-      console.error('Error fetching supervisor sites:', error);
+      console.error('Error fetching supervisor site IDs:', error);
       return [];
     }
-  }, [user]);
+  }, []);
 
-  // Fetch employees belonging to those sites
+  // Fetch employees by siteId (not siteName)
   const fetchEmployeesBySites = useCallback(async () => {
     if (!user) return;
     setFetching(true);
     try {
-      let sites = supervisorSites;
-      if (sites.length === 0) sites = await fetchSupervisorSites();
-      const siteNames = sites.map(s => s.name);
-      if (siteNames.length === 0) {
+      let siteIds = supervisorSiteIds;
+      if (siteIds.length === 0) {
+        siteIds = await fetchSupervisorSiteIds();
+      }
+      if (siteIds.length === 0) {
         setEmployees([]);
         setFetching(false);
+        toast.warning('No sites assigned to you.');
         return;
       }
+
       const response = await axios.get(`${API_URL}/employees`, { params: { limit: 1000 } });
       let allEmployees = response.data?.data || response.data?.employees || response.data || [];
       if (!Array.isArray(allEmployees)) allEmployees = [];
-      const filtered = allEmployees.filter((emp: any) => {
-        const empSite = emp.siteName || '';
-        return siteNames.some(sn => sn.toLowerCase().trim() === empSite.toLowerCase().trim());
-      });
+
+      // Filter by siteId (exact match)
+      const filtered = allEmployees.filter((emp: any) =>
+        emp.siteId && siteIds.includes(emp.siteId)
+      );
+
       setEmployees(filtered);
 
       // Find supervisor's own employee record (by email)
@@ -127,22 +118,21 @@ export default function SupervisorSalarySlip() {
     } finally {
       setFetching(false);
     }
-  }, [user, supervisorSites, fetchSupervisorSites]);
+  }, [user, supervisorSiteIds, fetchSupervisorSiteIds]);
 
   useEffect(() => {
     if (user) {
-      fetchSupervisorSites();
+      fetchSupervisorSiteIds();
     }
-  }, [user, fetchSupervisorSites]);
+  }, [user, fetchSupervisorSiteIds]);
 
   useEffect(() => {
-    if (supervisorSites.length > 0 || !user) {
+    if (supervisorSiteIds.length > 0 || !user) {
       fetchEmployeesBySites();
     }
-  }, [supervisorSites, fetchEmployeesBySites]);
+  }, [supervisorSiteIds, fetchEmployeesBySites]);
 
-  // Fetch the employee's active salary structure so the printed breakdown
-  // (DA/HRA/PF/ESIC/etc.) reflects real numbers instead of hardcoded zeros.
+  // Fetch salary structure
   const fetchSalaryStructure = async (employeeId: string): Promise<SalaryStructure | null> => {
     try {
       const res = await salaryStructureApi.getByEmployeeId(employeeId);
@@ -156,6 +146,7 @@ export default function SupervisorSalarySlip() {
     }
   };
 
+  // Print salary slip
   const printSlip = (slip: any, employee: Employee, structure: SalaryStructure | null) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -171,21 +162,9 @@ export default function SupervisorSalarySlip() {
     <head>
       <title>Salary Slip - ${employee.name}</title>
       <style>
-        @page {
-          size: A4 portrait;
-          margin: 10mm;
-        }
-        * {
-          box-sizing: border-box;
-        }
-        body {
-          font-family: Arial, sans-serif;
-          margin: 0;
-          padding: 0;
-          background: #fff;
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-        }
+        @page { size: A4 portrait; margin: 10mm; }
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
         .company-name { font-size: 24px; font-weight: bold; }
         .slip-title { font-size: 20px; }
@@ -202,8 +181,8 @@ export default function SupervisorSalarySlip() {
         .absent { background: #fee2e2; color: #991b1b; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .half-day { background: #fef3c7; color: #92400e; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .leaves { background: #dbeafe; color: #1e40af; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        @media print { 
-          body { margin: 0; } 
+        @media print {
+          body { margin: 0; }
           .present, .absent, .half-day, .leaves { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       </style>
@@ -215,7 +194,7 @@ export default function SupervisorSalarySlip() {
         <div>Period: ${slip.month}</div>
         <div>Wages Slip Rule 27(2) Maharashtra Minimum Wages Rules, 1963</div>
       </div>
-      
+
       <div class="employee-info">
         <div>
           <strong>Name:</strong> ${employee.name}<br>
@@ -289,13 +268,9 @@ export default function SupervisorSalarySlip() {
 
     printWindow.document.write(printContent);
     printWindow.document.close();
-
-    // ✅ FIX: Wait for window to load before printing
     printWindow.onload = function () {
       printWindow.print();
-      setTimeout(function () {
-        printWindow.close();
-      }, 1000);
+      setTimeout(() => printWindow.close(), 1000);
     };
   };
 
@@ -312,7 +287,6 @@ export default function SupervisorSalarySlip() {
         toast.error('Employee details not found');
         return;
       }
-
       const res = await salarySlipApi.getAll({ month: selectedMonth, employeeId: myEmployeeId });
       if (res.success && res.data.length > 0) {
         const structure = await fetchSalaryStructure(myEmployeeId);
@@ -341,11 +315,7 @@ export default function SupervisorSalarySlip() {
         toast.error('Employee details not found');
         return;
       }
-
-      const res = await salarySlipApi.getAll({
-        month: selectedMonth,
-        employeeId: selectedEmployeeId,
-      });
+      const res = await salarySlipApi.getAll({ month: selectedMonth, employeeId: selectedEmployeeId });
       if (res.success && res.data.length > 0) {
         const structure = await fetchSalaryStructure(selectedEmployeeId);
         printSlip(res.data[0], employee, structure);
@@ -378,11 +348,7 @@ export default function SupervisorSalarySlip() {
 
   return (
     <div className="p-4 space-y-6">
-      <DashboardHeader
-        title="Salary Slip"
-        subtitle="Download your salary slips"
-        onMenuClick={() => { }}
-      />
+      <DashboardHeader title="Salary Slip" subtitle="Download your salary slips" onMenuClick={() => {}} />
 
       <Card>
         <CardHeader><CardTitle>My Salary Slip</CardTitle></CardHeader>

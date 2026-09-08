@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { relative } from 'path';
 
 // KYC Document Interface
 interface KYCdocument {
@@ -25,6 +26,7 @@ interface SiteHistoryEntry {
 export interface IEmployee extends Document {
   // Basic Information
   employeeId: string;
+  userId: mongoose.Types.ObjectId;  // ← ADD THIS
   name: string;
   email: string;
   phone: string;
@@ -43,9 +45,8 @@ export interface IEmployee extends Document {
   
   // Address
   permanentAddress?: string;
-  permanentPincode?: string;
+ 
   localAddress?: string;
-  localPincode?: string;
   bankBranch?: string;
   
   // Bank Details
@@ -55,15 +56,15 @@ export interface IEmployee extends Document {
   branchName?: string;
   
   // Family Details
-  fatherName?: string;
-  motherName?: string;
-  spouseName?: string;
+relativeName?: string;   // the person's name
+relation?: string;   
   numberOfChildren?: number;
   
   // Emergency Contact
-  emergencyContactName?: string;
+ 
   emergencyContactPhone?: string;
-  emergencyContactRelation?: string;
+  emergencyPhone2?: string; // <-- ADD THIS
+  
   
   // Nominee Details
   nomineeName?: string;
@@ -107,8 +108,7 @@ export interface IEmployee extends Document {
   // System Fields
   createdAt: Date;
   updatedAt: Date;
-     // array of embeddings (each embedding is an array of 512 numbers)
-    userId?: mongoose.Types.ObjectId;      // reference to User
+    
   supervisorId?: mongoose.Types.ObjectId; // who supervises this employee (User or Employee ID)
 }
 
@@ -119,10 +119,11 @@ const EmployeeSchema: Schema = new Schema(
 employeeId: {
   type: String,
   unique: true,
+  sparse: true,
   trim: true,
-  required: [true, 'Employee ID is required']
-  // REMOVE the 'default' function completely
+  required: false
 },
+  userId: { type: Schema.Types.ObjectId, ref: 'User', index: true }, // ← ADD THIS
     name: {
       type: String,
       required: [true, 'Name is required'],
@@ -223,35 +224,13 @@ employeeId: {
       trim: true,
       default: null
     },
-    permanentPincode: {
-      type: String,
-      trim: true,
-      default: null,
-      validate: {
-        validator: function(v: string) {
-          if (!v || v.trim() === '') return true;
-          return /^[1-9][0-9]{5}$/.test(v);
-        },
-        message: 'Please enter a valid 6-digit pincode'
-      }
-    },
+   
     localAddress: {
       type: String,
       trim: true,
       default: null
     },
-    localPincode: {
-      type: String,
-      trim: true,
-      default: null,
-      validate: {
-        validator: function(v: string) {
-          if (!v || v.trim() === '') return true;
-          return /^[1-9][0-9]{5}$/.test(v);
-        },
-        message: 'Please enter a valid 6-digit pincode'
-      }
-    },
+    
     bankBranch: {
       type: String,
       trim: true,
@@ -288,20 +267,16 @@ employeeId: {
       default: null
     },
     
-    // Family Details
-    fatherName: {
-      type: String,
-      trim: true,
+  relativeName: { 
+      type: String, 
+
+      trim: true, 
+
       default: null
     },
-    motherName: {
-      type: String,
-      trim: true,
-      default: null
-    },
-    spouseName: {
-      type: String,
-      trim: true,
+    relation: { 
+      type: String, 
+      trim: true, 
       default: null
     },
     numberOfChildren: {
@@ -311,11 +286,7 @@ employeeId: {
     },
     
     // Emergency Contact
-    emergencyContactName: {
-      type: String,
-      trim: true,
-      default: null
-    },
+   
     emergencyContactPhone: {
       type: String,
       trim: true,
@@ -328,6 +299,18 @@ employeeId: {
         message: 'Please enter a valid 10-digit phone number or leave empty'
       }
     },
+    emergencyPhone2: {
+  type: String,
+  trim: true,
+  default: null,
+  validate: {
+    validator: function(v: string) {
+      if (!v || v.trim() === '') return true;
+      return /^[0-9]{10}$/.test(v);
+    },
+    message: 'Please enter a valid 10-digit phone number or leave empty'
+  }
+},
     emergencyContactRelation: {
       type: String,
       trim: true,
@@ -516,11 +499,7 @@ employeeId: {
       default: null
     },
 
-    userId: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: 'User',
-  default: null
-},
+   
 supervisorId: {
   type: mongoose.Schema.Types.ObjectId,
   ref: 'User',   // or 'Employee' – whichever you prefer
@@ -572,7 +551,7 @@ supervisorId: {
 // Indexes for better query performance
 EmployeeSchema.index({ email: 1 }, { unique: true });
 EmployeeSchema.index({ aadharNumber: 1 }, { unique: true });
-EmployeeSchema.index({ employeeId: 1 }, { unique: true });
+EmployeeSchema.index({ employeeId: 1 }, { unique: true, sparse: true });
 EmployeeSchema.index({ status: 1 });
 EmployeeSchema.index({ department: 1 });
 EmployeeSchema.index({ dateOfJoining: -1 });
@@ -595,7 +574,7 @@ EmployeeSchema.virtual('formattedDateOfExit').get(function() {
 
 // Virtual for KYC completion status
 EmployeeSchema.virtual('kycCompletionPercentage').get(function() {
-  const requiredDocs = ['aadhar', 'pan', 'police'];
+  const requiredDocs = ['aadhar', 'pan']; // police verification is optional
   const uploadedDocs = this.kycDocuments?.map((doc: any) => doc.documentType) || [];
   const verifiedDocs = this.kycDocuments?.filter((doc: any) => doc.verified).map((doc: any) => doc.documentType) || [];
   
@@ -651,11 +630,11 @@ EmployeeSchema.pre('save', function(next) {
     }
   });
   
-  const optionalFields = ['panNumber', 'esicNumber', 'uanNumber', 'permanentAddress',
-                         'localAddress', 'bankName', 'accountNumber', 'ifscCode',
-                         'branchName', 'fatherName', 'motherName', 'spouseName',
-                         'emergencyContactName', 'emergencyContactPhone',
-                         'emergencyContactRelation', 'nomineeName', 'nomineeRelation'];
+ const optionalFields = ['panNumber', 'esicNumber', 'uanNumber', 'permanentAddress', 'localAddress', 
+                       'bankName', 'accountNumber', 'ifscCode', 'branchName', 'relativeName', 'relation',
+                       'emergencyContactRelation', 'nomineeName', 'nomineeRelation', 'bloodGroup',
+                       'gender', 'maritalStatus', 'pantSize', 'shirtSize', 'capSize',
+                       ];  // ← ADD these
   
   optionalFields.forEach(field => {
     const value = this.get(field);
@@ -703,7 +682,7 @@ EmployeeSchema.statics.getDocumentTypes = function() {
     pan: { label: 'PAN Card', required: true },
     electricity: { label: 'Electricity Bill', required: false },
     driving: { label: 'Driving License', required: false },
-    police: { label: 'Police Verification', required: true },
+    police: { label: 'Police Verification', required: false },  // ← CHANGED TO false
     voter: { label: 'Voter ID', required: false },
     passport: { label: 'Passport', required: false },
     other: { label: 'Other Document', required: false }

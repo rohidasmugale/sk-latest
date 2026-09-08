@@ -1,8 +1,10 @@
+// src/services/importService.ts
 import ImportJob from '../models/ImportJob';
 import Employee from '../models/Employee';
 import Site from '../models/Site';
 import XLSX from 'xlsx';
 import fs from 'fs';
+import { relative } from 'path';
 
 // ─── Helper: convert Excel serial date to Date ───────────────────────
 function excelSerialToDate(serial: number): Date {
@@ -19,7 +21,7 @@ function excelSerialToDate(serial: number): Date {
       date.setHours(hours, minutes, seconds);
     }
     return date;
-  } catch (error) {
+  } catch {
     return new Date();
   }
 }
@@ -28,7 +30,18 @@ function parseDateString(dateStr: string): Date | null {
   if (!dateStr || typeof dateStr !== 'string') return null;
   try {
     const cleanStr = dateStr.trim();
-    // US format mm/dd/yyyy
+
+    // ✅ NEW: Dot format dd.mm.yyyy (e.g., 20.06.1978)
+    const dotMatch = cleanStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if (dotMatch) {
+      const day = parseInt(dotMatch[1]);
+      const month = parseInt(dotMatch[2]) - 1;
+      const year = parseInt(dotMatch[3]);
+      const date = new Date(year, month, day);
+      if (!isNaN(date.getTime())) return date;
+    }
+
+    // US mm/dd/yyyy
     const usMatch = cleanStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if (usMatch) {
       const month = parseInt(usMatch[1]) - 1;
@@ -37,7 +50,8 @@ function parseDateString(dateStr: string): Date | null {
       const date = new Date(year, month, day);
       if (!isNaN(date.getTime())) return date;
     }
-    // EU format dd/mm/yyyy
+
+    // EU dd/mm/yyyy
     const euMatch = cleanStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if (euMatch) {
       const day = parseInt(euMatch[1]);
@@ -46,6 +60,7 @@ function parseDateString(dateStr: string): Date | null {
       const date = new Date(year, month, day);
       if (!isNaN(date.getTime())) return date;
     }
+
     // ISO yyyy-mm-dd
     const isoMatch = cleanStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
     if (isoMatch) {
@@ -55,14 +70,16 @@ function parseDateString(dateStr: string): Date | null {
       const date = new Date(year, month, day);
       if (!isNaN(date.getTime())) return date;
     }
+
+    // Fallback: try JavaScript's Date parser
     const date = new Date(cleanStr);
     if (!isNaN(date.getTime())) return date;
+
     return null;
   } catch {
     return null;
   }
 }
-
 function safeNumericString(value: any): string {
   if (value === undefined || value === null || value === '') return '';
   if (typeof value === 'number') return String(Math.round(value));
@@ -77,7 +94,7 @@ function normalizeHeaderText(h: any): string {
     .trim();
 }
 
-// ─── Column alias mapping (same as frontend) ─────────────────────────
+// ─── Column alias mapping (matches your Excel headers) ──────────────
 const IMPORT_FIELD_ALIASES: Record<string, string[]> = {
   site: ['site', 'site name'],
   status: ['status'],
@@ -92,8 +109,8 @@ const IMPORT_FIELD_ALIASES: Record<string, string[]> = {
   dateOfExit: ['date of exit', 'exit date'],
   aadhar: ['aadhar no', 'adhaar number', 'aadhar number', 'aadhaar number', 'aadhar', 'aadhaar'],
   pan: ['pan no', 'pan number', 'pan'],
-  bloodGroup: ['blood group'],
-  relativeName: ['father name', 'father husband name', 'father s name', 'relative name'],
+  bloodGroup: ['blood group', 'blood group '],
+  relativeName: ['father name', 'father husband name', 'father s name', 'relative name', 'father / husband name'],
   relation: ['relation'],
   mobile: ['mobile no', 'mobile number', 'contact no', 'contact', 'mobile'],
   accountNumber: ['bank account no', 'bank a c number', 'account number', 'bank ac number'],
@@ -102,6 +119,7 @@ const IMPORT_FIELD_ALIASES: Record<string, string[]> = {
   nomineeName: ['nominee name'],
   nomineeRelation: ['nominee relation', 'relation2'],
   emergencyPhone: ['emergency contact no', 'emer no', 'emergency contact', 'emergency no', 'emergency contact 1'],
+  emergencyPhone2: ['emergency contact 2', 'emergency phone 2', 'second emergency phone'],
   localAddress: ['local address', 'present add'],
   permanentAddress: ['permanent address', 'adhar add', 'aadhar address', 'permannt address'],
   maritalStatus: ['married unmarried', 'marital status'],
@@ -111,8 +129,7 @@ const IMPORT_FIELD_ALIASES: Record<string, string[]> = {
   numberOfChildren: ['number of children', 'no of children', 'children'],
   department: ['department'],
   salary: ['salary', 'basic salary'],
-  permanentPincode: ['permanent pincode', 'permanent pin code'],
-  localPincode: ['local pincode', 'local pin code'],
+ 
 };
 
 interface ImportColumnMap {
@@ -122,7 +139,7 @@ interface ImportColumnMap {
   relativeName: number; relation: number; mobile: number; accountNumber: number;
   ifsc: number; bankBranch: number; nomineeName: number; nomineeRelation: number;
   emergencyPhone: number; localAddress: number; permanentAddress: number;
-  maritalStatus: number; pfNo: number;
+  maritalStatus: number; pfNo: number; emergencyPhone2: number;
 }
 
 function buildImportColumnMap(headers: any[]): ImportColumnMap {
@@ -230,12 +247,18 @@ async function performBulkImport(creates: any[], updates: any[]) {
 
   const result = await Employee.bulkWrite(operations, { ordered: false });
 
-  const errors = result.hasWriteErrors()
-    ? result.getWriteErrors().map((e: any) => ({
+  let errors: any[] = [];
+
+  // ✅ Use only the methods that TypeScript recognises
+  if (result.hasWriteErrors && typeof result.hasWriteErrors === 'function') {
+    if (result.hasWriteErrors()) {
+      const writeErrors = result.getWriteErrors ? result.getWriteErrors() : [];
+      errors = writeErrors.map((e: any) => ({
         row: e.index,
         message: e.errmsg
-      }))
-    : [];
+      }));
+    }
+  }
 
   return {
     createdCount: result.insertedCount || 0,
@@ -246,14 +269,19 @@ async function performBulkImport(creates: any[], updates: any[]) {
 
 // ─── Main background processor ────────────────────────────────────────
 export async function processImportJob(jobId: string, filePath: string) {
+  console.log(`📥 [processImportJob] Called for job ${jobId}, file: ${filePath}`);
   const job = await ImportJob.findOne({ jobId });
-  if (!job) return;
+  if (!job) {
+    console.error(`❌ Job ${jobId} not found`);
+    return;
+  }
 
   try {
+    // 1. Mark as processing
     job.status = 'processing';
     await job.save();
 
-    // 1. Read Excel as array of arrays (header: 1) – same as frontend
+    // 2. Read the Excel file
     const workbook = XLSX.readFile(filePath);
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const jsonData = XLSX.utils.sheet_to_json(sheet, {
@@ -267,6 +295,11 @@ export async function processImportJob(jobId: string, filePath: string) {
       throw new Error('Excel file has no data rows');
     }
 
+    // ✅ SET TOTAL ROWS IMMEDIATELY after reading the file
+    const totalRows = jsonData.length - 1;
+    job.totalRows = totalRows;
+    await job.save();
+
     const headers = jsonData[0] as string[];
     const col = buildImportColumnMap(headers);
 
@@ -275,12 +308,12 @@ export async function processImportJob(jobId: string, filePath: string) {
     if (col.site === -1) requiredMissing.push('Site');
     if (col.name === -1) requiredMissing.push('Name');
     if (col.aadhar === -1) requiredMissing.push('Aadhar');
-    if (col.employeeCode === -1) requiredMissing.push('Emp Code / Employee ID');
+   
     if (requiredMissing.length > 0) {
       throw new Error(`Missing required columns: ${requiredMissing.join(', ')}`);
     }
 
-    // 2. Fetch sites and existing employees
+    // 3. Fetch sites and existing employees
     const [sites, existingEmployees] = await Promise.all([
       Site.find(),
       Employee.find()
@@ -292,18 +325,28 @@ export async function processImportJob(jobId: string, filePath: string) {
     const normalizeSiteName = (name: string): string =>
       name.trim().toUpperCase().replace(/\s+/g, ' ');
 
-    const SITE_ALIASES: Record<string, string> = {
-      'OWC OPRETER': 'OWC OPERATOR',
-      'GOLBAL SQUARE': 'GLOBAL SQUARE',
-      'GOLBAL LIFE STYLE': 'GLOBAL LIFE STYLE',
-      // add more as needed
-    };
+   const SITE_ALIASES: Record<string, string> = {
+  'OWC OPRETER': 'OWC OPERATOR',
+  'GOLBAL SQUARE': 'GLOBAL SQUARE',
+  'GOLBAL LIFE STYLE': 'GLOBAL LIFE STYLE',
+
+  'SOLITURE BUSINESS HUB': 'SOILTURE BUSINESS HUB',   // typo: Soliture → Soilture
+  'GLOBAL INSPIRA': 'GLOBAL INSPERIA HK',              // typo: Inspira → Insperia
+  'WESTEND MALL': 'WESTEND MALL HK',
+  'SATURO': 'SATURO TECHNOLOGIES',
+  'ESPATH': 'ESPATH COMPANY',
+  'GHS MALL': 'GRAND HIGH STREET MALL',
+  'BHAIRAT': 'BHAIRAT HK',
+  'BRAMHA': 'BRAHMA CITY HK',
+  'BHRAMA': 'BRAHMA CITY HK',      // another typo of Bramha
+  'BHRMA': 'BRAHMA CITY HK',       // another typo of Bramha
+};
 
     const dbSiteNormalizedMap = new Map<string, string>();
     for (const site of sites) {
       dbSiteNormalizedMap.set(normalizeSiteName(site.name), site.name);
     }
-
+    console.log('📍 DB Sites available:', sites.map(s => s.name).join(' | '));
     // ─── Build lookup maps for existing employees ─────────────────────
     const existingByAadhar = new Map();
     const existingByEmpId = new Map();
@@ -350,12 +393,11 @@ export async function processImportJob(jobId: string, filePath: string) {
       managers: any[], supervisors: any[], staff: any[], rows: number[]
     }>();
 
-    // 3. Process each row (full frontend logic)
+    // 4. Process each row (full frontend logic)
     const employeesToCreate: any[] = [];
     const employeesToUpdate: any[] = [];
     const errors: any[] = [];
     let processed = 0;
-    const totalRows = jsonData.length - 1;
     const seenInFileAadhar = new Set<string>();
     const skippedReasons: string[] = [];
     const invalidSiteNames = new Set<string>();
@@ -438,10 +480,7 @@ export async function processImportJob(jobId: string, filePath: string) {
       const uanNumber = col.uan !== -1 ? safeNumericString(row[col.uan]) : '';
       const esicNumber = col.esic !== -1 ? safeNumericString(row[col.esic]) : '';
       const employeeCode = safeNumericString(row[col.employeeCode]);
-      if (!employeeCode) {
-        skippedReasons.push(`Row ${rowIndex}: Missing Employee ID`);
-        continue;
-      }
+      
       const position = col.position !== -1 && row[col.position] ? String(row[col.position]).trim() : '';
       const name = row[col.name] ? String(row[col.name]).trim() : '';
       let gender = '';
@@ -466,7 +505,7 @@ export async function processImportJob(jobId: string, filePath: string) {
       }
       seenInFileAadhar.add(paddedAadhar);
 
-      const matchedExisting = existingByAadhar.get(paddedAadhar) || existingByEmpId.get(employeeCode);
+      const matchedExisting = existingByAadhar.get(paddedAadhar) || (employeeCode ? existingByEmpId.get(employeeCode) : undefined);
       const contact = col.mobile !== -1 ? safeNumericString(row[col.mobile]) : '';
       const pan = col.pan !== -1 ? safeNumericString(row[col.pan]).toUpperCase() : '';
       const bloodGroup = col.bloodGroup !== -1 && row[col.bloodGroup] ? String(row[col.bloodGroup]).trim() : '';
@@ -478,6 +517,7 @@ export async function processImportJob(jobId: string, filePath: string) {
       const nomineeName = col.nomineeName !== -1 && row[col.nomineeName] ? String(row[col.nomineeName]).trim() : '';
       const nomineeRelation = col.nomineeRelation !== -1 && row[col.nomineeRelation] ? String(row[col.nomineeRelation]).trim() : '';
       const emergencyContactPhone = col.emergencyPhone !== -1 && row[col.emergencyPhone] ? String(row[col.emergencyPhone]).trim() : '';
+      const emergencyPhone2 = col.emergencyPhone2 !== -1 && row[col.emergencyPhone2] ? safeNumericString(row[col.emergencyPhone2]) : '';
       const localAddress = col.localAddress !== -1 && row[col.localAddress] ? String(row[col.localAddress]).trim() : '';
       const permanentAddress = col.permanentAddress !== -1 && row[col.permanentAddress] ? String(row[col.permanentAddress]).trim() : '';
       const rawMaritalStatus = col.maritalStatus !== -1 && row[col.maritalStatus] ? String(row[col.maritalStatus]).trim().toLowerCase() : '';
@@ -623,16 +663,19 @@ export async function processImportJob(jobId: string, filePath: string) {
         branchName: bankBranch || null,
         accountNumber: accountNumber || null,
         ifscCode: ifscCode || null,
-        fatherName: isFatherRelation ? relativeName : null,
-        spouseName: isSpouseRelation ? relativeName : null,
-        motherName: isMotherRelation ? relativeName : null,
+          relativeName: relativeName || null,
+        relation: relation || null,
+        isFather: isFatherRelation,
+        isMother: isMotherRelation,
+        isSpouse: isSpouseRelation,
         permanentAddress: permanentAddress || null,
         localAddress: localAddress || null,
         nomineeName: nomineeName || null,
         nomineeRelation: nomineeRelation || null,
-        emergencyContactName: null,
+       
         emergencyContactPhone: emergencyContactPhone || null,
-        emergencyContactRelation: null,
+        emergencyPhone2: emergencyPhone2 || null,
+        
         pantSize: null,
         shirtSize: null,
         capSize: null,
@@ -668,25 +711,40 @@ export async function processImportJob(jobId: string, filePath: string) {
         await job.save();
       }
     }
-
-    // 4. Perform bulk write
+    // 🔍 Log + persist skip reasons so we can actually see why rows failed
+       if (skippedReasons.length > 0) {
+      console.log(`⚠️ [IMPORT] ${skippedReasons.length} rows skipped. Writing full list to skip-log.txt`);
+      fs.writeFileSync('skip-log.txt', skippedReasons.join('\n'), 'utf-8');
+    }
+    // 5. Perform bulk write
     const result = await performBulkImport(employeesToCreate, employeesToUpdate);
 
-    // 5. Save final result
+    // 6. Save final result
     job.status = 'completed';
     job.processedRows = processed;
     job.createdCount = result.createdCount;
     job.updatedCount = result.updatedCount;
-    job.importErrors = errors;
+      job.importErrors = [...errors, ...skippedReasons.map(r => ({ message: r }))];
     job.completedAt = new Date();
     await job.save();
 
     // Cleanup uploaded file
-    fs.unlinkSync(filePath);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
   } catch (err: any) {
+    // ✅ Ensure the job is marked as failed and error is saved
+    console.error(`Import job ${jobId} failed:`, err);
     job.status = 'failed';
     job.importErrors = [{ message: err.message }];
+    job.completedAt = new Date();
     await job.save();
+
+    // Cleanup file if exists
+    if (fs.existsSync(filePath)) {
+      try { fs.unlinkSync(filePath); } catch (e) { /* ignore */ }
+    }
+
+    // Re-throw so the route can also handle it (optional)
+    throw err;
   }
 }

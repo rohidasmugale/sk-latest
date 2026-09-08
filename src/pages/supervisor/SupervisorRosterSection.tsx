@@ -81,7 +81,8 @@ const SupervisorRosterSection = () => {
 
   const supervisorId = authUser?._id || authUser?.id || "";
   
-  const daysInView = (() => {
+  // ✅ Helper to get days in current view – defined as a function, not a computed value
+  const getDaysInView = useCallback(() => {
     if (selectedRoster === "daily") return [selectedDate];
     if (selectedRoster === "weekly") {
       const start = startOfWeek(selectedDate, { weekStartsOn: 1 });
@@ -92,7 +93,7 @@ const SupervisorRosterSection = () => {
       return eachDayOfInterval({ start, end: addDays(start, 13) });
     }
     return eachDayOfInterval({ start: startOfMonth(selectedDate), end: endOfMonth(selectedDate) });
-  })();
+  }, [selectedRoster, selectedDate]);
 
   const selectedSite = sites.find(s => s._id === selectedSiteId) || null;
 
@@ -129,11 +130,11 @@ const SupervisorRosterSection = () => {
         const data = await siteService.getAllSites();
         const filtered = data.filter(site => supervisorAssignedSites.includes(site._id));
         setSites(filtered);
-        if (filtered.length > 0) setSelectedSiteId(filtered[0]._id);
+        if (filtered.length > 0 && !selectedSiteId) setSelectedSiteId(filtered[0]._id);
       } catch (err) { console.error(err); toast.error("Failed to load sites"); } 
       finally { setLoadingSites(false); }
     })();
-  }, [supervisorId, supervisorAssignedSites]);
+  }, [supervisorId, supervisorAssignedSites, selectedSiteId]);
 
   useEffect(() => {
     if (!selectedSite) { setEmployees([]); return; }
@@ -150,13 +151,16 @@ const SupervisorRosterSection = () => {
     })();
   }, [selectedSite]);
 
+  // ✅ fetchRosterEntries – now uses getDaysInView() inside and depends only on stable values
   const fetchRosterEntries = useCallback(async () => {
-    if (!selectedSite || daysInView.length === 0) return;
+    if (!selectedSite) return;
+    const days = getDaysInView();
+    if (days.length === 0) return;
     try {
       setLoadingRoster(true);
       const response = await rosterService.getRosterEntries({
-        startDate: format(daysInView[0], "yyyy-MM-dd"),
-        endDate: format(daysInView[daysInView.length - 1], "yyyy-MM-dd"),
+        startDate: format(days[0], "yyyy-MM-dd"),
+        endDate: format(days[days.length - 1], "yyyy-MM-dd"),
       });
       if (response.success) {
         const filtered = (response.roster || []).filter((e: RosterEntry) => e.siteId === selectedSite._id);
@@ -164,9 +168,12 @@ const SupervisorRosterSection = () => {
       } else throw new Error(response.message);
     } catch (err: any) { console.error(err); toast.error(err.message || "Failed to load roster"); } 
     finally { setLoadingRoster(false); }
-  }, [selectedSite, daysInView]);
+  }, [selectedSite, getDaysInView]); // getDaysInView is stable because it's a useCallback with dependencies
 
-  useEffect(() => { fetchRosterEntries(); }, [selectedSite, selectedRoster, selectedDate, fetchRosterEntries]);
+  // useEffect for fetching roster – depends on fetchRosterEntries which is stable
+  useEffect(() => {
+    fetchRosterEntries();
+  }, [fetchRosterEntries]);
 
   const handleAssignedWeekOffChange = async (employee: Employee, day: string) => {
     const previous = employee.assignedWeekOff;
@@ -226,10 +233,11 @@ const SupervisorRosterSection = () => {
     if (!selectedSite) { toast.error("Select a site first"); return; }
     if (employees.length === 0) { toast.error("No employees to export"); return; }
 
-    const header = ["Emp ID", "Employee Name", "Assigned Week Off", ...daysInView.map(d => format(d, "d-MMM")), "Total Working"];
+    const days = getDaysInView();
+    const header = ["Emp ID", "Employee Name", "Assigned Week Off", ...days.map(d => format(d, "d-MMM")), "Total Working"];
     const rows = employees.map((emp, idx) => {
       let working = 0;
-      const cells = daysInView.map(day => {
+      const cells = days.map(day => {
         const code = getEffectiveStatus(emp, day, format(day, "yyyy-MM-dd"));
         if (!code) working++;
         return code;
@@ -309,7 +317,7 @@ const SupervisorRosterSection = () => {
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <div className="w-36 text-center font-medium text-sm border rounded-md h-10 flex items-center justify-center">
-                    {selectedRoster === "daily" ? format(selectedDate, "dd MMM yyyy") : selectedRoster === "weekly" ? `Week of ${format(daysInView[0], "dd MMM")}` : selectedRoster === "fortnightly" ? `Fortnight of ${format(daysInView[0], "dd MMM")}` : format(selectedDate, "MMMM yyyy")}
+                    {selectedRoster === "daily" ? format(selectedDate, "dd MMM yyyy") : selectedRoster === "weekly" ? `Week of ${format(getDaysInView()[0], "dd MMM")}` : selectedRoster === "fortnightly" ? `Fortnight of ${format(getDaysInView()[0], "dd MMM")}` : format(selectedDate, "MMMM yyyy")}
                   </div>
                   <Button variant="outline" size="icon" onClick={() => setSelectedDate(prev => { if (selectedRoster === "daily") return addDays(prev, 1); if (selectedRoster === "weekly") return addDays(prev, 7); if (selectedRoster === "fortnightly") return addDays(prev, 14); return addMonths(prev, 1); })}>
                     <ChevronRight className="h-4 w-4" />
@@ -348,7 +356,7 @@ const SupervisorRosterSection = () => {
                     <TableRow>
                       <TableHead className="sticky left-0 bg-background z-10 min-w-[180px]">Employee ({filteredEmployees.length})</TableHead>
                       <TableHead className="min-w-[140px]">Assigned Week Off</TableHead>
-                      {daysInView.map((day, idx) => (
+                      {getDaysInView().map((day, idx) => (
                         <TableHead key={idx} className={cn("text-center min-w-[36px] text-xs px-1", (day.getDay() === 0 || day.getDay() === 6) && "bg-muted/40")}>
                           <div>{format(day, "d")}</div><div className="text-[10px] text-muted-foreground">{format(day, "EEEEE")}</div>
                         </TableHead>
@@ -358,7 +366,8 @@ const SupervisorRosterSection = () => {
                   </TableHeader>
                   <TableBody>
                     {filteredEmployees.map((emp) => {
-                      const workingCount = daysInView.filter((day) => !getEffectiveStatus(emp, day, format(day, "yyyy-MM-dd"))).length;
+                      const days = getDaysInView();
+                      const workingCount = days.filter((day) => !getEffectiveStatus(emp, day, format(day, "yyyy-MM-dd"))).length;
                       return (
                         <TableRow key={emp._id}>
                           <TableCell className="sticky left-0 bg-background z-10">
@@ -374,7 +383,7 @@ const SupervisorRosterSection = () => {
                               </SelectContent>
                             </Select>
                           </TableCell>
-                          {daysInView.map((day, idx) => {
+                          {days.map((day, idx) => {
                             const dateStr = format(day, "yyyy-MM-dd");
                             const code = getEffectiveStatus(emp, day, dateStr);
                             const meta = statusMeta(code);

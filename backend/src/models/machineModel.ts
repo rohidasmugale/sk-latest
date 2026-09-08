@@ -26,6 +26,7 @@ export interface IMachine extends Document {
   department?: string;
   assignedTo?: string;
   remark?: string;   // <-- add this
+  siteId?: mongoose.Types.ObjectId;
   maintenanceHistory: IMaintenanceRecord[];
 }
 
@@ -72,6 +73,7 @@ const MachineSchema: Schema<IMachine> = new Schema(
     department: { type: String },
     assignedTo: { type: String },
     remark: { type: String, default: '' },   // <-- add this
+    siteId: { type: Schema.Types.ObjectId, ref: 'Site', index: true },
     maintenanceHistory: { type: [MaintenanceSchema], default: [] },
   },
   { timestamps: true }

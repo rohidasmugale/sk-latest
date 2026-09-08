@@ -41,7 +41,7 @@ const assignTaskSchema = new mongoose.Schema({
     default: 'medium'
   },
   taskType: { type: String, required: true },
-  siteId: { type: String, required: true },
+siteId: { type: mongoose.Schema.Types.ObjectId, ref: 'Site', required: true, index: true },
   siteName: { type: String, required: true },
   siteLocation: { type: String, required: true },
   clientName: { type: String, required: true },

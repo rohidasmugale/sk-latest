@@ -33,6 +33,7 @@ export interface IStaffBriefing extends Document {
   time: string;
   conductedBy: string;
   site: string;
+  siteId?: mongoose.Types.ObjectId;
   department: string;
   attendeesCount: number;
   topics: string[];
@@ -100,6 +101,7 @@ const StaffBriefingSchema: Schema = new Schema(
       type: String,
       required: true
     },
+    siteId: { type: Schema.Types.ObjectId, ref: 'Site', index: true },  // ✅ ADD THIS
     department: {
       type: String,
       default: ''
@@ -156,7 +158,7 @@ const StaffBriefingSchema: Schema = new Schema(
 
 StaffBriefingSchema.index({ date: -1, shift: 1 });
 StaffBriefingSchema.index({ department: 1 });
-StaffBriefingSchema.index({ site: 1 });
+StaffBriefingSchema.index({ siteId: 1 }); 
 StaffBriefingSchema.index({ conductedBy: 1 });
 StaffBriefingSchema.index({ "supervisors.id": 1 });
 StaffBriefingSchema.index({ "managers.id": 1 });

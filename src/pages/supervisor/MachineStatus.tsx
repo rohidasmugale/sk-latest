@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import axios from "axios";
 import { DashboardHeader } from "@/components/shared/DashboardHeader";
+
 const API_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
@@ -26,7 +27,6 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Status options
 const STATUS_OPTIONS = [
   { value: 'operational', label: 'Operational', color: 'bg-green-100 text-green-800', icon: CheckCircle },
   { value: 'maintenance', label: 'Under Maintenance', color: 'bg-yellow-100 text-yellow-800', icon: AlertCircle },
@@ -39,53 +39,53 @@ export default function MachineStatus() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-
-  // Local remark state: store the current remark value per machine while editing
   const [editingRemark, setEditingRemark] = useState<{ [key: string]: string }>({});
 
-  // Helper: get supervisor site names from tasks
-  const getSupervisorSiteNames = useCallback(async (): Promise<string[]> => {
-    if (!currentUser || role !== "supervisor") return [];
-    const supervisorId = currentUser._id || currentUser.id;
-    try {
-      const res = await apiClient.get('/tasks', { params: { limit: 1000 } });
-      let tasks = res.data?.data || res.data || [];
-      if (!Array.isArray(tasks)) tasks = [];
-      const siteSet = new Set<string>();
-      tasks.forEach((task: any) => {
-        const assigned = task.assignedUsers?.some((u: any) => u.userId === supervisorId);
-        const assignedOld = task.assignedTo === supervisorId;
-        if ((assigned || assignedOld) && task.siteName) {
-          siteSet.add(task.siteName);
-        }
-      });
-      return Array.from(siteSet);
-    } catch (error) {
-      console.error("Error fetching tasks for machine status:", error);
-      return [];
-    }
-  }, [currentUser, role]);
+  
+ const getSupervisorSiteIds = useCallback(async (): Promise<string[]> => {
+   if (!currentUser || role !== "supervisor") return [];
+   try {
+     const supervisorId = currentUser._id || currentUser.id;
+     const supervisorName = currentUser.name;
+     const res = await apiClient.get('/tasks', { params: { limit: 1000 } });
+     let tasks = res.data?.data || res.data || [];
+     if (!Array.isArray(tasks)) tasks = [];
+    const siteIdSet = new Set<string>();
+    tasks.forEach((task: any) => {
+      const assigned =
+        task.assignedUsers?.some((u: any) =>
+          u.userId === supervisorId ||
+          (u.name && supervisorName && u.name.toLowerCase() === supervisorName.toLowerCase())
+        ) || task.assignedTo === supervisorId;
+      if (assigned && task.siteId) siteIdSet.add(task.siteId);
+     });
+     return Array.from(siteIdSet);
+   } catch (error) {
+     console.error("Error fetching sites for machines:", error);
+     return [];
+   }
+ }, [currentUser, role]);
 
+  // ✅ CHANGED: Use siteId for filtering
   const fetchMachines = async () => {
     try {
       let filteredMachines: FrontendMachine[] = [];
       const allMachines = await machineService.getMachines();
 
       if (role === "supervisor") {
-        const siteNames = await getSupervisorSiteNames();
-        if (siteNames.length === 0) {
+        const siteIds = await getSupervisorSiteIds();
+        if (siteIds.length === 0) {
           setMachines([]);
           setLoading(false);
           return;
         }
         filteredMachines = allMachines.filter(m =>
-          m.location && siteNames.some(site => site.toLowerCase() === m.location.toLowerCase())
+          m.siteId && siteIds.some(siteId => siteId === m.siteId)
         );
       } else {
         filteredMachines = allMachines;
       }
       setMachines(filteredMachines);
-      // Initialize editing remarks with existing remarks
       const initialRemarks: { [key: string]: string } = {};
       filteredMachines.forEach(m => {
         initialRemarks[m._id] = m.remark || "";
@@ -105,27 +105,26 @@ export default function MachineStatus() {
   }, [currentUser, role]);
 
   const updateMachineStatus = async (machineId: string, newStatus: string) => {
-  const machine = machines.find(m => m._id === machineId);
-  if (!machine) return;
-  if (!window.confirm(`Change status of "${machine.name}" to ${STATUS_OPTIONS.find(s => s.value === newStatus)?.label}?`)) return;
+    const machine = machines.find(m => m._id === machineId);
+    if (!machine) return;
+    if (!window.confirm(`Change status of "${machine.name}" to ${STATUS_OPTIONS.find(s => s.value === newStatus)?.label}?`)) return;
 
-  setUpdating(machineId);
-  try {
-    // Include the current remark to prevent it from being wiped
-    await machineService.updateMachine(machineId, {
-      status: newStatus,
-      remark: machine.remark || ""  // preserve existing remark
-    });
-    setMachines(prev =>
-      prev.map(m => (m._id === machineId ? { ...m, status: newStatus } : m))
-    );
-    toast.success(`Status updated to ${STATUS_OPTIONS.find(s => s.value === newStatus)?.label}`);
-  } catch (error) {
-    toast.error("Update failed");
-  } finally {
-    setUpdating(null);
-  }
-};
+    setUpdating(machineId);
+    try {
+      await machineService.updateMachine(machineId, {
+        status: newStatus,
+        remark: machine.remark || ""
+      });
+      setMachines(prev =>
+        prev.map(m => (m._id === machineId ? { ...m, status: newStatus } : m))
+      );
+      toast.success(`Status updated to ${STATUS_OPTIONS.find(s => s.value === newStatus)?.label}`);
+    } catch (error) {
+      toast.error("Update failed");
+    } finally {
+      setUpdating(null);
+    }
+  };
 
   const handleRemarkChange = (machineId: string, value: string) => {
     setEditingRemark(prev => ({ ...prev, [machineId]: value }));
@@ -135,7 +134,7 @@ export default function MachineStatus() {
     const newRemark = editingRemark[machineId];
     const machine = machines.find(m => m._id === machineId);
     if (!machine) return;
-    if (machine.remark === newRemark) return; // no change
+    if (machine.remark === newRemark) return;
 
     try {
       await machineService.updateMachine(machineId, { remark: newRemark });
@@ -145,7 +144,6 @@ export default function MachineStatus() {
       toast.success("Remark saved");
     } catch (error) {
       toast.error("Failed to save remark");
-      // revert local change
       setEditingRemark(prev => ({ ...prev, [machineId]: machine.remark || "" }));
     }
   };
@@ -235,7 +233,6 @@ export default function MachineStatus() {
                       </div>
                     </td>
                     <td className="p-3">
-                      {/* Status dropdown – allowed for supervisor, admin, manager, superadmin */}
                       {['superadmin', 'admin', 'manager', 'supervisor'].includes(role) && (
                         <Select
                           value={machine.status}
