@@ -107,7 +107,7 @@ interface Employee {
   relativeName?: string;
   relation?: string;
   numberOfChildren?: string | number;
- 
+
   emergencyContactPhone?: string;
   emergencyContactRelation?: string;
   nomineeName?: string;
@@ -216,7 +216,14 @@ const formatDate = (date: Date | string) => {
   const day = String(dateObj.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
-
+// Normalizes any date value to YYYY-MM-DD using local date parts
+const normalizeDateStr = (d: string | null | undefined): string => {
+  if (!d) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  const parsed = new Date(d);
+  if (isNaN(parsed.getTime())) return d;
+  return formatDate(parsed);
+};
 // Interface for attendance record
 interface AttendanceRecord {
   _id: string;
@@ -363,89 +370,60 @@ const fetchEmployeesAssignedToSites = async (): Promise<{ employees: Employee[],
     throw new Error(`Error loading employees: ${error.message}`);
   }
 };
+// Bulk-fetch raw attendance records for a date range, used to join to each
+// employee's current site instead of trusting attendance.siteName
+const fetchAttendanceRecordsRange = async (
+  start: string,
+  end: string
+): Promise<{ employeeId: string; employeeName: string; date: string; status: string }[]> => {
+  try {
+    const response = await axios.get(`${API_URL}/attendance`, {
+      params: { startDate: start, endDate: end, limit: 5000 }
+    });
 
+    let records: any[] = [];
+    if (response.data) {
+      if (response.data.success && Array.isArray(response.data.data)) records = response.data.data;
+      else if (Array.isArray(response.data)) records = response.data;
+      else if (Array.isArray(response.data.attendance)) records = response.data.attendance;
+    }
+
+    return records.map((record: any) => ({
+      employeeId: record.employeeId || record.employee?._id || '',
+      employeeName: record.employeeName || record.employee?.name || '',
+      date: normalizeDateStr(record.date),
+      status: (record.status?.toLowerCase() || 'absent'),
+    }));
+  } catch (error) {
+    console.error('Error fetching attendance records range:', error);
+    return [];
+  }
+};
 // Fetch attendance data from API and calculate totals across ALL SITES (ONLY SITE-ASSIGNED EMPLOYEES)
 const fetchAttendanceData = async (days: number = 30): Promise<DailyAttendanceSummary[]> => {
   try {
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(endDate.getDate() - days + 1);
-
     const startDateStr = formatDate(startDate);
     const endDateStr = formatDate(endDate);
 
-    const employeesWithCounts = await fetchEmployeesAssignedToSites();
-    const siteAssignedEmployees = employeesWithCounts.employees;
+    const { employees: siteAssignedEmployees, siteCounts } = await fetchEmployeesAssignedToSites();
+    const totalStaffAssignedToSites = siteAssignedEmployees.length;
 
-    const staffEmployees = siteAssignedEmployees; // include everyone
-    const totalStaffAssignedToSites = staffEmployees.length;
-
-    // Build lookup: MongoDB _id → employee (for matching attendance records)
-    const staffById = new Map<string, Employee>();
-    staffEmployees.forEach(emp => {
-      if (emp._id) staffById.set(emp._id, emp);
-      if (emp.id) staffById.set(emp.id, emp);
-    });
-    // Also build lookup by name (fallback)
-    const staffByName = new Map<string, Employee>();
-    staffEmployees.forEach(emp => {
-      if (emp.name) staffByName.set(emp.name, emp);
-    });
-    // Build employee ID → siteName map for backfilling missing siteName on records
-    // Build employee ID → siteName map from ALL employees (not just staff)
-    const empIdToSite = new Map<string, string>();
-    siteAssignedEmployees.forEach(emp => {
-      const mongoId = emp._id || emp.id;
-      if (mongoId) empIdToSite.set(mongoId, emp.site || emp.siteName || '');
-    });
-
-    // Fetch attendance records
-    let allRecords: AttendanceRecord[] = [];
-    try {
-      const response = await axios.get(`${API_URL}/attendance`, {
-        params: { startDate: startDateStr, endDate: endDateStr, limit: 10000 }
-      });
-      if (response.data?.success && Array.isArray(response.data.data)) {
-        allRecords = response.data.data;
-      } else if (Array.isArray(response.data)) {
-        allRecords = response.data;
-      }
-    } catch {
-      // day-by-day fallback
-      const tempDate = new Date(startDate);
-      while (tempDate <= endDate) {
-        const dateStr = formatDate(tempDate);
-        try {
-          const r = await axios.get(`${API_URL}/attendance`, { params: { date: dateStr } });
-          const recs = r.data?.success ? r.data.data : Array.isArray(r.data) ? r.data : [];
-          allRecords.push(...recs);
-        } catch { /* skip */ }
-        tempDate.setDate(tempDate.getDate() + 1);
-        await new Promise(res => setTimeout(res, 50));
-      }
-    }
-
-    // Backfill missing siteName using employee lookup
-    allRecords.forEach(record => {
-      if (!record.siteName && empIdToSite.has(record.employeeId)) {
-        record.siteName = empIdToSite.get(record.employeeId)!;
-      }
-    });
-
-    // Keep only staff records
-    const staffRecords = allRecords.filter(r =>
-      staffById.has(r.employeeId) ||
-      (r.employeeName && staffByName.has(r.employeeName))
-    );
-
-    // Build per-site staff counts
     const staffSiteCounts: { [site: string]: number } = {};
-    staffEmployees.forEach(emp => {
+    const empIdToSite = new Map<string, string>();
+    const empNameToSite = new Map<string, string>();
+    siteAssignedEmployees.forEach(emp => {
       const site = emp.site || emp.siteName || 'Unknown';
       staffSiteCounts[site] = (staffSiteCounts[site] || 0) + 1;
+      if (emp._id) empIdToSite.set(String(emp._id), site);
+      if (emp.name) empNameToSite.set(emp.name.trim().toLowerCase(), site);
     });
 
-    // Initialize daily summaries
+    // ✅ FIX: join attendance records to each employee's CURRENT site
+    const attendanceRecords = await fetchAttendanceRecordsRange(startDateStr, endDateStr);
+
     const dailySummaries: { [key: string]: DailyAttendanceSummary } = {};
     const cur = new Date(startDate);
     while (cur <= endDate) {
@@ -460,50 +438,45 @@ const fetchAttendanceData = async (days: number = 30): Promise<DailyAttendanceSu
         total: 0, rate: '0.0%', index: 0,
         totalEmployees: totalStaffAssignedToSites,
         sitesWithData: 0,
-        siteBreakdown: {}
+        siteBreakdown: {},
       };
-      // Initialize site breakdown
       Object.entries(staffSiteCounts).forEach(([site, count]) => {
         dailySummaries[dateStr].siteBreakdown![site] = {
-          total: count, present: 0, absent: 0, weeklyOff: 0, leave: 0
+          total: count, present: 0, absent: 0, weeklyOff: 0, leave: 0,
         };
       });
       cur.setDate(cur.getDate() + 1);
     }
 
-    // ✅ THE FIX: removed the ! — condition is now positive
-    staffRecords.forEach(record => {
+    attendanceRecords.forEach(record => {
       const summary = dailySummaries[record.date];
-      if (!summary) return; // skip records outside date range
+      if (!summary) return;
 
-      const status = (record.status || '').toLowerCase().trim();
+      const site =
+        empIdToSite.get(String(record.employeeId)) ||
+        (record.employeeName ? empNameToSite.get(record.employeeName.trim().toLowerCase()) : undefined);
+      if (!site) return;
 
-      // Update daily totals
-      if (status === 'present') { summary.present++; }
-      else if (status === 'half-day') { summary.present += 0.5; }
-      else if (status === 'weekly-off') { summary.weeklyOff++; }
-      else if (status === 'leave') { summary.leave++; }
-      else { summary.absent++; } // 'absent' or unknown
+      const status = record.status;
+      if (status === 'present') summary.present += 1;
+      else if (status === 'half-day') summary.present += 0.5;
+      else if (status === 'weekly-off') summary.weeklyOff += 1;
+      else if (status === 'leave') summary.leave += 1;
+      else summary.absent += 1;
 
-      // Update site breakdown if siteName matches
-      const siteKey = record.siteName;
-      if (siteKey && summary.siteBreakdown?.[siteKey]) {
-        const sb = summary.siteBreakdown[siteKey];
-        if (status === 'present') { sb.present++; }
-        else if (status === 'half-day') { sb.present += 0.5; }
-        else if (status === 'weekly-off') { sb.weeklyOff++; }
-        else if (status === 'leave') { sb.leave++; }
-        else { sb.absent++; }
+      const sb = summary.siteBreakdown?.[site];
+      if (sb) {
+        if (status === 'present') sb.present += 1;
+        else if (status === 'half-day') sb.present += 0.5;
+        else if (status === 'weekly-off') sb.weeklyOff += 1;
+        else if (status === 'leave') sb.leave += 1;
+        else sb.absent += 1;
       }
     });
 
-    // Fill unaccounted employees as absent, then compute rate
     Object.values(dailySummaries).forEach(summary => {
       const accounted = summary.present + summary.weeklyOff + summary.leave + summary.absent;
-      if (accounted < summary.totalEmployees) {
-        summary.absent += (summary.totalEmployees - accounted);
-      }
-      // Also fill site breakdown gaps
+      if (accounted < summary.totalEmployees) summary.absent += (summary.totalEmployees - accounted);
       Object.values(summary.siteBreakdown || {}).forEach(sb => {
         const siteAccounted = sb.present + sb.weeklyOff + sb.leave + sb.absent;
         if (siteAccounted < sb.total) sb.absent += (sb.total - siteAccounted);
@@ -517,14 +490,12 @@ const fetchAttendanceData = async (days: number = 30): Promise<DailyAttendanceSu
     return Object.values(dailySummaries).sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
     );
-
   } catch (error: any) {
     console.error('Error fetching attendance data:', error);
     toast.error('Failed to fetch attendance data');
     return [];
   }
 };
-
 
 
 const currentYear = new Date().getFullYear();
@@ -683,13 +654,12 @@ const exportToExcel = (data: any[], filename: string) => {
 // Mobile Stat Card Component
 const MobileStatCard = ({ title, value, icon: Icon, color = "primary", subtitle }: any) => {
   const colorClasses: Record<string, string> = {
-    primary: "text-blue-600 bg-blue-100",
-    success: "text-green-600 bg-green-100",
-    warning: "text-yellow-600 bg-yellow-100",
-    danger: "text-red-600 bg-red-100",
-    purple: "text-purple-600 bg-purple-100"
+    primary: "text-blue-600 dark:text-blue-300 bg-blue-100 dark:bg-blue-950/40",
+    success: "text-green-600 dark:text-green-300 bg-green-100 dark:bg-green-950/40",
+    warning: "text-yellow-600 dark:text-yellow-300 bg-yellow-100 dark:bg-yellow-950/40",
+    danger: "text-red-600 dark:text-red-300 bg-red-100 dark:bg-red-950/40",
+    purple: "text-purple-600 dark:text-purple-300 bg-purple-100 dark:bg-purple-950/40"
   };
-
   return (
     <Card className="overflow-hidden rounded-xl border-0 shadow-sm">
       <CardContent className="p-3">
@@ -761,7 +731,7 @@ const MobilePayrollCard = ({ item, formatCurrency, index }: any) => {
     </Card>
   );
 };
-const SuperAdminDashboard = ({ title: propTitle }: { title?: string }) => {
+const SuperAdminDashboard = ({ title: propTitle, headerExtra }: { title?: string; headerExtra?: React.ReactNode }) => {
   const { onMenuClick } = useOutletContext<{ onMenuClick: () => void }>();
   const { role } = useRole();
 
@@ -769,17 +739,21 @@ const SuperAdminDashboard = ({ title: propTitle }: { title?: string }) => {
   const dashboardTitle = propTitle || (role === 'admin' ? 'Admin Dashboard' : 'Super Admin Dashboard');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
+
+  const totalDeploymentStaff = useMemo(() => {
+    return siteService.getTotalStaffAcrossSites(sites);
+  }, [sites]);
+
   const departmentData = useMemo(() => {
     // Define allowed departments with icons/colors
     const allowedDepartments = [
-      { name: 'Housekeeping', icon: Home, color: 'from-blue-50 to-blue-100 border-blue-200' },
-      { name: 'Security', icon: Shield, color: 'from-green-50 to-green-100 border-green-200' },
-      { name: 'Waste Management', icon: Trash2, color: 'from-gray-50 to-gray-100 border-gray-200' },
-      { name: 'Parking Management', icon: Car, color: 'from-purple-50 to-purple-100 border-purple-200' },
-      { name: 'Consumables', icon: ShoppingCart, color: 'from-orange-50 to-orange-100 border-orange-200' },
-      { name: 'Technician', icon: Settings, color: 'from-slate-50 to-slate-100 border-slate-300' },
-      { name: 'Other', icon: Droplets, color: 'from-cyan-50 to-cyan-100 border-cyan-200' }
-
+      { name: 'Housekeeping', icon: Home, color: 'from-blue-50 to-blue-100 border-blue-200 dark:from-blue-950/40 dark:to-blue-900/40 dark:border-blue-800' },
+      { name: 'Security', icon: Shield, color: 'from-green-50 to-green-100 border-green-200 dark:from-green-950/40 dark:to-green-900/40 dark:border-green-800' },
+      { name: 'Waste Management', icon: Trash2, color: 'from-gray-50 to-gray-100 border-gray-200 dark:from-gray-800/60 dark:to-gray-700/60 dark:border-gray-600' },
+      { name: 'Parking Management', icon: Car, color: 'from-purple-50 to-purple-100 border-purple-200 dark:from-purple-950/40 dark:to-purple-900/40 dark:border-purple-800' },
+      { name: 'Consumables', icon: ShoppingCart, color: 'from-orange-50 to-orange-100 border-orange-200 dark:from-orange-950/40 dark:to-orange-900/40 dark:border-orange-800' },
+      { name: 'Technician', icon: Settings, color: 'from-slate-50 to-slate-100 border-slate-300 dark:from-slate-800/60 dark:to-slate-700/60 dark:border-slate-600' },
+      { name: 'Other', icon: Droplets, color: 'from-cyan-50 to-cyan-100 border-cyan-200 dark:from-cyan-950/40 dark:to-cyan-900/40 dark:border-cyan-800' }
     ];
 
     // Count sites per service
@@ -827,8 +801,9 @@ const SuperAdminDashboard = ({ title: propTitle }: { title?: string }) => {
   // State for UI navigation
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const [sixDaysStartIndex, setSixDaysStartIndex] = useState(1);
-  const [selectedYear, setSelectedYear] = useState('2024');
-  const [selectedMonth, setSelectedMonth] = useState('01');
+  const now = new Date();
+  const [selectedYear, setSelectedYear] = useState(String(now.getFullYear()));
+  const [selectedMonth, setSelectedMonth] = useState(String(now.getMonth() + 1).padStart(2, '0'));
   const [payrollData, setPayrollData] = useState<any[]>([]);
   const [loadingPayroll, setLoadingPayroll] = useState(false);
   const [payrollTab, setPayrollTab] = useState('list-view');
@@ -849,12 +824,13 @@ const SuperAdminDashboard = ({ title: propTitle }: { title?: string }) => {
   };
 
   useEffect(() => {
+    // Refresh every 5 minutes
     const interval = setInterval(() => {
-      loadAttendanceData(); // refresh without showing toast
-    }, 300000); // every 30 seconds
-
+      loadAttendanceData();
+    }, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
+
   useEffect(() => {
     fetchEmployeesData();
   }, []);
@@ -926,33 +902,40 @@ const SuperAdminDashboard = ({ title: propTitle }: { title?: string }) => {
       // Format month as YYYY-MM (e.g., "2024-01")
       const monthStr = `${selectedYear}-${selectedMonth}`;
 
+      const token = localStorage.getItem('token');
       const response = await axios.get(`${API_URL}/payroll`, {
-        params: { month: monthStr, limit: 1000 }
+        params: { month: monthStr, limit: 1000 },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-
       let records = response.data?.data || response.data || [];
       if (!Array.isArray(records)) records = [];
 
       // Transform to match the UI table structure
-      const transformed = records.map((p: any) => ({
-        id: p._id,
-        // If your payroll records contain employeeName, use it; otherwise fallback to employeeId
-        siteName: p.employeeName || p.employeeId || 'Unknown Employee',
-        billingAmount: p.netSalary || 0,
-        totalPaid: p.paymentStatus === 'paid' ? p.netSalary : 0,
-        holdSalary: p.paymentStatus === 'hold' ? p.netSalary : 0,
-        status: p.paymentStatus === 'paid' ? 'Paid' : p.paymentStatus === 'hold' ? 'Hold' : 'Pending',
-        remark: p.notes || 'Processed',
-        // Keep original data if needed
-        ...p
-      }));
+      const transformed = records.map((p: any) => {
+        const emp = employees.find(e => e.employeeId === p.employeeId);
+        return {
+          ...p,
+          id: p._id,
+          employeeName: emp?.name || p.employeeName || p.employeeId || 'Unknown Employee',
+          siteName: emp?.site || emp?.siteName || 'Unassigned',
+          billingAmount: p.netSalary || 0,
+          totalPaid: p.paymentStatus === 'paid'
+            ? (p.netSalary || 0)
+            : (p.paidAmount || 0),
+          holdSalary: p.paymentStatus === 'hold' ? (p.netSalary || 0) : 0,
+          status: p.paymentStatus === 'paid' ? 'Paid'
+            : p.paymentStatus === 'hold' ? 'Hold'
+              : p.paymentStatus === 'part-paid' ? 'Part Paid'
+                : 'Pending',
+          remark: p.notes || 'Processed',
+        };
+      });
 
       setPayrollData(transformed);
     } catch (error) {
       console.error('Failed to fetch payroll:', error);
       toast.error('Could not load payroll data');
-      // Optionally keep demo data as fallback (comment out if you prefer empty)
-      setPayrollData(generatePayrollData());
+      setPayrollData([]);
     } finally {
       setLoadingPayroll(false);
     }
@@ -1011,13 +994,40 @@ const SuperAdminDashboard = ({ title: propTitle }: { title?: string }) => {
 
     return { totalBilling, totalPaid, totalHold, totalDifference, completionRate: '0.0' };
   }, [payrollData]);
-
+  // Aggregate employee-level payroll records into one row per site
+  const siteWiseData = useMemo(() => {
+    const map = new Map<string, any>();
+    payrollData.forEach(item => {
+      const key = item.siteName || 'Unassigned';
+      if (key === 'Unassigned') return; // skip employees with no site assignment
+      const cur = map.get(key) || {
+        id: key,
+        siteName: key,
+        billingAmount: 0,
+        totalPaid: 0,
+        holdSalary: 0,
+        count: 0,
+        pendingCount: 0,
+      };
+      cur.billingAmount += item.billingAmount || 0;
+      cur.totalPaid += item.totalPaid || 0;
+      cur.holdSalary += item.holdSalary || 0;
+      cur.count += 1;
+      if (item.status === 'Pending') cur.pendingCount += 1;
+      map.set(key, cur);
+    });
+    return Array.from(map.values()).map(s => ({
+      ...s,
+      status: s.pendingCount === 0 && s.holdSalary === 0 ? 'Paid' : 'Pending',
+      remark: `${s.count} employee(s)`,
+    }));
+  }, [payrollData]);
   // Filtered payroll data
   const filteredPayrollData = useMemo(() => {
-    return payrollData.filter(item =>
+    return siteWiseData.filter(item =>
       item.siteName.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [payrollData, searchTerm]);
+  }, [siteWiseData, searchTerm]);
 
   // Paginated payroll data
   const paginatedPayrollData = useMemo(() => {
@@ -1026,7 +1036,7 @@ const SuperAdminDashboard = ({ title: propTitle }: { title?: string }) => {
   }, [filteredPayrollData, currentPage, itemsPerPage]);
 
   const totalPages = Math.ceil(filteredPayrollData.length / itemsPerPage);
-  const selectedSiteData = payrollData.find(item => item.siteName === selectedSite);
+  const selectedSiteData = siteWiseData.find(item => item.siteName === selectedSite);
 
   // Site pie chart data
   const sitePieChartData = selectedSiteData ? [
@@ -1078,7 +1088,7 @@ const SuperAdminDashboard = ({ title: propTitle }: { title?: string }) => {
   };
 
   const handlePayrollFilterChange = () => {
-    fetchRealPayroll();
+    // The useEffect on [selectedYear, selectedMonth, employees] already refetches.
     setCurrentPage(1);
     toast.success(`Payroll data updated for ${months.find(m => m.value === selectedMonth)?.label} ${selectedYear}`);
   };
@@ -1087,7 +1097,7 @@ const SuperAdminDashboard = ({ title: propTitle }: { title?: string }) => {
   };
   useEffect(() => {
     fetchRealPayroll();
-  }, [selectedYear, selectedMonth]);
+  }, [selectedYear, selectedMonth, employees]);
   const handleExportToExcel = () => {
     const monthName = months.find(m => m.value === selectedMonth)?.label;
     const filename = `Payroll_Data_${monthName}_${selectedYear}.csv`;
@@ -1121,7 +1131,7 @@ const SuperAdminDashboard = ({ title: propTitle }: { title?: string }) => {
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-white p-3 border rounded-lg shadow-lg"
+          className="bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700 p-3 border rounded-lg shadow-lg"
         >
           <p className="font-semibold text-sm">{data.name}</p>
           <p className="text-sm" style={{ color: data.payload.fill }}>
@@ -1141,7 +1151,7 @@ const SuperAdminDashboard = ({ title: propTitle }: { title?: string }) => {
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-white p-3 border rounded-lg shadow-lg"
+          className="bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700 p-3 border rounded-lg shadow-lg"
         >
           <p className="font-semibold text-sm">{data.name}</p>
           <p className="text-sm" style={{ color: data.payload.fill }}>
@@ -1190,6 +1200,8 @@ const SuperAdminDashboard = ({ title: propTitle }: { title?: string }) => {
         title={dashboardTitle}
         onMenuClick={onMenuClick}
       />
+
+      {headerExtra}
 
       {/* TOP‑RIGHT PLUS BUTTON – compact */}
       <div className="px-3 sm:px-4 mt-2 flex justify-end">
@@ -1364,20 +1376,24 @@ const SuperAdminDashboard = ({ title: propTitle }: { title?: string }) => {
                       </div>
                       <div className="flex-1">
                         <div className="space-y-1 text-xs">
-                          <div className="flex justify-between p-1 bg-green-50 rounded">
+                          <div className="flex justify-between p-1 bg-green-50 dark:bg-green-950/40 rounded">
                             <span>Present</span>
                             <span className="font-bold">{currentDayData.present}</span>
                           </div>
-                          <div className="flex justify-between p-1 bg-gray-50 rounded">
+                          <div className="flex justify-between p-1 bg-gray-50 dark:bg-gray-800 rounded">
                             <span>Weekly Off</span>
                             <span className="font-bold">{currentDayData.weeklyOff}</span>
                           </div>
-                          <div className="flex justify-between p-1 bg-red-50 rounded">
+                          <div className="flex justify-between p-1 bg-red-50 dark:bg-red-950/40 rounded">
                             <span>Absent</span>
                             <span className="font-bold">{currentDayData.absent}</span>
                           </div>
-                          <div className="flex justify-between p-1 bg-blue-50 rounded mt-1">
-                            <span>Total Staff</span>
+                          <div className="flex justify-between p-1 bg-purple-50 dark:bg-purple-950/40 rounded">
+                            <span>Deployment</span>
+                            <span className="font-bold">{totalDeploymentStaff}</span>
+                          </div>
+                          <div className="flex justify-between p-1 bg-blue-50 dark:bg-blue-950/40 rounded mt-1">
+                            <span>Actual Staff</span>
                             <span className="font-bold">{totalEmployeesAssignedToSites}</span>
                           </div>
                         </div>
@@ -1427,8 +1443,8 @@ const SuperAdminDashboard = ({ title: propTitle }: { title?: string }) => {
                             onClick={() => handleDepartmentCardClick(dept.department)}
                           >
                             <CardContent className="p-2">
-                              <div className="bg-white/50 rounded-full w-8 h-8 mx-auto mb-1 flex items-center justify-center">
-                                <IconComp className="h-4 w-4 text-gray-700" />
+                              <div className="bg-white/50 dark:bg-black/30 rounded-full w-8 h-8 mx-auto mb-1 flex items-center justify-center">
+                                <IconComp className="h-4 w-4 text-gray-700 dark:text-gray-200" />
                               </div>
                               <p className="text-[10px] font-medium truncate">{dept.department}</p>
                               <p className="text-sm font-bold mt-1">{dept.total}</p>
@@ -1499,7 +1515,7 @@ const SuperAdminDashboard = ({ title: propTitle }: { title?: string }) => {
                   </div>
                   <div className="hidden md:block overflow-x-auto rounded-lg border">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50">
+                      <thead className="bg-gray-50 dark:bg-gray-800">
                         <tr>
                           {['Site', 'Billing', 'Paid', 'Hold', 'Diff', 'Status', 'Remark'].map((header) => (
                             <th key={header} className="p-2 text-left text-xs font-semibold">{header}</th>
@@ -1510,7 +1526,7 @@ const SuperAdminDashboard = ({ title: propTitle }: { title?: string }) => {
                         {paginatedPayrollData.map((item) => {
                           const diff = item.billingAmount - item.totalPaid + item.holdSalary;
                           return (
-                            <tr key={item.id} className="border-b hover:bg-gray-50">
+                            <tr key={item.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
                               <td className="p-2 text-xs font-medium">{item.siteName.split(',')[0]}</td>
                               <td className="p-2 text-xs font-bold">{formatCurrency(item.billingAmount)}</td>
                               <td className="p-2 text-xs text-green-600">{formatCurrency(item.totalPaid)}</td>
@@ -1544,7 +1560,7 @@ const SuperAdminDashboard = ({ title: propTitle }: { title?: string }) => {
                 </motion.div>
               ) : (
                 <motion.div key="chart" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  <div className="mb-3"><label className="text-xs font-medium mb-1 block">Select Site</label><Select value={selectedSite} onValueChange={setSelectedSite}><SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Choose site..." /></SelectTrigger><SelectContent>{payrollData.map(site => <SelectItem key={site.siteName} value={site.siteName}>{site.siteName.split(',')[0]}</SelectItem>)}</SelectContent></Select></div>
+                  <div className="mb-3"><label className="text-xs font-medium mb-1 block">Select Site</label><Select value={selectedSite} onValueChange={setSelectedSite}><SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Choose site..." /></SelectTrigger><SelectContent>{siteWiseData.map(site => <SelectItem key={site.siteName} value={site.siteName}>{site.siteName.split(',')[0]}</SelectItem>)}</SelectContent></Select></div>
                   {selectedSiteData && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       <div className="h-64"><ResponsiveContainer width="100%" height="100%"><RechartsPieChart><Pie data={[{ name: 'Total Paid', value: selectedSiteData.totalPaid, color: '#10b981' }, { name: 'Hold Salary', value: selectedSiteData.holdSalary, color: '#f59e0b' }]} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}><Cell fill="#10b981" /><Cell fill="#f59e0b" /></Pie><Tooltip /><Legend /></RechartsPieChart></ResponsiveContainer></div>

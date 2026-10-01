@@ -6,273 +6,120 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import axios from 'axios';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Download,
-  Search,
-  Filter,
-  Plus,
-  Edit,
-  Trash2,
-  Eye,
-  IndianRupee,
-  Calendar,
-  CheckCircle,
-  FileText,
-  Printer,
-  Send,
-  Sheet,
-  MoreHorizontal,
-  Loader2,
-  Users,
-  FileSpreadsheet,
-  AlertCircle,
-  RefreshCw,
-  Building,
-  Upload, XCircle,
+  Download, Search, Filter, Plus, Edit, Trash2, Eye, IndianRupee, Calendar,
+  CheckCircle, FileText, Printer, Send, Loader2, Users, FileSpreadsheet,
+  AlertCircle, RefreshCw, Upload, XCircle, RotateCcw,
 } from "lucide-react";
 import * as XLSX from "xlsx";
-// Dialog Components
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-
-// API Services
 import {
-  payrollApi,
-  salaryStructureApi,
-  salarySlipApi,
-  employeeApi,
+  payrollApi, salaryStructureApi, salarySlipApi, employeeApi,
 } from "@/services/payrollApi";
+import AuditLogTab from "./AuditLogTab";
 
-// Types
+// ─── Types ───────────────────────────────────────────────────────────────
 interface Employee {
-  _id: string;
-  id?: string;
-  employeeId: string;
-  name: string;
-  email?: string;
-  phone?: string;
-  department: string;
-  position: string;
-  salary: number;
-  status: string;
-  accountNumber?: string;
-  ifscCode?: string;
-  bankBranch?: string;
-  bankName?: string;
-  gender?: string;
-  dateOfJoining?: string;
-  aadharNumber?: string;
-  panNumber?: string;
-  esicNumber?: string;
-  uanNumber?: string;
-  providentFund?: number;
-  professionalTax?: number;
-  permanentAddress?: string;
-  localAddress?: string;
-  site?: string;
-  siteName?: string;
-  siteId?: string;
-  profileStatus?: "complete" | "incomplete";   // ✅ ADD THIS
+  _id: string; id?: string; employeeId: string; name: string; email?: string;
+  phone?: string; department: string; position: string; salary: number;
+  status: string; accountNumber?: string; ifscCode?: string; bankBranch?: string;
+  bankName?: string; gender?: string; dateOfJoining?: string;
+  aadharNumber?: string; panNumber?: string; esicNumber?: string;
+  uanNumber?: string; providentFund?: number; professionalTax?: number;
+  permanentAddress?: string; localAddress?: string;
+  site?: string; siteName?: string; siteId?: string;
+  profileStatus?: "complete" | "incomplete";
 }
 
 interface SalaryStructure {
-  _id: string;
-  id?: string;
-  employeeId: string;
-  basicSalary: number;
-  hra: number;
-  da: number;
-  specialAllowance: number;
-  conveyance: number;
-  medicalAllowance: number;
-  otherAllowances: number;
-  providentFund: number;
-  professionalTax: number;
-  incomeTax: number;
-  otherDeductions: number;
-  leaveEncashment: number;
-  arrears: number;
-  esic: number;
-  advance: number;
-  mlwf: number;
-  effectiveFrom?: string;
-  isActive?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
+  _id: string; id?: string; employeeId: string;
+  basicSalary: number; hra: number; da: number; specialAllowance: number;
+  conveyance: number; medicalAllowance: number; otherAllowances: number;
+  providentFund: number; professionalTax: number; incomeTax: number;
+  otherDeductions: number; leaveEncashment: number; arrears: number;
+  esic: number; advance: number; mlwf: number;
+  effectiveFrom?: string; isActive?: boolean;
+  createdAt?: string; updatedAt?: string;
 }
 
 interface Payroll {
-  _id: string;
-  id?: string;
-  employeeId: string;
-  month: string;
-  basicSalary: number;
-  allowances: number;
-  deductions: number;
-  netSalary: number;
+  _id: string; id?: string; employeeId: string; month: string;
+  basicSalary: number; allowances: number; deductions: number; netSalary: number;
   status: "pending" | "processed" | "paid" | "hold" | "part-paid";
-  paymentDate?: string;
-  presentDays: number;
-  absentDays: number;
-  halfDays: number;
-  leaves: number;
-  paidAmount: number;
+  paymentDate?: string; presentDays: number; absentDays: number; halfDays: number;
+  leaves: number; paidAmount: number;
   paymentStatus: "pending" | "paid" | "hold" | "part-paid";
-  notes?: string;
-  overtimeHours?: number;
-  overtimeAmount?: number;
-  bonus?: number;
-  providentFund?: number;
-  esic?: number;
-  professionalTax?: number;
-  mlwf?: number;
-  advance?: number;
-  uniformAndId?: number;
-  fine?: number;
-  otherDeductions?: number;
-  da?: number;
-  hra?: number;
-  otherAllowances?: number;
-  leaveEncashment?: number;
+  notes?: string; overtimeHours?: number; overtimeAmount?: number; bonus?: number;
+  providentFund?: number; esic?: number; professionalTax?: number; mlwf?: number;
+  advance?: number; uniformAndId?: number; fine?: number; otherDeductions?: number;
+  da?: number; hra?: number; otherAllowances?: number; leaveEncashment?: number;
   arrears?: number;
-  createdAt?: string;
-  updatedAt?: string;
-  employee?: Employee;
+  deductionBreakdown?: {
+    additionalDeductions: number;
+    items: Array<{ type: string; amount: number; description: string; id: string }>;
+  };
+  manualAdjustments?: Array<{
+    amount: number;
+    reason: string;
+    adjustedBy: string;
+    adjustedAt: string;
+  }>;
+  createdAt?: string; updatedAt?: string; employee?: Employee;
 }
 
 interface SalarySlip {
-  _id: string;
-  id?: string;
-  payrollId: string;
-  employeeId: string;
-  month: string;
-  basicSalary: number;
-  allowances: number;
-  deductions: number;
-  netSalary: number;
-  generatedDate: string;
-  presentDays: number;
-  absentDays: number;
-  halfDays: number;
-  leaves: number;
-  slipNumber: string;
-  downloadUrl?: string;
-  emailSent?: boolean;
-  emailSentAt?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  _id: string; id?: string; payrollId: string; employeeId: string; month: string;
+  basicSalary: number; allowances: number; deductions: number; netSalary: number;
+  generatedDate: string; presentDays: number; absentDays: number; halfDays: number;
+  leaves: number; slipNumber: string; downloadUrl?: string;
+  emailSent?: boolean; emailSentAt?: string; createdAt?: string; updatedAt?: string;
 }
 
 interface Attendance {
-  employeeId: string;
-  employeeName?: string;
-  date: string;
+  employeeId: string; employeeName?: string; date: string;
   status: "present" | "absent" | "half-day";
-  checkIn?: string;
-  checkOut?: string;
-  overtimeHours?: number;
+  checkIn?: string; checkOut?: string; overtimeHours?: number;
 }
 
 interface Leave {
-  _id: string;
-  id?: string;
-  employeeId: string;
-  startDate: string;
-  endDate: string;
-  type: string;
-  reason: string;
-  status: "pending" | "approved" | "rejected";
-  approvedBy?: string;
-  approvedAt?: string;
-  createdAt?: string;
+  _id: string; id?: string; employeeId: string; startDate: string; endDate: string;
+  type: string; reason: string; status: "pending" | "approved" | "rejected";
+  approvedBy?: string; approvedAt?: string; createdAt?: string;
 }
 
 interface PayrollSummary {
-  totalAmount: number;
-  paidAmount: number;
-  pendingAmount: number;
-  holdAmount: number;
-  partPaidAmount: number;
-  processedCount: number;
-  pendingCount: number;
-  paidCount: number;
-  holdCount: number;
-  partPaidCount: number;
-  totalEmployees: number;
-  totalRecords: number;
-  activeEmployees: number;
-  employeesWithStructure: number;
-  employeesWithoutStructure: number;
-  payrollMonth: string;
+  totalAmount: number; paidAmount: number; pendingAmount: number; holdAmount: number;
+  partPaidAmount: number; processedCount: number; pendingCount: number; paidCount: number;
+  holdCount: number; partPaidCount: number; totalEmployees: number; totalRecords: number;
+  activeEmployees: number; employeesWithStructure: number;
+  employeesWithoutStructure: number; payrollMonth: string;
 }
 
 interface PayrollTabProps {
-  selectedMonth: string;
-  setSelectedMonth: (month: string) => void;
-  selectedSite: string;
-  sites: Site[];
+  selectedMonth: string; setSelectedMonth: (month: string) => void;
+  selectedSite: string; sites: Site[];
 }
 
-// Site interface
 interface Site {
-  _id: string;
-  name: string;
-  clientName: string;
-  location: string;
-  areaSqft: number;
-  services: string[];
-  status: 'active' | 'inactive';
-  contractValue: number;
-  contractEndDate: string;
-  staffDeployment: Array<{ role: string; count: number }>;
-  totalStaff?: number;
-  managerCount?: number;
-  supervisorCount?: number;
-  addedBy?: string;
-  addedByRole?: string;
-  manager?: string;
-  clientId?: string;
-  contractStartDate?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  _id: string; name: string; clientName: string; location: string; areaSqft: number;
+  services: string[]; status: 'active' | 'inactive'; contractValue: number;
+  contractEndDate: string; staffDeployment: Array<{ role: string; count: number }>;
+  totalStaff?: number; managerCount?: number; supervisorCount?: number;
+  addedBy?: string; addedByRole?: string; manager?: string; clientId?: string;
+  contractStartDate?: string; createdAt?: string; updatedAt?: string;
 }
 
 const API_URL = import.meta.env.VITE_API_URL ||
@@ -282,7 +129,6 @@ const getItemId = (item: any): string => {
   if (!item) return "";
   if (item._id) return item._id;
   if (item.id) return item.id;
-  console.warn("No ID found for item:", item);
   return "";
 };
 
@@ -291,7 +137,7 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [slipPaidDays, setSlipPaidDays] = useState<number | null>(null);
-  // Data states
+
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [payroll, setPayroll] = useState<Payroll[]>([]);
   const [salaryStructures, setSalaryStructures] = useState<SalaryStructure[]>([]);
@@ -299,106 +145,94 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [payrollSummary, setPayrollSummary] = useState<PayrollSummary>({
-    totalAmount: 0,
-    paidAmount: 0,
-    pendingAmount: 0,
-    holdAmount: 0,
-    partPaidAmount: 0,
-    processedCount: 0,
-    pendingCount: 0,
-    paidCount: 0,
-    holdCount: 0,
-    partPaidCount: 0,
-    totalEmployees: 0,
-    totalRecords: 0,
-    activeEmployees: 0,
-    employeesWithStructure: 0,
-    employeesWithoutStructure: 0,
-    payrollMonth: "",
+    totalAmount: 0, paidAmount: 0, pendingAmount: 0, holdAmount: 0, partPaidAmount: 0,
+    processedCount: 0, pendingCount: 0, paidCount: 0, holdCount: 0, partPaidCount: 0,
+    totalEmployees: 0, totalRecords: 0, activeEmployees: 0,
+    employeesWithStructure: 0, employeesWithoutStructure: 0, payrollMonth: "",
   });
 
-  // Loading states
   const [loading, setLoading] = useState({
-    employees: false,
-    payroll: false,
-    structures: false,
-    slips: false,
-    summary: false,
+    employees: false, payroll: false, structures: false, slips: false, summary: false,
   });
 
-  // Dialog states
   const [isAddingStructure, setIsAddingStructure] = useState(false);
   const [editingStructure, setEditingStructure] = useState<SalaryStructure | null>(null);
-  const [processDialog, setProcessDialog] = useState<{
-    open: boolean;
-    employee: Employee | null;
-  }>({ open: false, employee: null });
-  const [paymentStatusDialog, setPaymentStatusDialog] = useState<{
-    open: boolean;
-    payroll: Payroll | null;
-  }>({ open: false, payroll: null });
-  const [slipDialog, setSlipDialog] = useState<{
-    open: boolean;
-    salarySlip: SalarySlip | null;
-  }>({ open: false, salarySlip: null });
+  const [processDialog, setProcessDialog] = useState<{ open: boolean; employee: Employee | null }>({ open: false, employee: null });
+  const [paymentStatusDialog, setPaymentStatusDialog] = useState<{ open: boolean; payroll: Payroll | null }>({ open: false, payroll: null });
+  const [slipDialog, setSlipDialog] = useState<{ open: boolean; salarySlip: SalarySlip | null }>({ open: false, salarySlip: null });
   const [processAllDialog, setProcessAllDialog] = useState(false);
-  const [deleteDialog, setDeleteDialog] = useState<{
-    open: boolean;
-    structure: SalaryStructure | null;
-  }>({ open: false, structure: null });
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; structure: SalaryStructure | null }>({ open: false, structure: null });
 
   const [paymentStatusForm, setPaymentStatusForm] = useState({
-    status: "paid",
-    paidAmount: "",
-    notes: "",
+    status: "paid", paidAmount: "", notes: "",
     paymentDate: new Date().toISOString().split("T")[0],
   });
 
   const [structureForm, setStructureForm] = useState({
-    employeeId: "",
-    basicSalary: "",
-    hra: "",
-    da: "",
-    specialAllowance: "",
-    conveyance: "",
-    medicalAllowance: "",
-    otherAllowances: "",
-    providentFund: "",
-    professionalTax: "",
-    incomeTax: "",
-    otherDeductions: "",
-    leaveEncashment: "",
-    arrears: "",
-    esic: "",
-    advance: "",
-    mlwf: "",
+    employeeId: "", basicSalary: "", hra: "", da: "", specialAllowance: "",
+    conveyance: "", medicalAllowance: "", otherAllowances: "", providentFund: "",
+    professionalTax: "", incomeTax: "", otherDeductions: "", leaveEncashment: "",
+    arrears: "", esic: "", advance: "", mlwf: "",
   });
   const [payrollItemsPerPage, setPayrollItemsPerPage] = useState(10);
   const [payrollPage, setPayrollPage] = useState(1);
-  // Import structure dialog
+  const [payrollRecordsPage, setPayrollRecordsPage] = useState(1);
+  const [payrollRecordsPerPage, setPayrollRecordsPerPage] = useState(6);
+
   const [importStructureDialogOpen, setImportStructureDialogOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importLoading, setImportLoading] = useState(false);
   const [importPreview, setImportPreview] = useState<any[]>([]);
   const [importValidationResults, setImportValidationResults] = useState<{
-    valid: any[];
-    invalid: any[];
-    missingEmployees: string[];
+    valid: any[]; invalid: any[]; missingEmployees: string[];
   }>({ valid: [], invalid: [], missingEmployees: [] });
   const [importErrors, setImportErrors] = useState<string[]>([]);
-  // ----- SITE FILTERING -----
-  // Filter employees based on selected site
+
+  const [deductionPreview, setDeductionPreview] = useState<{
+    additionalDeductions: number;
+    items: Array<{ type: string; amount: number; description: string; id: string }>;
+  }>({ additionalDeductions: 0, items: [] });
+
+  // ─── Currency formatter (whole rupees, no decimals) ─────────────────
+  const fmtMoney = (n: number | undefined | null): string =>
+    Math.round(n || 0).toLocaleString('en-IN');
+
+  const authHeaders = (): Record<string, string> => {
+    const token = localStorage.getItem('token');
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
+  const [adjustDialog, setAdjustDialog] = useState<{
+    open: boolean;
+    payroll: Payroll | null;
+  }>({ open: false, payroll: null });
+
+  const [adjustForm, setAdjustForm] = useState({
+    amount: "",
+    reason: "",
+  });
+
+  // ─── Bulk selection state ───────────────────────────────────────────
+  const [selectedPayrollIds, setSelectedPayrollIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteDialog, setBulkDeleteDialog] = useState(false);
+  const [bulkStatusDialog, setBulkStatusDialog] = useState(false);
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [bulkDeleteForm, setBulkDeleteForm] = useState({ reason: "" });
+  const [bulkStatusForm, setBulkStatusForm] = useState({
+    status: "paid" as "paid" | "hold" | "pending",
+    paymentDate: new Date().toISOString().split("T")[0],
+  });
+
+  // ─── Site filtering ─────────────────────────────────────────────────
   const siteFilteredEmployees = useMemo(() => {
     if (!selectedSite || selectedSite === 'all') return employees;
     return employees.filter(emp =>
-      emp.site === selectedSite ||
-      emp.siteId === selectedSite ||
+      emp.site === selectedSite || emp.siteId === selectedSite ||
       emp.siteName === selectedSite ||
       sites.some(s => s._id === selectedSite && (s.name === emp.site || s.name === emp.siteName))
     );
   }, [employees, selectedSite, sites]);
 
-  // Convert YYYY-MM to "Month Year"
   const formatMonthYear = (monthStr: string) => {
     if (!monthStr) return '';
     const [year, month] = monthStr.split('-');
@@ -406,31 +240,27 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
     return date.toLocaleString('default', { month: 'long' }) + ' ' + year;
   };
 
-  // Get number of days in a given month (YYYY-MM)
   const getDaysInMonth = (monthStr: string) => {
     if (!monthStr) return 30;
     const [year, month] = monthStr.split('-').map(Number);
     return new Date(year, month, 0).getDate();
   };
-  // Filter payroll records to only those belonging to site-filtered employees
+
   const filteredPayroll = useMemo(() => {
     const empIds = new Set(siteFilteredEmployees.map(e => e.employeeId));
     return payroll.filter(p => empIds.has(p.employeeId));
   }, [payroll, siteFilteredEmployees]);
 
-  // Filter salary structures to only those belonging to site-filtered employees
   const filteredSalaryStructures = useMemo(() => {
     const empIds = new Set(siteFilteredEmployees.map(e => e.employeeId));
     return salaryStructures.filter(s => empIds.has(s.employeeId));
   }, [salaryStructures, siteFilteredEmployees]);
 
-  // Filter salary slips to only those belonging to site-filtered employees
   const filteredSalarySlips = useMemo(() => {
     const empIds = new Set(siteFilteredEmployees.map(e => e.employeeId));
     return salarySlips.filter(s => empIds.has(s.employeeId));
   }, [salarySlips, siteFilteredEmployees]);
 
-  // Derived lists for UI
   const employeesWithStructure = useMemo(() => {
     return siteFilteredEmployees.filter((emp) =>
       filteredSalaryStructures.some((s) => s.employeeId === emp.employeeId)
@@ -451,15 +281,9 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
         employee.department?.toLowerCase().includes(searchTerm.toLowerCase());
 
       if (statusFilter === "all") return matchesSearch;
-
-      const employeeStructure = filteredSalaryStructures.find(
-        (s) => s.employeeId === employee.employeeId
-      );
-      if (statusFilter === "with-structure")
-        return matchesSearch && employeeStructure;
-      if (statusFilter === "without-structure")
-        return matchesSearch && !employeeStructure;
-
+      const employeeStructure = filteredSalaryStructures.find((s) => s.employeeId === employee.employeeId);
+      if (statusFilter === "with-structure") return matchesSearch && employeeStructure;
+      if (statusFilter === "without-structure") return matchesSearch && !employeeStructure;
       return matchesSearch;
     });
   }, [siteFilteredEmployees, searchTerm, statusFilter, filteredSalaryStructures]);
@@ -469,37 +293,57 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
     return filteredEmployees.slice(start, start + payrollItemsPerPage);
   }, [filteredEmployees, payrollPage, payrollItemsPerPage]);
 
-  // ----- FETCH DATA -----
+  const paginatedPayrollRecords = useMemo(() => {
+    const start = (payrollRecordsPage - 1) * payrollRecordsPerPage;
+    return filteredPayroll.slice(start, start + payrollRecordsPerPage);
+  }, [filteredPayroll, payrollRecordsPage, payrollRecordsPerPage]);
+
+  // ─── Bulk selection derived values ──────────────────────────────────
+  const allVisibleSelected = useMemo(() => {
+    if (paginatedPayrollRecords.length === 0) return false;
+    return paginatedPayrollRecords.every((r) => selectedPayrollIds.has(getItemId(r)));
+  }, [paginatedPayrollRecords, selectedPayrollIds]);
+
+  const togglePayrollSelection = (id: string) => {
+    if (!id) return;
+    setSelectedPayrollIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const isPayrollSelected = (id: string) => selectedPayrollIds.has(id);
+
+  const selectAllVisible = () => {
+    const visibleIds = paginatedPayrollRecords.map((r) => getItemId(r)).filter(Boolean);
+    setSelectedPayrollIds(new Set(visibleIds));
+  };
+
+  const clearSelection = () => setSelectedPayrollIds(new Set());
+
+  // ─── Fetch attendance ───────────────────────────────────────────────
   const fetchAttendanceForMonth = async (month: string) => {
     try {
       const [year, monthNum] = month.split('-');
       const startDate = `${year}-${monthNum}-01`;
       const endDate = new Date(Number(year), Number(monthNum), 0).toISOString().split('T')[0];
-
       const response = await axios.get(`${API_URL}/attendance`, {
         params: { startDate, endDate, limit: 10000 }
       });
-
       let records = response.data?.data || response.data || [];
       if (!Array.isArray(records)) records = [];
-
-      const transformed = records.map((r: any) => ({
-        employeeId: r.employeeId,
-        employeeName: r.employeeName,
-        date: r.date,
-        status: r.status,
-        checkIn: r.checkInTime,
-        checkOut: r.checkOutTime,
+      setAttendance(records.map((r: any) => ({
+        employeeId: r.employeeId, employeeName: r.employeeName, date: r.date,
+        status: r.status, checkIn: r.checkInTime, checkOut: r.checkOutTime,
         overtimeHours: r.overtimeHours
-      }));
-
-      setAttendance(transformed);
+      })));
     } catch (error) {
-      console.error('Failed to fetch attendance for payroll:', error);
+      console.error('Failed to fetch attendance:', error);
     }
   };
 
-  // Fetch attendance records for a given month (returns raw array)
   const fetchAttendanceRecordsForMonth = async (month: string): Promise<Attendance[]> => {
     try {
       const [year, monthNum] = month.split('-');
@@ -511,10 +355,8 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
       let records = response.data?.data || response.data || [];
       if (!Array.isArray(records)) records = [];
       return records.map((r: any) => ({
-        employeeId: r.employeeId,
-        employeeName: r.employeeName,
-        date: r.date,
-        status: r.status,
+        employeeId: r.employeeId, employeeName: r.employeeName,
+        date: r.date, status: r.status,
       }));
     } catch (error) {
       console.error('Failed to fetch attendance for month:', month, error);
@@ -522,140 +364,68 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
     }
   };
 
- const computePaidDays = (employeeId: string, month: string, records: Attendance[]): number | null => {
-  const employee = employees.find(e => e.employeeId === employeeId || e._id === employeeId);
-  if (!employee) {
-    console.warn('[computePaidDays] Employee not found for ID:', employeeId);
-    return null;
-  }
-
-  console.log('[computePaidDays] Matching employee:', employee.name, '(_id:', employee._id, 'employeeId:', employee.employeeId, ')');
-  console.log('[computePaidDays] Total attendance records for month:', records.length);
-
-  const monthAttendance = records.filter((a) => {
-    const empIdStr = String(a.employeeId);
-    const empMongoStr = String(employee._id);
-    const empCodeStr = String(employee.employeeId);
-    const nameMatch = a.employeeName?.trim().toLowerCase() === employee.name?.trim().toLowerCase();
-
-    const matches =
-      empIdStr === empMongoStr ||
-      empIdStr === empCodeStr ||
-      nameMatch;
-
-    if (matches) {
-      console.log('[computePaidDays] ✅ Matched record:', a.date, a.status);
-    }
-    return matches && a.date?.startsWith(month);
-  });
-
-  console.log('[computePaidDays] Matched records count:', monthAttendance.length);
-
-  let absentDays = 0, halfDays = 0;
-  monthAttendance.forEach(a => {
-    const status = a.status?.toLowerCase() || '';
-    if (status === 'half-day' || status === 'half day') halfDays++;
-    else if (status !== 'present') absentDays++;
-  });
-
-  const totalDays = getDaysInMonth(month);
-  const paid = totalDays - absentDays - halfDays * 0.5;
-  console.log('[computePaidDays] totalDays:', totalDays, 'absentDays:', absentDays, 'halfDays:', halfDays, 'paid:', paid);
-  return paid;
-};
+  const computePaidDays = (employeeId: string, month: string, records: Attendance[]): number | null => {
+    const employee = employees.find(e => e.employeeId === employeeId || e._id === employeeId);
+    if (!employee) return null;
+    const monthAttendance = records.filter((a) => {
+      const empIdStr = String(a.employeeId);
+      const matches =
+        empIdStr === String(employee._id) ||
+        empIdStr === String(employee.employeeId) ||
+        a.employeeName?.trim().toLowerCase() === employee.name?.trim().toLowerCase();
+      return matches && a.date?.startsWith(month);
+    });
+    let absentDays = 0, halfDays = 0;
+    monthAttendance.forEach(a => {
+      const status = a.status?.toLowerCase() || '';
+      if (status === 'half-day' || status === 'half day') halfDays++;
+      else if (status !== 'present') absentDays++;
+    });
+    return getDaysInMonth(month) - absentDays - halfDays * 0.5;
+  };
 
   const fetchAllData = async () => {
     try {
-      setLoading({
-        employees: true,
-        payroll: true,
-        structures: true,
-        slips: true,
-        summary: true,
-      });
-
-      console.log("Fetching data for month:", selectedMonth);
-
+      setLoading({ employees: true, payroll: true, structures: true, slips: true, summary: true });
       const [employeesRes, payrollRes, structuresRes, slipsRes] = await Promise.all([
         employeeApi.getAll({ status: 'active', limit: 10000 }),
-        payrollApi.getAll({ month: selectedMonth }),
+        payrollApi.getAll({ month: selectedMonth, limit: 10000 }),
         salaryStructureApi.getAll({ isActive: true }),
         salarySlipApi.getAll({ month: selectedMonth }),
       ]);
-
-      console.log('API Responses:', { employeesRes, payrollRes, structuresRes });
-
-      if (employeesRes.success) {
-        setEmployees(employeesRes.data || []);
-      } else {
-        console.warn('No employee data received');
-        setEmployees([]);
-      }
-
-      if (payrollRes.success) {
-        setPayroll(payrollRes.data || []);
-      } else {
-        console.warn('No payroll data received');
-        setPayroll([]);
-      }
-
-      if (structuresRes.success) {
-        setSalaryStructures(structuresRes.data || []);
-      } else {
-        console.warn('No structures data received');
-        setSalaryStructures([]);
-      }
-      if (slipsRes.success) {
-        setSalarySlips(slipsRes.data || []);
-      } else {
-        setSalarySlips([]);
-      }
-
-      // Recalculate summary using filtered data
-      updateSummary(siteFilteredEmployees, filteredPayroll, filteredSalaryStructures);
-
+      if (employeesRes.success) setEmployees(employeesRes.data || []); else setEmployees([]);
+      if (payrollRes.success) setPayroll(payrollRes.data || []); else setPayroll([]);
+      if (structuresRes.success) setSalaryStructures(structuresRes.data || []); else setSalaryStructures([]);
+      if (slipsRes.success) setSalarySlips(slipsRes.data || []); else setSalarySlips([]);
       toast.success('Data loaded successfully');
     } catch (error: any) {
-      console.error("❌ Error in main fetch:", error);
+      console.error("Error fetching data:", error);
       toast.error("Failed to fetch data. Please check your API connection.");
     } finally {
-      setLoading({
-        employees: false,
-        payroll: false,
-        structures: false,
-        slips: false,
-        summary: false,
-      });
+      setLoading({ employees: false, payroll: false, structures: false, slips: false, summary: false });
     }
   };
 
   const updateSummary = (empList: Employee[], payList: Payroll[], structList: SalaryStructure[]) => {
     const totalAmount = payList.reduce((sum, item) => sum + (item.netSalary || 0), 0);
     const paidAmount = payList.reduce((sum, item) => sum + (item.paidAmount || 0), 0);
-
     const pending = payList.filter(p => p.status === 'pending');
     const processed = payList.filter(p => p.status === 'processed');
     const paid = payList.filter(p => p.status === 'paid');
     const hold = payList.filter(p => p.status === 'hold');
     const partPaid = payList.filter(p => p.status === 'part-paid');
-
     const employeesWithStructureCount = empList.filter(emp =>
       structList.some(s => s.employeeId === emp.employeeId)
     ).length;
 
     setPayrollSummary({
-      totalAmount,
-      paidAmount,
+      totalAmount, paidAmount,
       pendingAmount: pending.reduce((sum, p) => sum + (p.netSalary || 0), 0),
       holdAmount: hold.reduce((sum, p) => sum + (p.netSalary || 0), 0),
       partPaidAmount: partPaid.reduce((sum, p) => sum + (p.netSalary || 0), 0),
-      processedCount: processed.length,
-      pendingCount: pending.length,
-      paidCount: paid.length,
-      holdCount: hold.length,
-      partPaidCount: partPaid.length,
-      totalEmployees: empList.length,
-      totalRecords: payList.length,
+      processedCount: processed.length, pendingCount: pending.length,
+      paidCount: paid.length, holdCount: hold.length, partPaidCount: partPaid.length,
+      totalEmployees: empList.length, totalRecords: payList.length,
       activeEmployees: empList.filter(e => e.status === 'active').length,
       employeesWithStructure: employeesWithStructureCount,
       employeesWithoutStructure: empList.length - employeesWithStructureCount,
@@ -663,53 +433,64 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
     });
   };
 
-  // Recalculate summary whenever filtered data changes
   useEffect(() => {
     updateSummary(siteFilteredEmployees, filteredPayroll, filteredSalaryStructures);
   }, [siteFilteredEmployees, filteredPayroll, filteredSalaryStructures]);
 
   useEffect(() => {
-    if (selectedMonth) {
-      fetchAttendanceForMonth(selectedMonth);
-    }
+    if (selectedMonth) fetchAttendanceForMonth(selectedMonth);
   }, [selectedMonth]);
 
+  useEffect(() => { fetchAllData(); }, [selectedMonth]);
+
+  // Clear selection whenever month changes (avoids stale IDs from a different month)
+  useEffect(() => { clearSelection(); }, [selectedMonth]);
+
+  // Fetch deduction preview when process dialog opens
   useEffect(() => {
-    fetchAllData();
-  }, [selectedMonth]);
+    if (processDialog.open && processDialog.employee) {
+      const fetchPreview = async () => {
+        try {
+          const response = await axios.get(`${API_URL}/payroll/preview-deductions`, {
+            params: { employeeId: processDialog.employee?.employeeId, month: selectedMonth },
+          });
+          if (response.data.success) setDeductionPreview(response.data.data);
+          else setDeductionPreview({ additionalDeductions: 0, items: [] });
+        } catch (error) {
+          console.error('Failed to fetch deduction preview:', error);
+          setDeductionPreview({ additionalDeductions: 0, items: [] });
+        }
+      };
+      fetchPreview();
+    } else {
+      setDeductionPreview({ additionalDeductions: 0, items: [] });
+    }
+  }, [processDialog.open, processDialog.employee, selectedMonth]);
+
   useEffect(() => {
     const compute = async () => {
-      if (!slipDialog.salarySlip) {
-        setSlipPaidDays(null);
-        return;
-      }
+      if (!slipDialog.salarySlip) { setSlipPaidDays(null); return; }
       const slip = slipDialog.salarySlip;
-      // If the slip month matches the currently selected month, reuse the already-fetched attendance
       const records = (slip.month === selectedMonth && attendance.length > 0)
         ? attendance
         : await fetchAttendanceRecordsForMonth(slip.month);
-
       const paid = computePaidDays(slip.employeeId, slip.month, records);
       setSlipPaidDays(paid);
     };
     compute();
   }, [slipDialog.salarySlip, selectedMonth, attendance, employees]);
-  // ----- HELPER FUNCTIONS -----
+
+  // ─── Helper functions ───────────────────────────────────────────────
   const getEmployeeAttendance = (employeeId: string) => {
-    const employee = employees.find(e =>
-      e.employeeId === employeeId || e._id === employeeId
-    );
-    if (!employee) {
-      return { presentDays: 0, absentDays: 0, halfDays: 0, totalWorkingDays: 22 };
-    }
+    const employee = employees.find(e => e.employeeId === employeeId || e._id === employeeId);
+    if (!employee) return { presentDays: 0, absentDays: 0, halfDays: 0, totalWorkingDays: 22 };
 
     const monthAttendance = attendance.filter((a) => {
       const matchesEmpId =
         a.employeeId === employee._id ||
         a.employeeId === employee.employeeId ||
-        (a.employeeName?.trim().toLowerCase() === employee.name?.trim().toLowerCase()); // ✅ fallback
-      const matchesMonth = a.date?.startsWith(selectedMonth);
-      return matchesEmpId && matchesMonth;
+        (a.employeeName?.trim().toLowerCase() === employee.name?.trim().toLowerCase());
+      return matchesEmpId && a.date?.startsWith(selectedMonth);
     });
 
     let presentDays = 0, absentDays = 0, halfDays = 0;
@@ -717,124 +498,84 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
       const status = a.status?.toLowerCase() || '';
       if (status === 'present') presentDays++;
       else if (status === 'half-day' || status === 'half day') halfDays++;
-      else if (status === 'leave' || status === 'absent') absentDays++;
       else absentDays++;
     });
-
     return { presentDays, absentDays, halfDays, totalWorkingDays: 22 };
   };
 
-  const getEmployeeLeaves = (employeeId: string) => 0; // counted as absent
+  const getEmployeeLeaves = (_: string) => 0;
 
   const calculateSalary = (employeeId: string, structure: SalaryStructure) => {
     if (!structure || !structure.basicSalary) return 0;
-
     const attendance = getEmployeeAttendance(employeeId);
     const totalLeaves = getEmployeeLeaves(employeeId);
-
     const totalWorkingDays = attendance.totalWorkingDays;
     if (totalWorkingDays === 0) return 0;
 
     const dailyRate = structure.basicSalary / totalWorkingDays;
     const halfDayRate = dailyRate / 2;
-
     const earnedBasicSalary = attendance.presentDays * dailyRate + attendance.halfDays * halfDayRate;
     const salaryLoss = attendance.absentDays * dailyRate + totalLeaves * dailyRate;
     const netBasicSalary = Math.max(0, earnedBasicSalary - salaryLoss);
 
     const totalAllowances =
       (structure.hra || 0) + (structure.da || 0) + (structure.specialAllowance || 0) +
-      (structure.conveyance || 0) + (structure.medicalAllowance || 0) + (structure.otherAllowances || 0) +
-      (structure.leaveEncashment || 0) + (structure.arrears || 0);
+      (structure.conveyance || 0) + (structure.medicalAllowance || 0) +
+      (structure.otherAllowances || 0) + (structure.leaveEncashment || 0) + (structure.arrears || 0);
 
     const totalDeductions =
       (structure.providentFund || 0) + (structure.professionalTax || 0) +
       (structure.incomeTax || 0) + (structure.otherDeductions || 0) +
       (structure.esic || 0) + (structure.advance || 0) + (structure.mlwf || 0);
 
-    const netSalary = netBasicSalary + totalAllowances - totalDeductions;
-    return Math.max(0, netSalary);
+    return Math.max(0, netBasicSalary + totalAllowances - totalDeductions);
   };
+
   const getPayrollCalculationDetails = (employeeId: string) => {
     const structure = filteredSalaryStructures.find((s) => s.employeeId === employeeId);
     if (!structure) return null;
-
     const attendance = getEmployeeAttendance(employeeId);
     const totalLeaves = getEmployeeLeaves(employeeId);
-    const calculatedSalary = structure ? calculateSalary(employeeId, structure) : 0;
+    const calculatedSalary = calculateSalary(employeeId, structure);
     const totalAllowances =
       (structure.hra || 0) + (structure.da || 0) + (structure.specialAllowance || 0) +
-      (structure.conveyance || 0) + (structure.medicalAllowance || 0) + (structure.otherAllowances || 0) +
-      (structure.leaveEncashment || 0) + (structure.arrears || 0);
+      (structure.conveyance || 0) + (structure.medicalAllowance || 0) +
+      (structure.otherAllowances || 0) + (structure.leaveEncashment || 0) + (structure.arrears || 0);
     const totalDeductions =
       (structure.providentFund || 0) + (structure.professionalTax || 0) +
       (structure.incomeTax || 0) + (structure.otherDeductions || 0) +
       (structure.esic || 0) + (structure.advance || 0) + (structure.mlwf || 0);
-
     const dailyRate = structure.basicSalary / attendance.totalWorkingDays;
     const basicSalaryEarned = attendance.presentDays * dailyRate + (attendance.halfDays * dailyRate) / 2;
     const salaryDeductions = attendance.absentDays * dailyRate + totalLeaves * dailyRate;
     const netBasicSalary = basicSalaryEarned - salaryDeductions;
 
-    // ─── ADD DEDUCTION BREAKDOWN (PLACEHOLDER) ──────────────────────────────
-    // TODO: Fetch real deductions from API /state and include them here.
-    // For now, this is a placeholder – it will not show any items.
-    const deductionBreakdown = {
-      additionalDeductions: 0,
-      items: [] as Array<{ type: string; amount: number; description: string }>
-    };
-
     return {
-      structure,
-      attendance,
-      totalLeaves,
-      calculatedSalary,
-      totalAllowances,
-      totalDeductions,
-      dailyRate,
-      basicSalaryEarned,
-      salaryDeductions,
-      netBasicSalary,
-      deductionBreakdown, // ✅ Added this property
+      structure, attendance, totalLeaves, calculatedSalary, totalAllowances,
+      totalDeductions, dailyRate, basicSalaryEarned, salaryDeductions, netBasicSalary,
     };
   };
 
-  // ----- ACTION HANDLERS -----
+  // ─── Action handlers ────────────────────────────────────────────────
   const handleProcessPayroll = async (employeeId: string) => {
     const employee = siteFilteredEmployees.find((e) => e.employeeId === employeeId);
-    if (!employee) {
-      toast.error("Employee not found");
-      return;
-    }
-
+    if (!employee) { toast.error("Employee not found"); return; }
     const structure = filteredSalaryStructures.find((s) => s.employeeId === employeeId);
-    if (!structure) {
-      toast.error("Salary structure not found for this employee");
-      return;
-    }
-
-    const existingPayroll = filteredPayroll.find(
-      (p) => p.employeeId === employeeId && p.month === selectedMonth
-    );
-    if (existingPayroll) {
-      toast.error("Payroll already processed for this employee for " + selectedMonth);
-      return;
-    }
+    if (!structure) { toast.error("Salary structure not found"); return; }
+    const existingPayroll = filteredPayroll.find(p => p.employeeId === employeeId && p.month === selectedMonth);
+    if (existingPayroll) { toast.error("Payroll already processed for " + selectedMonth); return; }
 
     const attendanceData = getEmployeeAttendance(employeeId);
     const leavesCount = getEmployeeLeaves(employeeId);
     const calculatedSalary = calculateSalary(employeeId, structure);
 
     const payrollData = {
-      employeeId,
-      month: selectedMonth,
+      employeeId, month: selectedMonth,
       basicSalary: structure.basicSalary,
-      allowances:
-        (structure.hra || 0) + (structure.da || 0) + (structure.specialAllowance || 0) +
-        (structure.conveyance || 0) + (structure.medicalAllowance || 0) + (structure.otherAllowances || 0) +
-        (structure.leaveEncashment || 0) + (structure.arrears || 0),
-      deductions:
-        (structure.providentFund || 0) + (structure.professionalTax || 0) +
+      allowances: (structure.hra || 0) + (structure.da || 0) + (structure.specialAllowance || 0) +
+        (structure.conveyance || 0) + (structure.medicalAllowance || 0) +
+        (structure.otherAllowances || 0) + (structure.leaveEncashment || 0) + (structure.arrears || 0),
+      deductions: (structure.providentFund || 0) + (structure.professionalTax || 0) +
         (structure.incomeTax || 0) + (structure.otherDeductions || 0) +
         (structure.esic || 0) + (structure.advance || 0) + (structure.mlwf || 0),
       netSalary: calculatedSalary,
@@ -843,105 +584,61 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
       absentDays: attendanceData.absentDays,
       halfDays: attendanceData.halfDays,
       leaves: leavesCount,
-      paidAmount: 0,
-      paymentStatus: "pending",
-      da: structure.da,
-      hra: structure.hra,
-      providentFund: structure.providentFund,
-      professionalTax: structure.professionalTax,
-      esic: structure.esic,
-      advance: structure.advance,
-      mlwf: structure.mlwf,
-      leaveEncashment: structure.leaveEncashment,
-      arrears: structure.arrears,
-      createdBy: "system",
-      updatedBy: "system",
+      paidAmount: 0, paymentStatus: "pending",
+      da: structure.da, hra: structure.hra,
+      providentFund: structure.providentFund, professionalTax: structure.professionalTax,
+      esic: structure.esic, advance: structure.advance, mlwf: structure.mlwf,
+      leaveEncashment: structure.leaveEncashment, arrears: structure.arrears,
+      createdBy: "system", updatedBy: "system",
       employeeDetails: {
-        accountNumber: employee.accountNumber,
-        ifscCode: employee.ifscCode,
-        bankBranch: employee.bankBranch,
-        bankName: employee.bankName,
-        aadharNumber: employee.aadharNumber,
-        panNumber: employee.panNumber,
-        esicNumber: employee.esicNumber,
-        uanNumber: employee.uanNumber,
-        permanentAddress: employee.permanentAddress,
-        localAddress: employee.localAddress,
+        accountNumber: employee.accountNumber, ifscCode: employee.ifscCode,
+        bankBranch: employee.bankBranch, bankName: employee.bankName,
+        aadharNumber: employee.aadharNumber, panNumber: employee.panNumber,
+        esicNumber: employee.esicNumber, uanNumber: employee.uanNumber,
+        permanentAddress: employee.permanentAddress, localAddress: employee.localAddress,
       },
     };
 
     try {
       const response = await payrollApi.process(payrollData);
       if (response.success) {
-        toast.success("Payroll processed successfully", {
-          description: `Salary processed for ${employee.name}`,
-        });
-        if (response.data) {
-          setPayroll((prev) => [...prev, response.data!]);
-        }
+        toast.success("Payroll processed successfully", { description: `Salary processed for ${employee.name}` });
+        if (response.data) setPayroll((prev) => [...prev, response.data!]);
         setProcessDialog({ open: false, employee: null });
         fetchAllData();
       } else {
         toast.error(response.message || "Failed to process payroll");
       }
     } catch (error: any) {
-      console.error("Error processing payroll:", error);
       toast.error(error.response?.data?.message || "Failed to process payroll");
     }
   };
 
   const handleUpdatePaymentStatus = async () => {
-    if (!paymentStatusDialog.payroll) {
-      toast.error("Payroll is missing");
-      return;
-    }
-
+    if (!paymentStatusDialog.payroll) { toast.error("Payroll is missing"); return; }
     const payrollId = getItemId(paymentStatusDialog.payroll);
-    if (!payrollId) {
-      toast.error("Payroll ID is missing");
-      return;
-    }
+    if (!payrollId) { toast.error("Payroll ID is missing"); return; }
 
     if (paymentStatusForm.status === "part-paid") {
       const paidAmount = parseFloat(paymentStatusForm.paidAmount);
-      if (isNaN(paidAmount) || paidAmount <= 0) {
-        toast.error("Please enter a valid paid amount for part-paid status");
-        return;
-      }
-      if (paidAmount > (paymentStatusDialog.payroll.netSalary || 0)) {
-        toast.error("Paid amount cannot exceed net salary");
-        return;
-      }
+      if (isNaN(paidAmount) || paidAmount <= 0) { toast.error("Enter a valid paid amount"); return; }
+      if (paidAmount > (paymentStatusDialog.payroll.netSalary || 0)) { toast.error("Paid amount exceeds net salary"); return; }
     }
-
-    if (
-      (paymentStatusForm.status === "paid" || paymentStatusForm.status === "part-paid") &&
-      !paymentStatusForm.paymentDate
-    ) {
-      toast.error("Payment date is required");
-      return;
+    if ((paymentStatusForm.status === "paid" || paymentStatusForm.status === "part-paid") && !paymentStatusForm.paymentDate) {
+      toast.error("Payment date is required"); return;
     }
-
     try {
       const response = await payrollApi.updatePaymentStatus(payrollId, paymentStatusForm);
       if (response.success) {
-        toast.success("Payment status updated", {
-          description: `Updated to ${paymentStatusForm.status} for ${paymentStatusDialog.payroll?.employee?.name}`,
-        });
-        setPayroll((prev) =>
-          prev.map((p) => {
-            const pId = getItemId(p);
-            if (pId === payrollId && response.data) {
-              return { ...p, ...response.data };
-            }
-            return p;
-          })
-        );
+        toast.success("Payment status updated");
+        setPayroll((prev) => prev.map((p) => {
+          const pId = getItemId(p);
+          if (pId === payrollId && response.data) return { ...p, ...response.data };
+          return p;
+        }));
         setPaymentStatusDialog({ open: false, payroll: null });
         setPaymentStatusForm({
-          status: "paid",
-          paidAmount: "",
-          notes: "",
+          status: "paid", paidAmount: "", notes: "",
           paymentDate: new Date().toISOString().split("T")[0],
         });
         fetchAllData();
@@ -949,17 +646,14 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
         toast.error(response.message || "Failed to update payment status");
       }
     } catch (error: any) {
-      console.error("Error updating payment status:", error);
       toast.error(error.response?.data?.message || "Failed to update payment status");
     }
   };
 
   const handleProcessAllPayroll = async () => {
     if (employeesWithStructure.length === 0) {
-      toast.error("No employees with salary structures found for selected site");
-      return;
+      toast.error("No employees with salary structures found"); return;
     }
-
     try {
       const employeeIds = employeesWithStructure.map((emp) => emp.employeeId);
       const attendanceMap: any = {};
@@ -967,20 +661,11 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
         const att = getEmployeeAttendance(employee.employeeId);
         const leaves = getEmployeeLeaves(employee.employeeId);
         attendanceMap[employee.employeeId] = {
-          presentDays: att.presentDays,
-          absentDays: att.absentDays,
-          halfDays: att.halfDays,
-          leaves,
-          totalWorkingDays: att.totalWorkingDays,
+          presentDays: att.presentDays, absentDays: att.absentDays,
+          halfDays: att.halfDays, leaves, totalWorkingDays: att.totalWorkingDays,
         };
       }
-
-      const response = await payrollApi.bulkProcess({
-        month: selectedMonth,
-        employeeIds,
-        attendanceMap,
-      });
-
+      const response = await payrollApi.bulkProcess({ month: selectedMonth, employeeIds, attendanceMap });
       if (response.success) {
         toast.success(`Payroll processed for ${response.results?.length || 0} employees`);
         setProcessAllDialog(false);
@@ -989,26 +674,15 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
         toast.error(response.message || "Failed to process payroll");
       }
     } catch (error: any) {
-      console.error("Error processing bulk payroll:", error);
       toast.error(error.response?.data?.message || "Failed to process payroll");
     }
   };
 
   const handleAddStructure = async () => {
-    if (!structureForm.employeeId) {
-      toast.error("Please select an employee");
-      return;
-    }
-
+    if (!structureForm.employeeId) { toast.error("Please select an employee"); return; }
     try {
-      const employee = siteFilteredEmployees.find(
-        (e) => e.employeeId === structureForm.employeeId
-      );
-      if (!employee) {
-        toast.error("Employee not found");
-        return;
-      }
-
+      const employee = siteFilteredEmployees.find((e) => e.employeeId === structureForm.employeeId);
+      if (!employee) { toast.error("Employee not found"); return; }
       const salaryStructureData = {
         employeeId: structureForm.employeeId,
         basicSalary: parseFloat(structureForm.basicSalary) || employee.salary || 0,
@@ -1029,12 +703,9 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
         mlwf: parseFloat(structureForm.mlwf) || 0,
         isActive: true,
       };
-
       const response = await salaryStructureApi.create(salaryStructureData);
       if (response.success) {
-        toast.success("Salary structure added", {
-          description: `Structure configured for ${employee.name}`,
-        });
+        toast.success("Salary structure added", { description: `Structure configured for ${employee.name}` });
         setSalaryStructures((prev) => [...prev, response.data!]);
         setIsAddingStructure(false);
         resetStructureForm();
@@ -1043,14 +714,12 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
         toast.error(response.message || "Failed to add salary structure");
       }
     } catch (error: any) {
-      console.error("Error adding salary structure:", error);
       toast.error(error.response?.data?.message || "Failed to add salary structure");
     }
   };
 
   const handleUpdateStructure = async () => {
     if (!editingStructure) return;
-
     try {
       const updates = {
         basicSalary: parseFloat(structureForm.basicSalary) || 0,
@@ -1070,22 +739,14 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
         advance: parseFloat(structureForm.advance) || 0,
         mlwf: parseFloat(structureForm.mlwf) || 0,
       };
-
-      const response = await salaryStructureApi.update(
-        getItemId(editingStructure),
-        updates
-      );
+      const response = await salaryStructureApi.update(getItemId(editingStructure), updates);
       if (response.success) {
         toast.success("Salary structure updated successfully");
-        setSalaryStructures((prev) =>
-          prev.map((s) => {
-            const sId = getItemId(s);
-            if (sId === getItemId(editingStructure) && response.data) {
-              return response.data!;
-            }
-            return s;
-          })
-        );
+        setSalaryStructures((prev) => prev.map((s) => {
+          const sId = getItemId(s);
+          if (sId === getItemId(editingStructure) && response.data) return response.data!;
+          return s;
+        }));
         setEditingStructure(null);
         resetStructureForm();
         fetchAllData();
@@ -1093,17 +754,12 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
         toast.error(response.message || "Failed to update salary structure");
       }
     } catch (error: any) {
-      console.error("Error updating salary structure:", error);
       toast.error(error.response?.data?.message || "Failed to update salary structure");
     }
   };
 
   const handleDeleteStructure = async (id: string) => {
-    if (!id) {
-      toast.error("Structure ID is missing");
-      return;
-    }
-
+    if (!id) { toast.error("Structure ID is missing"); return; }
     try {
       const response = await salaryStructureApi.delete(id);
       if (response.success) {
@@ -1115,7 +771,6 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
         toast.error(response.message || "Failed to delete salary structure");
       }
     } catch (error: any) {
-      console.error("Error deleting salary structure:", error);
       toast.error(error.response?.data?.message || "Failed to delete salary structure");
     }
   };
@@ -1144,11 +799,7 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
   };
 
   const handleGenerateSalarySlip = async (payrollId: string) => {
-    if (!payrollId) {
-      toast.error("Payroll ID is missing");
-      return;
-    }
-
+    if (!payrollId) { toast.error("Payroll ID is missing"); return; }
     try {
       const response = await salarySlipApi.generate({ payrollId });
       if (response.success) {
@@ -1164,17 +815,289 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
       const existingSlip = error.response?.data?.data;
       if (error.response?.status === 400 && existingSlip) {
         setSalarySlips((prev) => {
-          if (!prev.find(s => s._id === existingSlip._id)) {
-            return [...prev, existingSlip];
-          }
+          if (!prev.find(s => s._id === existingSlip._id)) return [...prev, existingSlip];
           return prev;
         });
         setSlipDialog({ open: true, salarySlip: existingSlip });
-        toast.info("Salary slip already exists, showing it");
+        toast.info("Salary slip already exists");
         return;
       }
-      console.error("Error generating salary slip:", error);
       toast.error(error.response?.data?.message || "Failed to generate salary slip");
+    }
+  };
+
+  // ─── DELETE SALARY SLIP ─────────────────────────────────────────────
+  const handleDeleteSlip = async () => {
+    if (!slipDialog.salarySlip) return;
+    const slipId = getItemId(slipDialog.salarySlip);
+    if (!slipId) {
+      toast.error("Salary slip ID is missing");
+      return;
+    }
+
+    if (!confirm(
+      "Delete this salary slip?\n\n" +
+      "You can regenerate it after re-processing the payroll."
+    )) return;
+
+    try {
+      const response = await axios.delete(
+        `${API_URL}/salary-slips/${slipId}`,
+        { headers: authHeaders() }
+      );
+      if (response.data.success) {
+        toast.success("Salary slip deleted");
+        setSlipDialog({ open: false, salarySlip: null });
+        fetchAllData();
+      } else {
+        toast.error(response.data.message || "Failed to delete slip");
+      }
+    } catch (error: any) {
+      console.error("Error deleting salary slip:", error);
+      toast.error(error.response?.data?.message || "Failed to delete salary slip");
+    }
+  };
+
+  // ─── OPEN ADJUST DIALOG ─────────────────────────────────────────────
+  const handleOpenAdjust = (payroll: Payroll) => {
+    setAdjustDialog({ open: true, payroll });
+    setAdjustForm({ amount: "", reason: "" });
+  };
+
+  // ─── SAVE ADJUSTMENT ────────────────────────────────────────────────
+  const handleSaveAdjustment = async () => {
+    if (!adjustDialog.payroll) return;
+    const payrollId = getItemId(adjustDialog.payroll);
+    if (!payrollId) { toast.error("Payroll ID missing"); return; }
+
+    const amount = parseFloat(adjustForm.amount);
+    if (isNaN(amount) || amount === 0) {
+      toast.error("Amount must be non-zero");
+      return;
+    }
+    if (!adjustForm.reason || adjustForm.reason.trim().length < 3) {
+      toast.error("Please enter a reason (min 3 characters)");
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `${API_URL}/payroll/${payrollId}/adjust`,
+        { amount, reason: adjustForm.reason.trim() },
+        { headers: authHeaders() }
+      );
+      if (response.data.success) {
+        toast.success("Adjustment added", {
+          description: `New net salary: ₹${fmtMoney(response.data.newNetSalary)}`,
+        });
+        setAdjustDialog({ open: false, payroll: null });
+        setAdjustForm({ amount: "", reason: "" });
+        fetchAllData();
+      } else {
+        toast.error(response.data.message || "Failed to add adjustment");
+      }
+    } catch (error: any) {
+      console.error("Error adding adjustment:", error);
+      toast.error(error.response?.data?.message || "Failed to add adjustment");
+    }
+  };
+
+  // ─── REMOVE ADJUSTMENT ──────────────────────────────────────────────
+  const handleRemoveAdjustment = async (payrollId: string, index: number) => {
+    if (!confirm("Remove this adjustment? Net salary will be recalculated.")) return;
+    try {
+      const response = await axios.delete(
+        `${API_URL}/payroll/${payrollId}/adjust/${index}`,
+        { headers: authHeaders() }
+      );
+      if (response.data.success) {
+        toast.success("Adjustment removed");
+        fetchAllData();
+      } else {
+        toast.error(response.data.message || "Failed to remove adjustment");
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to remove adjustment");
+    }
+  };
+
+  // ─── BULK DELETE ────────────────────────────────────────────────────
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedPayrollIds);
+    if (ids.length === 0) { toast.error("No records selected"); return; }
+
+    setBulkActionLoading(true);
+    try {
+      const response = await axios.post(
+        `${API_URL}/payroll/bulk-delete`,
+        { ids, reason: bulkDeleteForm.reason.trim() },
+        { headers: authHeaders() }
+      );
+
+      if (response.data.success) {
+        const { deleted, skipped, errors } = response.data.data;
+        toast.success(`Deleted ${deleted} record(s)`, {
+          description: [
+            skipped.length > 0 ? `${skipped.length} skipped (slip exists)` : '',
+            errors.length > 0 ? `${errors.length} failed` : '',
+          ].filter(Boolean).join(' · ') || undefined,
+        });
+        setBulkDeleteDialog(false);
+        setBulkDeleteForm({ reason: "" });
+        clearSelection();
+        fetchAllData();
+      } else {
+        toast.error(response.data.message || "Bulk delete failed");
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Bulk delete failed");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  // ─── BULK PAYMENT STATUS ────────────────────────────────────────────
+  const handleBulkPaymentStatus = async () => {
+    const ids = Array.from(selectedPayrollIds);
+    if (ids.length === 0) { toast.error("No records selected"); return; }
+
+    setBulkActionLoading(true);
+    try {
+      const response = await axios.post(
+        `${API_URL}/payroll/bulk-payment-status`,
+        {
+          ids,
+          status: bulkStatusForm.status,
+          paymentDate: bulkStatusForm.status === 'paid' ? bulkStatusForm.paymentDate : undefined,
+        },
+        { headers: authHeaders() }
+      );
+
+      if (response.data.success) {
+        toast.success(response.data.message);
+        setBulkStatusDialog(false);
+        clearSelection();
+        fetchAllData();
+      } else {
+        toast.error(response.data.message || "Bulk status update failed");
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Bulk status update failed");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  // ─── BULK GENERATE SLIPS ────────────────────────────────────────────
+  const handleBulkGenerateSlips = async () => {
+    const ids = Array.from(selectedPayrollIds);
+    if (ids.length === 0) { toast.error("No records selected"); return; }
+
+    setBulkActionLoading(true);
+    try {
+      const response = await axios.post(
+        `${API_URL}/payroll/bulk-generate-slips`,
+        { ids },
+        { headers: authHeaders() }
+      );
+
+      if (response.data.success) {
+        const { generated, skipped } = response.data.data;
+        toast.success(`Generated ${generated} slip(s)`, {
+          description: skipped.length > 0 ? `${skipped.length} skipped (already exist)` : undefined,
+        });
+        clearSelection();
+        fetchAllData();
+      } else {
+        toast.error(response.data.message || "Bulk generate failed");
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Bulk generate failed");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  // ─── DELETE PAYROLL RECORD ──────────────────────────────────────────
+  const handleDeletePayroll = async (payrollId: string) => {
+    if (!payrollId) {
+      toast.error("Payroll ID is missing");
+      return;
+    }
+
+    const slip = filteredSalarySlips.find(s => s.payrollId === payrollId);
+    if (slip) {
+      toast.error("Cannot delete payroll — salary slip exists", {
+        description: "Delete the salary slip first (open it → Delete Slip).",
+      });
+      return;
+    }
+
+    if (!confirm(
+      "Delete this payroll record?\n\n" +
+      "• Consumed fines will be marked as ACTIVE again.\n" +
+      "• Advance repayments will be reversed.\n" +
+      "• You can re-process payroll afterward."
+    )) return;
+
+    try {
+      const response = await axios.delete(
+        `${API_URL}/payroll/${payrollId}`,
+        { headers: authHeaders() }
+      );
+      if (response.data.success) {
+        toast.success("Payroll record deleted", {
+          description: "Consumed deductions/advances have been reversed.",
+        });
+        fetchAllData();
+      } else {
+        toast.error(response.data.message || "Failed to delete payroll");
+      }
+    } catch (error: any) {
+      console.error("Error deleting payroll:", error);
+      toast.error(error.response?.data?.message || "Failed to delete payroll");
+    }
+  };
+
+  // ─── REPROCESS PAYROLL (Delete + Recreate) ──────────────────────────
+  const handleReprocessPayroll = async (payrollId: string, employee: Employee) => {
+    if (!payrollId) {
+      toast.error("Payroll ID is missing");
+      return;
+    }
+
+    const slip = filteredSalarySlips.find(s => s.payrollId === payrollId);
+    if (slip) {
+      toast.error("Cannot reprocess — salary slip exists", {
+        description: "Delete the salary slip first (open it → Delete Slip).",
+      });
+      return;
+    }
+
+    if (!confirm(
+      `Reprocess payroll for ${employee.name}?\n\n` +
+      "This will:\n" +
+      "• Delete the current payroll record\n" +
+      "• Reverse any consumed fines/advances\n" +
+      "• You can then process fresh payroll with the latest data."
+    )) return;
+
+    try {
+      const response = await axios.delete(
+        `${API_URL}/payroll/${payrollId}`,
+        { headers: authHeaders() }
+      );
+      if (response.data.success) {
+        toast.success("Payroll removed — ready to reprocess", {
+          description: `Click "Process Salary" for ${employee.name} to create a fresh record.`,
+        });
+        fetchAllData();
+      } else {
+        toast.error(response.data.message || "Failed to reprocess payroll");
+      }
+    } catch (error: any) {
+      console.error("Error reprocessing payroll:", error);
+      toast.error(error.response?.data?.message || "Failed to reprocess payroll");
     }
   };
 
@@ -1182,204 +1105,217 @@ const PayrollTab = ({ selectedMonth, setSelectedMonth, selectedSite, sites }: Pa
     setSlipDialog({ open: true, salarySlip });
   };
 
+  // ─── PRINT SALARY SLIP ──────────────────────────────────────────────
   const handlePrintSalarySlip = () => {
     if (!slipDialog.salarySlip) return;
 
     const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      const employee = siteFilteredEmployees.find(
-        (e) => e.employeeId === slipDialog.salarySlip!.employeeId
-      );
-      if (!employee) return;
+    if (!printWindow) { toast.error("Please allow popups for this site"); return; }
 
-      const structure = salaryStructures.find(
-        (s) => s.employeeId === slipDialog.salarySlip!.employeeId
-      ) || salaryStructures.find(
-        (s) => s.employeeId === employee?._id
-      );
+    const employee = siteFilteredEmployees.find(
+      (e) => e.employeeId === slipDialog.salarySlip!.employeeId
+    );
+    if (!employee) return;
 
-      const printContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-         
-          <style>
-           @page {
-  size: A4 portrait;
-  margin: 10mm;
-}
-* {
-  box-sizing: border-box;
-}
-body {
-  font-family: Arial, sans-serif;
-  margin: 0;
-  padding: 0;
-  background: #fff;
-}
-/* Remove any fixed-width containers; they will inherit full page width */
-.header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
-.company-name { font-size: 24px; font-weight: bold; }
-.slip-title { font-size: 20px; }
-.employee-info { display: flex; justify-content: space-between; margin-bottom: 20px; }
-.section { margin-bottom: 20px; }
-.section-title { font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 10px; }
-.breakdown { width: 100%; border-collapse: collapse; }
-.breakdown td { padding: 8px; border-bottom: 1px solid #eee; }
-.breakdown .amount { text-align: right; }
-.total { font-weight: bold; border-top: 2px solid #333; }
-.attendance-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; margin-top: 20px; }
-.attendance-item { padding: 10px; border-radius: 5px; }
-.present { background: #d1fae5; color: #065f46; }
-.absent { background: #fee2e2; color: #991b1b; }
-.half-day { background: #fef3c7; color: #92400e; }
-.leaves { background: #dbeafe; color: #1e40af; }
-@media print { body { margin: 0; } }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="company-name">S K ENTERPRISES</div>
-            <div class="slip-title">SALARY SLIP</div>
-            <div>Period: ${formatMonthYear(slipDialog.salarySlip.month)}</div>
-            <div>Wages Slip Rule 27(2) Maharashtra Minimum Wages Rules, 1963</div>
-          </div>
-          
-          <div class="employee-info">
-          <div>
-  <strong>Name:</strong> ${employee.name}<br>
-  <strong>Employee ID:</strong> ${employee.employeeId}<br>
-  <strong>Department:</strong> ${employee.department}<br>
-  <strong>Designation:</strong> ${employee.position || "N/A"}<br>
-  <strong>Site:</strong> ${employee.siteName || employee.site || "N/A"}<br>
-  <strong>UAN:</strong> ${employee.uanNumber || "N/A"}<br>
-  <strong>ESIC:</strong> ${employee.esicNumber || "N/A"}<br>
-  <strong>Bank Account:</strong> ${employee.accountNumber || "N/A"}<br>
-  <strong>Bank:</strong> ${employee.bankName || "N/A"} - ${employee.bankBranch || "N/A"}<br>
+    const slip = slipDialog.salarySlip;
 
-<strong>Paid Days:</strong> ${slipPaidDays !== null ? slipPaidDays : getDaysInMonth(slipDialog.salarySlip.month) - slipDialog.salarySlip.absentDays - (slipDialog.salarySlip.halfDays || 0) * 0.5}
-</div>
-</div>
+    const payrollRecord = filteredPayroll.find(
+      (p) => p.employeeId === slip.employeeId && p.month === slip.month
+    );
+    const structure = salaryStructures.find((s) => s.employeeId === slip.employeeId);
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-            <!-- Earnings Section -->
-            <div class="section">
-              <div class="section-title">EARNINGS</div>
-              <table class="breakdown">
-                <tr><td>BASIC</td><td class="amount">₹${slipDialog.salarySlip.basicSalary.toLocaleString()}</td></tr>
-                <tr><td>DA</td><td class="amount">₹${(structure?.da || 0).toLocaleString()}</td></tr>
-                <tr><td>HRA</td><td class="amount">₹${(structure?.hra || 0).toLocaleString()}</td></tr>
-                <tr><td>CCA</td><td class="amount">₹${(structure?.conveyance || 0).toLocaleString()}</td></tr>
-                <tr><td>BONUS</td><td class="amount">₹${(structure?.specialAllowance || 0).toLocaleString()}</td></tr>
-                <tr><td>LEAVE</td><td class="amount">₹${(structure?.leaveEncashment || 0).toLocaleString()}</td></tr>
-                <tr><td>MEDICAL</td><td class="amount">₹${(structure?.medicalAllowance || 0).toLocaleString()}</td></tr>
-                <tr><td>ARREARS</td><td class="amount">₹${(structure?.arrears || 0).toLocaleString()}</td></tr>
-                <tr><td>OTHER ALL</td><td class="amount">₹${(structure?.otherAllowances || 0).toLocaleString()}</td></tr>
-                <tr class="total">
-                  <td><strong>GROSS TOTAL</strong></td>
-                  <td class="amount"><strong>₹${slipDialog.salarySlip.allowances.toLocaleString()}</strong></td>
-                </tr>
+    const pf = payrollRecord?.providentFund ?? structure?.providentFund ?? 0;
+    const esic = payrollRecord?.esic ?? structure?.esic ?? 0;
+    const pt = payrollRecord?.professionalTax ?? structure?.professionalTax ?? 0;
+    const mlwf = payrollRecord?.mlwf ?? structure?.mlwf ?? 0;
+    const structureAdv = payrollRecord?.advance ?? structure?.advance ?? 0;
+
+    const items = payrollRecord?.deductionBreakdown?.items || [];
+    const advanceTotal = items.filter(i => i.type === 'advance').reduce((s, i) => s + i.amount, 0);
+    const fineTotal = items.filter(i => i.type === 'fine').reduce((s, i) => s + i.amount, 0);
+    const otherTotal = items.filter(i => i.type === 'other').reduce((s, i) => s + i.amount, 0);
+
+    const totalDeductions = pf + esic + pt + mlwf + structureAdv + advanceTotal + fineTotal + otherTotal;
+    const grossTotal = (slip.basicSalary || 0) + (slip.allowances || 0);
+    const paidDays = slip.presentDays ?? slipPaidDays ?? 0;
+
+    const [year, monthNum] = slip.month.split('-');
+    const monthLabel = new Date(parseInt(year), parseInt(monthNum) - 1)
+      .toLocaleString('default', { month: 'short', year: '2-digit' }).toUpperCase();
+
+    const siteName = sites.find(s => s._id === (employee.siteId || employee.site))?.name
+      || employee.siteName || employee.site || 'N/A';
+
+    const additionalRowsHtml = items.length > 0
+      ? items.map((item: any) => `
+          <tr>
+            <td style="padding:6px 8px;border:1px solid #ddd;">${item.type === 'advance' ? 'ADVANCE' :
+          item.type === 'fine' ? 'FINE' : 'OTHER'
+        }</td>
+            <td style="padding:6px 8px;border:1px solid #ddd;text-align:right;color:#dc2626;">-₹${fmtMoney(item.amount)}</td>
+            <td style="padding:6px 8px;border:1px solid #ddd;font-size:11px;color:#555;">${item.description || ''}</td>
+          </tr>`).join('')
+      : '';
+
+    const adjustments = payrollRecord?.manualAdjustments || [];
+    const adjustmentsTotal = adjustments.reduce((s, a) => s + (a.amount || 0), 0);
+    const adjustmentsRowsHtml = adjustments.length > 0
+      ? adjustments.map((adj: any) => `
+          <tr>
+            <td style="padding:6px 8px;border:1px solid #ddd;">${adj.amount >= 0 ? 'BONUS' : 'ADJUSTMENT'}</td>
+            <td style="padding:6px 8px;border:1px solid #ddd;text-align:right;color:${adj.amount >= 0 ? '#16a34a' : '#dc2626'};">
+              ${adj.amount >= 0 ? '+' : ''}₹${fmtMoney(adj.amount)}
+            </td>
+            <td style="padding:6px 8px;border:1px solid #ddd;font-size:11px;color:#555;">
+              ${adj.reason || ''}
+            </td>
+          </tr>`).join('')
+      : '';
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Salary Slip - ${employee.name}</title>
+        <style>
+          @page { size: A4 portrait; margin: 10mm; }
+          * { box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; margin: 0; padding: 0; font-size: 13px; }
+          .outer { border: 1px solid #000; padding: 12px; }
+          .top-note { text-align: center; font-size: 11px; }
+          .company-name { text-align: center; font-size: 22px; font-weight: bold; margin: 4px 0; }
+          .company-addr { text-align: center; font-size: 12px; margin-bottom: 10px; }
+          table { width: 100%; border-collapse: collapse; }
+          .meta td { border: 1px solid #000; padding: 4px 6px; font-size: 12px; }
+          .emol th, .emol td { border: 1px solid #000; padding: 5px 8px; font-size: 12px; }
+          .emol th { background: #f0f0f0; text-align: center; }
+          .amt { text-align: right; }
+          .total-row td { font-weight: bold; background: #f9f9f9; }
+          .net-payable { text-align: right; font-size: 15px; font-weight: bold; margin-top: 10px; }
+          .sign { text-align: right; margin-top: 30px; font-size: 12px; }
+          .footer-note { text-align: center; font-size: 10px; margin-top: 20px; }
+        </style>
+      </head>
+      <body>
+        <div class="outer">
+          <div class="top-note">Wages Slip Rule 27(2) Maharashtra Minimum Wages Rules, 1963</div>
+          <div class="company-name">S K ENTERPRISES</div>
+          <div class="company-addr">Office No 505, Global Square, Deccan College Road, Yerwada, Pune 411006</div>
+
+          <table class="meta">
+            <tr>
+              <td><strong>MONTH:</strong> ${monthLabel}</td>
+              <td><strong>SITE NAME:</strong> ${siteName}</td>
+              <td><strong>SR. NO:</strong> ${employee.employeeId}</td>
+            </tr>
+            <tr>
+              <td><strong>Name:</strong> ${employee.name}</td>
+              <td><strong>Paid Days:</strong> ${paidDays}</td>
+              <td><strong>UAN:</strong> ${employee.uanNumber || '-'}</td>
+            </tr>
+            <tr>
+              <td><strong>Designation:</strong> ${employee.position || 'N/A'}</td>
+              <td><strong>ESIC NO:</strong> ${employee.esicNumber || '-'}</td>
+              <td><strong>Bank A/C:</strong> ${employee.accountNumber || 'N/A'}</td>
+            </tr>
+          </table>
+
+          <table class="emol" style="margin-top:8px;">
+            <tr><th>EMOLUMENTS</th><th>AMOUNT</th><th>DEDUCTIONS</th><th>AMOUNT</th></tr>
+            <tr><td>BASIC</td><td class="amt">₹${fmtMoney(slip.basicSalary)}</td><td>PF</td><td class="amt">₹${fmtMoney(pf)}</td></tr>
+            <tr><td>DA</td><td class="amt">₹${fmtMoney(payrollRecord?.da || structure?.da || 0)}</td><td>ESIC</td><td class="amt">₹${fmtMoney(esic)}</td></tr>
+            <tr><td>HRA</td><td class="amt">₹${fmtMoney(payrollRecord?.hra || structure?.hra || 0)}</td><td>PT</td><td class="amt">₹${fmtMoney(pt)}</td></tr>
+            <tr><td>OTHERS</td><td class="amt">₹${fmtMoney(payrollRecord?.otherAllowances || structure?.otherAllowances || 0)}</td><td>MLWF</td><td class="amt">₹${fmtMoney(mlwf)}</td></tr>
+            <tr><td>BONUS</td><td class="amt">₹0</td><td>ADVANCE</td><td class="amt">₹${fmtMoney(advanceTotal || structureAdv)}</td></tr>
+            <tr><td>LEAVE</td><td class="amt">₹${fmtMoney(payrollRecord?.leaveEncashment || structure?.leaveEncashment || 0)}</td><td>FINE</td><td class="amt">₹${fmtMoney(fineTotal)}</td></tr>
+            <tr><td>ARREARS</td><td class="amt">₹${fmtMoney(payrollRecord?.arrears || structure?.arrears || 0)}</td><td>UNIFORM/ID</td><td class="amt">₹${fmtMoney(otherTotal)}</td></tr>
+            <tr class="total-row">
+              <td>TOTAL</td><td class="amt">₹${fmtMoney(grossTotal)}</td>
+              <td>TOTAL DEDUCTION</td><td class="amt">₹${fmtMoney(totalDeductions)}</td>
+            </tr>
+          </table>
+
+          ${items.length > 0 ? `
+            <div style="margin-top:12px;">
+              <div style="font-weight:bold;font-size:13px;background:#fef3c7;padding:5px 8px;border:1px solid #ddd;">Additional Deductions Breakdown</div>
+              <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <thead>
+                  <tr style="background:#fef3c7;">
+                    <th style="padding:6px 8px;border:1px solid #ddd;text-align:left;">Type</th>
+                    <th style="padding:6px 8px;border:1px solid #ddd;text-align:right;">Amount</th>
+                    <th style="padding:6px 8px;border:1px solid #ddd;text-align:left;">Description</th>
+                  </tr>
+                </thead>
+                <tbody>${additionalRowsHtml}</tbody>
               </table>
-            </div>
+            </div>` : ''}
 
-            <!-- Deductions Section -->
-            <div class="section">
-              <div class="section-title">DEDUCTIONS</div>
-              <table class="breakdown">
-                <tr><td>PF</td><td class="amount">-₹${(structure?.providentFund || 0).toLocaleString()}</td></tr>
-                <tr><td>ESIC</td><td class="amount">-₹${(structure?.esic || 0).toLocaleString()}</td></tr>
-                <tr><td>ADVANCE</td><td class="amount">-₹${(structure?.advance || 0).toLocaleString()}</td></tr>
-                <tr><td>MLWF</td><td class="amount">-₹${(structure?.mlwf || 0).toLocaleString()}</td></tr>
-                <tr><td>Profession Tax</td><td class="amount">-₹${(structure?.professionalTax || 0).toLocaleString()}</td></tr>
-                <tr class="total">
-                  <td><strong>TOTAL DEDUCTIONS</strong></td>
-                  <td class="amount"><strong>-₹${slipDialog.salarySlip.deductions.toLocaleString()}</strong></td>
-                </tr>
+          ${adjustments.length > 0 ? `
+            <div style="margin-top:12px;">
+              <div style="font-weight:bold;font-size:13px;background:#dcfce7;padding:5px 8px;border:1px solid #ddd;">Adjustments / Bonus</div>
+              <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                <thead>
+                  <tr style="background:#dcfce7;">
+                    <th style="padding:6px 8px;border:1px solid #ddd;text-align:left;">Type</th>
+                    <th style="padding:6px 8px;border:1px solid #ddd;text-align:right;">Amount</th>
+                    <th style="padding:6px 8px;border:1px solid #ddd;text-align:left;">Reason</th>
+                  </tr>
+                </thead>
+                <tbody>${adjustmentsRowsHtml}</tbody>
               </table>
-            </div>
-          </div>
+            </div>` : ''}
 
-          <div class="section">
-            <div class="section-title">NET SALARY</div>
-            <table class="breakdown">
-              <tr class="total">
-                <td><strong>NET PAYABLE</strong></td>
-                <td class="amount"><strong>₹${slipDialog.salarySlip.netSalary.toLocaleString()}</strong></td>
-              </tr>
-            </table>
-          </div>
+          <div class="net-payable">NET PAYABLE: ₹${fmtMoney((slip.netSalary || 0) + adjustmentsTotal)}</div>
 
-          
-          <div style="margin-top: 30px; text-align: center; color: #666; font-size: 12px;">
-            <p>Office No 505, Global Square, Deccan College Road, Yerwada, Pune 411006</p>
-            <p>THIS IS COMPUTER GENERATED SLIP NOT REQUIRED SIGNATURE & STAMP</p>
-          </div>
-        </body>
-        </html>
-      `;
+          <div class="sign">for S K Enterprises<br/><br/><br/>Auth. Sign.</div>
+          <div class="footer-note">THIS IS COMPUTER GENERATED SLIP NOT REQUIRED SIGNATURE &amp; STAMP</div>
+        </div>
+      </body>
+      </html>
+    `;
 
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      printWindow.onload = function () {
-        printWindow.print();
-        setTimeout(function () {
-          printWindow.close();
-        }, 1000);
-      };
-    }
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.onload = function () {
+      printWindow.print();
+      setTimeout(() => printWindow.close(), 1000);
+    };
   };
 
   const handleSendSalarySlip = async () => {
     if (!slipDialog.salarySlip) return;
-
     const slipId = getItemId(slipDialog.salarySlip);
-    if (!slipId) {
-      toast.error("Salary slip ID is missing");
-      return;
-    }
-
+    if (!slipId) { toast.error("Salary slip ID is missing"); return; }
     try {
       const response = await salarySlipApi.markAsEmailed(slipId);
       if (response.success) {
-        toast.success("Salary slip sent to employee's email!");
-        setSalarySlips((prev) =>
-          prev.map((slip) =>
-            getItemId(slip) === slipId
-              ? { ...slip, emailSent: true, emailSentAt: new Date().toISOString() }
-              : slip
-          )
-        );
+        toast.success("Salary slip sent!");
+        setSalarySlips((prev) => prev.map((slip) =>
+          getItemId(slip) === slipId ? { ...slip, emailSent: true, emailSentAt: new Date().toISOString() } : slip
+        ));
         setSlipDialog({ open: false, salarySlip: null });
       } else {
         toast.error(response.message || "Failed to send salary slip");
       }
     } catch (error: any) {
-      console.error("Error sending salary slip:", error);
       toast.error(error.response?.data?.message || "Failed to send salary slip");
     }
   };
 
   const handleExportPayrollExcel = async () => {
     if (!filteredPayroll || filteredPayroll.length === 0) {
-      toast.error("No payroll data to export for selected site");
-      return;
+      toast.error("No payroll data to export for selected site"); return;
     }
-
     try {
       const response = await payrollApi.export({
-        month: selectedMonth,
-        format: "csv",
+        month: selectedMonth, format: "csv",
         site: selectedSite !== 'all' ? selectedSite : undefined,
       });
-
       const url = window.URL.createObjectURL(new Blob([response]));
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute("download", `payroll-${selectedMonth}${selectedSite !== 'all' ? '-filtered' : ''}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-
+      document.body.appendChild(link); link.click(); link.remove();
       toast.success("Payroll exported successfully");
     } catch (error: any) {
       let errorMessage = "Failed to export payroll";
@@ -1388,13 +1324,10 @@ body {
           const text = await error.response.data.text();
           const json = JSON.parse(text);
           errorMessage = json.message || errorMessage;
-        } catch (parseError) {
-          errorMessage = await error.response.data.text() || errorMessage;
-        }
+        } catch { errorMessage = await error.response.data.text() || errorMessage; }
       } else {
         errorMessage = error.response?.data?.message || error.message || errorMessage;
       }
-      console.error("Error exporting payroll:", error);
       toast.error(errorMessage);
     }
   };
@@ -1402,12 +1335,9 @@ body {
   const handleExportClientReport = async () => {
     try {
       const response = await payrollApi.export({
-        month: selectedMonth,
-        format: 'client-template',
+        month: selectedMonth, format: 'client-template',
         site: selectedSite !== 'all' ? selectedSite : undefined,
       });
-
-      // The response is a Blob (Excel file)
       const blob = new Blob([response], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
@@ -1415,38 +1345,25 @@ body {
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `client-payroll-${selectedMonth}.xlsx`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      document.body.appendChild(link); link.click(); link.remove();
       window.URL.revokeObjectURL(url);
-
       toast.success('Client report exported successfully');
     } catch (error: any) {
-      console.error('Error exporting client report:', error);
       toast.error(error.response?.data?.message || 'Failed to export client report');
     }
   };
+
   const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, {
-      label: string;
-      bgColor: string;
-      textColor: string;
-      borderColor: string;
-    }> = {
+    const statusConfig: Record<string, { label: string; bgColor: string; textColor: string; borderColor: string }> = {
       pending: { label: "Pending", bgColor: "bg-amber-50", textColor: "text-amber-800", borderColor: "border-amber-200" },
       processed: { label: "Processed", bgColor: "bg-blue-50", textColor: "text-blue-800", borderColor: "border-blue-200" },
       paid: { label: "Paid", bgColor: "bg-green-50", textColor: "text-green-800", borderColor: "border-green-200" },
       hold: { label: "Hold", bgColor: "bg-red-50", textColor: "text-red-800", borderColor: "border-red-200" },
       "part-paid": { label: "Part Paid", bgColor: "bg-orange-50", textColor: "text-orange-800", borderColor: "border-orange-200" },
     };
-
     const config = statusConfig[status] || {
-      label: status,
-      bgColor: "bg-gray-50",
-      textColor: "text-gray-800",
-      borderColor: "border-gray-200",
+      label: status, bgColor: "bg-gray-50", textColor: "text-gray-800", borderColor: "border-gray-200",
     };
-
     return (
       <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${config.bgColor} ${config.textColor} border ${config.borderColor}`}>
         <div className="h-2 w-2 rounded-full bg-current mr-2"></div>
@@ -1455,9 +1372,8 @@ body {
     );
   };
 
-  const getEmployeeDetails = (employeeId: string) => {
-    return siteFilteredEmployees.find((e) => e.employeeId === employeeId) || null;
-  };
+  const getEmployeeDetails = (employeeId: string) =>
+    siteFilteredEmployees.find((e) => e.employeeId === employeeId) || null;
 
   const calculateStructureTotals = () => {
     const basic = parseFloat(structureForm.basicSalary) || 0;
@@ -1469,7 +1385,6 @@ body {
     const otherAllowances = parseFloat(structureForm.otherAllowances) || 0;
     const leaveEncashment = parseFloat(structureForm.leaveEncashment) || 0;
     const arrears = parseFloat(structureForm.arrears) || 0;
-
     const providentFund = parseFloat(structureForm.providentFund) || 0;
     const professionalTax = parseFloat(structureForm.professionalTax) || 0;
     const incomeTax = parseFloat(structureForm.incomeTax) || 0;
@@ -1477,33 +1392,17 @@ body {
     const esic = parseFloat(structureForm.esic) || 0;
     const advance = parseFloat(structureForm.advance) || 0;
     const mlwf = parseFloat(structureForm.mlwf) || 0;
-
     const totalEarnings = basic + hra + da + specialAllowance + conveyance + medicalAllowance + otherAllowances + leaveEncashment + arrears;
     const totalDeductions = providentFund + professionalTax + incomeTax + otherDeductions + esic + advance + mlwf;
-    const netSalary = totalEarnings - totalDeductions;
-
-    return { totalEarnings, totalDeductions, netSalary };
+    return { totalEarnings, totalDeductions, netSalary: totalEarnings - totalDeductions };
   };
 
   const resetStructureForm = () => {
     setStructureForm({
-      employeeId: "",
-      basicSalary: "",
-      hra: "",
-      da: "",
-      specialAllowance: "",
-      conveyance: "",
-      medicalAllowance: "",
-      otherAllowances: "",
-      providentFund: "",
-      professionalTax: "",
-      incomeTax: "",
-      otherDeductions: "",
-      leaveEncashment: "",
-      arrears: "",
-      esic: "",
-      advance: "",
-      mlwf: "",
+      employeeId: "", basicSalary: "", hra: "", da: "", specialAllowance: "",
+      conveyance: "", medicalAllowance: "", otherAllowances: "", providentFund: "",
+      professionalTax: "", incomeTax: "", otherDeductions: "", leaveEncashment: "",
+      arrears: "", esic: "", advance: "", mlwf: "",
     });
   };
 
@@ -1511,8 +1410,7 @@ body {
     const employee = siteFilteredEmployees.find((e) => e.employeeId === employeeId);
     if (employee) {
       setStructureForm((prev) => ({
-        ...prev,
-        employeeId,
+        ...prev, employeeId,
         basicSalary: (employee.salary ?? 0).toString(),
         providentFund: (employee.providentFund ?? 0).toString(),
         professionalTax: (employee.professionalTax ?? 0).toString(),
@@ -1522,12 +1420,7 @@ body {
 
   const handleOpenPaymentStatus = (payroll: Payroll) => {
     const payrollId = getItemId(payroll);
-    if (!payrollId) {
-      console.error("Payroll ID is missing:", payroll);
-      toast.error("Cannot update payment status: Payroll ID is missing");
-      return;
-    }
-
+    if (!payrollId) { toast.error("Payroll ID missing"); return; }
     setPaymentStatusDialog({ open: true, payroll });
     setPaymentStatusForm({
       status: payroll.paymentStatus || "pending",
@@ -1540,8 +1433,7 @@ body {
   const getMonthOptions = () => {
     const options = [];
     const currentYear = new Date().getFullYear();
-    const startYear = 2024;
-    for (let year = startYear; year <= currentYear + 1; year++) {
+    for (let year = 2024; year <= currentYear + 1; year++) {
       for (let month = 1; month <= 12; month++) {
         const value = `${year}-${String(month).padStart(2, '0')}`;
         const label = new Date(year, month - 1).toLocaleString('default', { month: 'long' }) + ` ${year}`;
@@ -1550,74 +1442,49 @@ body {
     }
     return options;
   };
-
   const monthOptions = getMonthOptions();
 
-  const handleRefreshData = () => {
-    fetchAllData();
-  };
-  // ========== IMPORT STRUCTURES ==========
+  const handleRefreshData = () => fetchAllData();
+
+  // ─── Import structures ──────────────────────────────────────────────
   const downloadStructureTemplate = () => {
-    const headers = [
-      'Employee ID*', 'Employee Name', 'Basic Salary', 'HRA', 'DA',
-      'Special Allowance', 'Conveyance', 'Medical Allowance', 'Other Allowances',
-      'Provident Fund', 'Professional Tax', 'Income Tax', 'Other Deductions',
-      'Leave Encashment', 'Arrears', 'ESIC', 'Advance', 'MLWF'
-    ];
-    const sample = [
-      'EMP001', 'John Doe', '25000', '5000', '3000', '2000', '1000', '1500', '0',
-      '1800', '200', '0', '0', '0', '0', '0', '0', '0'
-    ];
-    const wsData = [headers, sample];
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const headers = ['Employee ID*', 'Employee Name', 'Basic Salary', 'HRA', 'DA', 'Special Allowance', 'Conveyance', 'Medical Allowance', 'Other Allowances', 'Provident Fund', 'Professional Tax', 'Income Tax', 'Other Deductions', 'Leave Encashment', 'Arrears', 'ESIC', 'Advance', 'MLWF'];
+    const sample = ['EMP001', 'John Doe', '25000', '5000', '3000', '2000', '1000', '1500', '0', '1800', '200', '0', '0', '0', '0', '0', '0', '0'];
+    const ws = XLSX.utils.aoa_to_sheet([headers, sample]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Salary Structures');
     XLSX.writeFile(wb, 'Salary_Structure_Template.xlsx');
   };
 
-  const readStructureFile = (file: File): Promise<any[]> => {
-    return new Promise((resolve, reject) => {
+  const readStructureFile = (file: File): Promise<any[]> =>
+    new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
           const data = e.target?.result;
           const workbook = XLSX.read(data, { type: 'binary' });
           const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-          resolve(json);
-        } catch (error) {
-          reject(error);
-        }
+          resolve(XLSX.utils.sheet_to_json(sheet, { defval: '' }));
+        } catch (error) { reject(error); }
       };
       reader.readAsBinaryString(file);
     });
-  };
 
   const validateStructureRows = (rows: any[]) => {
     const valid: any[] = [];
     const invalid: any[] = [];
     const missingEmployees: string[] = [];
     const errors: string[] = [];
-
     const employeeMap = new Map(siteFilteredEmployees.map(e => [e.employeeId, e]));
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const rowNum = i + 2;
       const empId = row['Employee ID']?.toString().trim();
-      if (!empId) {
-        errors.push(`Row ${rowNum}: Missing Employee ID`);
-        invalid.push(row);
-        continue;
-      }
+      if (!empId) { errors.push(`Row ${rowNum}: Missing Employee ID`); invalid.push(row); continue; }
       const employee = employeeMap.get(empId);
-      if (!employee) {
-        missingEmployees.push(`${empId} (Row ${rowNum})`);
-        invalid.push(row);
-        continue;
-      }
-
-      const structure = {
+      if (!employee) { missingEmployees.push(`${empId} (Row ${rowNum})`); invalid.push(row); continue; }
+      valid.push({
         employeeId: empId,
         basicSalary: parseFloat(row['Basic Salary']) || 0,
         hra: parseFloat(row['HRA']) || 0,
@@ -1635,10 +1502,8 @@ body {
         esic: parseFloat(row['ESIC']) || 0,
         advance: parseFloat(row['Advance']) || 0,
         mlwf: parseFloat(row['MLWF']) || 0,
-      };
-      valid.push(structure);
+      });
     }
-
     setImportErrors(errors);
     return { valid, invalid, missingEmployees };
   };
@@ -1653,13 +1518,9 @@ body {
       setImportPreview(data);
       const results = validateStructureRows(data);
       setImportValidationResults(results);
-      if (results.valid.length > 0) {
-        toast.success(`${results.valid.length} valid structures ready for import`);
-      }
-      if (results.missingEmployees.length > 0) {
-        toast.warning(`${results.missingEmployees.length} employees not found in the selected site`);
-      }
-    } catch (error) {
+      if (results.valid.length > 0) toast.success(`${results.valid.length} valid structures ready`);
+      if (results.missingEmployees.length > 0) toast.warning(`${results.missingEmployees.length} employees not found`);
+    } catch {
       toast.error('Failed to read file');
     } finally {
       setImportLoading(false);
@@ -1667,11 +1528,7 @@ body {
   };
 
   const handleImportStructures = async () => {
-    if (importValidationResults.valid.length === 0) {
-      toast.error('No valid structures to import');
-      return;
-    }
-
+    if (importValidationResults.valid.length === 0) { toast.error('No valid structures to import'); return; }
     setImportLoading(true);
     try {
       const response = await salaryStructureApi.import(importValidationResults.valid);
@@ -1679,7 +1536,7 @@ body {
         toast.success(`Imported ${response.data?.length || importValidationResults.valid.length} structures`);
         setImportStructureDialogOpen(false);
         resetImport();
-        fetchAllData(); // refresh structures
+        fetchAllData();
       } else {
         toast.error(response.message || 'Import failed');
       }
@@ -1696,6 +1553,7 @@ body {
     setImportValidationResults({ valid: [], invalid: [], missingEmployees: [] });
     setImportErrors([]);
   };
+
   if (loading.employees && loading.payroll && loading.structures && loading.slips) {
     return (
       <div className="flex flex-col justify-center items-center h-96 space-y-4">
@@ -1705,14 +1563,7 @@ body {
         </div>
         <div className="text-center space-y-2">
           <p className="text-lg font-medium">Loading Payroll Data</p>
-          <p className="text-sm text-muted-foreground max-w-md">
-            Fetching employees, salary structures, and payroll records...
-          </p>
-          <div className="flex items-center justify-center gap-2 pt-2">
-            <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse"></div>
-            <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse delay-150"></div>
-            <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse delay-300"></div>
-          </div>
+          <p className="text-sm text-muted-foreground max-w-md">Fetching employees, salary structures, and payroll records...</p>
         </div>
       </div>
     );
@@ -1720,9 +1571,9 @@ body {
 
   return (
     <div className="space-y-6">
-      {/* Process Salary Dialog */}
+      {/* ─── Process Salary Dialog ─────────────────────────────────────── */}
       <Dialog open={processDialog.open} onOpenChange={(open) => setProcessDialog({ open, employee: null })}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader className="border-b pb-4">
             <div className="flex items-center gap-3">
               <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
@@ -1737,110 +1588,116 @@ body {
             </div>
           </DialogHeader>
 
-          {processDialog.employee &&
-            (() => {
-              const calculation = getPayrollCalculationDetails(processDialog.employee.employeeId);
-              if (!calculation) {
-                return (
-                  <div className="text-center py-8">
-                    <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-                    <p className="text-lg font-medium">Salary structure not found</p>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Please add a salary structure for this employee first.
-                    </p>
-                    <Button
-                      onClick={() => {
-                        handleEmployeeSelect(processDialog.employee!.employeeId);
-                        setIsAddingStructure(true);
-                        setActivePayrollTab("salary-structures");
-                        setProcessDialog({ open: false, employee: null });
-                      }}
-                    >
-                      Add Salary Structure
-                    </Button>
-                  </div>
-                );
-              }
-
+          {processDialog.employee && (() => {
+            const calculation = getPayrollCalculationDetails(processDialog.employee.employeeId);
+            if (!calculation) {
               return (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium">Employee:</span>
-                      <div>{processDialog.employee.name}</div>
-                      <div className="text-muted-foreground">{processDialog.employee.employeeId}</div>
+                <div className="text-center py-8">
+                  <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+                  <p className="text-lg font-medium">Salary structure not found</p>
+                  <p className="text-sm text-muted-foreground mb-4">Please add a salary structure first.</p>
+                  <Button onClick={() => {
+                    handleEmployeeSelect(processDialog.employee!.employeeId);
+                    setIsAddingStructure(true);
+                    setActivePayrollTab("salary-structures");
+                    setProcessDialog({ open: false, employee: null });
+                  }}>Add Salary Structure</Button>
+                </div>
+              );
+            }
+
+            return (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium">Employee:</span>
+                    <div>{processDialog.employee.name}</div>
+                    <div className="text-muted-foreground">{processDialog.employee.employeeId}</div>
+                  </div>
+                  <div>
+                    <span className="font-medium">Department:</span>
+                    <div>{processDialog.employee.department}</div>
+                  </div>
+                </div>
+
+                <div className="border rounded-lg p-3 bg-gray-50">
+                  <h4 className="font-medium mb-2">Bank Details</h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div><span className="text-gray-600">Account:</span><div className="font-medium">{processDialog.employee.accountNumber || "N/A"}</div></div>
+                    <div><span className="text-gray-600">IFSC:</span><div className="font-medium">{processDialog.employee.ifscCode || "N/A"}</div></div>
+                    <div><span className="text-gray-600">Bank:</span><div className="font-medium">{processDialog.employee.bankName || "N/A"}</div></div>
+                    <div><span className="text-gray-600">Branch:</span><div className="font-medium">{processDialog.employee.bankBranch || "N/A"}</div></div>
+                  </div>
+                  {(!processDialog.employee?.accountNumber || !processDialog.employee?.ifscCode) && (
+                    <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mt-2">
+                      ⚠️ Bank account or IFSC missing — payment will need manual handling.
                     </div>
-                    <div>
-                      <span className="font-medium">Department:</span>
-                      <div>{processDialog.employee.department}</div>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <div className="border rounded-lg p-3">
+                    <h4 className="font-medium mb-2">Attendance Summary</h4>
+                    <div className="grid grid-cols-4 gap-2 text-sm">
+                      <div className="text-center"><div className="font-medium text-green-600">{calculation.attendance.presentDays}</div><div className="text-xs text-muted-foreground">Present</div></div>
+                      <div className="text-center"><div className="font-medium text-red-600">{calculation.attendance.absentDays}</div><div className="text-xs text-muted-foreground">Absent</div></div>
+                      <div className="text-center"><div className="font-medium text-yellow-600">{calculation.attendance.halfDays}</div><div className="text-xs text-muted-foreground">Half Days</div></div>
                     </div>
                   </div>
 
-                  <div className="border rounded-lg p-3 bg-gray-50">
-                    <h4 className="font-medium mb-2">Bank Details</h4>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div><span className="text-gray-600">Account:</span><div className="font-medium">{processDialog.employee.accountNumber || "N/A"}</div></div>
-                      <div><span className="text-gray-600">IFSC:</span><div className="font-medium">{processDialog.employee.ifscCode || "N/A"}</div></div>
-                      <div><span className="text-gray-600">Bank:</span><div className="font-medium">{processDialog.employee.bankName || "N/A"}</div></div>
-                      <div><span className="text-gray-600">Branch:</span><div className="font-medium">{processDialog.employee.bankBranch || "N/A"}</div></div>
-                    </div>
-                  </div>
+                  <div className="border rounded-lg p-3">
+                    <h4 className="font-medium mb-2">Salary Calculation</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between"><span>Basic Salary:</span><span className="font-medium">₹{fmtMoney(calculation.structure.basicSalary)}</span></div>
+                      <div className="flex justify-between text-green-600"><span>Earned Basic:</span><span>+₹{fmtMoney(calculation.basicSalaryEarned)}</span></div>
+                      <div className="flex justify-between text-red-600"><span>Deductions (Absent/Leaves):</span><span>-₹{fmtMoney(calculation.salaryDeductions)}</span></div>
+                      <div className="flex justify-between border-t pt-1"><span className="font-medium">Net Basic Salary:</span><span className="font-medium">₹{fmtMoney(calculation.netBasicSalary)}</span></div>
+                      <div className="flex justify-between"><span>Allowances:</span><span className="text-green-600">+₹{fmtMoney(calculation.totalAllowances)}</span></div>
+                      <div className="flex justify-between"><span>Deductions:</span><span className="text-red-600">-₹{fmtMoney(calculation.totalDeductions)}</span></div>
 
-                  <div className="space-y-3">
-                    <div className="border rounded-lg p-3">
-                      <h4 className="font-medium mb-2">Attendance Summary</h4>
-                      <div className="grid grid-cols-4 gap-2 text-sm">
-                        <div className="text-center"><div className="font-medium text-green-600">{calculation.attendance.presentDays}</div><div className="text-xs text-muted-foreground">Present</div></div>
-                        <div className="text-center"><div className="font-medium text-red-600">{calculation.attendance.absentDays}</div><div className="text-xs text-muted-foreground">Absent</div></div>
-                        <div className="text-center"><div className="font-medium text-yellow-600">{calculation.attendance.halfDays}</div><div className="text-xs text-muted-foreground">Half Days</div></div>
-                      </div>
-                    </div>
-
-                    <div className="border rounded-lg p-3">
-                      <h4 className="font-medium mb-2">Salary Calculation</h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between"><span>Basic Salary:</span><span className="font-medium">₹{calculation.structure.basicSalary?.toLocaleString()}</span></div>
-                        <div className="flex justify-between text-green-600"><span>Earned Basic:</span><span>+₹{calculation.basicSalaryEarned.toFixed(2)}</span></div>
-                        <div className="flex justify-between text-red-600"><span>Deductions (Absent/Leaves):</span><span>-₹{calculation.salaryDeductions.toFixed(2)}</span></div>
-                        <div className="flex justify-between border-t pt-1"><span className="font-medium">Net Basic Salary:</span><span className="font-medium">₹{calculation.netBasicSalary.toFixed(2)}</span></div>
-                        <div className="flex justify-between"><span>Allowances:</span><span className="text-green-600">+₹{calculation.totalAllowances.toLocaleString()}</span></div>
-                        <div className="flex justify-between"><span>Deductions:</span><span className="text-red-600">-₹{calculation.totalDeductions.toLocaleString()}</span></div>
-                        {/* ─── DEDUCTION BREAKDOWN ───────────────────────────────────────────── */}
-                        {calculation.deductionBreakdown && calculation.deductionBreakdown.items?.length > 0 && (
-                          <div className="border rounded-lg p-3 bg-orange-50">
-                            <h4 className="font-medium mb-2 text-orange-800">Additional Deductions</h4>
-                            <div className="space-y-1 text-sm">
-                              {calculation.deductionBreakdown.items.map((item: any, idx: number) => (
-                                <div key={idx} className="flex justify-between">
-                                  <span>{item.type === 'advance' ? 'Salary Advance' : item.type === 'fine' ? 'Fine/Penalty' : 'Other Deduction'}</span>
-                                  <span className="text-red-600">-₹{item.amount}</span>
-                                </div>
-                              ))}
-                              <div className="flex justify-between font-bold border-t pt-1">
-                                <span>Total Additional Deductions</span>
-                                <span className="text-red-600">-₹{calculation.deductionBreakdown.additionalDeductions}</span>
+                      {deductionPreview.items.length > 0 && (
+                        <div className="border rounded-lg p-3 bg-orange-50">
+                          <h4 className="font-medium mb-2 text-orange-800">Additional Deductions</h4>
+                          <div className="space-y-1 text-sm">
+                            {deductionPreview.items.map((item: any, idx: number) => (
+                              <div key={idx} className="flex justify-between">
+                                <span>
+                                  {item.type === 'advance' ? 'Salary Advance' : item.type === 'fine' ? 'Fine/Penalty' : 'Other Deduction'}
+                                  {item.description && <span className="text-xs text-gray-500 ml-1">({item.description})</span>}
+                                </span>
+                                <span className="text-red-600">-₹{fmtMoney(item.amount)}</span>
                               </div>
+                            ))}
+                            <div className="flex justify-between font-bold border-t pt-1">
+                              <span>Total Additional Deductions</span>
+                              <span className="text-red-600">-₹{fmtMoney(deductionPreview.additionalDeductions)}</span>
                             </div>
                           </div>
-                        )}
-                        <div className="flex justify-between border-t pt-2 font-bold"><span>Final Net Salary:</span><span className="text-lg">₹{calculation.calculatedSalary.toFixed(2)}</span></div>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between border-t pt-2 font-bold">
+                        <span>Final Net Salary:</span>
+                        <span className="text-lg">₹{fmtMoney(calculation.calculatedSalary)}</span>
                       </div>
                     </div>
                   </div>
                 </div>
-              );
-            })()}
+              </div>
+            );
+          })()}
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setProcessDialog({ open: false, employee: null })}>Cancel</Button>
-            <Button onClick={() => processDialog.employee && handleProcessPayroll(processDialog.employee.employeeId)} disabled={!getPayrollCalculationDetails(processDialog.employee?.employeeId || "")}>
+            <Button onClick={() => processDialog.employee && handleProcessPayroll(processDialog.employee.employeeId)}
+              disabled={!getPayrollCalculationDetails(processDialog.employee?.employeeId || "")}>
               <CheckCircle className="mr-2 h-4 w-4" /> Process Salary
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Payment Status Dialog */}
+      {/* ─── Payment Status Dialog ─────────────────────────────────────── */}
       <Dialog open={paymentStatusDialog.open} onOpenChange={(open) => setPaymentStatusDialog({ open, payroll: null })}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1852,10 +1709,10 @@ body {
             <div className="space-y-4">
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-600 mb-2">₹{paymentStatusDialog.payroll.netSalary?.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-gray-600 mb-2">₹{fmtMoney(paymentStatusDialog.payroll.netSalary)}</div>
                   <div className="text-sm text-gray-700">Total Net Salary</div>
                   {paymentStatusDialog.payroll.paidAmount && paymentStatusDialog.payroll.paidAmount > 0 && (
-                    <div className="text-sm text-green-600 mt-1">Already Paid: ₹{paymentStatusDialog.payroll.paidAmount.toLocaleString()}</div>
+                    <div className="text-sm text-green-600 mt-1">Already Paid: ₹{fmtMoney(paymentStatusDialog.payroll.paidAmount)}</div>
                   )}
                 </div>
               </div>
@@ -1878,19 +1735,24 @@ body {
               {paymentStatusForm.status === "part-paid" && (
                 <div className="space-y-2">
                   <Label htmlFor="paidAmount">Paid Amount *</Label>
-                  <Input id="paidAmount" type="number" placeholder="Enter paid amount" value={paymentStatusForm.paidAmount} onChange={(e) => {
-                    const value = e.target.value;
-                    const maxAmount = paymentStatusDialog.payroll?.netSalary || 0;
-                    const numericValue = parseFloat(value) || 0;
-                    if (numericValue > maxAmount) {
-                      toast.error(`Amount cannot exceed ₹${maxAmount.toLocaleString()}`);
-                      setPaymentStatusForm((prev) => ({ ...prev, paidAmount: maxAmount.toString() }));
-                    } else {
-                      setPaymentStatusForm((prev) => ({ ...prev, paidAmount: value }));
-                    }
-                  }} min="0" max={paymentStatusDialog.payroll?.netSalary || 0} />
+                  <Input id="paidAmount" type="number" placeholder="Enter paid amount"
+                    value={paymentStatusForm.paidAmount}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      const maxAmount = paymentStatusDialog.payroll?.netSalary || 0;
+                      const numericValue = parseFloat(value) || 0;
+                      if (numericValue > maxAmount) {
+                        toast.error(`Amount cannot exceed ₹${fmtMoney(maxAmount)}`);
+                        setPaymentStatusForm((prev) => ({ ...prev, paidAmount: maxAmount.toString() }));
+                      } else {
+                        setPaymentStatusForm((prev) => ({ ...prev, paidAmount: value }));
+                      }
+                    }}
+                    min="0" max={paymentStatusDialog.payroll?.netSalary || 0} />
                   {paymentStatusDialog.payroll && (
-                    <div className="text-xs text-muted-foreground">Remaining: ₹{((paymentStatusDialog.payroll.netSalary || 0) - (parseFloat(paymentStatusForm.paidAmount) || 0)).toLocaleString()}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Remaining: ₹{fmtMoney((paymentStatusDialog.payroll.netSalary || 0) - (parseFloat(paymentStatusForm.paidAmount) || 0))}
+                    </div>
                   )}
                 </div>
               )}
@@ -1898,13 +1760,19 @@ body {
               {(paymentStatusForm.status === "paid" || paymentStatusForm.status === "part-paid") && (
                 <div className="space-y-2">
                   <Label htmlFor="paymentDate">Payment Date *</Label>
-                  <Input id="paymentDate" type="date" value={paymentStatusForm.paymentDate} onChange={(e) => setPaymentStatusForm((prev) => ({ ...prev, paymentDate: e.target.value }))} required />
+                  <Input id="paymentDate" type="date" value={paymentStatusForm.paymentDate}
+                    onChange={(e) => setPaymentStatusForm((prev) => ({ ...prev, paymentDate: e.target.value }))} required />
                 </div>
               )}
 
               <div className="space-y-2">
                 <Label htmlFor="notes">Notes (Optional)</Label>
-                <textarea id="notes" className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" placeholder="Add any notes..." value={paymentStatusForm.notes} onChange={(e) => setPaymentStatusForm((prev) => ({ ...prev, notes: e.target.value }))} rows={3} />
+                <textarea id="notes"
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  placeholder="Add any notes..."
+                  value={paymentStatusForm.notes}
+                  onChange={(e) => setPaymentStatusForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  rows={3} />
               </div>
             </div>
           )}
@@ -1916,7 +1784,216 @@ body {
         </DialogContent>
       </Dialog>
 
-      {/* Salary Slip Dialog */}
+      {/* ─── Adjust Payroll Dialog ─────────────────────────────────────── */}
+      <Dialog open={adjustDialog.open} onOpenChange={(open) => setAdjustDialog({ open, payroll: null })}>
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <IndianRupee className="h-5 w-5 text-emerald-600" />
+              Adjust Payroll
+            </DialogTitle>
+            <DialogDescription>
+              Add a bonus or one-time deduction. This will not change the original salary calculation.
+            </DialogDescription>
+          </DialogHeader>
+
+          {adjustDialog.payroll && (
+            <div className="space-y-4">
+              <div className="bg-gray-50 rounded-lg p-3">
+                <div className="text-sm text-muted-foreground">Current Net Salary</div>
+                <div className="text-2xl font-bold text-gray-800">
+                  ₹{fmtMoney(adjustDialog.payroll.netSalary)}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Amount *</Label>
+                <Input
+                  type="number"
+                  placeholder="Positive for bonus, negative for deduction"
+                  value={adjustForm.amount}
+                  onChange={(e) => setAdjustForm((p) => ({ ...p, amount: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Use <strong>+</strong> for bonus, <strong>−</strong> for deduction (e.g. 500 or -200)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Reason * <span className="text-xs text-muted-foreground">(required)</span></Label>
+                <textarea
+                  className="flex min-h-[70px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  placeholder="e.g. Diwali bonus, correction for last month underpayment"
+                  value={adjustForm.reason}
+                  onChange={(e) => setAdjustForm((p) => ({ ...p, reason: e.target.value }))}
+                  rows={3}
+                />
+              </div>
+
+              {adjustForm.amount && !isNaN(parseFloat(adjustForm.amount)) && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-emerald-700">New Net Salary:</span>
+                    <span className="font-bold text-emerald-800">
+                      ₹{fmtMoney(
+                        (adjustDialog.payroll.netSalary || 0) + (parseFloat(adjustForm.amount) || 0)
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {adjustDialog.payroll.manualAdjustments && adjustDialog.payroll.manualAdjustments.length > 0 && (
+                <div className="border rounded-lg p-3">
+                  <h4 className="font-medium text-sm mb-2">Existing Adjustments</h4>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {adjustDialog.payroll.manualAdjustments.map((adj, idx) => (
+                      <div key={idx} className="flex justify-between items-center text-xs border-b pb-1 last:border-0">
+                        <div className="flex-1">
+                          <div className={adj.amount >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+                            {adj.amount >= 0 ? '+' : ''}₹{fmtMoney(adj.amount)}
+                          </div>
+                          <div className="text-muted-foreground">{adj.reason}</div>
+                          <div className="text-gray-400">
+                            by {adj.adjustedBy} on {new Date(adj.adjustedAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-600 h-6 w-6 p-0"
+                          onClick={() =>
+                            handleRemoveAdjustment(getItemId(adjustDialog.payroll!), idx)
+                          }
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdjustDialog({ open: false, payroll: null })}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveAdjustment}
+              disabled={!adjustForm.amount || !adjustForm.reason.trim()}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <CheckCircle className="mr-2 h-4 w-4" /> Save Adjustment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Bulk Delete Dialog ────────────────────────────────────────── */}
+      <AlertDialog open={bulkDeleteDialog} onOpenChange={setBulkDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-red-600" />
+              Delete {selectedPayrollIds.size} Payroll Record(s)?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will delete the selected records and reverse any consumed fines/advances.
+              Records with existing salary slips will be skipped automatically.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-3 py-2">
+            <div className="space-y-2">
+              <Label>Reason (optional, for audit log)</Label>
+              <textarea
+                className="flex min-h-[70px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                placeholder="e.g. Reprocessing this month's payroll with corrected attendance"
+                value={bulkDeleteForm.reason}
+                onChange={(e) => setBulkDeleteForm({ reason: e.target.value })}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkActionLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              disabled={bulkActionLoading}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {bulkActionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Delete {selectedPayrollIds.size} Record(s)
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ─── Bulk Payment Status Dialog ────────────────────────────────── */}
+      <Dialog open={bulkStatusDialog} onOpenChange={setBulkStatusDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              Bulk Update Payment Status
+            </DialogTitle>
+            <DialogDescription>
+              Apply the same payment status to all {selectedPayrollIds.size} selected record(s).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>New Status *</Label>
+              <Select
+                value={bulkStatusForm.status}
+                onValueChange={(v) => setBulkStatusForm((p) => ({ ...p, status: v as any }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="paid">Paid (full net salary)</SelectItem>
+                  <SelectItem value="hold">Hold</SelectItem>
+                  <SelectItem value="pending">Pending (reset paid amount to 0)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {bulkStatusForm.status === 'paid' && (
+              <div className="space-y-2">
+                <Label>Payment Date *</Label>
+                <Input
+                  type="date"
+                  value={bulkStatusForm.paymentDate}
+                  onChange={(e) => setBulkStatusForm((p) => ({ ...p, paymentDate: e.target.value }))}
+                />
+              </div>
+            )}
+
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+              ⚠️ This will overwrite any existing paid amount / payment date on the selected records.
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkStatusDialog(false)} disabled={bulkActionLoading}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBulkPaymentStatus}
+              disabled={bulkActionLoading}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {bulkActionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+              Update {selectedPayrollIds.size} Record(s)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Salary Slip Dialog (screen view) ──────────────────────────── */}
       <Dialog open={slipDialog.open} onOpenChange={(open) => setSlipDialog({ open, salarySlip: null })}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -1926,7 +2003,6 @@ body {
           {slipDialog.salarySlip && (() => {
             const employee = getEmployeeDetails(slipDialog.salarySlip!.employeeId);
             if (!employee) return null;
-
             return (
               <div className="space-y-6 p-1">
                 <div className="border-b pb-4">
@@ -1941,12 +2017,9 @@ body {
                       <div className="text-sm text-muted-foreground">{employee.department}</div>
                       <div className="text-sm text-muted-foreground">Designation: {employee.position || "N/A"}</div>
                       <div className="text-sm text-muted-foreground">Site: {employee.siteName || employee.site || "N/A"}</div>
+                      <div className="text-sm text-muted-foreground">UAN: {employee.uanNumber || "N/A"} | ESIC: {employee.esicNumber || "N/A"}</div>
                       <div className="text-sm text-muted-foreground">
-                        UAN: {employee.uanNumber || "N/A"} | ESIC: {employee.esicNumber || "N/A"}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-
-                        Paid Days: {slipPaidDays !== null ? slipPaidDays : getDaysInMonth(slipDialog.salarySlip.month) - slipDialog.salarySlip.absentDays - (slipDialog.salarySlip.halfDays || 0) * 0.5}
+                        Paid Days: {slipDialog.salarySlip.presentDays ?? slipPaidDays ?? '-'}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         Bank: {employee.accountNumber ? `XXXX${employee.accountNumber.slice(-4)}` : "N/A"}
@@ -1958,15 +2031,43 @@ body {
             );
           })()}
 
+
           <DialogFooter className="flex flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={handlePrintSalarySlip} className="sm:flex-1"><Printer className="mr-2 h-4 w-4" /> Print</Button>
-            <Button variant="outline" onClick={handleSendSalarySlip} className="sm:flex-1"><Send className="mr-2 h-4 w-4" /> Send Email</Button>
-            <Button onClick={() => setSlipDialog({ open: false, salarySlip: null })} className="sm:flex-1">Close</Button>
+            <Button
+              variant="outline"
+              onClick={handlePrintSalarySlip}
+              className="sm:flex-1"
+            >
+              <Printer className="mr-2 h-4 w-4" /> Print
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={handleSendSalarySlip}
+              className="sm:flex-1"
+            >
+              <Send className="mr-2 h-4 w-4" /> Send Email
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={handleDeleteSlip}
+              className="sm:flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <Trash2 className="mr-2 h-4 w-4" /> Delete Slip
+            </Button>
+
+            <Button
+              onClick={() => setSlipDialog({ open: false, salarySlip: null })}
+              className="sm:flex-1"
+            >
+              Close
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Process All Payroll Dialog */}
+      {/* ─── Process All Payroll Dialog ────────────────────────────────── */}
       <AlertDialog open={processAllDialog} onOpenChange={setProcessAllDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1982,7 +2083,7 @@ body {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete Structure Dialog */}
+      {/* ─── Delete Structure Dialog ───────────────────────────────────── */}
       <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ open, structure: null })}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1993,41 +2094,29 @@ body {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => deleteDialog.structure && handleDeleteStructure(getItemId(deleteDialog.structure))} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+            <AlertDialogAction onClick={() => deleteDialog.structure && handleDeleteStructure(getItemId(deleteDialog.structure))}
+              className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      {/* Import Salary Structures Dialog */}
-      <Dialog open={importStructureDialogOpen} onOpenChange={(open) => {
-        setImportStructureDialogOpen(open);
-        if (!open) resetImport();
-      }}>
+
+      {/* ─── Import Salary Structures Dialog ───────────────────────────── */}
+      <Dialog open={importStructureDialogOpen} onOpenChange={(open) => { setImportStructureDialogOpen(open); if (!open) resetImport(); }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Import Salary Structures</DialogTitle>
-            <DialogDescription>
-              Upload an Excel file with employee salary structures. Employee IDs must exist in the currently selected site.
-            </DialogDescription>
+            <DialogDescription>Upload an Excel file with employee salary structures. Employee IDs must exist in the currently selected site.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* File Upload */}
             <div className="space-y-2">
               <Label>Upload Excel File</Label>
               <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors bg-gray-50">
-                <Input
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  onChange={handleStructureFileSelect}
-                  className="hidden"
-                  disabled={importLoading}
-                  id="structure-import-file"
-                />
+                <Input type="file" accept=".xlsx,.xls,.csv" onChange={handleStructureFileSelect}
+                  className="hidden" disabled={importLoading} id="structure-import-file" />
                 <Label htmlFor="structure-import-file" className="cursor-pointer">
                   <Upload className="h-10 w-10 mx-auto mb-2 text-gray-400" />
-                  <p className="text-sm font-medium text-gray-700">
-                    {importLoading ? 'Processing...' : 'Click to upload or drag & drop'}
-                  </p>
+                  <p className="text-sm font-medium text-gray-700">{importLoading ? 'Processing...' : 'Click to upload or drag & drop'}</p>
                   <p className="text-xs text-gray-500">Supports .xlsx, .xls, .csv</p>
                 </Label>
                 {importFile && (
@@ -2041,14 +2130,12 @@ body {
               </div>
             </div>
 
-            {/* Download Template */}
             <div className="flex justify-center">
               <Button onClick={downloadStructureTemplate} variant="outline" size="sm">
                 <Download className="mr-2 h-4 w-4" /> Download Template
               </Button>
             </div>
 
-            {/* Preview & Validation */}
             {importValidationResults.valid.length > 0 && (
               <div className="border rounded-lg p-3 bg-green-50">
                 <div className="flex items-center gap-2 mb-2">
@@ -2058,7 +2145,7 @@ body {
                 <div className="max-h-32 overflow-y-auto text-xs">
                   {importValidationResults.valid.map((s, idx) => (
                     <div key={idx} className="py-1 border-b border-green-200 last:border-0">
-                      {s.employeeId} – ₹{s.basicSalary.toLocaleString()}
+                      {s.employeeId} – ₹{fmtMoney(s.basicSalary)}
                     </div>
                   ))}
                 </div>
@@ -2073,9 +2160,7 @@ body {
                 </div>
                 <div className="max-h-32 overflow-y-auto text-xs">
                   {importValidationResults.missingEmployees.map((m, idx) => (
-                    <div key={idx} className="py-1 border-b border-yellow-200 last:border-0">
-                      {m}
-                    </div>
+                    <div key={idx} className="py-1 border-b border-yellow-200 last:border-0">{m}</div>
                   ))}
                 </div>
               </div>
@@ -2089,45 +2174,25 @@ body {
                 </div>
                 <div className="max-h-32 overflow-y-auto text-xs">
                   {importErrors.map((err, idx) => (
-                    <div key={idx} className="py-1 border-b border-red-200 last:border-0 text-red-700">
-                      {err}
-                    </div>
+                    <div key={idx} className="py-1 border-b border-red-200 last:border-0 text-red-700">{err}</div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-2">
-              <Button
-                onClick={handleImportStructures}
+              <Button onClick={handleImportStructures}
                 disabled={importValidationResults.valid.length === 0 || importLoading}
-                className="flex-1 bg-blue-600 hover:bg-blue-700"
-              >
-                {importLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Importing...
-                  </>
-                ) : (
-                  `Import ${importValidationResults.valid.length} Structures`
-                )}
+                className="flex-1 bg-blue-600 hover:bg-blue-700">
+                {importLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Importing...</>) : (`Import ${importValidationResults.valid.length} Structures`)}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setImportStructureDialogOpen(false);
-                  resetImport();
-                }}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
+              <Button variant="outline" onClick={() => { setImportStructureDialogOpen(false); resetImport(); }} className="flex-1">Cancel</Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
-      {/* Header */}
+
+      {/* ─── Header ───────────────────────────────────────────────────── */}
       <div className="space-y-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div className="space-y-1">
@@ -2137,10 +2202,7 @@ body {
               </div>
               <div>
                 <h1 className="text-3xl font-bold tracking-tight">Payroll Management</h1>
-                <p className="text-gray-600">
-                  Manage employee salaries, payroll processing, and salary slips for {selectedMonth}
-                  {selectedSite !== 'all' && ` • Site: ${sites.find(s => s._id === selectedSite)?.name || 'Selected'}`}
-                </p>
+
               </div>
             </div>
           </div>
@@ -2150,9 +2212,7 @@ body {
               <div className="relative">
                 <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger className="pl-9 w-full sm:w-[180px] bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger className="pl-9 w-full sm:w-[180px] bg-white"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {monthOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
@@ -2168,140 +2228,72 @@ body {
               <Button variant="outline" onClick={handleExportPayrollExcel} disabled={filteredPayroll.length === 0} className="gap-2">
                 <FileSpreadsheet className="h-4 w-4" /> Export
               </Button>
-              <Button
-                variant="outline"
-                onClick={handleExportClientReport}
-                disabled={filteredPayroll.length === 0}
-                className="gap-2"
-              >
-                <FileSpreadsheet className="h-4 w-4" />
-                Export excel
+              <Button variant="outline" onClick={handleExportClientReport} disabled={filteredPayroll.length === 0} className="gap-2">
+                <FileSpreadsheet className="h-4 w-4" /> Export excel
               </Button>
             </div>
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="border-l-4 border-l-blue-500 transition-all duration-200 hover:shadow-md border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                    <IndianRupee className="h-4 w-4 text-blue-600" />
-                  </div>
-                  Total Payroll
-                </span>
-                <Badge variant="outline" className="font-normal">{payrollSummary.totalRecords} rec</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">₹{payrollSummary.totalAmount.toLocaleString()}</div>
-              <div className="flex items-center gap-1 mt-1">
-                <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min((payrollSummary.processedCount / Math.max(payrollSummary.totalEmployees, 1)) * 100, 100)}%` }}></div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {/* ─── Compact Stats Bar ─────────────────────────────────────── */}
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-white px-4 py-3">
+          <div className="flex items-center gap-2 pr-3 border-r last:border-r-0">
+            <IndianRupee className="h-4 w-4 text-blue-600" />
+            <span className="text-xs text-muted-foreground">Total Payroll</span>
+            <span className="text-sm font-bold">₹{fmtMoney(payrollSummary.totalAmount)}</span>
 
-          <Card className="border-l-4 border-l-green-500 transition-all duration-200 hover:shadow-md border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                  </div>
-                  Processed
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{payrollSummary.processedCount}</div>
-              <div className="text-sm text-muted-foreground mt-1">₹{payrollSummary.totalAmount.toLocaleString()}</div>
-            </CardContent>
-          </Card>
+          </div>
 
-          <Card className="border-l-4 border-l-amber-500 transition-all duration-200 hover:shadow-md border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center">
-                    <AlertCircle className="h-4 w-4 text-amber-600" />
-                  </div>
-                  Pending
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-amber-600">{payrollSummary.pendingCount}</div>
-              <div className="text-sm text-muted-foreground mt-1">₹{payrollSummary.pendingAmount.toLocaleString()}</div>
-            </CardContent>
-          </Card>
+          <div className="flex items-center gap-2 pr-3 border-r last:border-r-0">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <span className="text-xs text-muted-foreground">Processed</span>
+            <span className="text-sm font-bold text-green-600">{payrollSummary.processedCount}</span>
+          </div>
 
-          <Card className="border-l-4 border-l-red-500 transition-all duration-200 hover:shadow-md border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
-                    <Users className="h-4 w-4 text-red-600" />
-                  </div>
-                  With Structure
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{payrollSummary.employeesWithStructure}</div>
-              <div className="text-sm text-muted-foreground mt-1">of {payrollSummary.activeEmployees} active</div>
-            </CardContent>
-          </Card>
+          <div className="flex items-center gap-2 pr-3 border-r last:border-r-0">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <span className="text-xs text-muted-foreground">Pending</span>
+
+            <span className="text-xs text-muted-foreground">(₹{fmtMoney(payrollSummary.pendingAmount)})</span>
+          </div>
+
+          <div className="flex items-center gap-2 pr-3 border-r last:border-r-0">
+            <Users className="h-4 w-4 text-gray-600" />
+            <span className="text-xs text-muted-foreground">Employees</span>
+            <span className="text-sm font-bold">{siteFilteredEmployees.length}</span>
+
+          </div>
+
+          <div className="flex items-center gap-2 pr-3 border-r last:border-r-0">
+            <div className="h-2 w-2 rounded-full bg-green-500" />
+            <span className="text-xs text-muted-foreground">With Structure</span>
+            <span className="text-sm font-bold text-green-600">{payrollSummary.employeesWithStructure}</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-red-500" />
+            <span className="text-xs text-muted-foreground">Without Structure</span>
+            <span className="text-sm font-bold text-red-600">{payrollSummary.employeesWithoutStructure}</span>
+          </div>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2"><Users className="h-4 w-4" /> Total Employees</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{siteFilteredEmployees.length}</div>
-              <div className="text-xs text-muted-foreground mt-1">{payrollSummary.activeEmployees} active</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">With Salary Structure</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{payrollSummary.employeesWithStructure}</div>
-              <div className="text-xs text-muted-foreground mt-1">Ready for payroll</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Without Structure</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{payrollSummary.employeesWithoutStructure}</div>
-              <div className="text-xs text-muted-foreground mt-1">Needs structure setup</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Tabs */}
-        <Card className="transition-all duration-200 hover:shadow-md border">
+        {/* ─── Main Tabs ─────────────────────────────────────────────── */}
+        <Card className="hover:shadow-md transition-all duration-200 border">
           <CardHeader>
             <CardTitle>Payroll Management</CardTitle>
           </CardHeader>
           <CardContent>
             <Tabs value={activePayrollTab} onValueChange={setActivePayrollTab} className="w-full">
               <TabsList className="flex flex-wrap gap-1 sm:gap-2 w-full h-auto p-1 bg-gray-100 rounded-lg">
-                <TabsTrigger value="salary-slips" className="flex-1 min-w-[100px] sm:min-w-[140px] text-xs sm:text-sm whitespace-nowrap">Salary Processing</TabsTrigger>
-                <TabsTrigger value="salary-structures" className="flex-1 min-w-[100px] sm:min-w-[140px] text-xs sm:text-sm whitespace-nowrap">Salary Structures</TabsTrigger>
-                <TabsTrigger value="payroll-records" className="flex-1 min-w-[100px] sm:min-w-[140px] text-xs sm:text-sm whitespace-nowrap">Payroll Records</TabsTrigger>
+                <TabsTrigger value="salary-slips" className="flex-1 min-w-[100px] sm:min-w-[140px] text-xs sm:text-sm">Salary Processing</TabsTrigger>
+                <TabsTrigger value="salary-structures" className="flex-1 min-w-[100px] sm:min-w-[140px] text-xs sm:text-sm">Salary Structures</TabsTrigger>
+                <TabsTrigger value="payroll-records" className="flex-1 min-w-[100px] sm:min-w-[140px] text-xs sm:text-sm">Payroll Records</TabsTrigger>
+                <TabsTrigger value="audit-log" className="flex-1 min-w-[100px] sm:min-w-[140px] text-xs sm:text-sm">
+                  Audit Log
+                </TabsTrigger>
               </TabsList>
 
-              {/* Salary Processing Tab */}
+              {/* ─── Salary Processing Tab ────────────────────────────── */}
               <TabsContent value="salary-slips" className="space-y-4">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
@@ -2325,6 +2317,7 @@ body {
                     <CheckCircle className="mr-2 h-4 w-4" /> Process All Payroll
                   </Button>
                 </div>
+
                 {loading.employees ? (
                   <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
                 ) : (
@@ -2360,14 +2353,15 @@ body {
                               const structure = filteredSalaryStructures.find(s => s.employeeId === employee.employeeId);
                               const payrollRecord = filteredPayroll.find(p => p.employeeId === employee.employeeId && p.month === selectedMonth);
                               const attendance = getEmployeeAttendance(employee.employeeId);
-                              const totalLeaves = getEmployeeLeaves(employee.employeeId);
                               const calculatedSalary = structure ? calculateSalary(employee.employeeId, structure) : 0;
 
                               return (
-                                <TableRow key={employee.employeeId || employee._id || `employee-${index}`} className="transition-all duration-200 hover:bg-gray-50/50 border-b border-gray-100">
+                                <TableRow key={employee.employeeId || employee._id || `employee-${index}`} className="hover:bg-gray-50/50 border-b border-gray-100">
                                   <TableCell>
                                     <div className="flex items-start space-x-3">
-                                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0"><span className="font-medium text-blue-700">{employee.name?.charAt(0) || 'E'}</span></div>
+                                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                        <span className="font-medium text-blue-700">{employee.name?.charAt(0) || 'E'}</span>
+                                      </div>
                                       <div className="flex-1 min-w-0">
                                         <p className="font-medium text-gray-900 truncate">{employee.name}</p>
                                         <p className="text-sm text-gray-500">{employee.employeeId}</p>
@@ -2378,13 +2372,28 @@ body {
                                   </TableCell>
                                   <TableCell><div className="text-sm text-gray-700">{employee.department}</div></TableCell>
                                   <TableCell>
-                                    {structure ? <div className="flex items-center gap-2"><div className="h-2 w-2 rounded-full bg-green-500"></div><Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Configured</Badge></div> :
-                                      <div className="flex items-center gap-2"><div className="h-2 w-2 rounded-full bg-red-500"></div><Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Not Configured</Badge></div>}
+                                    {structure ? (
+                                      <div className="flex items-center gap-2">
+                                        <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Configured</Badge>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-2">
+                                        <div className="h-2 w-2 rounded-full bg-red-500"></div>
+                                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Not Configured</Badge>
+                                      </div>
+                                    )}
                                   </TableCell>
                                   <TableCell>
-                                    <div className="text-sm"><div className="flex items-center gap-1"><span className="text-green-600">P: {attendance.presentDays}</span><span className="text-red-600">A: {attendance.absentDays}</span><span className="text-yellow-600">H: {attendance.halfDays}</span></div></div>
+                                    <div className="text-sm">
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-green-600">P: {attendance.presentDays}</span>
+                                        <span className="text-red-600">A: {attendance.absentDays}</span>
+                                        <span className="text-yellow-600">H: {attendance.halfDays}</span>
+                                      </div>
+                                    </div>
                                   </TableCell>
-                                  <TableCell><div className="font-medium text-gray-900">₹{calculatedSalary.toFixed(2)}</div></TableCell>
+                                  <TableCell><div className="font-medium text-gray-900">₹{fmtMoney(calculatedSalary)}</div></TableCell>
                                   <TableCell>
                                     <div className="flex gap-2">
                                       {structure ? (
@@ -2395,7 +2404,7 @@ body {
                                               <Button size="sm" variant="ghost" onClick={() => handleOpenPaymentStatus(payrollRecord)} className="h-8 w-8 p-0" title="Update payment status"><Edit className="h-4 w-4" /></Button>
                                               <Button size="sm" variant="ghost" onClick={() => {
                                                 const payrollId = getItemId(payrollRecord);
-                                                if (!payrollId) { toast.error("Cannot generate slip: Payroll ID missing"); return; }
+                                                if (!payrollId) { toast.error("Payroll ID missing"); return; }
                                                 const slip = filteredSalarySlips.find(s => s.payrollId === payrollId);
                                                 if (slip) handleViewSalarySlip(slip);
                                                 else handleGenerateSalarySlip(payrollId);
@@ -2420,11 +2429,18 @@ body {
 
                     {filteredEmployees.length > payrollItemsPerPage && (
                       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
-                        <div className="text-sm text-muted-foreground">Showing {Math.min((payrollPage - 1) * payrollItemsPerPage + 1, filteredEmployees.length)} to {Math.min(payrollPage * payrollItemsPerPage, filteredEmployees.length)} of {filteredEmployees.length} employees</div>
+                        <div className="text-sm text-muted-foreground">
+                          Showing {Math.min((payrollPage - 1) * payrollItemsPerPage + 1, filteredEmployees.length)} to {Math.min(payrollPage * payrollItemsPerPage, filteredEmployees.length)} of {filteredEmployees.length} employees
+                        </div>
                         <div className="flex items-center gap-2">
                           <Select value={String(payrollItemsPerPage)} onValueChange={(value) => { setPayrollItemsPerPage(parseInt(value)); setPayrollPage(1); }}>
                             <SelectTrigger className="w-20 h-8"><SelectValue /></SelectTrigger>
-                            <SelectContent><SelectItem value="10">10</SelectItem><SelectItem value="25">25</SelectItem><SelectItem value="50">50</SelectItem><SelectItem value="100">100</SelectItem></SelectContent>
+                            <SelectContent>
+                              <SelectItem value="10">10</SelectItem>
+                              <SelectItem value="25">25</SelectItem>
+                              <SelectItem value="50">50</SelectItem>
+                              <SelectItem value="100">100</SelectItem>
+                            </SelectContent>
                           </Select>
                           <Button variant="outline" size="sm" onClick={() => setPayrollPage(p => Math.max(1, p - 1))} disabled={payrollPage === 1} className="h-8 w-8 p-0">‹</Button>
                           <span className="text-sm">{payrollPage} / {Math.ceil(filteredEmployees.length / payrollItemsPerPage)}</span>
@@ -2436,7 +2452,7 @@ body {
                 )}
               </TabsContent>
 
-              {/* Salary Structures Tab */}
+              {/* ─── Salary Structures Tab ─────────────────────────────── */}
               <TabsContent value="salary-structures" className="space-y-4">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <h3 className="text-lg font-semibold">Salary Structures</h3>
@@ -2472,7 +2488,7 @@ body {
                           <SelectContent>
                             {employeesWithoutStructure.length > 0 ? employeesWithoutStructure.map((employee) => (
                               <SelectItem key={employee.employeeId} value={employee.employeeId}>
-                                {employee.name} ({employee.employeeId}) - {employee.department} - ₹{(employee.salary ?? 0).toLocaleString()}
+                                {employee.name} ({employee.employeeId}) - {employee.department} - ₹{fmtMoney(employee.salary)}
                               </SelectItem>
                             )) : <SelectItem value="no-employees" disabled>All employees have salary structures</SelectItem>}
                           </SelectContent>
@@ -2483,47 +2499,146 @@ body {
                           if (!selectedEmployee) return null;
                           return (
                             <div className="text-sm text-muted-foreground mt-1 p-2 bg-gray-50 rounded">
-                              <div>Monthly Salary: ₹{(selectedEmployee.salary ?? 0).toLocaleString()}</div>
+                              <div>Monthly Salary: ₹{fmtMoney(selectedEmployee.salary)}</div>
                               {selectedEmployee.accountNumber && <div>Bank Account: XXXX{selectedEmployee.accountNumber.slice(-4)}</div>}
-                              {selectedEmployee.providentFund && <div>PF Contribution: ₹{selectedEmployee.providentFund.toLocaleString()}</div>}
+                              {selectedEmployee.providentFund && <div>PF Contribution: ₹{fmtMoney(selectedEmployee.providentFund)}</div>}
                             </div>
                           );
                         })()}
                       </div>
 
-                      <div className="border rounded-lg p-4"><h3 className="font-semibold mb-4 text-lg">EARNINGS</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-3">
-                          <div className="space-y-2"><Label htmlFor="basic" className="font-medium">GROSS *</Label><Input id="basic" type="number" placeholder="Basic Salary" value={structureForm.basicSalary} onChange={(e) => setStructureForm((prev) => ({ ...prev, basicSalary: e.target.value }))} required /><p className="text-xs text-muted-foreground">Auto-filled from employee's monthly salary</p></div>
-                          <div className="space-y-2"><Label htmlFor="da" className="font-medium">DA</Label><Input id="da" type="number" placeholder="Dearness Allowance" value={structureForm.da} onChange={(e) => setStructureForm((prev) => ({ ...prev, da: e.target.value }))} /></div>
-                          <div className="space-y-2"><Label htmlFor="hra" className="font-medium">HRA</Label><Input id="hra" type="number" placeholder="House Rent Allowance" value={structureForm.hra} onChange={(e) => setStructureForm((prev) => ({ ...prev, hra: e.target.value }))} /></div>
+                      <div className="border rounded-lg p-4">
+                        <h3 className="font-semibold mb-4 text-lg">EARNINGS</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-3">
+                            <div className="space-y-2">
+                              <Label htmlFor="basic" className="font-medium">GROSS *</Label>
+                              <Input id="basic" type="number" placeholder="Basic Salary" value={structureForm.basicSalary}
+                                onChange={(e) => setStructureForm((prev) => ({ ...prev, basicSalary: e.target.value }))} required />
+                              <p className="text-xs text-muted-foreground">Auto-filled from employee's monthly salary</p>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="da" className="font-medium">DA</Label>
+                              <Input id="da" type="number" placeholder="Dearness Allowance" value={structureForm.da}
+                                onChange={(e) => setStructureForm((prev) => ({ ...prev, da: e.target.value }))} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="hra" className="font-medium">HRA</Label>
+                              <Input id="hra" type="number" placeholder="House Rent Allowance" value={structureForm.hra}
+                                onChange={(e) => setStructureForm((prev) => ({ ...prev, hra: e.target.value }))} />
+                            </div>
+                          </div>
+                          <div className="space-y-3">
+                            <div className="space-y-2">
+                              <Label htmlFor="cca" className="font-medium">CCA</Label>
+                              <Input id="cca" type="number" placeholder="City Compensatory Allowance" value={structureForm.conveyance}
+                                onChange={(e) => setStructureForm((prev) => ({ ...prev, conveyance: e.target.value }))} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="medical" className="font-medium">MEDICAL</Label>
+                              <Input id="medical" type="number" placeholder="Medical Allowance" value={structureForm.medicalAllowance}
+                                onChange={(e) => setStructureForm((prev) => ({ ...prev, medicalAllowance: e.target.value }))} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="otherAll" className="font-medium">OTHER ALL</Label>
+                              <Input id="otherAll" type="number" placeholder="Other Allowances" value={structureForm.otherAllowances}
+                                onChange={(e) => setStructureForm((prev) => ({ ...prev, otherAllowances: e.target.value }))} />
+                            </div>
+                          </div>
                         </div>
-                        <div className="space-y-3">
-                          <div className="space-y-2"><Label htmlFor="cca" className="font-medium">CCA</Label><Input id="cca" type="number" placeholder="City Compensatory Allowance" value={structureForm.conveyance} onChange={(e) => setStructureForm((prev) => ({ ...prev, conveyance: e.target.value }))} /></div>
-                          <div className="space-y-2"><Label htmlFor="medical" className="font-medium">MEDICAL</Label><Input id="medical" type="number" placeholder="Medical Allowance" value={structureForm.medicalAllowance} onChange={(e) => setStructureForm((prev) => ({ ...prev, medicalAllowance: e.target.value }))} /></div>
-                          <div className="space-y-2"><Label htmlFor="otherAll" className="font-medium">OTHER ALL</Label><Input id="otherAll" type="number" placeholder="Other Allowances" value={structureForm.otherAllowances} onChange={(e) => setStructureForm((prev) => ({ ...prev, otherAllowances: e.target.value }))} /></div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                          <div className="space-y-3">
+                            <div className="space-y-2">
+                              <Label htmlFor="bonus" className="font-medium">BONUS</Label>
+                              <Input id="bonus" type="number" placeholder="Bonus" value={structureForm.specialAllowance}
+                                onChange={(e) => setStructureForm((prev) => ({ ...prev, specialAllowance: e.target.value }))} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="leave" className="font-medium">LEAVE</Label>
+                              <Input id="leave" type="number" placeholder="Leave Encashment" value={structureForm.leaveEncashment}
+                                onChange={(e) => setStructureForm((prev) => ({ ...prev, leaveEncashment: e.target.value }))} />
+                            </div>
+                          </div>
+                          <div className="space-y-3">
+                            <div className="space-y-2">
+                              <Label htmlFor="arrears" className="font-medium">ARREARS</Label>
+                              <Input id="arrears" type="number" placeholder="Arrears" value={structureForm.arrears}
+                                onChange={(e) => setStructureForm((prev) => ({ ...prev, arrears: e.target.value }))} />
+                            </div>
+                          </div>
                         </div>
-                      </div><div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                          <div className="space-y-3"><div className="space-y-2"><Label htmlFor="bonus" className="font-medium">BONUS</Label><Input id="bonus" type="number" placeholder="Bonus" value={structureForm.specialAllowance} onChange={(e) => setStructureForm((prev) => ({ ...prev, specialAllowance: e.target.value }))} /></div><div className="space-y-2"><Label htmlFor="leave" className="font-medium">LEAVE</Label><Input id="leave" type="number" placeholder="Leave Encashment" value={structureForm.leaveEncashment} onChange={(e) => setStructureForm((prev) => ({ ...prev, leaveEncashment: e.target.value }))} /></div></div>
-                          <div className="space-y-3"><div className="space-y-2"><Label htmlFor="arrears" className="font-medium">ARREARS</Label><Input id="arrears" type="number" placeholder="Arrears" value={structureForm.arrears} onChange={(e) => setStructureForm((prev) => ({ ...prev, arrears: e.target.value }))} /></div></div>
-                        </div></div>
+                      </div>
 
-                      <div className="border rounded-lg p-4"><h3 className="font-semibold mb-4 text-lg">DEDUCTIONS</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-3">
-                          <div className="space-y-2"><Label htmlFor="pf" className="font-medium">PF</Label><Input id="pf" type="number" placeholder="Provident Fund" value={structureForm.providentFund} onChange={(e) => setStructureForm((prev) => ({ ...prev, providentFund: e.target.value }))} /><p className="text-xs text-muted-foreground">Auto-filled from employee data if available</p></div>
-                          <div className="space-y-2"><Label htmlFor="esic" className="font-medium">ESIC</Label><Input id="esic" type="number" placeholder="ESIC Contribution" value={structureForm.esic} onChange={(e) => setStructureForm((prev) => ({ ...prev, esic: e.target.value }))} /></div>
-                          <div className="space-y-2"><Label htmlFor="advance" className="font-medium">ADVANCE</Label><Input id="advance" type="number" placeholder="Advance Deduction" value={structureForm.advance} onChange={(e) => setStructureForm((prev) => ({ ...prev, advance: e.target.value }))} /></div>
+                      <div className="border rounded-lg p-4">
+                        <h3 className="font-semibold mb-4 text-lg">DEDUCTIONS</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-3">
+                            <div className="space-y-2">
+                              <Label htmlFor="pf" className="font-medium">PF</Label>
+                              <Input id="pf" type="number" placeholder="Provident Fund" value={structureForm.providentFund}
+                                onChange={(e) => setStructureForm((prev) => ({ ...prev, providentFund: e.target.value }))} />
+                              <p className="text-xs text-muted-foreground">Auto-filled from employee data if available</p>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="esic" className="font-medium">ESIC</Label>
+                              <Input id="esic" type="number" placeholder="ESIC Contribution" value={structureForm.esic}
+                                onChange={(e) => setStructureForm((prev) => ({ ...prev, esic: e.target.value }))} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="advance" className="font-medium">ADVANCE</Label>
+                              <Input id="advance" type="number" placeholder="Advance Deduction" value={structureForm.advance}
+                                onChange={(e) => setStructureForm((prev) => ({ ...prev, advance: e.target.value }))} />
+                            </div>
+                          </div>
+                          <div className="space-y-3">
+                            <div className="space-y-2">
+                              <Label htmlFor="mlwf" className="font-medium">MLWF</Label>
+                              <Input id="mlwf" type="number" placeholder="MLWF Deduction" value={structureForm.mlwf}
+                                onChange={(e) => setStructureForm((prev) => ({ ...prev, mlwf: e.target.value }))} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="professionTax" className="font-medium">Profession Tax</Label>
+                              <Input id="professionTax" type="number" placeholder="Professional Tax" value={structureForm.professionalTax}
+                                onChange={(e) => setStructureForm((prev) => ({ ...prev, professionalTax: e.target.value }))} />
+                              <p className="text-xs text-muted-foreground">Auto-filled from employee data if available</p>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="incomeTax" className="font-medium">INCOME TAX</Label>
+                              <Input id="incomeTax" type="number" placeholder="Income Tax" value={structureForm.incomeTax}
+                                onChange={(e) => setStructureForm((prev) => ({ ...prev, incomeTax: e.target.value }))} />
+                            </div>
+                          </div>
                         </div>
-                        <div className="space-y-3">
-                          <div className="space-y-2"><Label htmlFor="mlwf" className="font-medium">MLWF</Label><Input id="mlwf" type="number" placeholder="MLWF Deduction" value={structureForm.mlwf} onChange={(e) => setStructureForm((prev) => ({ ...prev, mlwf: e.target.value }))} /></div>
-                          <div className="space-y-2"><Label htmlFor="professionTax" className="font-medium">Profession Tax</Label><Input id="professionTax" type="number" placeholder="Professional Tax" value={structureForm.professionalTax} onChange={(e) => setStructureForm((prev) => ({ ...prev, professionalTax: e.target.value }))} /><p className="text-xs text-muted-foreground">Auto-filled from employee data if available</p></div>
-                          <div className="space-y-2"><Label htmlFor="incomeTax" className="font-medium">INCOME TAX</Label><Input id="incomeTax" type="number" placeholder="Income Tax" value={structureForm.incomeTax} onChange={(e) => setStructureForm((prev) => ({ ...prev, incomeTax: e.target.value }))} /></div>
-                        </div>
-                      </div></div>
+                      </div>
 
-                      <div className="bg-gray-50 rounded-lg p-4"><h3 className="font-semibold mb-3">Summary</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm"><div className="space-y-2"><div className="flex justify-between"><span>Net Total:</span><span className="font-medium text-green-600">₹{calculateStructureTotals().totalEarnings.toLocaleString()}</span></div><div className="flex justify-between"><span>Total Deductions:</span><span className="font-medium text-red-600">₹{calculateStructureTotals().totalDeductions.toLocaleString()}</span></div></div><div className="space-y-2"><div className="flex justify-between border-t pt-2"><span className="font-semibold">Net Salary:</span><span className="font-bold text-lg">₹{calculateStructureTotals().netSalary.toLocaleString()}</span></div></div></div></div>
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <h3 className="font-semibold mb-3">Summary</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span>Net Total:</span>
+                              <span className="font-medium text-green-600">₹{fmtMoney(calculateStructureTotals().totalEarnings)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Total Deductions:</span>
+                              <span className="font-medium text-red-600">₹{fmtMoney(calculateStructureTotals().totalDeductions)}</span>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex justify-between border-t pt-2">
+                              <span className="font-semibold">Net Salary:</span>
+                              <span className="font-bold text-lg">₹{fmtMoney(calculateStructureTotals().netSalary)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
 
                       <div className="flex flex-col sm:flex-row gap-2 pt-4">
-                        <Button onClick={editingStructure ? handleUpdateStructure : handleAddStructure} disabled={!structureForm.basicSalary || !structureForm.employeeId || structureForm.employeeId === "no-employees"} className="flex-1">{editingStructure ? "Update Structure" : "Add Structure"}</Button>
+                        <Button onClick={editingStructure ? handleUpdateStructure : handleAddStructure}
+                          disabled={!structureForm.basicSalary || !structureForm.employeeId || structureForm.employeeId === "no-employees"}
+                          className="flex-1">
+                          {editingStructure ? "Update Structure" : "Add Structure"}
+                        </Button>
                         <Button variant="outline" onClick={() => { setIsAddingStructure(false); setEditingStructure(null); resetStructureForm(); }} className="flex-1">Cancel</Button>
                       </div>
                     </CardContent>
@@ -2557,31 +2672,29 @@ body {
                             const totalCTC = (structure.basicSalary || 0) + totalAllowances;
 
                             return (
-                              <TableRow key={structure._id || structure.id || `structure-${index}`} className="transition-all duration-200 hover:bg-gray-50/50 border-b border-gray-100">
+                              <TableRow key={structure._id || structure.id || `structure-${index}`} className="hover:bg-gray-50/50 border-b border-gray-100">
                                 <TableCell>
                                   <div className="flex items-start space-x-3">
-                                    <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0"><span className="font-medium text-blue-700">{employee.name?.charAt(0) || 'E'}</span></div>
+                                    <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                      <span className="font-medium text-blue-700">{employee.name?.charAt(0) || 'E'}</span>
+                                    </div>
                                     <div className="flex-1 min-w-0">
                                       <p className="font-medium text-gray-900 truncate">{employee.name}</p>
                                       <p className="text-sm text-gray-500">{employee.employeeId}</p>
                                       <p className="text-xs text-gray-400 mt-0.5">{employee.department}</p>
-                                      {employee.accountNumber && <div className="flex items-center gap-1 mt-1"><div className="h-2 w-2 rounded-full bg-green-500"></div><span className="text-xs text-gray-500">Bank account configured</span></div>}
                                     </div>
                                   </div>
                                 </TableCell>
-
                                 <TableCell>
                                   <div className="flex items-center">
                                     <IndianRupee className="h-4 w-4 mr-1" />
-                                    {(structure.basicSalary || 0).toLocaleString()}
+                                    {fmtMoney(structure.basicSalary)}
                                   </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    Monthly: ₹{(employee.salary ?? 0).toLocaleString()}
-                                  </div>
+                                  <div className="text-xs text-muted-foreground">Monthly: ₹{fmtMoney(employee.salary)}</div>
                                 </TableCell>
-                                <TableCell><div className="flex items-center"><IndianRupee className="h-4 w-4 mr-1" />{totalAllowances.toLocaleString()}</div></TableCell>
-                                <TableCell><div className="flex items-center"><IndianRupee className="h-4 w-4 mr-1" />{totalDeductions.toLocaleString()}</div></TableCell>
-                                <TableCell><div className="font-medium flex items-center"><IndianRupee className="h-4 w-4 mr-1" />{totalCTC.toLocaleString()}</div></TableCell>
+                                <TableCell><div className="flex items-center"><IndianRupee className="h-4 w-4 mr-1" />{fmtMoney(totalAllowances)}</div></TableCell>
+                                <TableCell><div className="flex items-center"><IndianRupee className="h-4 w-4 mr-1" />{fmtMoney(totalDeductions)}</div></TableCell>
+                                <TableCell><div className="font-medium flex items-center"><IndianRupee className="h-4 w-4 mr-1" />{fmtMoney(totalCTC)}</div></TableCell>
                                 <TableCell>
                                   <div className="flex gap-2">
                                     <Button size="sm" variant="outline" onClick={() => handleEditStructure(structure)}><Edit className="h-4 w-4" /></Button>
@@ -2598,55 +2711,195 @@ body {
                 )}
               </TabsContent>
 
-              {/* Payroll Records Tab */}
+              {/* ─── Payroll Records Tab ─────────────────────────────── */}
               <TabsContent value="payroll-records" className="space-y-4">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
                     <h3 className="text-lg font-semibold">Payroll Records - {selectedMonth}</h3>
-                    <p className="text-sm text-muted-foreground">Total Records: {filteredPayroll.length} | Total Amount: ₹{filteredPayroll.reduce((sum, p) => sum + (p.netSalary || 0), 0).toLocaleString()}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Total Records: {filteredPayroll.length} | Total Amount: ₹
+                      {fmtMoney(filteredPayroll.reduce((sum, p) => sum + (p.netSalary || 0), 0))}
+                    </p>
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={handleExportPayrollExcel} disabled={filteredPayroll.length === 0}><FileSpreadsheet className="mr-2 h-4 w-4" /> Export</Button>
+                  <div className="flex gap-2 items-center">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 cursor-pointer accent-blue-600"
+                        checked={allVisibleSelected}
+                        onChange={(e) => {
+                          if (e.target.checked) selectAllVisible();
+                          else clearSelection();
+                        }}
+                      />
+                      Select all on page
+                    </label>
+                    <Button variant="outline" size="sm" onClick={handleExportPayrollExcel} disabled={filteredPayroll.length === 0}>
+                      <FileSpreadsheet className="mr-2 h-4 w-4" /> Export
+                    </Button>
                   </div>
                 </div>
 
                 {loading.payroll ? (
                   <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
                 ) : filteredPayroll.length === 0 ? (
-                  <div className="text-center py-8"><AlertCircle className="h-12 w-12 mx-auto mb-4 text-yellow-500" /><p className="text-lg font-medium">No payroll records found</p><p className="text-sm text-muted-foreground mb-4">Try selecting a different month or site filter</p><Button onClick={fetchAllData} variant="outline"><Loader2 className="mr-2 h-4 w-4" /> Retry Loading Data</Button></div>
+                  <div className="text-center py-8">
+                    <AlertCircle className="h-12 w-12 mx-auto mb-4 text-yellow-500" />
+                    <p className="text-lg font-medium">No payroll records found</p>
+                    <p className="text-sm text-muted-foreground mb-4">Try selecting a different month or site filter</p>
+                    <Button onClick={fetchAllData} variant="outline"><Loader2 className="mr-2 h-4 w-4" /> Retry Loading Data</Button>
+                  </div>
                 ) : (
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {filteredPayroll.slice(0, 6).map((record, index) => {
+                      {paginatedPayrollRecords.map((record, index) => {
                         const employee = siteFilteredEmployees.find(e => e.employeeId === record.employeeId);
+                        const recordId = getItemId(record);
+                        const isSelected = isPayrollSelected(recordId);
                         return (
-                          <Card key={record._id || index} className="transition-all duration-200 hover:shadow-md border">
+                          <Card
+                            key={record._id || index}
+                            className={`hover:shadow-md transition-all duration-200 border ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50/40' : ''
+                              }`}
+                          >
                             <CardContent className="pt-6">
-                              <div className="font-medium">{employee?.name || 'Unknown'}</div>
-                              <div className="text-sm text-muted-foreground">{record.employeeId}</div>
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="font-medium truncate">{employee?.name || 'Unknown'}</div>
+                                  <div className="text-sm text-muted-foreground">{record.employeeId}</div>
+                                </div>
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 mt-0.5 cursor-pointer accent-blue-600"
+                                  checked={isSelected}
+                                  onChange={() => togglePayrollSelection(recordId)}
+                                />
+                              </div>
                               <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
                                 <div><div className="text-gray-600">Department</div><div className="font-medium">{employee?.department || 'N/A'}</div></div>
                                 <div><div className="text-gray-600">Status</div><div>{getStatusBadge(record.status)}</div></div>
                               </div>
-                              <div className="mt-4 flex justify-between items-center border-t pt-4"><span className="text-gray-700">Net Salary:</span><span className="font-bold text-lg">₹{record.netSalary?.toLocaleString()}</span></div>
-                              <div className="mt-2 flex justify-between items-center"><span className="text-gray-700">Paid:</span><span className="font-medium text-green-600">₹{record.paidAmount?.toLocaleString()}</span></div>
-                              <div className="mt-4 flex gap-2">
-                                <Button size="sm" variant="outline" className="flex-1" onClick={() => handleOpenPaymentStatus(record)}>Update Status</Button>
-                                <Button size="sm" variant="outline" className="flex-1" onClick={() => {
+                              <div className="mt-4 flex justify-between items-center border-t pt-4">
+                                <span className="text-gray-700">Net Salary:</span>
+                                <span className="font-bold text-lg">₹{fmtMoney(record.netSalary)}</span>
+                              </div>
+                              <div className="mt-2 flex justify-between items-center">
+                                <span className="text-gray-700">Paid:</span>
+                                <span className="font-medium text-green-600">₹{fmtMoney(record.paidAmount)}</span>
+                              </div>
+
+                              <div className="mt-4 grid grid-cols-3 gap-2">
+                                <Button size="sm" variant="outline" onClick={() => handleOpenPaymentStatus(record)}>
+                                  Status
+                                </Button>
+                                <Button size="sm" variant="outline" className="text-emerald-600 hover:bg-emerald-50"
+                                  onClick={() => handleOpenAdjust(record)} title="Add Manual Adjustment">
+                                  <IndianRupee className="h-4 w-4" />
+                                </Button>
+                                <Button size="sm" variant="outline" className="text-amber-600 hover:bg-amber-50"
+                                  onClick={() => {
+                                    const newNotes = prompt("Edit notes:", record.notes || "");
+                                    if (newNotes === null) return;
+                                    axios.patch(`${API_URL}/payroll/${getItemId(record)}/notes`, { notes: newNotes }, { headers: authHeaders() })
+                                      .then(() => { toast.success("Notes updated"); fetchAllData(); })
+                                      .catch(() => toast.error("Failed to update notes"));
+                                  }} title="Edit Notes">
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => {
                                   const payrollId = getItemId(record);
                                   const slip = filteredSalarySlips.find(s => s.payrollId === payrollId);
                                   if (slip) handleViewSalarySlip(slip);
                                   else handleGenerateSalarySlip(payrollId);
-                                }}><Eye className="h-4 w-4" /></Button>
+                                }} title="View / Generate Slip">
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button size="sm" variant="outline" className="text-blue-600 hover:bg-blue-50"
+                                  onClick={() => {
+                                    if (!employee) { toast.error("Employee not found"); return; }
+                                    handleReprocessPayroll(getItemId(record), employee);
+                                  }} title="Reprocess Payroll">
+                                  <RotateCcw className="h-4 w-4" />
+                                </Button>
+                                <Button size="sm" variant="outline" className="text-red-600 hover:bg-red-50"
+                                  onClick={() => handleDeletePayroll(getItemId(record))} title="Delete Payroll">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
                               </div>
                             </CardContent>
                           </Card>
                         );
                       })}
                     </div>
-                    <div className="text-center"><p className="text-sm text-muted-foreground">Showing {Math.min(filteredPayroll.length, 6)} of {filteredPayroll.length} records</p>{filteredPayroll.length > 6 && <Button variant="link" onClick={() => toast.info("Full table view coming soon!")} className="mt-2">View All Records →</Button>}</div>
+
+                    {filteredPayroll.length > payrollRecordsPerPage && (
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+                        <div className="text-sm text-muted-foreground">
+                          Showing {Math.min((payrollRecordsPage - 1) * payrollRecordsPerPage + 1, filteredPayroll.length)} to{" "}
+                          {Math.min(payrollRecordsPage * payrollRecordsPerPage, filteredPayroll.length)} of {filteredPayroll.length} records
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Select value={String(payrollRecordsPerPage)} onValueChange={(value) => { setPayrollRecordsPerPage(parseInt(value)); setPayrollRecordsPage(1); }}>
+                            <SelectTrigger className="w-20 h-8"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="6">6</SelectItem>
+                              <SelectItem value="12">12</SelectItem>
+                              <SelectItem value="24">24</SelectItem>
+                              <SelectItem value="50">50</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button variant="outline" size="sm" onClick={() => setPayrollRecordsPage(p => Math.max(1, p - 1))} disabled={payrollRecordsPage === 1} className="h-8 w-8 p-0">‹</Button>
+                          <span className="text-sm">{payrollRecordsPage} / {Math.ceil(filteredPayroll.length / payrollRecordsPerPage)}</span>
+                          <Button variant="outline" size="sm" onClick={() => setPayrollRecordsPage(p => Math.min(Math.ceil(filteredPayroll.length / payrollRecordsPerPage), p + 1))} disabled={payrollRecordsPage === Math.ceil(filteredPayroll.length / payrollRecordsPerPage)} className="h-8 w-8 p-0">›</Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ─── Floating Bulk Action Bar ─────────────────────── */}
+                    {selectedPayrollIds.size > 0 && (
+                      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-white border shadow-2xl rounded-xl px-4 py-3 flex items-center gap-3">
+                        <div className="text-sm font-medium">
+                          <span className="text-blue-600 font-bold">{selectedPayrollIds.size}</span> selected
+                        </div>
+                        <div className="h-6 w-px bg-gray-200" />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setBulkStatusDialog(true)}
+                          className="text-green-700 border-green-300 hover:bg-green-50"
+                        >
+                          <CheckCircle className="mr-2 h-4 w-4" /> Mark Paid / Hold
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleBulkGenerateSlips}
+                          disabled={bulkActionLoading}
+                          className="text-blue-700 border-blue-300 hover:bg-blue-50"
+                        >
+                          {bulkActionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+                          Generate Slips
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setBulkDeleteDialog(true)}
+                          className="text-red-700 border-red-300 hover:bg-red-50"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" /> Delete
+                        </Button>
+                        <div className="h-6 w-px bg-gray-200" />
+                        <Button size="sm" variant="ghost" onClick={clearSelection} className="text-gray-500">
+                          <XCircle className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
+              </TabsContent>
+
+              <TabsContent value="audit-log" className="space-y-4">
+                <AuditLogTab />
               </TabsContent>
             </Tabs>
           </CardContent>

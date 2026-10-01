@@ -56,7 +56,7 @@ export const getAllBriefings = async (req: Request, res: Response) => {
     const skip = (pageNum - 1) * limitNum;
     console.log("MongoDB filter:", filter);
     const [briefings, total] = await Promise.all([
-      StaffBriefing.find(filter).sort({ date: -1, createdAt: -1 }).skip(skip).limit(limitNum),
+      StaffBriefing.find(filter).sort({ date: -1, createdAt: -1 }).skip(skip).limit(limitNum).lean(),
       StaffBriefing.countDocuments(filter)
     ]);
     console.log(`Found ${briefings.length} staff briefings`);

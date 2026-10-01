@@ -21,17 +21,20 @@ const API_URL = import.meta.env.VITE_API_URL ||
 
 const employeeService = {
   // Get all employees with pagination
-  getEmployees: async (page = 1, limit = 100): Promise<EmployeeResponse> => {
-    try {
-      console.log('🔵 Fetching employees from API...');
-      const response = await apiClient.get(`/employees?page=${page}&limit=${limit}`);
-      console.log('🟢 Employees fetched:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('🔴 Failed to fetch employees:', error);
-      throw error;
-    }
-  },
+ getEmployees: async (params: { page?: number; limit?: number } = {}): Promise<EmployeeResponse> => {
+  try {
+    const { page = 1, limit = 100 } = params;
+    console.log('🔵 Fetching employees from API...');
+    const response = await apiClient.get(`/employees`, { 
+      params: { page, limit } 
+    });
+    console.log('🟢 Employees fetched:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('🔴 Failed to fetch employees:', error);
+    throw error;
+  }
+},
 
   // Get employee by ID or employeeId
   getEmployeeById: async (id: string): Promise<EmployeeSingleResponse> => {

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import SalaryStructure, { ISalaryStructure } from '../models/SalaryStructure';
 import Employee from '../models/Employee';
 import mongoose from 'mongoose';
+import { logAudit, getUserFromReq } from '../utils/auditLogger';
 
 // Helper function to populate employee data
 const populateEmployeeData = async (structures: any[]) => {
@@ -54,7 +55,7 @@ const populateEmployeeData = async (structures: any[]) => {
     return structures.map(structure => {
       const structureObj = structure.toObject ? structure.toObject() : structure;
       const employee = employeeMap.get(structureObj.employeeId);
-      
+
       return {
         ...structureObj,
         employee: employee || null
@@ -75,15 +76,15 @@ const populateEmployeeData = async (structures: any[]) => {
 // Get all salary structures
 export const getAllSalaryStructures = async (req: Request, res: Response) => {
   try {
-    const { 
-      page = 1, 
-      limit = 100, 
-      search = '', 
+    const {
+      page = 1,
+      limit = 100,
+      search = '',
       isActive = 'true',
       sortBy = 'updatedAt',
       sortOrder = 'desc'
     } = req.query;
-    
+
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
     const skip = (pageNum - 1) * limitNum;
@@ -107,7 +108,7 @@ export const getAllSalaryStructures = async (req: Request, res: Response) => {
       }).select('employeeId').lean();
 
       const employeeIds = employees.map(emp => (emp as any).employeeId);
-      
+
       if (employeeIds.length > 0) {
         query.employeeId = { $in: employeeIds };
       } else {
@@ -204,7 +205,7 @@ export const getSalaryStructureById = async (req: Request, res: Response) => {
 export const getSalaryStructureByEmployeeId = async (req: Request, res: Response) => {
   try {
     const { employeeId } = req.params;
-    
+
     // Verify employee exists
     const employee = await Employee.findOne({ employeeId });
     if (!employee) {
@@ -214,9 +215,9 @@ export const getSalaryStructureByEmployeeId = async (req: Request, res: Response
       });
     }
 
-    const salaryStructure = await SalaryStructure.findOne({ 
+    const salaryStructure = await SalaryStructure.findOne({
       employeeId,
-      isActive: true 
+      isActive: true
     });
 
     if (!salaryStructure) {
@@ -276,9 +277,9 @@ export const createSalaryStructure = async (req: Request, res: Response) => {
     }
 
     // Check if active structure already exists
-    const existingStructure = await SalaryStructure.findOne({ 
+    const existingStructure = await SalaryStructure.findOne({
       employeeId,
-      isActive: true 
+      isActive: true
     }).session(session);
 
     if (existingStructure) {
@@ -326,6 +327,16 @@ export const createSalaryStructure = async (req: Request, res: Response) => {
     // Populate employee data
     const populatedStructures = await populateEmployeeData([salaryStructure]);
 
+    await logAudit({
+      action: 'structure.create',
+      entity: 'salaryStructure',
+      entityId: String(salaryStructure._id),
+      employeeId: salaryStructure.employeeId,
+      performedBy: getUserFromReq(req),
+      description: `Created salary structure for ${salaryStructure.employeeId}`,
+      after: { basicSalary: salaryStructure.basicSalary },
+    });
+
     res.status(201).json({
       success: true,
       message: 'Salary structure created successfully',
@@ -334,9 +345,9 @@ export const createSalaryStructure = async (req: Request, res: Response) => {
   } catch (error: any) {
     await session.abortTransaction();
     session.endSession();
-    
+
     console.error('Error creating salary structure:', error);
-    
+
     // Handle duplicate key error (unique constraint violation)
     if (error.code === 11000) {
       return res.status(400).json({
@@ -344,7 +355,7 @@ export const createSalaryStructure = async (req: Request, res: Response) => {
         message: 'Active salary structure already exists for this employee'
       });
     }
-    
+
     // Handle validation errors
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map((err: any) => err.message);
@@ -354,7 +365,7 @@ export const createSalaryStructure = async (req: Request, res: Response) => {
         errors: messages
       });
     }
-    
+
     res.status(500).json({
       success: false,
       message: 'Error creating salary structure',
@@ -394,6 +405,8 @@ export const updateSalaryStructure = async (req: Request, res: Response) => {
         message: 'Salary structure not found'
       });
     }
+
+    const oldBasicSalary = existingStructure.basicSalary;
 
     // Remove immutable fields
     delete updates.employeeId;
@@ -436,6 +449,17 @@ export const updateSalaryStructure = async (req: Request, res: Response) => {
     // Populate employee data
     const populatedStructures = await populateEmployeeData([salaryStructure]);
 
+    await logAudit({
+      action: 'structure.update',
+      entity: 'salaryStructure',
+      entityId: String(salaryStructure._id),
+      employeeId: salaryStructure.employeeId,
+      performedBy: getUserFromReq(req),
+      description: `Updated salary structure for ${salaryStructure.employeeId}`,
+      before: { basicSalary: oldBasicSalary },
+      after: { basicSalary: salaryStructure.basicSalary },
+    });
+
     res.status(200).json({
       success: true,
       message: 'Salary structure updated successfully',
@@ -444,9 +468,9 @@ export const updateSalaryStructure = async (req: Request, res: Response) => {
   } catch (error: any) {
     await session.abortTransaction();
     session.endSession();
-    
+
     console.error('Error updating salary structure:', error);
-    
+
     // Handle validation errors
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map((err: any) => err.message);
@@ -456,7 +480,7 @@ export const updateSalaryStructure = async (req: Request, res: Response) => {
         errors: messages
       });
     }
-    
+
     res.status(500).json({
       success: false,
       message: 'Error updating salary structure',
@@ -501,6 +525,16 @@ export const deleteSalaryStructure = async (req: Request, res: Response) => {
 
     console.log('Salary structure deleted successfully:', id);
 
+    await logAudit({
+      action: 'structure.delete',
+      entity: 'salaryStructure',
+      entityId: String(salaryStructure._id),
+      employeeId: salaryStructure.employeeId,
+      performedBy: getUserFromReq(req),
+      description: `Deleted salary structure for ${salaryStructure.employeeId}`,
+      before: { basicSalary: salaryStructure.basicSalary },
+    });
+
     res.status(200).json({
       success: true,
       message: 'Salary structure deleted successfully',
@@ -509,7 +543,7 @@ export const deleteSalaryStructure = async (req: Request, res: Response) => {
   } catch (error: any) {
     await session.abortTransaction();
     session.endSession();
-    
+
     console.error('Error deleting salary structure:', error);
     res.status(500).json({
       success: false,
@@ -541,9 +575,9 @@ export const deactivateSalaryStructure = async (req: Request, res: Response) => 
 
     const salaryStructure = await SalaryStructure.findByIdAndUpdate(
       id,
-      { 
-        isActive: false, 
-        updatedAt: new Date() 
+      {
+        isActive: false,
+        updatedAt: new Date()
       },
       { new: true, runValidators: true, session }
     );
@@ -573,7 +607,7 @@ export const deactivateSalaryStructure = async (req: Request, res: Response) => 
   } catch (error: any) {
     await session.abortTransaction();
     session.endSession();
-    
+
     console.error('Error deactivating salary structure:', error);
     res.status(500).json({
       success: false,
@@ -586,14 +620,14 @@ export const deactivateSalaryStructure = async (req: Request, res: Response) => 
 // Get employees without salary structure
 export const getEmployeesWithoutStructure = async (req: Request, res: Response) => {
   try {
-    const { 
-      page = 1, 
-      limit = 100, 
+    const {
+      page = 1,
+      limit = 100,
       search = '',
       sortBy = 'name',
       sortOrder = 'asc'
     } = req.query;
-    
+
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
     const skip = (pageNum - 1) * limitNum;
@@ -602,7 +636,7 @@ export const getEmployeesWithoutStructure = async (req: Request, res: Response) 
     const salaryStructures = await SalaryStructure.find({ isActive: true })
       .select('employeeId')
       .lean();
-    
+
     const employeeIdsWithStructure = salaryStructures.map(s => s.employeeId);
 
     // Build query for employees without structure
@@ -660,21 +694,21 @@ export const getSalaryStructureSummary = async (req: Request, res: Response) => 
   try {
     // Count active structures
     const activeStructures = await SalaryStructure.countDocuments({ isActive: true });
-    
+
     // Count total employees
     const totalEmployees = await Employee.countDocuments({ status: 'active' });
-    
+
     // Calculate employees without structure
     const employeesWithoutStructure = totalEmployees - activeStructures;
-    
+
     // Get average basic salary
     const avgBasicResult = await SalaryStructure.aggregate([
       { $match: { isActive: true } },
       { $group: { _id: null, avgBasic: { $avg: '$basicSalary' } } }
     ]);
-    
+
     const avgBasicSalary = avgBasicResult.length > 0 ? avgBasicResult[0].avgBasic : 0;
-    
+
     // Get total allowances and deductions
     const totalsResult = await SalaryStructure.aggregate([
       { $match: { isActive: true } },
@@ -684,8 +718,8 @@ export const getSalaryStructureSummary = async (req: Request, res: Response) => 
           totalBasic: { $sum: '$basicSalary' },
           totalHRA: { $sum: '$hra' },
           totalDA: { $sum: '$da' },
-          totalAllowances: { 
-            $sum: { 
+          totalAllowances: {
+            $sum: {
               $add: [
                 '$hra',
                 '$da',
@@ -698,8 +732,8 @@ export const getSalaryStructureSummary = async (req: Request, res: Response) => 
               ]
             }
           },
-          totalDeductions: { 
-            $sum: { 
+          totalDeductions: {
+            $sum: {
               $add: [
                 '$providentFund',
                 '$professionalTax',
@@ -714,7 +748,7 @@ export const getSalaryStructureSummary = async (req: Request, res: Response) => 
         }
       }
     ]);
-    
+
     const totals = totalsResult.length > 0 ? totalsResult[0] : {
       totalBasic: 0,
       totalHRA: 0,
@@ -722,10 +756,10 @@ export const getSalaryStructureSummary = async (req: Request, res: Response) => 
       totalAllowances: 0,
       totalDeductions: 0
     };
-    
+
     // Calculate total CTC (Cost to Company)
     const totalCTC = totals.totalBasic + totals.totalAllowances;
-    
+
     res.status(200).json({
       success: true,
       data: {
@@ -757,7 +791,7 @@ export const getSalaryStructureSummary = async (req: Request, res: Response) => 
 export const getSalaryStructuresByEmployeeIds = async (req: Request, res: Response) => {
   try {
     const { employeeIds } = req.body;
-    
+
     if (!employeeIds || !Array.isArray(employeeIds)) {
       return res.status(400).json({
         success: false,
@@ -803,9 +837,9 @@ export const validateSalaryStructure = async (req: Request, res: Response) => {
     }
 
     // Check if active structure already exists
-    const existingStructure = await SalaryStructure.findOne({ 
+    const existingStructure = await SalaryStructure.findOne({
       employeeId,
-      isActive: true 
+      isActive: true
     });
 
     if (existingStructure) {
@@ -884,9 +918,9 @@ export const updateSalaryStructureStatus = async (req: Request, res: Response) =
 
     const salaryStructure = await SalaryStructure.findByIdAndUpdate(
       id,
-      { 
+      {
         isActive,
-        updatedAt: new Date() 
+        updatedAt: new Date()
       },
       { new: true, runValidators: true, session }
     );
@@ -916,7 +950,7 @@ export const updateSalaryStructureStatus = async (req: Request, res: Response) =
   } catch (error: any) {
     await session.abortTransaction();
     session.endSession();
-    
+
     console.error('Error updating salary structure status:', error);
     res.status(500).json({
       success: false,
@@ -931,7 +965,7 @@ export const getSalaryStructureHistory = async (req: Request, res: Response) => 
   try {
     const { employeeId } = req.params;
     const { limit = 10, page = 1 } = req.query;
-    
+
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
     const skip = (pageNum - 1) * limitNum;
@@ -1026,10 +1060,10 @@ export const calculateSalaryBreakdown = async (req: Request, res: Response) => {
     const advance = salaryStructure.advance || 0;
     const mlwf = salaryStructure.mlwf || 0;
 
-    const totalAllowances = hra + da + specialAllowance + conveyance + 
+    const totalAllowances = hra + da + specialAllowance + conveyance +
                            medicalAllowance + otherAllowances + leaveEncashment + arrears;
-    
-    const totalDeductions = providentFund + professionalTax + incomeTax + 
+
+    const totalDeductions = providentFund + professionalTax + incomeTax +
                            otherDeductions + esic + advance + mlwf;
 
     const grossSalary = basicSalary + totalAllowances;
@@ -1142,9 +1176,9 @@ export const importSalaryStructures = async (req: Request, res: Response) => {
         }
 
         // Check if active structure already exists
-        const existingStructure = await SalaryStructure.findOne({ 
+        const existingStructure = await SalaryStructure.findOne({
           employeeId,
-          isActive: true 
+          isActive: true
         }).session(session);
 
         if (existingStructure) {
@@ -1229,6 +1263,14 @@ export const importSalaryStructures = async (req: Request, res: Response) => {
     await session.commitTransaction();
     session.endSession();
 
+    await logAudit({
+      action: 'structure.import',
+      entity: 'salaryStructure',
+      performedBy: getUserFromReq(req),
+      description: `Imported salary structures — Created: ${importedCount}, Updated: ${updatedCount}, Errors: ${errors.length}`,
+      metadata: { created: importedCount, updated: updatedCount, failed: errors.length, total: structures.length },
+    });
+
     res.status(200).json({
       success: true,
       message: `Salary structures imported successfully. Created: ${importedCount}, Updated: ${updatedCount}, Errors: ${errors.length}`,
@@ -1244,7 +1286,7 @@ export const importSalaryStructures = async (req: Request, res: Response) => {
   } catch (error: any) {
     await session.abortTransaction();
     session.endSession();
-    
+
     console.error('Error importing salary structures:', error);
     res.status(500).json({
       success: false,

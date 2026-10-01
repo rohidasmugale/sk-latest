@@ -15,8 +15,9 @@ const API_URL = import.meta.env.VITE_API_URL ||
 
 export const DOCUMENT_TYPES = [
   { value: 'aadhar', label: 'Aadhaar Card', icon: '🆔', required: true, pattern: '^[0-9]{12}$', patternMessage: 'Enter 12-digit Aadhar number' },
-  { value: 'pan', label: 'PAN Card', icon: '💳', required: true, pattern: '^[A-Z]{5}[0-9]{4}[A-Z]{1}$', patternMessage: 'Enter PAN (e.g., ABCDE1234F)' },
-  { value: 'police', label: 'Police Verification', icon: '👮', required: false, pattern: null },  // ← CHANGED to false
+  { value: 'pan', label: 'PAN Card', icon: '💳', required: false, pattern: '^[A-Z]{5}[0-9]{4}[A-Z]{1}$', patternMessage: 'Enter PAN (e.g., ABCDE1234F)' }, // required: true → false
+  { value: 'passbook', label: 'Bank Passbook', icon: '📖', required: true, pattern: null }, // NEW
+  { value: 'police', label: 'Police Verification', icon: '👮', required: false, pattern: null },
   { value: 'driving', label: 'Driving License', icon: '🚗', required: false, pattern: null },
   { value: 'electricity', label: 'Electricity Bill', icon: '⚡', required: false, pattern: null },
   { value: 'voter', label: 'Voter ID', icon: '🗳️', required: false, pattern: null },
@@ -279,26 +280,25 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         method: 'PATCH'
       });
 
-      const data = await response.json();
+      let data: any = {};
+      try {
+        data = await response.json();
+      } catch {
+        // non-JSON body (likely 404/500 HTML page)
+      }
 
       if (!response.ok) {
-        throw new Error(data.message || `http error! status: ${response.status}`);
+        throw new Error(data.message || `Server returned ${response.status} ${response.statusText}`);
       }
 
       toast.success('Document verified successfully');
-
       fetchDocuments();
-
-      if (onDocumentUploaded) {
-        onDocumentUploaded();
-      }
-
+      if (onDocumentUploaded) onDocumentUploaded();
     } catch (error: any) {
       console.error('Error verifying document:', error);
       toast.error(error.message || 'Failed to verify document');
     }
   };
-
   const openDocumentPreview = (document: Document) => {
     setSelectedDocument(document);
     setPreviewDialogOpen(true);

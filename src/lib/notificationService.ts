@@ -121,7 +121,7 @@ class NotificationService {
     this.playNotificationSound();
     // Add a system notification
     this.addNotification({
-      title: `🚨 Employee Left Site`,
+      title: `🚨a Employee Left Site`,
       message: `${employeeName} is ${(distanceKm * 1000).toFixed(0)}m away from ${siteName || 'the site'}.`,
       type: 'system',
       metadata: {

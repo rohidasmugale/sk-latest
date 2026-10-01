@@ -28,8 +28,7 @@ export const getAllClients = async (req: Request, res: Response) => {
       filter.status = 'active';
     }
     
-    const clients = await Client.find(filter)
-      .sort('name');
+   const clients = await Client.find(filter).sort('name').lean();
     
     res.status(200).json({
       success: true,
@@ -256,9 +255,7 @@ export const searchClients = async (req: Request, res: Response) => {
       ]
     };
     
-    const clients = await Client.find(filter)
-      .sort('name')
-      .limit(20);
+   const clients = await Client.find(filter).sort('name').lean();
     
     res.status(200).json({
       success: true,

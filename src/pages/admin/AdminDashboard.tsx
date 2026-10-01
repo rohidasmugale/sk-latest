@@ -1,10 +1,10 @@
 import SuperAdminDashboard from "../superadmin/SuperAdminDashboard";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Camera, Coffee, Timer, RefreshCw, Upload } from "lucide-react";
+import { Camera, Coffee, Timer } from "lucide-react";
 import CameraCapture from "../supervisor/CameraCapture";
 
 const API_URL = import.meta.env.VITE_API_URL ||
@@ -22,9 +22,8 @@ const AdminDashboard = () => {
     hasCheckedOutToday: false,
   });
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [cameraAction, setCameraAction] = useState(null);
   const [loading, setLoading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [myEmployeeRecord, setMyEmployeeRecord] = useState<any>(null);
 
   const getCurrentAdminId = () => {
     const stored = localStorage.getItem("sk_user");
@@ -39,12 +38,51 @@ const AdminDashboard = () => {
     return null;
   };
 
+  const getCurrentAdminName = () => {
+    const stored = localStorage.getItem("sk_user");
+    if (stored) {
+      try {
+        const user = JSON.parse(stored);
+        return user.name || user.firstName || "Admin";
+      } catch {
+        return "Admin";
+      }
+    }
+    return "Admin";
+  };
+
+  const fetchMyEmployeeRecord = async () => {
+    try {
+      const stored = localStorage.getItem("sk_user");
+      const me = stored ? JSON.parse(stored) : null;
+      if (!me?._id) return;
+
+      const response = await axios.get(`${API_URL}/employees`, {
+        params: { userId: me._id, limit: 1 }
+      });
+
+      let employeesData = [];
+      if (response.data) {
+        if (Array.isArray(response.data)) employeesData = response.data;
+        else if (response.data.success && Array.isArray(response.data.data)) employeesData = response.data.data;
+      }
+
+      if (employeesData.length > 0) {
+        setMyEmployeeRecord(employeesData[0]);
+      } else {
+        console.warn('⚠️ No Employee record linked to this User (userId):', me._id);
+      }
+    } catch (error) {
+      console.error('Failed to fetch my employee record:', error);
+    }
+  };
+
   const loadMyAttendanceStatus = async () => {
-    const userId = getCurrentAdminId();
-    if (!userId) return;
+    const empId = myEmployeeRecord?.employeeId || myEmployeeRecord?._id;
+    if (!empId) return;
 
     try {
-      const response = await axios.get(`${API_URL}/attendance/status/${userId}`);
+      const response = await axios.get(`${API_URL}/attendance/status/${empId}`);
       if (response.data.success && response.data.data) {
         const api = response.data.data;
         const today = new Date().toDateString();
@@ -67,35 +105,52 @@ const AdminDashboard = () => {
   };
 
   useEffect(() => {
-    loadMyAttendanceStatus();
+    fetchMyEmployeeRecord();
   }, []);
 
+  useEffect(() => {
+    if (myEmployeeRecord) {
+      loadMyAttendanceStatus();
+    }
+  }, [myEmployeeRecord]);
+
   const handleAttendanceCamera = () => {
-    setCameraAction('recognize');
     setCameraOpen(true);
   };
 
   const handlePhotoCapture = async (photoFile) => {
     setLoading(true);
     try {
+      if (!myEmployeeRecord) {
+        toast.error("Your employee record wasn't found. Contact superadmin to link your account.");
+        setLoading(false);
+        setCameraOpen(false);
+        return;
+      }
+
+      const isCheckingOut = attendance.hasCheckedInToday && !attendance.hasCheckedOutToday;
+      const endpoint = isCheckingOut
+        ? `${API_URL}/attendance/checkout-with-photo`
+        : `${API_URL}/attendance/checkin-with-photo`;
+
+      const empId = myEmployeeRecord.employeeId || myEmployeeRecord._id;
+      const empName = myEmployeeRecord.name || "Admin";
+      const empSite = myEmployeeRecord.siteName || myEmployeeRecord.site || '';
+
       const formData = new FormData();
       formData.append('photo', photoFile);
-      formData.append('supervisorId', getCurrentAdminId() || '');
-      formData.append('siteName', '');
+      formData.append('employeeId', empId);
+      formData.append('employeeName', empName);
+      formData.append('siteName', empSite);
 
-      const response = await axios.post(`${API_URL}/attendance/auto-attendance`, formData, {
+      const response = await axios.post(endpoint, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 15000,
       });
 
       if (response.data.success) {
-        const { employeeName, action, alreadyCheckedIn } = response.data.data;
-        if (alreadyCheckedIn) {
-          toast.info(`${employeeName} already checked in`);
-        } else {
-          toast.success(`${employeeName} ${action === 'checkin' ? 'checked in' : 'checked out'}!`);
-          loadMyAttendanceStatus();
-        }
+        toast.success(isCheckingOut ? 'Checked out successfully!' : 'Checked in successfully!');
+        loadMyAttendanceStatus();
       } else {
         toast.error(response.data.message || 'Attendance failed');
       }
@@ -104,16 +159,7 @@ const AdminDashboard = () => {
     } finally {
       setLoading(false);
       setCameraOpen(false);
-      setCameraAction(null);
     }
-  };
-
-  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handlePhotoCapture(file);
-    }
-    e.target.value = "";
   };
 
   const handleBreakIn = async () => {
@@ -127,12 +173,11 @@ const AdminDashboard = () => {
     }
 
     try {
-      const userId = getCurrentAdminId();
-      await axios.post(`${API_URL}/attendance/breakin`, { employeeId: userId });
+      const empId = myEmployeeRecord?.employeeId || myEmployeeRecord?._id;
+      await axios.post(`${API_URL}/attendance/breakin`, { employeeId: empId });
       setAttendance({
         ...attendance,
         isOnBreak: true,
-        breakStartTime: new Date().toISOString(),
       });
       toast.success("Break started");
       loadMyAttendanceStatus();
@@ -148,12 +193,11 @@ const AdminDashboard = () => {
     }
 
     try {
-      const userId = getCurrentAdminId();
-      await axios.post(`${API_URL}/attendance/breakout`, { employeeId: userId });
+      const empId = myEmployeeRecord?.employeeId || myEmployeeRecord?._id;
+      await axios.post(`${API_URL}/attendance/breakout`, { employeeId: empId });
       setAttendance({
         ...attendance,
         isOnBreak: false,
-        breakEndTime: new Date().toISOString(),
       });
       toast.success("Break ended");
       loadMyAttendanceStatus();
@@ -162,72 +206,59 @@ const AdminDashboard = () => {
     }
   };
 
+  const attendanceBar = (
+    <div className="px-3 sm:px-4 mt-2 flex flex-wrap items-center gap-2">
+      <Button
+        onClick={handleAttendanceCamera}
+        variant="default"
+        size="sm"
+        className="flex items-center gap-1"
+        disabled={loading}
+      >
+        <Camera className="h-4 w-4" />
+        {loading
+          ? 'Processing...'
+          : attendance.hasCheckedInToday && !attendance.hasCheckedOutToday
+            ? 'Check Out'
+            : 'Check In'}
+      </Button>
+
+      <Button
+        onClick={handleBreakIn}
+        disabled={!attendance.isCheckedIn || attendance.isOnBreak}
+        variant="outline"
+        size="sm"
+      >
+        <Coffee className="h-4 w-4 mr-1" /> Break In
+      </Button>
+
+      <Button
+        onClick={handleBreakOut}
+        disabled={!attendance.isOnBreak}
+        variant="outline"
+        size="sm"
+      >
+        <Timer className="h-4 w-4 mr-1" /> Break Out
+      </Button>
+
+      <div className="flex items-center gap-2 ml-auto sm:ml-0">
+        <Badge
+          variant={attendance.hasCheckedOutToday ? "default" : attendance.hasCheckedInToday ? "secondary" : "outline"}
+          className="text-xs"
+        >
+          {attendance.hasCheckedOutToday ? "Completed" : attendance.hasCheckedInToday ? "In Progress" : "Not Started"}
+        </Badge>
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          Hours: {attendance.totalHours.toFixed(1)}h
+        </span>
+      </div>
+    </div>
+  );
+
   return (
     <>
-      {/* Admin Self-Attendance Bar */}
-      <div className="px-3 sm:px-4 mt-2 flex flex-wrap items-center gap-2">
-        <Button
-          onClick={handleAttendanceCamera}
-          variant="default"
-          size="sm"
-          className="flex items-center gap-1"
-          disabled={loading}
-        >
-          <Camera className="h-4 w-4" />
-          {loading ? 'Processing...' : 'Attendance'}
-        </Button>
+      <SuperAdminDashboard title="Admin Dashboard" headerExtra={attendanceBar} />
 
-        <Button
-          onClick={() => fileInputRef.current?.click()}
-          variant="outline"
-          size="sm"
-          className="flex items-center gap-1"
-        >
-          <Upload className="h-4 w-4" /> Upload Photo
-        </Button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleFileSelected}
-          className="hidden"
-        />
-
-        <Button
-          onClick={handleBreakIn}
-          disabled={!attendance.isCheckedIn || attendance.isOnBreak}
-          variant="outline"
-          size="sm"
-        >
-          <Coffee className="h-4 w-4 mr-1" /> Break In
-        </Button>
-
-        <Button
-          onClick={handleBreakOut}
-          disabled={!attendance.isOnBreak}
-          variant="outline"
-          size="sm"
-        >
-          <Timer className="h-4 w-4 mr-1" /> Break Out
-        </Button>
-
-        <div className="flex items-center gap-2 ml-auto sm:ml-0">
-          <Badge
-            variant={attendance.hasCheckedOutToday ? "default" : attendance.hasCheckedInToday ? "secondary" : "outline"}
-            className="text-xs"
-          >
-            {attendance.hasCheckedOutToday ? "Completed" : attendance.hasCheckedInToday ? "In Progress" : "Not Started"}
-          </Badge>
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
-            Hours: {attendance.totalHours.toFixed(1)}h
-          </span>
-        </div>
-      </div>
-
-      {/* SuperAdmin Dashboard */}
-      <SuperAdminDashboard title="Admin Dashboard" />
-
-      {/* Camera Capture Modal */}
       <CameraCapture
         open={cameraOpen}
         onOpenChange={setCameraOpen}

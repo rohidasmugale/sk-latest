@@ -27,7 +27,7 @@ const ManagerHRMS = () => {
             setFetchAttempted(true);
 
             console.log('🟡 Fetching employees for Manager HRMS...');
-            const response = await employeeService.getEmployees();
+            const response = await employeeService.getEmployees({ limit: 10000 });
             console.log('🟡 Full response:', response);
 
             // Try different ways to extract employees

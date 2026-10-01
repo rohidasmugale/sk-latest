@@ -37,12 +37,15 @@ export interface Site {
   shifts?: ShiftDefinition[];  // ✅ ADD THIS
   createdAt?: string;
   updatedAt?: string;
-   supervisorId?: string;
+    supervisorId?: string;
   supervisor?: string;
   assignedSupervisors?: string[];
   supervisorName?: string;
+  // ✅ Geofence
+  latitude?: number;
+  longitude?: number;
+  geofenceRadius?: number;
 }
-
 export interface Client {
   _id: string;
   name: string;
@@ -63,12 +66,15 @@ export interface CreateSiteRequest {
   supervisorCount?: number; // ADD THIS
   contractValue: number;
   contractEndDate: string;
-  services: string[];
+   services: string[];
   staffDeployment: Array<{ role: string; count: number }>;
    shifts?: ShiftDefinition[];  // ✅ ADD THIS
   status: 'active' | 'inactive';
+  // ✅ Geofence
+  latitude?: number;
+  longitude?: number;
+  geofenceRadius?: number;
 }
-
 export type UpdateSiteRequest = Partial<CreateSiteRequest>;
 
 export interface SiteStats {
@@ -124,11 +130,12 @@ const defaultStats: SiteStats = {
 class SiteService {
  
   // Generic fetch method with error handling
-  private async fetchApi<T>(
+   private async fetchApi<T>(
     endpoint: string, 
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${API_URL}${endpoint}`;
+    const token = localStorage.getItem('sk_token');   // ← ADD THIS LINE
     
     console.log(`🌐 API Call: ${options.method || 'GET'} ${url}`, options.body ? { body: JSON.parse(options.body as string) } : '');
     
@@ -137,6 +144,7 @@ class SiteService {
         ...options,
         headers: {
           'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),   // ← ADD THIS LINE
           ...options.headers,
         },
       });
@@ -261,9 +269,13 @@ class SiteService {
         color: s.color || '#4CAF50',
         appliesTo: Array.isArray(s.appliesTo) ? s.appliesTo : [],
         isOvernight: s.isOvernight || (s.endTime && s.startTime && s.endTime < s.startTime)
-      })) : [],
+           })) : [],
       createdAt: site.createdAt || site.created || new Date().toISOString(),
-      updatedAt: site.updatedAt || site.updated || new Date().toISOString()
+      updatedAt: site.updatedAt || site.updated || new Date().toISOString(),
+      // ✅ Geofence — treat 0 as "not configured" (schema default)
+      latitude: (site.latitude != null && site.latitude !== 0) ? Number(site.latitude) : undefined,
+      longitude: (site.longitude != null && site.longitude !== 0) ? Number(site.longitude) : undefined,
+      geofenceRadius: site.geofenceRadius != null ? Number(site.geofenceRadius) : 0.5,
     })) as Site[];   // 👈 cast here
 
     console.log(`✅ Transformed ${transformedSites.length} sites`);
@@ -475,6 +487,10 @@ private transformSiteData(data: any): Site | null {
     supervisor: data.supervisor || undefined,
     assignedSupervisors: data.assignedSupervisors || undefined,
     supervisorName: data.supervisorName || undefined,
+    // ✅ Geofence
+    latitude: (data.latitude != null && data.latitude !== 0) ? Number(data.latitude) : undefined,
+    longitude: (data.longitude != null && data.longitude !== 0) ? Number(data.longitude) : undefined,
+    geofenceRadius: data.geofenceRadius != null ? Number(data.geofenceRadius) : 0.5,
   };
 }
 

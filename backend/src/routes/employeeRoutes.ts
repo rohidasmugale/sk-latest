@@ -960,7 +960,7 @@ router.get('/export', async (req: any, res: any) => {
 
 // ==================== SINGLE EMPLOYEE CRUD ROUTES ====================
 
-router.get('/', async (req: any, res: any) => {
+router.get('/', authenticate, async (req: any, res: any) => {
   try {
     const { 
       page = 1, 
@@ -1526,7 +1526,7 @@ router.patch('/:id/status', async (req: any, res: any) => {
 
 // ==================== DOCUMENT MANAGEMENT ROUTES ====================
 
-type DocumentType = 'aadhar' | 'pan' | 'police' | 'driving' | 'electricity' | 'voter' | 'passport' | 'other';
+type DocumentType = 'aadhar' | 'pan' | 'passbook' | 'police' | 'driving' | 'electricity' | 'voter' | 'passport' | 'other';
 
 interface KYCdocument {
   documentType: DocumentType;
@@ -1573,7 +1573,7 @@ router.post('/:id/documents',
         });
       }
 
-      const validDocumentTypes: DocumentType[] = ['aadhar', 'pan', 'police', 'driving', 'electricity', 'voter', 'passport', 'other'];
+     const validDocumentTypes: DocumentType[] = ['aadhar', 'pan', 'passbook', 'police', 'driving', 'electricity', 'voter', 'passport', 'other'];
       if (!validDocumentTypes.includes(documentType as DocumentType)) {
         return res.status(400).json({
           success: false,
@@ -1590,15 +1590,16 @@ router.post('/:id/documents',
         });
       }
 
-      let folder = 'employee-documents';
-      if (documentType === 'aadhar') folder = 'employee-documents/aadhar';
-      else if (documentType === 'pan') folder = 'employee-documents/pan';
-      else if (documentType === 'police') folder = 'employee-documents/police';
-      else if (documentType === 'driving') folder = 'employee-documents/driving';
-      else if (documentType === 'electricity') folder = 'employee-documents/electricity';
-      else if (documentType === 'voter') folder = 'employee-documents/voter';
-      else if (documentType === 'passport') folder = 'employee-documents/passport';
-      else folder = 'employee-documents/other';
+     let folder = 'employee-documents';
+if (documentType === 'aadhar') folder = 'employee-documents/aadhar';
+else if (documentType === 'pan') folder = 'employee-documents/pan';
+else if (documentType === 'passbook') folder = 'employee-documents/passbook'; // NEW
+else if (documentType === 'police') folder = 'employee-documents/police';
+else if (documentType === 'driving') folder = 'employee-documents/driving';
+else if (documentType === 'electricity') folder = 'employee-documents/electricity';
+else if (documentType === 'voter') folder = 'employee-documents/voter';
+else if (documentType === 'passport') folder = 'employee-documents/passport';
+else folder = 'employee-documents/other';
       
       console.log('Uploading to Cloudinary folder:', folder);
       
@@ -1694,25 +1695,21 @@ router.delete('/:id/documents/:documentIndex', async (req: any, res: any) => {
   try {
     const { id, documentIndex } = req.params;
     const index = parseInt(documentIndex);
-    
-    const employee = await Employee.findById(id);
-    
-    if (!employee) {
-      return res.status(404).json({
-        success: false,
-        message: 'Employee not found'
-      });
+
+    if (isNaN(index) || index < 0) {
+      return res.status(400).json({ success: false, message: 'Invalid document index' });
     }
 
+    const employee = await Employee.findById(id);
+    if (!employee) {
+      return res.status(404).json({ success: false, message: 'Employee not found' });
+    }
     if (!employee.kycDocuments || index >= employee.kycDocuments.length) {
-      return res.status(404).json({
-        success: false,
-        message: 'Document not found'
-      });
+      return res.status(404).json({ success: false, message: 'Document not found' });
     }
 
     const documentToDelete = employee.kycDocuments[index];
-    
+
     try {
       if (documentToDelete.filePublicId) {
         await deleteFromCloudinary(documentToDelete.filePublicId);
@@ -1720,20 +1717,16 @@ router.delete('/:id/documents/:documentIndex', async (req: any, res: any) => {
     } catch (cloudinaryError) {
       console.error('Error deleting from Cloudinary:', cloudinaryError);
     }
-    
+
     employee.kycDocuments.splice(index, 1);
-    await employee.save();
+    await employee.save({ validateBeforeSave: false });
 
-    res.json({
-      success: true,
-      message: 'Document deleted successfully'
-    });
-
+    res.json({ success: true, message: 'Document deleted successfully' });
   } catch (error: any) {
     console.error('Error deleting document:', error);
     res.status(500).json({
       success: false,
-      message: 'Error deleting document',
+      message: error.message || 'Error deleting document',
       error: error.message
     });
   }
@@ -1743,39 +1736,43 @@ router.patch('/:id/documents/:documentIndex/verify', async (req: any, res: any) 
   try {
     const { id, documentIndex } = req.params;
     const index = parseInt(documentIndex);
-    
-    const employee = await Employee.findById(id);
-    
+
+    if (isNaN(index) || index < 0) {
+      return res.status(400).json({ success: false, message: 'Invalid document index' });
+    }
+
+    const employee = await Employee.findById(id).select('kycDocuments');
     if (!employee) {
-      return res.status(404).json({
-        success: false,
-        message: 'Employee not found'
-      });
+      return res.status(404).json({ success: false, message: 'Employee not found' });
     }
-
     if (!employee.kycDocuments || index >= employee.kycDocuments.length) {
-      return res.status(404).json({
-        success: false,
-        message: 'Document not found'
-      });
+      return res.status(404).json({ success: false, message: 'Document not found' });
     }
 
-    employee.kycDocuments[index].verified = true;
-    employee.kycDocuments[index].verifiedAt = new Date();
-    employee.kycDocuments[index].verifiedBy = req.user?.id || 'system';
-    
-    await employee.save();
+    // Update ONLY the targeted subdocument fields.
+    // skip full-document validation — this is a flag change, not a record rewrite.
+    const updated = await Employee.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          [`kycDocuments.${index}.verified`]: true,
+          [`kycDocuments.${index}.verifiedAt`]: new Date(),
+          [`kycDocuments.${index}.verifiedBy`]: req.user?._id || req.user?.id || 'system',
+        }
+      },
+      { new: true, runValidators: false }
+    ).select('kycDocuments');
 
     res.json({
       success: true,
-      message: 'Document verified successfully'
+      message: 'Document verified successfully',
+      document: updated?.kycDocuments?.[index]
     });
-
   } catch (error: any) {
     console.error('Error verifying document:', error);
     res.status(500).json({
       success: false,
-      message: 'Error verifying document',
+      message: error.message || 'Error verifying document',
       error: error.message
     });
   }
@@ -1799,18 +1796,19 @@ router.get('/:id/documents/stats', async (req: any, res: any) => {
     const verifiedDocs = documents.filter(d => d.verified).length;
     const pendingDocs = totalDocs - verifiedDocs;
     
-    const documentTypes = {
-      aadhar: documents.find(d => d.documentType === 'aadhar'),
-      pan: documents.find(d => d.documentType === 'pan'),
-      police: documents.find(d => d.documentType === 'police'),
-      driving: documents.find(d => d.documentType === 'driving'),
-      electricity: documents.find(d => d.documentType === 'electricity'),
-      voter: documents.find(d => d.documentType === 'voter'),
-      passport: documents.find(d => d.documentType === 'passport'),
-      other: documents.filter(d => d.documentType === 'other').length
-    };
+   const documentTypes = {
+  aadhar: documents.find(d => d.documentType === 'aadhar'),
+  pan: documents.find(d => d.documentType === 'pan'),
+  passbook: documents.find(d => d.documentType === 'passbook'), // NEW
+  police: documents.find(d => d.documentType === 'police'),
+  driving: documents.find(d => d.documentType === 'driving'),
+  electricity: documents.find(d => d.documentType === 'electricity'),
+  voter: documents.find(d => d.documentType === 'voter'),
+  passport: documents.find(d => d.documentType === 'passport'),
+  other: documents.filter(d => d.documentType === 'other').length
+};
 
-    const requiredDocs = ['aadhar', 'pan'];
+   const requiredDocs = ['aadhar', 'passbook']; // was ['aadhar', 'pan']
     const uploadedRequired = requiredDocs.filter(type => 
       documents.some(d => d.documentType === type)
     ).length;

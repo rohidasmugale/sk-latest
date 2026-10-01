@@ -1,7 +1,7 @@
 // src/context/NotificationContext.tsx
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
-import NotificationService, { NotificationItem } from '@/lib/notificationService';
+import { NotificationItem } from '@/lib/notificationService';
 import { useRole } from './RoleContext';
 import axios, { AxiosInstance } from 'axios';
 
@@ -54,8 +54,7 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { role, user } = useRole();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const service = NotificationService;
-  const pollInterval = useRef<NodeJS.Timeout | null>(null);
+
   const isMounted = useRef(true);
 
   // Refs for task polling (cross‑tab)
@@ -113,14 +112,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       })) return prev;
       return [item, ...prev];
     });
-
     // Play sound and show toast
     playNotificationSound();
     toast.info(item.title, { description: item.message, duration: 6000 });
-
-    // Also persist to localStorage (for offline / cross‑tab via service)
-    service.addNotification(notif);
-  }, [service]);
+  }, []);
 
   // ========== Poll /assigntasks for NEW tasks (supervisor/manager/employee) ==========
   useEffect(() => {
@@ -357,9 +352,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         const token = localStorage.getItem('sk_token');
         if (!token) return;
 
-        const wereCleared = localStorage.getItem('notifications_cleared');
-        if (wereCleared === 'true') return;
-
         const response = await apiClientRef.current.get('/notifications', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -477,34 +469,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
   }, [role, user, addNotification]);
 
-  // ========== Load initial notifications from localStorage ==========
-  // ========== Load initial notifications from localStorage ==========
-  useEffect(() => {
-    isMounted.current = true;
-
-    // ✅ Check if notifications were cleared
-    const wereCleared = localStorage.getItem('notifications_cleared');
-    if (wereCleared === 'true') {
-      // If cleared, don't load from localStorage
-      setNotifications([]);
-      // Clear the flag after checking
-      localStorage.removeItem('notifications_cleared');
-      return;
-    }
-
-    const cached = service.getNotifications();
-    if (cached.length > 0) setNotifications(cached);
-
-    const unsubscribe = service.subscribe((updated) => {
-      if (isMounted.current) setNotifications([...updated]);
-    });
-
-    return () => {
-      isMounted.current = false;
-      unsubscribe();
-      if (pollInterval.current) clearInterval(pollInterval.current);
-    };
-  }, [service]);
 
   // ========== Poll /incidents for NEW incident reports (admin/superadmin/manager) ==========
 
@@ -525,49 +489,32 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // ========== CRUD operations (now use setNotifications) ==========
   const markAsRead = useCallback((id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-    service.markAsRead(id);
     apiClientRef.current.patch(`/notifications/${id}/read`).catch(() => { });
-  }, [service]);
+  }, []);
 
   const markAllAsRead = useCallback(() => {
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-    service.markAllAsRead();
     apiClientRef.current.patch('/notifications/read-all').catch(() => { });
-  }, [service]);
-
+  }, []);
   const removeNotification = useCallback((id: string) => {
     // ✅ Also remove from shown IDs
     shownNotificationIds.current.delete(id);
     setNotifications(prev => prev.filter(n => n.id !== id));
-    service.deleteNotification(id);
-  }, [service]);
+  }, []);
 
-  const clearAll = useCallback(() => {
-    // 1. Clear the shown IDs to prevent duplicates
+  const clearAll = useCallback(async () => {
     shownNotificationIds.current.clear();
-
-    // 2. Clear React state
     setNotifications([]);
 
-    // 3. Clear from service
-    service.clearAllNotifications();
-
-    // 4. Explicitly clear all localStorage items
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('site_notifications');
-      localStorage.removeItem('sk_notifications');
-      // Set a flag that notifications were cleared
-      localStorage.setItem('notifications_cleared', 'true');
+    try {
+      await apiClientRef.current.delete('/notifications/clear-all');
+    } catch (err) {
+      console.warn('Failed to clear notifications on server:', err);
     }
 
-    // 5. Show success message
     toast.success('All notifications cleared');
+  }, []);
 
-    // 6. Force a re-render by triggering a storage event
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new Event('storage'));
-    }
-  }, [service]);
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return (

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import CameraCapture from "./CameraCapture";
+import employeeService from "@/services/employeeService";
 import {
   Calendar,
   CheckCircle,
@@ -27,6 +28,7 @@ import {
   ChevronUp,
   FileSpreadsheet,
   UserCog,
+  UserCheck
 } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
@@ -165,7 +167,7 @@ const Attendance = () => {
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
-  const [supervisorSites, setSupervisorSites] = useState<Site[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
@@ -215,43 +217,7 @@ const Attendance = () => {
   const [newEmployeeStatus, setNewEmployeeStatus] = useState<"active" | "inactive" | "left">("active");
   const [updatingEmployeeStatus, setUpdatingEmployeeStatus] = useState(false);
   // Data fetching
-  const fetchSupervisorSites = useCallback(async () => {
-    if (!currentUser) return [];
-    try {
-      const supervisorId = currentUser._id || currentUser.id;
-      const supervisorName = currentUser.name;
-      const response = await axios.get(`${API_URL}/tasks`, { params: { limit: 1000 } });
-      let allTasks = response.data?.data || response.data || [];
-      if (!Array.isArray(allTasks)) allTasks = [];
 
-      const siteIdSet = new Set<string>();
-      allTasks.forEach((task: any) => {
-        const assigned =
-          task.assignedUsers?.some((u: any) =>
-            u.userId === supervisorId ||
-            (u.name && supervisorName && u.name.toLowerCase() === supervisorName.toLowerCase())
-          ) ||
-          task.assignedTo === supervisorId;
-        if (assigned && task.siteId) siteIdSet.add(task.siteId);
-      });
-
-      const sitesRes = await axios.get(`${API_URL}/sites`);
-      let allSites = sitesRes.data?.data || sitesRes.data || [];
-      if (!Array.isArray(allSites)) allSites = [];
-
-      const filtered = allSites.filter((s: any) => siteIdSet.has(s._id));
-
-      if (filtered.length === 0) {
-        console.warn("⚠️ No sites found via task assignment for this supervisor — check that this supervisor has at least one task with a siteId set.");
-      }
-
-      setSupervisorSites(filtered);
-      return filtered;
-    } catch (error) {
-      console.error("Error fetching supervisor sites:", error);
-      return [];
-    }
-  }, [currentUser]);
 
   const fetchSiteShifts = async (siteName: string) => {
     if (!siteName) return;
@@ -282,39 +248,20 @@ const Attendance = () => {
   const fetchEmployees = useCallback(async () => {
     if (!currentUser) return;
     try {
-      let sites = supervisorSites;
-      if (sites.length === 0) sites = await fetchSupervisorSites();
+      const response = await employeeService.getSupervisorEmployees();
+      const allSupervisorEmployees = response?.data || (response as any)?.employees || [];
 
-      if (sites.length === 0) {
-        console.warn("⚠️ No sites resolved for this supervisor (no tasks with siteId?)");
-        setEmployees([]);
-        return;
-      }
+      const activeEmployees = (Array.isArray(allSupervisorEmployees) ? allSupervisorEmployees : [])
+        .filter((emp: any) => emp.status === 'active');
 
-      const siteIds = sites.map((s: any) => s._id).filter(Boolean);
-      const siteNames = sites
-        .map((s: any) => (s.name || "").trim().toLowerCase())
-        .filter(Boolean);
-
-      const response = await axios.get(`${API_URL}/employees`, { params: { limit: 1000 } });
-      let allEmployees = response.data?.data || response.data?.employees || response.data || [];
-      if (!Array.isArray(allEmployees)) allEmployees = [];
-
-      // ✅ Match by siteId OR siteName (fallback), same as SuperAdmin view does
-      const filtered = allEmployees.filter((emp: any) => {
-        if (emp.status !== 'active') return false;
-        const empSiteId = emp.siteId;
-        const empSiteName = (emp.siteName || emp.site || "").trim().toLowerCase();
-        return siteIds.includes(empSiteId) || siteNames.includes(empSiteName);
-      });
-
-      console.log(`✅ Supervisor employees resolved: ${filtered.length} (siteIds: ${siteIds.length}, siteNames: ${siteNames.length}, totalEmployees: ${allEmployees.length})`);
-      setEmployees(filtered);
+      console.log(`✅ Supervisor employees resolved: ${activeEmployees.length}`);
+      setEmployees(activeEmployees);
     } catch (error) {
       console.error("Error fetching employees:", error);
       toast.error("Failed to load employees");
+      setEmployees([]);
     }
-  }, [currentUser, supervisorSites, fetchSupervisorSites]);
+  }, [currentUser]);
 
   const loadAttendanceRecords = useCallback(async () => {
     if (employees.length === 0) {
@@ -381,8 +328,7 @@ const Attendance = () => {
     if (currentUser && currentUser.role === "supervisor") {
       const init = async () => {
         setLoading(true);
-        await fetchSupervisorSites();
-        await fetchEmployees();
+        await fetchEmployees();   // fetchSupervisorSites() removed
         setLoading(false);
       };
       init();
@@ -486,6 +432,41 @@ const Attendance = () => {
       toast.error(error.response?.data?.message || "Failed to mark present with photo");
     }
   };
+
+  const handleQuickMarkPresent = async (emp: Employee) => {
+    const toastId = toast.loading(`Marking ${emp.name} present...`);
+    try {
+      const now = new Date().toISOString(); // captured as check-in time
+
+      const response = await axios.post(`${API_URL}/attendance/manual`, {
+        employeeId: emp._id,
+        employeeName: emp.name,
+        date: selectedDate,
+        checkInTime: now,
+        checkOutTime: null,
+        breakStartTime: null,
+        breakEndTime: null,
+        status: "present",
+        remarks: "Marked present manually (no camera)",
+        totalHours: 0,
+        isCheckedIn: true,
+        supervisorId: currentUser?._id || currentUser?.id,
+      });
+
+      toast.dismiss(toastId);
+
+      if (response.data.success) {
+        toast.success(`${emp.name} marked present at ${new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+        await loadAttendanceRecords();
+      } else {
+        toast.error(response.data.message || "Failed to mark present");
+      }
+    } catch (error: any) {
+      toast.dismiss(toastId);
+      console.error("Quick mark present error:", error);
+      toast.error(error.response?.data?.message || "Error marking present");
+    }
+  };
   const handleCheckoutPhotoCapture = async (photoFile: File) => {
     if (!checkoutPhotoTarget) return;
 
@@ -574,32 +555,34 @@ const Attendance = () => {
     setStatusDialogOpen(true);
   };
 
-  const submitStatusUpdate = async () => {
-    if (!selectedEmployeeForStatus) return;
-    setUpdatingStatus(true);
-    try {
-      const response = await axios.post(`${API_URL}/attendance/update-status`, {
-        employeeId: statusUpdateData.employeeId,
-        attendanceId: statusUpdateData.attendanceId || null,
-        date: statusUpdateData.date,
-        status: statusUpdateData.newStatus,
-        remarks: statusUpdateData.remarks,
-        supervisorId: currentUser?._id || currentUser?.id,
-        employeeName: selectedEmployeeForStatus.name,
-      });
-      if (response.data.success) {
-        toast.success(`Status updated to ${statusUpdateData.newStatus.replace('-', ' ')}`);
-        setStatusDialogOpen(false);
-        await loadAttendanceRecords();
-      } else {
-        toast.error(response.data.message || "Update failed");
-      }
-    } catch (error) {
-      toast.error("Error updating status");
-    } finally {
-      setUpdatingStatus(false);
+const submitStatusUpdate = async () => {
+  if (!selectedEmployeeForStatus) return;
+  setUpdatingStatus(true);
+  try {
+    const response = await axios.post(`${API_URL}/attendance/update-status`, {
+      employeeId: statusUpdateData.employeeId,
+      attendanceId: statusUpdateData.attendanceId || null,
+      date: statusUpdateData.date,
+      status: statusUpdateData.newStatus,
+      remarks: statusUpdateData.remarks,
+      supervisorId: currentUser?._id || currentUser?.id,
+      employeeName: selectedEmployeeForStatus.name,
+      siteName: selectedEmployeeForStatus.siteName || '',   // ✅ ADD THIS LINE
+      department: selectedEmployeeForStatus.department || '', // ✅ ADD THIS LINE (optional, helps other reports)
+    });
+    if (response.data.success) {
+      toast.success(`Status updated to ${statusUpdateData.newStatus.replace('-', ' ')}`);
+      setStatusDialogOpen(false);
+      await loadAttendanceRecords();
+    } else {
+      toast.error(response.data.message || "Update failed");
     }
-  };
+  } catch (error) {
+    toast.error("Error updating status");
+  } finally {
+    setUpdatingStatus(false);
+  }
+};
 
   const handleViewPhoto = (photoUrl: string | null, type: 'checkin' | 'checkout') => {
     if (photoUrl) {
@@ -956,17 +939,29 @@ const Attendance = () => {
                     <div className="flex gap-1 flex-wrap">
                       {/* 1. Mark Present (If Absent, Half-Day, or Weekly Off) */}
                       {derived.status === 'absent' || derived.status === 'half-day' || derived.status === 'weekly-off' ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-green-600 border-green-600 hover:bg-green-50"
-                          onClick={() => {
-                            setAttendancePhotoTarget(emp);
-                            setAttendanceCameraOpen(true);
-                          }}
-                        >
-                          <Camera className="h-4 w-4 mr-1" /> Mark Present
-                        </Button>
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-green-600 border-green-600 hover:bg-green-50"
+                            onClick={() => {
+                              setAttendancePhotoTarget(emp);
+                              setAttendanceCameraOpen(true);
+                            }}
+                          >
+                            <Camera className="h-4 w-4 mr-1" /> Mark Present
+                          </Button>
+
+                          {/* NEW: no-camera fallback, one tap */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-emerald-700 border-emerald-700 hover:bg-emerald-50"
+                            onClick={() => handleQuickMarkPresent(emp)}
+                          >
+                            <UserCheck className="h-4 w-4 mr-1" /> Present
+                          </Button>
+                        </>
                       ) : null}
 
                       {/* 2. Check Out (If Present and not checked out yet) */}
@@ -1149,17 +1144,29 @@ const Attendance = () => {
 
                           {/* 1. If Absent / Half-Day / Weekly-Off -> Show Mark Present */}
                           {derived.status === 'absent' || derived.status === 'half-day' || derived.status === 'weekly-off' ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-green-600 border-green-600 hover:bg-green-50"
-                              onClick={() => {
-                                setAttendancePhotoTarget(emp);
-                                setAttendanceCameraOpen(true);
-                              }}
-                            >
-                              <Camera className="h-4 w-4 mr-1" /> Mark Present
-                            </Button>
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-green-600 border-green-600 hover:bg-green-50"
+                                onClick={() => {
+                                  setAttendancePhotoTarget(emp);
+                                  setAttendanceCameraOpen(true);
+                                }}
+                              >
+                                <Camera className="h-4 w-4 mr-1" /> Mark Present
+                              </Button>
+
+                              {/* NEW: no-camera fallback, one tap */}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-emerald-700 border-emerald-700 hover:bg-emerald-50"
+                                onClick={() => handleQuickMarkPresent(emp)}
+                              >
+                                <UserCheck className="h-4 w-4 mr-1" /> Present
+                              </Button>
+                            </>
                           ) : null}
 
                           {/* 2. If Present (Checked In) -> Show Mark Check Out */}

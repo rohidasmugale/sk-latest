@@ -380,7 +380,7 @@ const fetchAttendanceRecords = async (start: string, end: string): Promise<Atten
 
         // Filter records by date range if API doesn't support range filtering
         const filteredRecords = records.filter((record: any) => {
-          const recordDate = record.date;
+          const recordDate = normalizeDateStr(record.date); // you already have this helper
           return recordDate >= start && recordDate <= end;
         });
 
@@ -625,7 +625,7 @@ const generateEmployeeData = async (
       const currentDate = formatDate(date);
 
       for (const employee of siteEmployees) {
-        const empId = employee.employeeId || employee._id || employee.id || '';
+        const empId = employee._id || employee.id || employee.employeeId || '';
         const attendanceKey = `${empId}_${currentDate}`;
         const attendance = attendanceMap.get(attendanceKey) ||
           attendanceMap.get(`name_${employee.name}_${currentDate}`);
@@ -2214,14 +2214,13 @@ table { width: 100%; border-collapse: collapse; font-size: 10px; }
               ) : paginatedEmployees.length === 0 ? (
                 <tr><td colSpan={14} className="p-4 text-center text-muted-foreground">No employees found</td></tr>
               ) : (
-                paginatedEmployees.map((emp: any, index: number) => {  // ✅ ADD 'index'
+                paginatedEmployees.map((emp: any, index: number) => {
                   const { status: displayStatus, isLate } = getDerivedAttendanceStatus(emp);
-                  const srNo = (currentPage - 1) * itemsPerPage + index + 1;  // ✅ ADD THIS LINE
+                  const srNo = (currentPage - 1) * itemsPerPage + index + 1;
                   return (
                     <tr key={emp.id} className="border-b hover:bg-muted/50">
-                      <td className="p-2 text-xs font-medium text-center">{srNo}</td>  {/* ✅ ADD Sr No as FIRST cell */}
+                      <td className="p-2 text-xs font-medium text-center">{srNo}</td>
                       <td className="p-2 text-xs font-mono">{emp.employeeId}</td>
-
                       <td className="p-2 font-medium">
                         <div className="flex items-center gap-1">
                           {emp.name}
@@ -2232,9 +2231,11 @@ table { width: 100%; border-collapse: collapse; font-size: 10px; }
                       </td>
                       <td className="p-2"><Badge variant="outline" className="text-xs">{emp.department}</Badge></td>
                       <td className="p-2 text-xs">{emp.position}</td>
-                      <td className="p-2">{emp.isManager ? <Badge className="bg-amber-100 text-amber-800 text-xs">Mgr</Badge> : emp.isSupervisor ? <Badge className="bg-teal-100 text-teal-800 text-xs">Sup</Badge> : <Badge className="bg-cyan-100 text-cyan-800 text-xs">Staff</Badge>}</td>
-
-                      {/* ✅ Edit button - now second */}
+                      <td className="p-2">
+                        {emp.isManager ? <Badge className="bg-amber-100 text-amber-800 text-xs">Mgr</Badge>
+                          : emp.isSupervisor ? <Badge className="bg-teal-100 text-teal-800 text-xs">Sup</Badge>
+                            : <Badge className="bg-cyan-100 text-cyan-800 text-xs">Staff</Badge>}
+                      </td>
                       {role === 'superadmin' && (
                         <td className="p-2">
                           <Button variant="ghost" size="sm" onClick={() => openEditEmployee(emp)}>
@@ -2242,36 +2243,45 @@ table { width: 100%; border-collapse: collapse; font-size: 10px; }
                           </Button>
                         </td>
                       )}
-
-                      {/* ✅ Status badge - now third */}
                       <td className="p-2">
                         <div className="flex items-center gap-2">
                           <Badge
                             variant={
                               displayStatus === "present" ? "default" :
                                 displayStatus === "half-day" ? "secondary" :
-                                  displayStatus === "weekly-off" ? "outline" :
-                                    "destructive"
+                                  displayStatus === "weekly-off" ? "outline" : "destructive"
                             }
                             className="text-xs"
                           >
-                            {displayStatus === "weekly-off" ? "WO" :
-                              displayStatus === "half-day" ? "Half Day" :
-                                displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
+                            {displayStatus === "weekly-off" ? "WO"
+                              : displayStatus === "half-day" ? "Half Day"
+                                : displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
                           </Badge>
                           {isLate && (
-                            <Badge variant="outline" className="bg-orange-100 text-orange-800 text-xs">
-                              Late
-                            </Badge>
+                            <Badge variant="outline" className="bg-orange-100 text-orange-800 text-xs">Late</Badge>
                           )}
                         </div>
                       </td>
-
                       <td className="p-2 text-xs">{emp.checkInTime || "-"}</td>
                       <td className="p-2 text-xs">{emp.checkOutTime || "-"}</td>
-                      <td className="p-2">{emp.checkInPhoto ? <Button variant="ghost" size="sm" onClick={() => handleViewPhoto(emp.checkInPhoto, "checkin")} className="h-6 px-1"><Camera className="h-3 w-3" /></Button> : "-"}</td>
-                      <td className="p-2">{emp.checkOutPhoto ? <Button variant="ghost" size="sm" onClick={() => handleViewPhoto(emp.checkOutPhoto, "checkout")} className="h-6 px-1"><Camera className="h-3 w-3" /></Button> : "-"}</td>
-                      <td className="p-2"><Input value={emp.remark || ""} onChange={(e) => updateEmployeeRemark(emp.id, e.target.value)} placeholder="Remark" className="h-7 text-xs" /></td>
+                      <td className="p-2">
+                        {emp.checkInPhoto
+                          ? <Button variant="ghost" size="sm" onClick={() => handleViewPhoto(emp.checkInPhoto, "checkin")} className="h-6 px-1"><Camera className="h-3 w-3" /></Button>
+                          : "-"}
+                      </td>
+                      <td className="p-2">
+                        {emp.checkOutPhoto
+                          ? <Button variant="ghost" size="sm" onClick={() => handleViewPhoto(emp.checkOutPhoto, "checkout")} className="h-6 px-1"><Camera className="h-3 w-3" /></Button>
+                          : "-"}
+                      </td>
+                      <td className="p-2">
+                        <Input
+                          value={emp.remark || ""}
+                          onChange={(e) => updateEmployeeRemark(emp.id, e.target.value)}
+                          placeholder="Remark"
+                          className="h-7 text-xs"
+                        />
+                      </td>
                     </tr>
                   );
                 })
@@ -3268,56 +3278,57 @@ const SuperAdminAttendanceView = () => {
   const loadDepartmentAttendance = async () => {
     setLoadingDept(true);
     try {
-      const allEmployees = await fetchEmployees();           // your existing fetch
-      const attendanceRecords = await fetchAttendanceRecords(startDate, endDate);
+      // ONE summary call — get per-employee totals
+      const response = await axios.get(`${API_URL}/attendance/summary`, {
+        params: { startDate, endDate },
+      });
+      const perEmployee = response.data?.perEmployee || [];
 
-      // Map employee ID -> department (staff only)
+      // We still need employee → department mapping, but only for staff
+      const employeesResponse = await axios.get(`${API_URL}/employees`, {
+        params: { limit: 5000 },
+      });
+      const allEmployees = employeesResponse.data?.data
+        || employeesResponse.data?.employees
+        || employeesResponse.data
+        || [];
+
       const empDeptMap = new Map<string, string>();
-      const empIsStaff = new Map<string, boolean>();
-      allEmployees.forEach(emp => {
-        if (emp.isManager || emp.isSupervisor) return;
-        const dept = emp.department?.trim();
-        if (dept) {
-          empDeptMap.set(emp.id, dept);
-          empIsStaff.set(emp.id, true);
-        }
+      allEmployees.forEach((emp: any) => {
+        const pos = (emp.position || '').toLowerCase();
+        const dept = (emp.department || '').toLowerCase();
+        const isManager = pos.includes('manager') || dept.includes('manager');
+        const isSupervisor = pos.includes('supervisor') || dept.includes('supervisor');
+        if (isManager || isSupervisor) return;
+        const empId = emp._id || emp.id;
+        if (empId && emp.department) empDeptMap.set(empId, emp.department.trim());
       });
 
-      // Track which staff employees were present (at least once)
-      const presentEmpIds = new Set<string>();
-      attendanceRecords.forEach(rec => {
-        const status = rec.status?.toLowerCase() || '';
-        if (status === 'present' || status === 'half-day') {
-          const empId = rec.employeeId;
-          if (empIsStaff.get(empId)) presentEmpIds.add(empId);
-        }
-      });
-
-      // Count totals and presents per department
       const deptTotalMap = new Map<string, number>();
       const deptPresentMap = new Map<string, number>();
+
+      // Count totals from the employee map
       for (const [empId, dept] of empDeptMap.entries()) {
         deptTotalMap.set(dept, (deptTotalMap.get(dept) || 0) + 1);
-        if (presentEmpIds.has(empId)) {
-          deptPresentMap.set(dept, (deptPresentMap.get(dept) || 0) + 1);
-        }
       }
 
-      // Always show the six fixed departments
-      const desiredDepts = [
-        'Housekeeping',
-        'Security',
-        'Waste Management',
-        'Parking',
-        'Consumables',
-        'Technician',
-        'Other',
-      ];
+      // Count presents from the summary's perEmployee rows
+      perEmployee.forEach((row: any) => {
+        const empId = row._id?.employeeId;
+        const present = (row.present || 0) + (row.halfDay || 0) * 0.5;
+        if (empId && empDeptMap.has(empId) && present > 0) {
+          const dept = empDeptMap.get(empId)!;
+          deptPresentMap.set(dept, (deptPresentMap.get(dept) || 0) + 1);
+        }
+      });
+
+      const desiredDepts = ['Housekeeping', 'Security', 'Waste Management', 'Parking', 'Consumables', 'Technician', 'Other'];
       const stats = desiredDepts.map(dept => ({
         department: dept,
         total: deptTotalMap.get(dept) || 0,
         present: deptPresentMap.get(dept) || 0,
       }));
+
       setDepartmentStats(stats);
     } catch (err) {
       console.error(err);
@@ -3365,7 +3376,7 @@ const SuperAdminAttendanceView = () => {
   const calculateDisplayData = async (sitesData: Site[]) => {
     try {
       setRefreshing(true);
-      // Filter sites by service if viewType === 'service'
+
       let filteredSites = sitesData;
       if (viewType === 'service' && selectedService) {
         const serviceLower = selectedService.toLowerCase().trim();
@@ -3374,47 +3385,129 @@ const SuperAdminAttendanceView = () => {
         );
       }
 
-      const calculatedData = [];
-      for (const site of filteredSites) {
-        // Use regular site attendance calculation (all employees)
-        const siteData = await calculateSiteAttendanceData(site, startDate, endDate);
-        if (!siteData.employees) siteData.employees = [];
-        calculatedData.push(siteData);
-        await new Promise(resolve => setTimeout(resolve, 100));
+      if (filteredSites.length === 0) {
+        setDisplayData([]);
+        return;
       }
+
+      const [allEmployees, attendanceRecords] = await Promise.all([
+        fetchEmployees(),
+        fetchAttendanceRecords(startDate, endDate),
+      ]);
+
+      // Group employees by their CURRENT site, deduped by id.
+      // Includes managers/supervisors — matches Site Details' "All" count.
+      const siteToEmployees = new Map<string, { id: string; name: string }[]>();
+      const seenEmpIds = new Set<string>();
+      allEmployees.forEach(emp => {
+        const site = (emp.site || emp.siteName || '').trim();
+        const empId = String(emp._id || emp.id || '');
+        if (!site || !empId || seenEmpIds.has(empId)) return;
+
+        // ✅ Only count active employees — skips left / inactive / terminated
+        const s = String(emp.employeeStatus ?? (emp as any).status ?? '').trim().toLowerCase();
+        if (s === 'left' || s === 'inactive' || s === 'terminated' || s === 'resigned') return;
+
+        seenEmpIds.add(empId);
+        if (!siteToEmployees.has(site)) siteToEmployees.set(site, []);
+        siteToEmployees.get(site)!.push({ id: empId, name: (emp.name || '').trim().toLowerCase() });
+      });
+
+      // One attendance record per (employeeId, date) — first match wins,
+      // so duplicate rows for the same employee/day can't double-count.
+      const attendanceByEmpDate = new Map<string, string>(); // key: `${empId}_${date}` -> status
+      const attendanceByNameDate = new Map<string, string>(); // fallback key: `${name}_${date}` -> status
+      attendanceRecords.forEach(record => {
+        const empId = String(record.employeeId || '');
+        const name = (record.employeeName || '').trim().toLowerCase();
+        const date = record.date;
+        if (empId) {
+          const key = `${empId}_${date}`;
+          if (!attendanceByEmpDate.has(key)) attendanceByEmpDate.set(key, record.status);
+        }
+        if (name) {
+          const key = `${name}_${date}`;
+          if (!attendanceByNameDate.has(key)) attendanceByNameDate.set(key, record.status);
+        }
+      });
+
+      const daysInPeriod = calculateDaysBetween(startDate, endDate);
+      const dateKeys: string[] = [];
+      {
+        const s = parseLocalDate(startDate);
+        const e = parseLocalDate(endDate);
+        for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) dateKeys.push(formatDate(d));
+      }
+
+      const groupedBySite = new Map<string, {
+        present: number; absent: number; weeklyOff: number; leave: number; halfDay: number;
+      }>();
+
+      siteToEmployees.forEach((employeesAtSite, site) => {
+        const g = { present: 0, absent: 0, weeklyOff: 0, leave: 0, halfDay: 0 };
+        employeesAtSite.forEach(emp => {
+          dateKeys.forEach(date => {
+            const status =
+              attendanceByEmpDate.get(`${emp.id}_${date}`) ??
+              attendanceByNameDate.get(`${emp.name}_${date}`) ??
+              'absent'; // no record for this employee/day = absent, exactly like generateEmployeeData
+
+            if (status === 'present') g.present += 1;
+            else if (status === 'half-day') { g.halfDay += 1; g.present += 0.5; }
+            else if (status === 'weekly-off') g.weeklyOff += 1;
+            else if (status === 'leave') g.leave += 1;
+            else g.absent += 1;
+          });
+        });
+        groupedBySite.set(site, g);
+      });
+
+      const calculatedData = filteredSites.map(site => {
+        const g = groupedBySite.get(site.name) || { present: 0, absent: 0, weeklyOff: 0, leave: 0, halfDay: 0 };
+        const actualHeadcount = (siteToEmployees.get(site.name) || []).length;
+        const dailyRequirement = site.staffDeployment
+          ? site.staffDeployment
+            .filter(d => !d.role?.toLowerCase().includes('manager') && !d.role?.toLowerCase().includes('supervisor'))
+            .reduce((sum, d) => sum + (Number(d.count) || 0), 0)
+          : 0;
+        const totalRequiredForPeriod = actualHeadcount * daysInPeriod;
+        const totalPresent = Math.round(g.present);
+
+        return {
+          id: `${site._id}-${startDate}-${endDate}`,
+          siteId: `${site._id}-${startDate}-${endDate}`,
+          name: site.name,
+          siteName: site.name,
+          dailyRequirement,
+          totalEmployees: actualHeadcount,
+          totalRequiredForPeriod,
+          totalPresent,
+          totalWeeklyOff: g.weeklyOff,
+          totalLeave: g.leave,
+          totalAbsent: g.absent,
+          present: totalPresent,
+          weeklyOff: g.weeklyOff,
+          leave: g.leave,
+          absent: g.absent,
+          durationTotalRequired: totalRequiredForPeriod,
+          durationWeeklyOff: g.weeklyOff,
+          durationOnSiteRequirement: totalRequiredForPeriod - g.weeklyOff,
+          durationPresent: totalPresent,
+          durationAbsent: g.absent + g.leave,
+          daysInPeriod,
+          startDate,
+          endDate,
+          employees: [],
+          originalSite: site,
+          isRealData: true,
+        };
+      });
+
       setDisplayData(calculatedData);
     } catch (error) {
       console.error('Error calculating display data:', error);
-      setDisplayData(
-        sitesData.map(site => ({
-          ...site,
-          employees: [],
-          isRealData: false,
-          daysInPeriod: calculateDaysBetween(startDate, endDate),
-          startDate,
-          endDate,
-          dailyRequirement: 0,
-          totalEmployees: 0,
-          totalRequiredForPeriod: 0,
-          totalPresent: 0,
-          totalWeeklyOff: 0,
-          totalLeave: 0,
-          totalAbsent: 0,
-          deploymentStats: {
-            totalStaff: 0,
-            managerCount: 0,
-            supervisorCount: 0,
-            staffCount: 0,
-            managerRequirement: site.managerCount || 0,
-            supervisorRequirement: site.supervisorCount || 0,
-            staffRequirement: 0,
-            dailyStaffRequirement: 0,
-            totalStaffRequirementForPeriod: 0,
-            isStaffFull: false,
-            remainingStaff: 0,
-          },
-        }))
-      );
+      toast.error('Failed to load attendance summary');
+      setDisplayData([]);
     } finally {
       setRefreshing(false);
     }
@@ -3752,7 +3845,7 @@ const SuperAdminAttendanceView = () => {
           console.error('Refresh error:', error);
         }
       }}
-      className="min-h-screen bg-background p-4 sm:p-6 relative overflow-y-auto"
+      className="min-h-screen bg-background p-2 sm:p-4 relative overflow-y-auto"
     >
       {/* Header */}
       <motion.div
@@ -3781,14 +3874,41 @@ const SuperAdminAttendanceView = () => {
               </h1>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Date range picker */}
+            <div className="flex items-center gap-1 bg-muted/50 px-2 py-1 rounded-md">
+              <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  if (e.target.value > endDate) setEndDate(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-32 h-7 text-xs border-0 bg-transparent focus:outline-none"
+              />
+              <span className="text-xs text-muted-foreground">to</span>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  if (e.target.value < startDate) setStartDate(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-32 h-7 text-xs border-0 bg-transparent focus-visible:ring-0"
+              />
+            </div>
+
             <Button
               variant="outline"
               size="sm"
               onClick={handleRefreshAll}
               disabled={refreshing || loading}
+              className="h-8"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} /> Refresh All
+              <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
             </Button>
           </div>
         </div>
@@ -3817,13 +3937,13 @@ const SuperAdminAttendanceView = () => {
         transition={{ delay: 0.4 }}
       >
         <Card>
-          <CardHeader>
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <CardTitle>
+          <CardHeader className="pb-2 pt-3 px-3">
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <CardTitle className="text-base">
                   {viewType === 'department'
-                    ? `${selectedService} Sites Attendance - Cumulative Totals (${daysInPeriod} days)`
-                    : `All Sites Attendance - Cumulative Totals (${daysInPeriod} days)`}
+                    ? `${selectedService} — ${daysInPeriod} day${daysInPeriod > 1 ? 's' : ''}`
+                    : `All Sites — ${daysInPeriod} day${daysInPeriod > 1 ? 's' : ''}`}
                 </CardTitle>
                 <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
                   <div className="relative w-full sm:w-64">
@@ -3849,7 +3969,7 @@ const SuperAdminAttendanceView = () => {
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-2 sm:p-3">
             {/* THIS IS WHERE YOUR EXISTING CardContent GOES - KEEP IT EXACTLY AS IS */}
             {filteredData.length === 0 ? (
               <div className="text-center py-12">
@@ -3880,19 +4000,23 @@ const SuperAdminAttendanceView = () => {
                   return (
                     <Card
                       key={item.siteId || item.id || index}
-                      className="p-3 cursor-pointer"
+                      className="p-2 cursor-pointer"
                       onClick={() => handleViewDetails(item)}
                     >
                       <div className="flex justify-between items-start">
                         <div>
-                          <h3 className="font-semibold">{item.siteName || item.name}</h3>
-                          <p className="text-xs text-muted-foreground">{item.daysInPeriod} {item.daysInPeriod === 1 ? 'day' : 'days'}</p>
+                          <h3 className="font-semibold text-sm">{item.siteName || item.name}</h3>
+                          {daysInPeriod > 1 && (
+                            <p className="text-[10px] text-muted-foreground">{item.daysInPeriod} days</p>
+                          )}
                         </div>
-                        <Badge variant={status === 'Excellent' ? 'default' : status === 'Good' ? 'secondary' : 'outline'}>{status}</Badge>
+                        <Badge variant={status === 'Excellent' ? 'default' : status === 'Good' ? 'secondary' : 'outline'} className="text-[10px]">{status}</Badge>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
+                      <div className="grid grid-cols-2 gap-1 mt-2 text-xs">
                         <div><span className="text-muted-foreground">Daily Req:</span> <strong>{dailyRequirement}</strong></div>
-                        <div><span className="text-muted-foreground">Total Required:</span> <strong>{totalRequired}</strong></div>
+                        {daysInPeriod > 1 && (
+                          <div><span className="text-muted-foreground">Total Req ({daysInPeriod}d):</span> <strong>{totalRequired}</strong></div>
+                        )}
                         <div className="text-green-600"><span className="text-muted-foreground">Present:</span> <strong>{present}</strong></div>
                         <div className="text-red-600"><span className="text-muted-foreground">Absent:</span> <strong>{absent}</strong></div>
                         <div><span className="text-muted-foreground">Rate:</span> <strong>{rate}%</strong></div>
@@ -3916,15 +4040,20 @@ const SuperAdminAttendanceView = () => {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/50">
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Site Name</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-indigo-700 bg-indigo-50">Daily Req</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-blue-700 bg-blue-50">Total Required</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-green-700 bg-green-50">Present</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-purple-700 bg-purple-50">Weekly Off</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-red-700 bg-red-50">Absent</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Rate</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Status</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Attendance</th>
+                        <th className="h-8 px-2 text-left text-xs font-medium text-muted-foreground w-10">#</th>
+                        <th className="h-8 px-2 text-left text-xs font-medium text-muted-foreground">Site Name</th>
+                        <th className="h-8 px-2 text-center text-xs font-medium text-indigo-700 bg-indigo-50">Daily Req</th>
+                        {daysInPeriod > 1 && (
+                          <th className="h-8 px-2 text-center text-xs font-medium text-blue-700 bg-blue-50">
+                            Total Req ({daysInPeriod}d)
+                          </th>
+                        )}
+                        <th className="h-8 px-2 text-center text-xs font-medium text-green-700 bg-green-50">Present</th>
+                        <th className="h-8 px-2 text-center text-xs font-medium text-purple-700 bg-purple-50">WO</th>
+                        <th className="h-8 px-2 text-center text-xs font-medium text-red-700 bg-red-50">Absent</th>
+                        <th className="h-8 px-2 text-center text-xs font-medium text-muted-foreground">Rate</th>
+                        <th className="h-8 px-2 text-center text-xs font-medium text-muted-foreground">Status</th>
+                        <th className="h-8 px-2 text-center text-xs font-medium text-muted-foreground">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -3935,6 +4064,7 @@ const SuperAdminAttendanceView = () => {
                         const absent = (item.totalAbsent || 0) + (item.totalLeave || 0);
                         const rate = totalRequired > 0 ? ((present / totalRequired) * 100).toFixed(1) : '0.0';
                         const status = parseFloat(rate) >= 90 ? 'Excellent' : parseFloat(rate) >= 80 ? 'Good' : parseFloat(rate) >= 70 ? 'Average' : 'Poor';
+                        const srNo = (currentPage - 1) * itemsPerPage + index + 1;
 
                         return (
                           <tr
@@ -3942,28 +4072,34 @@ const SuperAdminAttendanceView = () => {
                             className="border-b hover:bg-muted/50 cursor-pointer"
                             onClick={() => handleViewDetails(item)}
                           >
-                            <td className="p-4 align-middle font-medium">
-                              <div className="font-medium text-sm">{item.siteName || item.name}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {item.daysInPeriod} {item.daysInPeriod === 1 ? 'day' : 'days'}
-                              </div>
+                            <td className="px-2 py-1.5 text-xs text-muted-foreground">{srNo}</td>
+                            <td className="px-2 py-1.5">
+                              <div className="font-medium text-xs">{item.siteName || item.name}</div>
+                              {daysInPeriod > 1 && (
+                                <div className="text-[10px] text-muted-foreground">{item.daysInPeriod} days</div>
+                              )}
                             </td>
-                            <td className="p-4 align-middle font-bold text-indigo-700 bg-indigo-50">{dailyRequirement}</td>
-                            <td className="p-4 align-middle font-bold text-blue-700 bg-blue-50">{totalRequired}</td>
-                            <td className="p-4 align-middle font-bold text-green-700 bg-green-50">{present}</td>
-                            <td className="p-4 align-middle font-bold text-purple-700 bg-purple-50">
+                            <td className="px-2 py-1.5 text-center font-semibold text-xs text-indigo-700 bg-indigo-50">{dailyRequirement}</td>
+                            {daysInPeriod > 1 && (
+                              <td className="px-2 py-1.5 text-center font-semibold text-xs text-blue-700 bg-blue-50">{totalRequired}</td>
+                            )}
+                            <td className="px-2 py-1.5 text-center font-semibold text-xs text-green-700 bg-green-50">{present}</td>
+                            <td className="px-2 py-1.5 text-center font-semibold text-xs text-purple-700 bg-purple-50">
                               {item.totalWeeklyOff || item.weeklyOffCount || 0}
                             </td>
-                            <td className="p-4 align-middle font-bold text-red-700 bg-red-50">{absent}</td>
-                            <td className="p-4 align-middle font-bold">{rate}%</td>
-                            <td className="p-4 align-middle">
-                              <Badge variant={status === 'Excellent' ? 'default' : status === 'Good' ? 'secondary' : status === 'Average' ? 'outline' : 'destructive'}>
+                            <td className="px-2 py-1.5 text-center font-semibold text-xs text-red-700 bg-red-50">{absent}</td>
+                            <td className="px-2 py-1.5 text-center text-xs font-medium">{rate}%</td>
+                            <td className="px-2 py-1.5 text-center">
+                              <Badge
+                                variant={status === 'Excellent' ? 'default' : status === 'Good' ? 'secondary' : status === 'Average' ? 'outline' : 'destructive'}
+                                className="text-[10px] px-1.5 py-0"
+                              >
                                 {status}
                               </Badge>
                             </td>
-                            <td className="p-4 align-middle" onClick={(e) => e.stopPropagation()}>
-                              <Button variant="outline" size="sm" onClick={() => handleViewDetails(item)}>
-                                <Eye className="h-4 w-4 mr-1" /> Details
+                            <td className="px-2 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
+                              <Button variant="outline" size="sm" onClick={() => handleViewDetails(item)} className="h-6 px-2 text-xs">
+                                <Eye className="h-3 w-3 mr-1" /> View
                               </Button>
                             </td>
                           </tr>

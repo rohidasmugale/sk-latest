@@ -7,6 +7,7 @@ import { Loader2, Building, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
 import { useRole } from "@/context/RoleContext";
+import employeeService from "@/services/employeeService"; // ✅ Import the same service
 
 interface Employee {
   _id: string;
@@ -44,74 +45,19 @@ export default function GroomingStatus() {
   const [records, setRecords] = useState<Map<string, GroomingRecord>>(new Map());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [supervisorSiteIds, setSupervisorSiteIds] = useState<string[]>([]);
   const today = new Date().toISOString().split("T")[0];
 
   const initialLoadDone = useRef(false);
 
-  // Fetch site IDs AND names for the supervisor (from tasks)
-  const getSupervisorSitesInfo = useCallback(async (): Promise<{ ids: string[]; names: string[] }> => {
-    if (!currentUser) return { ids: [], names: [] };
+  // ✅ STEP 1: Fetch employees directly from the Supervisor's employee list (Same as Attendance)
+  const fetchEmployees = useCallback(async (): Promise<Employee[]> => {
+    if (!currentUser) return [];
     try {
-      const supervisorId = currentUser._id || currentUser.id;
-      const supervisorName = currentUser.name;
-      const response = await apiClient.get('/tasks', { params: { limit: 1000 } });
-      let allTasks = response.data?.data || response.data || [];
-      if (!Array.isArray(allTasks)) allTasks = [];
+      const response = await employeeService.getSupervisorEmployees();
+      const allSupervisorEmployees = response?.data || (response as any)?.employees || [];
 
-      const siteIdSet = new Set<string>();
-      const siteNameSet = new Set<string>();
-      allTasks.forEach((task: any) => {
-        const assigned =
-          task.assignedUsers?.some((u: any) =>
-            u.userId === supervisorId ||
-            (u.name && supervisorName && u.name.toLowerCase() === supervisorName.toLowerCase())
-          ) || task.assignedTo === supervisorId;
-        if (assigned) {
-          if (task.siteId) siteIdSet.add(task.siteId);
-          if (task.siteName) siteNameSet.add(task.siteName.trim().toLowerCase());
-        }
-      });
-
-      return { ids: Array.from(siteIdSet), names: Array.from(siteNameSet) };
-    } catch (error) {
-      console.error("Error fetching sites for grooming:", error);
-      return { ids: [], names: [] };
-    }
-  }, [currentUser]);
-
-  // Fetch employees with siteId OR siteName fallback (same as Attendance)
-  // ✅ EXCLUDE supervisors/managers - they inspect, not get inspected
-  const fetchEmployeesForSites = useCallback(async (siteIds: string[], siteNames: string[]): Promise<Employee[]> => {
-    if (siteIds.length === 0 && siteNames.length === 0) {
-      setEmployees([]);
-      return [];
-    }
-    try {
-      const res = await apiClient.get('/employees', { params: { limit: 1000 } });
-      let allEmployees = res.data?.data || res.data?.employees || res.data || [];
-      if (!Array.isArray(allEmployees)) allEmployees = [];
-
-      // Filter: active + site-matched + NOT supervisor/manager
-      const filtered = allEmployees
-        .filter((emp: any) => {
-          if (emp.status !== 'active') return false;
-          const empSiteId = emp.siteId;
-          const empSiteName = (emp.siteName || emp.site || '').trim().toLowerCase();
-          const siteMatch = siteIds.includes(empSiteId) || siteNames.includes(empSiteName);
-          if (!siteMatch) return false;
-
-          // ✅ EXCLUDE supervisors and managers
-          const position = (emp.position || '').toLowerCase();
-          const department = (emp.department || '').toLowerCase();
-          const role = (emp.role || '').toLowerCase();
-          const isManagerOrSupervisor =
-            position.includes('manager') || position.includes('supervisor') ||
-            department.includes('manager') || department.includes('supervisor') ||
-            role === 'manager' || role === 'supervisor';
-
-          return !isManagerOrSupervisor;
-        })
+      const activeEmployees = (Array.isArray(allSupervisorEmployees) ? allSupervisorEmployees : [])
+        .filter((emp: any) => emp.status === 'active')
         .map((emp: any) => ({
           _id: emp._id,
           name: emp.name,
@@ -124,21 +70,21 @@ export default function GroomingStatus() {
           role: emp.role,
         }));
 
-      setEmployees(filtered);
-      return filtered;
+      console.log(`✅ Loaded ${activeEmployees.length} active employees for grooming.`);
+      setEmployees(activeEmployees);
+      return activeEmployees;
     } catch (error) {
       console.error("Error fetching employees:", error);
       toast.error("Failed to load employees");
       return [];
     }
-  }, []);
+  }, [currentUser]);
 
-  // Fetch present employees (attendance records)
-  // ✅ FIXED: Added limit: 1000 to get ALL records
+  // ✅ STEP 2: Fetch present employees (attendance records) for today
   const fetchPresentEmployees = useCallback(async (empList: Employee[]) => {
     try {
       const res = await apiClient.get('/attendance', {
-        params: { date: today, limit: 1000 }   // ✅ Added limit: 1000
+        params: { date: today, limit: 1000 }
       });
       let records = res.data?.data || res.data || [];
       if (!Array.isArray(records)) records = [];
@@ -147,7 +93,7 @@ export default function GroomingStatus() {
       records.forEach((rec: any) => {
         if (rec.status !== 'present' && rec.status !== 'half-day') return;
 
-        // Match on _id, employeeId, or name — same logic as Attendance.tsx
+        // Match on _id, employeeId, or name
         const match = empList.find(e =>
           e._id === rec.employeeId ||
           e.employeeId === rec.employeeId ||
@@ -156,6 +102,7 @@ export default function GroomingStatus() {
         if (match) presentIds.add(match._id);
       });
 
+      console.log(`✅ Found ${presentIds.size} present employees today.`);
       setPresentEmployeeIds(presentIds);
       return presentIds;
     } catch (error) {
@@ -164,32 +111,26 @@ export default function GroomingStatus() {
     }
   }, [today]);
 
-  // Fetch grooming records for given siteIds
-  const fetchGroomingRecords = useCallback(async (empList: Employee[], siteIds: string[]) => {
-    if (empList.length === 0 || siteIds.length === 0) return;
+  // ✅ STEP 3: Fetch grooming records for the present employees
+  const fetchGroomingRecords = useCallback(async (empList: Employee[]) => {
+    if (empList.length === 0) return;
 
     const map = new Map<string, GroomingRecord>();
-    let anySuccess = false;
+    try {
+      // Fetch grooming records for today (We don't need siteIds anymore)
+      const res = await apiClient.get('/grooming', {
+        params: { date: today }
+      });
+      const recordsArray = res.data?.data || res.data || [];
 
-    for (const siteId of siteIds) {
-      try {
-        const res = await apiClient.get('/grooming', {
-          params: { date: today, siteId }
-        });
-        const recordsArray = res.data?.data || res.data || [];
-        recordsArray.forEach((r: GroomingRecord) => {
-          map.set(r.employeeId, r);
-        });
-        anySuccess = true;
-      } catch (error: any) {
-        console.warn(`Failed to fetch grooming for site ${siteId}:`, error.message);
-      }
-    }
+      recordsArray.forEach((r: GroomingRecord) => {
+        map.set(r.employeeId, r);
+      });
 
-    if (anySuccess) {
       setRecords(map);
       localStorage.setItem('grooming_backup', JSON.stringify(Array.from(map.values())));
-    } else {
+    } catch (error) {
+      console.warn("Failed to fetch grooming records, trying cache...");
       const cached = localStorage.getItem('grooming_backup');
       if (cached) {
         try {
@@ -205,7 +146,7 @@ export default function GroomingStatus() {
     }
   }, [today]);
 
-  // Initial load
+  // Initial Load
   useEffect(() => {
     if (!currentUser || !isAuthenticated || currentUser.role !== "supervisor") {
       setLoading(false);
@@ -216,34 +157,30 @@ export default function GroomingStatus() {
 
     const loadAll = async () => {
       setLoading(true);
-      const { ids: siteIds, names: siteNames } = await getSupervisorSitesInfo();
-      setSupervisorSiteIds(siteIds);
-
-      const empList = await fetchEmployeesForSites(siteIds, siteNames);
+      const empList = await fetchEmployees();
       const presentIds = await fetchPresentEmployees(empList);
 
-      if (empList.length > 0 && presentIds.size > 0) {
-        await fetchGroomingRecords(empList, siteIds);
+      if (empList.length > 0) {
+        await fetchGroomingRecords(empList);
       }
       setLoading(false);
     };
     loadAll();
-  }, [currentUser, isAuthenticated, getSupervisorSitesInfo, fetchEmployeesForSites, fetchPresentEmployees, fetchGroomingRecords]);
+  }, [currentUser, isAuthenticated, fetchEmployees, fetchPresentEmployees, fetchGroomingRecords]);
 
   // Update checklist
   const updateChecklist = (empId: string, field: string, checked: boolean) => {
     setRecords(prev => {
       const employee = employees.find(e => e._id === empId);
-      if (!employee) {
-        console.warn(`Employee ${empId} not found in list`);
-        return prev;
-      }
+      if (!employee) return prev;
+
       const gender = employee.gender || 'male';
+      // Fallback to employee's siteId if it exists, otherwise just empty
       const employeeSiteId = employee.siteId || '';
 
       const getDefault = () => ({
         employeeId: empId,
-        siteId: employeeSiteId || supervisorSiteIds[0] || '',
+        siteId: employeeSiteId,
         date: today,
         shirt: false,
         pant: false,
@@ -254,6 +191,7 @@ export default function GroomingStatus() {
         westcoat: false,
         ...(gender === 'female' ? { nails: false, singleBangles: false, studs: false } : { shaving: false, haircut: false, nails: false })
       });
+
       const existing = prev.get(empId) || getDefault();
       const updated = { ...existing, [field]: checked };
       const newMap = new Map(prev);
@@ -267,12 +205,12 @@ export default function GroomingStatus() {
     setSaving(true);
     try {
       const payload = Array.from(records.values()).map(r => ({ ...r, date: today }));
-      const response = await apiClient.post('/grooming/batch', { records: payload });
+      await apiClient.post('/grooming/batch', { records: payload });
       toast.success("Grooming status saved");
-      await fetchGroomingRecords(employees, supervisorSiteIds);
+      await fetchGroomingRecords(employees);
     } catch (error: any) {
       console.error("Save error:", error);
-      const message = error.response?.data?.message || error.message || "Network error – please check your connection and try again.";
+      const message = error.response?.data?.message || error.message || "Network error";
       toast.error(`Save failed: ${message}`);
     } finally {
       setSaving(false);
@@ -289,14 +227,10 @@ export default function GroomingStatus() {
       const gender = emp.gender || 'male';
       if (gender === 'female') {
         if (!rec.shirt || !rec.pant || !rec.cap || !rec.shoes || !rec.idCard ||
-          !rec.nails || !rec.singleBangles || !rec.studs) {
-          count++;
-        }
+          !rec.nails || !rec.singleBangles || !rec.studs) count++;
       } else {
         if (!rec.shirt || !rec.pant || !rec.cap || !rec.shoes || !rec.idCard ||
-          !rec.shaving || !rec.haircut || !rec.nails) {
-          count++;
-        }
+          !rec.shaving || !rec.haircut || !rec.nails) count++;
       }
     }
     return count;
@@ -305,9 +239,7 @@ export default function GroomingStatus() {
   const countNotSubmitted = () => {
     let count = 0;
     for (const emp of employees) {
-      if (presentEmployeeIds.has(emp._id) && !records.has(emp._id)) {
-        count++;
-      }
+      if (presentEmployeeIds.has(emp._id) && !records.has(emp._id)) count++;
     }
     return count;
   };
@@ -347,7 +279,7 @@ export default function GroomingStatus() {
       <div className="flex flex-wrap justify-between items-center gap-2">
         <h1 className="text-lg sm:text-xl font-bold">Grooming Status</h1>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => fetchGroomingRecords(employees, supervisorSiteIds)}>
+          <Button variant="outline" size="sm" onClick={() => fetchGroomingRecords(employees)}>
             <RefreshCw className="h-4 w-4 mr-1" /> Reload
           </Button>
           <Badge variant="destructive" className="text-xs sm:text-sm">
@@ -361,7 +293,7 @@ export default function GroomingStatus() {
 
       <div className="overflow-x-auto -mx-2 sm:mx-0">
         <table className="w-full text-xs sm:text-sm border min-w-[640px]">
-          <thead className="bg-gray-50">
+          <thead className="bg-gray-50 dark:bg-gray-800">
             <tr>
               <th className="p-1 sm:p-2 text-left">Employee</th>
               <th className="p-1 sm:p-2 text-center">Shirt</th>

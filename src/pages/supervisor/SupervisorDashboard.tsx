@@ -85,6 +85,7 @@ import { UnifiedCreateModal } from "@/components/shared/UnifiedCreateModal";
 import { BackButton } from '@/components/shared/BackButton';
 import { machineService } from '@/services/machineService';
 import { siteService } from "@/services/SiteService";
+import employeeService from "@/services/employeeService";
 const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 // API client with auth interceptor
@@ -1193,49 +1194,47 @@ const SupervisorDashboard = () => {
         }
       }
 
-      console.log(`📊 Total leaves from API: ${allLeaves.length}`);
+      // ✅ Scope to this supervisor's team + their own leave requests
+      const myEmployeeIds = new Set(employees.map(e => e.employeeId));
+      const myEmployeeMongoIds = new Set(employees.map(e => e._id));
 
-      // Count pending leaves
-      const pendingCount = allLeaves.filter(leave => leave.status === 'pending').length;
+      const myLeaves = allLeaves.filter(leave =>
+        myEmployeeIds.has(leave.employeeId) ||
+        myEmployeeMongoIds.has(leave.employeeId) ||
+        (leave.isSupervisorLeave && leave.supervisorId === currentSupervisor.id)
+      );
+
+      const pendingCount = myLeaves.filter(leave => leave.status === 'pending').length;
       setPendingLeaveCount(pendingCount);
 
-      // Get recent leaves (last 5, sorted by createdAt desc)
-      const sortedLeaves = [...allLeaves].sort((a, b) =>
+      const sortedLeaves = [...myLeaves].sort((a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
-      const recent = sortedLeaves.slice(0, 5);
-      setRecentLeaves(recent);
+      setRecentLeaves(sortedLeaves.slice(0, 5));
 
-      // Count today's leaves
       const today = selectedDate;
-      const approvedLeavesToday = allLeaves.filter(leave => {
+      const approvedLeavesToday = myLeaves.filter(leave => {
         if (leave.status !== 'approved') return false;
         return isDateInLeaveRange(today, leave.fromDate, leave.toDate);
       });
 
-      console.log(`✅ Found ${approvedLeavesToday.length} employees on leave today`);
-      console.log(`📋 Pending leaves: ${pendingCount}`);
-
-      setLeaveRequests(allLeaves);
+      setLeaveRequests(myLeaves);
       setTodayLeaveCount(approvedLeavesToday.length);
 
-      // Update summary leave count
       setSummary(prev => ({
         ...prev,
         leaveCount: approvedLeavesToday.length
       }));
 
-      // Update stats pending requests
       setStats(prev => ({
         ...prev,
         pendingRequests: pendingCount
       }));
 
-      // Create activity for each pending leave (optional - for recent activities)
-      if (pendingCount > 0 && recent.length > 0) {
-        const pendingLeaves = allLeaves.filter(l => l.status === 'pending');
+      // Optional: create activity for pending leaves
+      if (pendingCount > 0 && sortedLeaves.length > 0) {
+        const pendingLeaves = myLeaves.filter(l => l.status === 'pending');
         if (pendingLeaves.length > 0 && activities.length === 0) {
-          // Add one activity for pending leaves
           addActivity('approval', `${pendingLeaves.length} pending leave request${pendingLeaves.length !== 1 ? 's' : ''} awaiting approval`, 'system');
         }
       }
@@ -1248,7 +1247,7 @@ const SupervisorDashboard = () => {
     } finally {
       setLoadingLeaves(false);
     }
-  }, [currentSupervisor, selectedDate]);
+  }, [currentSupervisor, selectedDate, employees]);   // ← employees added
 
   // Fetch tasks assigned to this supervisor (similar to SupervisorAssignTask)
   const fetchAssignedTasks = useCallback(async () => {
@@ -1664,93 +1663,72 @@ const SupervisorDashboard = () => {
 
     try {
       setLoadingEmployees(true);
-      console.log("Fetching employees...");
+      console.log("Fetching employees via getSupervisorEmployees...");
 
-      let supervisorSiteList = supervisorSites;
-      let supervisorSiteNameList = supervisorSiteNames;
+      const response = await employeeService.getSupervisorEmployees();
+      const allSupervisorEmployees = response?.data || (response as any)?.employees || [];
 
-      if (supervisorSiteList.length === 0) {
-        supervisorSiteList = await fetchAllSites() || [];
-        supervisorSiteNameList = supervisorSiteList.map(site => site.name);
-      }
+      const fetchedEmployees = (Array.isArray(allSupervisorEmployees) ? allSupervisorEmployees : [])
+        .filter((emp: any) => emp.status === 'active');
 
-      if (supervisorSiteNameList.length === 0) {
-        console.log("❌ No sites from tasks - setting empty employees array");
-        setEmployees([]);
-        setSiteEmployeeCounts([]);
-        setSummary(prev => ({ ...prev, totalEmployees: 0 }));
-        setStats(prev => ({ ...prev, totalEmployees: 0 }));
-        toast.warning("You have no tasks assigned to any sites. Please contact your administrator.");
-        setLoadingEmployees(false);
-        return;
-      }
+      console.log(`✅ Supervisor employees resolved: ${fetchedEmployees.length}`);
 
-      console.log("📡 Fetching all employees from API:", `${API_URL}/employees`);
-
-      const response = await axios.get(`${API_URL}/employees`, {
-        params: { limit: 1000 }
+      // Derive supervisor's sites directly from their employees (source of truth)
+      const siteNameSet = new Set<string>();
+      fetchedEmployees.forEach((emp: any) => {
+        const name = (emp.siteName || emp.site || '').trim();
+        if (name) siteNameSet.add(name);
       });
+      const derivedSiteNames = Array.from(siteNameSet);
 
-      let fetchedEmployees: Employee[] = [];
-      let allEmployees: Employee[] = [];
+      let derivedSites: Site[] = derivedSiteNames.map((name) => ({ _id: name, name }));
 
-      if (response.data) {
-        if (response.data.success) {
-          allEmployees = response.data.data || response.data.employees || [];
-        } else if (Array.isArray(response.data)) {
-          allEmployees = response.data;
-        } else if (response.data.employees && Array.isArray(response.data.employees)) {
-          allEmployees = response.data.employees;
-        }
-
-        console.log(`📊 Total employees from API: ${allEmployees.length}`);
-        console.log("📍 Supervisor's task-assigned sites:", supervisorSiteNameList);
-
-        // ✅ NEW: filter by siteId only
-        const siteIds = supervisorSiteList.map(site => site._id);
-
-        if (siteIds.length === 0) {
-          setEmployees([]);
-          setSiteEmployeeCounts([]);
-          setSummary(prev => ({ ...prev, totalEmployees: 0 }));
-          setLoadingEmployees(false);
-          return;
-        }
-
-       fetchedEmployees = allEmployees.filter((emp: Employee) =>
-  siteIds.includes(emp.siteId) && emp.status === 'active'   // ✅ ID match + active only
-);
-
-       
-        console.log(`✅ Filtered ${fetchedEmployees.length} employees for supervisor's task-assigned sites`);
-
-        const siteCountMap = new Map<string, number>();
-        fetchedEmployees.forEach(emp => {
-          const siteName = emp.siteName || 'Unknown Site';
-          siteCountMap.set(siteName, (siteCountMap.get(siteName) || 0) + 1);
+      // Enrich with real site _id/clientName if /sites is reachable (non-blocking)
+      try {
+        const sitesRes = await axios.get(`${API_URL}/sites`);
+        let allSitesData: any[] = sitesRes.data?.data || sitesRes.data || [];
+        if (!Array.isArray(allSitesData)) allSitesData = [];
+        derivedSites = derivedSiteNames.map((name) => {
+          const match = allSitesData.find((s: any) => s.name === name);
+          return {
+            _id: match?._id || match?.id || name,
+            name,
+            clientName: match?.clientName || match?.client,
+            status: match?.status || 'active'
+          };
         });
-
-        const siteCounts = Array.from(siteCountMap.entries()).map(([siteName, count]) => ({
-          siteName,
-          totalEmployees: count
-        }));
-
-        setSiteEmployeeCounts(siteCounts);
-        setSummary(prev => ({ ...prev, totalEmployees: fetchedEmployees.length }));
-        setStats(prev => ({ ...prev, totalEmployees: fetchedEmployees.length }));
+      } catch (e) {
+        console.warn("Could not enrich site metadata:", e);
       }
 
+      setSupervisorSites(derivedSites);
+      setSupervisorSiteNames(derivedSiteNames);
+      if (derivedSites.length > 0 && !selectedSite) {
+        setSelectedSite(derivedSites[0].name);
+      }
+
+      const siteCountMap = new Map<string, number>();
+      fetchedEmployees.forEach((emp: any) => {
+        const siteName = emp.siteName || 'Unknown Site';
+        siteCountMap.set(siteName, (siteCountMap.get(siteName) || 0) + 1);
+      });
+      const siteCounts = Array.from(siteCountMap.entries()).map(([siteName, count]) => ({
+        siteName,
+        totalEmployees: count
+      }));
+
+      setSiteEmployeeCounts(siteCounts);
+      setSummary(prev => ({ ...prev, totalEmployees: fetchedEmployees.length }));
+      setStats(prev => ({ ...prev, totalEmployees: fetchedEmployees.length }));
       setEmployees(fetchedEmployees);
 
     } catch (error: any) {
       console.error('❌ Error fetching employees:', error);
-
       if (error.code === 'ERR_NETWORK') {
         toast.error("Network error: Cannot connect to server");
       } else {
         toast.error(`Failed to load employees: ${error.message}`);
       }
-
       setEmployees([]);
       setSiteEmployeeCounts([]);
       setSummary(prev => ({ ...prev, totalEmployees: 0 }));
@@ -1758,7 +1736,7 @@ const SupervisorDashboard = () => {
     } finally {
       setLoadingEmployees(false);
     }
-  }, [currentSupervisor, supervisorSites, supervisorSiteNames, fetchAllSites]);
+  }, [currentSupervisor, selectedSite]);
   // ========== Geofence Breach Monitoring ==========
   useEffect(() => {
     // Check for geofence breaches every 60 seconds
@@ -2507,7 +2485,7 @@ const SupervisorDashboard = () => {
         loadAttendanceStatus();
         loadManagerAttendanceData();
         loadSupervisorAttendanceRecords();
-        fetchAllSites();
+
         fetchEmployees();
         loadAttendanceRecords(selectedDate);
         fetchAssignedTasks();
@@ -2525,7 +2503,7 @@ const SupervisorDashboard = () => {
     loadAttendanceStatus();
     loadManagerAttendanceData();
     loadSupervisorAttendanceRecords();
-    fetchAllSites();
+
     fetchEmployees();
     loadAttendanceRecords(selectedDate);
     fetchAssignedTasks();
@@ -2601,7 +2579,7 @@ const SupervisorDashboard = () => {
       setLoading(true);
       console.log("🚀 Initializing supervisor dashboard...");
       await checkBackendConnection();
-      await fetchAllSites();
+
       await fetchEmployees();
       await fetchAllLeaveRequests();
       await loadAttendanceRecords(selectedDate);

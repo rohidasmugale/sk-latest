@@ -31,6 +31,8 @@ export interface IUser extends Document {
   permissions?: Record<string, boolean>;
   createdAt: Date;
   updatedAt: Date;
+  resetPasswordToken?: string;
+resetPasswordExpires?: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
   isPasswordChangedAfter(JWTTimestamp: number): boolean;
 }

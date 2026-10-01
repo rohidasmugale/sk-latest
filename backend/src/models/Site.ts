@@ -113,6 +113,7 @@ const SiteSchema: Schema = new Schema(
             'Security',
             'Parking',
             'Waste Management',
+             'Technician',
             'Other'
           ];
           return services.every(service => validServices.includes(service));
@@ -133,7 +134,8 @@ const SiteSchema: Schema = new Schema(
             'Housekeeping Staff',
             'Security Guard',
             'Parking Attendant',
-            'Waste Collector'
+            'Waste Collector',
+            'Technician'
           ]
         },
         count: {

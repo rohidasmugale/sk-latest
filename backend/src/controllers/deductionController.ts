@@ -233,7 +233,7 @@ class DeductionController {
         type,
         amount: parsedAmount,
         appliedMonth,
-        status: status || 'pending'
+        status: status || 'active'
       };
       
       // Optional fields
@@ -387,43 +387,36 @@ class DeductionController {
                 $cond: [{ $eq: ['$type', 'other'] }, '$amount', 0]
               }
             },
-            pendingCount: {
-              $sum: {
-                $cond: [{ $eq: ['$status', 'pending'] }, 1, 0]
-              }
-            },
-            approvedCount: {
-              $sum: {
-                $cond: [{ $eq: ['$status', 'approved'] }, 1, 0]
-              }
-            },
-            rejectedCount: {
-              $sum: {
-                $cond: [{ $eq: ['$status', 'rejected'] }, 1, 0]
-              }
-            },
-            completedCount: {
-              $sum: {
-                $cond: [{ $eq: ['$status', 'completed'] }, 1, 0]
-              }
-            },
+           activeCount: {
+  $sum: {
+    $cond: [{ $eq: ['$status', 'active'] }, 1, 0]
+  }
+},
+completedCount: {
+  $sum: {
+    $cond: [{ $eq: ['$status', 'completed'] }, 1, 0]
+  }
+},
+cancelledCount: {
+  $sum: {
+    $cond: [{ $eq: ['$status', 'cancelled'] }, 1, 0]
+  }
+},
             totalCount: { $sum: 1 }
           }
         }
       ]);
       
       // If no deductions exist, return zero stats
-      const result = stats[0] || {
-        totalDeductions: 0,
-        totalFines: 0,
-        totalOther: 0,
-        pendingCount: 0,
-        approvedCount: 0,
-        rejectedCount: 0,
-        completedCount: 0,
-        totalCount: 0
-      };
-      
+     const result = stats[0] || {
+  totalDeductions: 0,
+  totalFines: 0,
+  totalOther: 0,
+  activeCount: 0,
+  completedCount: 0,
+  cancelledCount: 0,
+  totalCount: 0
+};
       // Add zero for advances (handled separately)
       result.totalAdvances = 0;
       

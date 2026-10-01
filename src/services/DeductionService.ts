@@ -1,4 +1,6 @@
-// Types
+// src/services/DeductionService.ts
+
+// ─── Types ───────────────────────────────────────────────────────────────
 export interface Employee {
   id: string;
   employeeId: string;
@@ -18,7 +20,7 @@ export interface Deduction {
   amount: number;
   description: string;
   deductionDate: string;
-  status: 'pending' | 'approved' | 'rejected' | 'completed';
+  status: 'active' | 'completed' | 'cancelled';
   repaymentMonths: number;
   installmentAmount: number;
   fineAmount: number;
@@ -37,7 +39,7 @@ export interface CreateDeductionRequest {
   amount: number;
   description?: string;
   deductionDate: string;
-  status: 'pending' | 'approved' | 'rejected' | 'completed';
+  status: 'active' | 'completed' | 'cancelled';
   repaymentMonths?: number;
   fineAmount?: number;
   appliedMonth: string;
@@ -51,7 +53,7 @@ export interface UpdateDeductionRequest {
   amount: number;
   description?: string;
   deductionDate: string;
-  status: 'pending' | 'approved' | 'rejected' | 'completed';
+  status: 'active' | 'completed' | 'cancelled';
   repaymentMonths?: number;
   fineAmount?: number;
   appliedMonth: string;
@@ -61,10 +63,9 @@ export interface DeductionStats {
   totalDeductions: number;
   totalAdvances: number;
   totalFines: number;
-  pendingCount: number;
-  approvedCount: number;
-  rejectedCount: number;
+  activeCount: number;
   completedCount: number;
+  cancelledCount: number;
   monthlyStats?: {
     month: string;
     total: number;
@@ -99,56 +100,52 @@ export interface EmployeeResponse {
   message?: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? `http://localhost:5001/api` : 'https://sk-backend-btbj.onrender.com/api');
 
+// ─── Service Class ───────────────────────────────────────────────────────
 class DeductionService {
   // Cache implementation
   private cache: Record<string, { data: any; timestamp: number; ttl: number }> = {
-    employees: { data: null, timestamp: 0, ttl: 5 * 60 * 1000 }, // 5 minutes
-    deductions: { data: null, timestamp: 0, ttl: 2 * 60 * 1000 }, // 2 minutes
-    stats: { data: null, timestamp: 0, ttl: 1 * 60 * 1000 } // 1 minute
+    employees: { data: null, timestamp: 0, ttl: 5 * 60 * 1000 },
+    deductions: { data: null, timestamp: 0, ttl: 2 * 60 * 1000 },
+    stats: { data: null, timestamp: 0, ttl: 1 * 60 * 1000 },
   };
 
   private abortControllers: Map<string, AbortController> = new Map();
 
-  // Helper method to create cache key
   private createCacheKey(endpoint: string, params?: Record<string, any>): string {
     const key = endpoint + (params ? JSON.stringify(params) : '');
-    return btoa(key); // Base64 encode to ensure valid cache key
+    return btoa(key);
   }
 
-  // Helper method to get from cache
   private getFromCache<T>(key: string): T | null {
     const cached = this.cache[key];
-    if (cached && cached.data && (Date.now() - cached.timestamp) < cached.ttl) {
+    if (cached && cached.data && Date.now() - cached.timestamp < cached.ttl) {
       console.log(`Using cached data for ${key}`);
       return cached.data;
     }
     return null;
   }
 
-  // Helper method to set cache
   private setCache(key: string, data: any, ttl?: number): void {
     this.cache[key] = {
       data,
       timestamp: Date.now(),
-      ttl: ttl || this.cache[key]?.ttl || 60 * 1000
+      ttl: ttl || this.cache[key]?.ttl || 60 * 1000,
     };
   }
 
-  // Helper method to clear cache
   clearCache(key?: string): void {
     if (key) {
       this.cache[key] = { data: null, timestamp: 0, ttl: 0 };
     } else {
-      Object.keys(this.cache).forEach(k => {
+      Object.keys(this.cache).forEach((k) => {
         this.cache[k] = { data: null, timestamp: 0, ttl: 0 };
       });
     }
   }
 
-  // Helper method to abort previous requests
   private abortPreviousRequest(key: string): void {
     if (this.abortControllers.has(key)) {
       this.abortControllers.get(key)?.abort();
@@ -156,7 +153,6 @@ class DeductionService {
     }
   }
 
-  // Enhanced fetch method with comprehensive error handling
   private async fetchWithCache<T>(
     endpoint: string,
     options: RequestInit = {},
@@ -164,21 +160,15 @@ class DeductionService {
     ttl: number,
     params?: Record<string, any>
   ): Promise<T | null> {
-    // Check cache first
     const cachedData = this.getFromCache<T>(cacheKey);
-    if (cachedData) {
-      return cachedData;
-    }
+    if (cachedData) return cachedData;
 
-    // Abort previous request for this cache key
     this.abortPreviousRequest(cacheKey);
 
-    // Create new abort controller
     const abortController = new AbortController();
     this.abortControllers.set(cacheKey, abortController);
 
     try {
-      // Build URL with params
       const urlParams = new URLSearchParams();
       if (params) {
         Object.entries(params).forEach(([key, value]) => {
@@ -187,20 +177,18 @@ class DeductionService {
           }
         });
       }
-      
-      // Add cache-busting timestamp if not already in params
+
       if (!params?._t) {
         urlParams.append('_t', Date.now().toString());
       }
 
       const queryString = urlParams.toString();
       const url = `${API_URL}/${endpoint}${queryString ? `?${queryString}` : ''}`;
-      
+
       console.log(`Fetching from: ${url}`);
 
-      // Add timeout to the fetch request
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Request timeout')), 10000); // 10 second timeout
+        setTimeout(() => reject(new Error('Request timeout')), 10000);
       });
 
       const fetchPromise = fetch(url, {
@@ -208,38 +196,32 @@ class DeductionService {
         signal: abortController.signal,
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
+          Accept: 'application/json',
           'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          ...options.headers
+          Pragma: 'no-cache',
+          ...options.headers,
         },
-        // Add credentials if needed for CORS
-        credentials: 'same-origin'
+        credentials: 'same-origin',
       });
 
       const response = await Promise.race([fetchPromise, timeoutPromise]);
 
-      // Check for network errors
       if (!response.ok) {
         let errorMessage = `http error! status: ${response.status}`;
         try {
-          // Try to parse error response as JSON
           const errorData = await response.json();
           errorMessage = errorData.message || errorData.error || errorMessage;
-        } catch (e) {
-          // If response is not JSON, try to get text
+        } catch {
           try {
             const text = await response.text();
             if (text) errorMessage = text;
-          } catch (textError) {
-            // Use status text as fallback
+          } catch {
             errorMessage = response.statusText || errorMessage;
           }
         }
         throw new Error(errorMessage);
       }
 
-      // Parse response
       let data: T;
       try {
         data = await response.json();
@@ -248,7 +230,6 @@ class DeductionService {
         throw new Error('Invalid JSON response from server');
       }
 
-      // Only cache successful responses with data
       if (data && (data as any).success !== false) {
         this.setCache(cacheKey, data, ttl);
       }
@@ -259,42 +240,40 @@ class DeductionService {
         console.log('Fetch aborted:', endpoint);
         return null;
       }
-      
-      // Handle specific error types
+
       if (error.message === 'Failed to fetch') {
-        console.error(`Network error: Cannot connect to backend at ${API_URL}. Please ensure the server is running on port 5001.`);
+        console.error(
+          `Network error: Cannot connect to backend at ${API_URL}. Please ensure the server is running on port 5001.`
+        );
         throw new Error(`Cannot connect to server. Please ensure backend is running on port 5001.`);
       }
-      
+
       if (error.message === 'Request timeout') {
         console.error(`Timeout error: Request to ${endpoint} timed out after 10 seconds`);
         throw new Error('Request timeout. Please check your network connection.');
       }
-      
+
       console.error(`Error fetching ${endpoint}:`, error.message || error);
-      
-      // For non-critical endpoints (stats, exports), return null instead of throwing
+
       if (endpoint.includes('stats') || endpoint.includes('export')) {
         return null;
       }
-      
+
       throw error;
     } finally {
       this.abortControllers.delete(cacheKey);
     }
   }
 
-  // Health check method
   async checkBackendHealth(): Promise<boolean> {
     try {
       const response = await fetch(`${API_URL}/health`, {
         method: 'GET',
         headers: {
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache'
-        }
+          Accept: 'application/json',
+          'Cache-Control': 'no-cache',
+        },
       });
-      
       return response.ok;
     } catch (error) {
       console.error('Backend health check failed:', error);
@@ -302,21 +281,20 @@ class DeductionService {
     }
   }
 
-  // Employees
+  // ─── Employees ────────────────────────────────────────────────────────
   async getEmployees(params?: {
     status?: string;
     limit?: number;
     search?: string;
   }): Promise<EmployeeResponse> {
     try {
-      // First check if backend is healthy
       const isHealthy = await this.checkBackendHealth();
       if (!isHealthy) {
         console.warn('Backend is not reachable, returning empty employees list');
         return {
           success: true,
           data: [],
-          message: 'Backend server is not reachable'
+          message: 'Backend server is not reachable',
         };
       }
 
@@ -325,15 +303,12 @@ class DeductionService {
         'employees',
         {},
         cacheKey,
-        5 * 60 * 1000, // 5 minutes cache
+        5 * 60 * 1000,
         params
       );
 
       if (!data) {
-        return {
-          success: true,
-          data: []
-        };
+        return { success: true, data: [] };
       }
 
       return data;
@@ -342,12 +317,12 @@ class DeductionService {
       return {
         success: true,
         data: [],
-        message: error.message || 'Failed to fetch employees'
+        message: error.message || 'Failed to fetch employees',
       };
     }
   }
 
-  // Deductions
+  // ─── Deductions ───────────────────────────────────────────────────────
   async getDeductions(params?: {
     page?: number;
     limit?: number;
@@ -359,7 +334,6 @@ class DeductionService {
     endDate?: string;
   }): Promise<PaginatedResponse<Deduction>> {
     try {
-      // Check backend health first
       const isHealthy = await this.checkBackendHealth();
       if (!isHealthy) {
         return {
@@ -371,9 +345,9 @@ class DeductionService {
             totalItems: 0,
             totalPages: 0,
             hasNext: false,
-            hasPrev: false
+            hasPrev: false,
           },
-          message: 'Backend server is not reachable'
+          message: 'Backend server is not reachable',
         };
       }
 
@@ -382,7 +356,7 @@ class DeductionService {
         'deductions',
         {},
         cacheKey,
-        2 * 60 * 1000, // 2 minutes cache
+        2 * 60 * 1000,
         params
       );
 
@@ -396,8 +370,8 @@ class DeductionService {
             totalItems: 0,
             totalPages: 0,
             hasNext: false,
-            hasPrev: false
-          }
+            hasPrev: false,
+          },
         };
       }
 
@@ -413,9 +387,9 @@ class DeductionService {
           totalItems: 0,
           totalPages: 0,
           hasNext: false,
-          hasPrev: false
+          hasPrev: false,
         },
-        message: error.message || 'Failed to fetch deductions'
+        message: error.message || 'Failed to fetch deductions',
       };
     }
   }
@@ -425,9 +399,9 @@ class DeductionService {
       const response = await fetch(`${API_URL}/deductions/${id}?_t=${Date.now()}`, {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Accept': 'application/json'
-        }
+          Pragma: 'no-cache',
+          Accept: 'application/json',
+        },
       });
 
       if (!response.ok) {
@@ -448,9 +422,9 @@ class DeductionService {
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache',
-          'Accept': 'application/json'
+          Accept: 'application/json',
         },
-        body: JSON.stringify(deductionData)
+        body: JSON.stringify(deductionData),
       });
 
       if (!response.ok) {
@@ -460,7 +434,6 @@ class DeductionService {
 
       const data = await response.json();
 
-      // Clear deductions cache since data has changed
       this.clearCache('deductions');
       this.clearCache('stats');
 
@@ -471,16 +444,19 @@ class DeductionService {
     }
   }
 
-  async updateDeduction(id: string, deductionData: UpdateDeductionRequest): Promise<ApiResponse<Deduction>> {
+  async updateDeduction(
+    id: string,
+    deductionData: UpdateDeductionRequest
+  ): Promise<ApiResponse<Deduction>> {
     try {
       const response = await fetch(`${API_URL}/deductions/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache',
-          'Accept': 'application/json'
+          Accept: 'application/json',
         },
-        body: JSON.stringify(deductionData)
+        body: JSON.stringify(deductionData),
       });
 
       if (!response.ok) {
@@ -490,7 +466,6 @@ class DeductionService {
 
       const data = await response.json();
 
-      // Clear deductions cache since data has changed
       this.clearCache('deductions');
       this.clearCache('stats');
 
@@ -507,8 +482,8 @@ class DeductionService {
         method: 'DELETE',
         headers: {
           'Cache-Control': 'no-cache',
-          'Accept': 'application/json'
-        }
+          Accept: 'application/json',
+        },
       });
 
       if (!response.ok) {
@@ -518,7 +493,6 @@ class DeductionService {
 
       const data = await response.json();
 
-      // Clear deductions cache since data has changed
       this.clearCache('deductions');
       this.clearCache('stats');
 
@@ -529,7 +503,7 @@ class DeductionService {
     }
   }
 
-  // Statistics - Updated with better error handling
+  // ─── Statistics ───────────────────────────────────────────────────────
   async getDeductionStats(params?: {
     startDate?: string;
     endDate?: string;
@@ -538,8 +512,7 @@ class DeductionService {
   }): Promise<ApiResponse<DeductionStats>> {
     try {
       console.log('Fetching deduction stats with params:', params);
-      
-      // Check backend health first
+
       const isHealthy = await this.checkBackendHealth();
       if (!isHealthy) {
         console.warn('Backend not reachable for stats, returning empty stats');
@@ -549,12 +522,11 @@ class DeductionService {
             totalDeductions: 0,
             totalAdvances: 0,
             totalFines: 0,
-            pendingCount: 0,
-            approvedCount: 0,
-            rejectedCount: 0,
-            completedCount: 0
+            activeCount: 0,
+            completedCount: 0,
+            cancelledCount: 0,
           },
-          message: 'Backend server is not reachable'
+          message: 'Backend server is not reachable',
         };
       }
 
@@ -563,7 +535,7 @@ class DeductionService {
         'deductions/stats',
         {},
         cacheKey,
-        1 * 60 * 1000, // 1 minute cache
+        1 * 60 * 1000,
         params
       );
 
@@ -575,11 +547,10 @@ class DeductionService {
             totalDeductions: 0,
             totalAdvances: 0,
             totalFines: 0,
-            pendingCount: 0,
-            approvedCount: 0,
-            rejectedCount: 0,
-            completedCount: 0
-          }
+            activeCount: 0,
+            completedCount: 0,
+            cancelledCount: 0,
+          },
         };
       }
 
@@ -593,27 +564,28 @@ class DeductionService {
           totalDeductions: 0,
           totalAdvances: 0,
           totalFines: 0,
-          pendingCount: 0,
-          approvedCount: 0,
-          rejectedCount: 0,
-          completedCount: 0
+          activeCount: 0,
+          completedCount: 0,
+          cancelledCount: 0,
         },
-        message: error.message || 'Failed to fetch deduction stats'
+        message: error.message || 'Failed to fetch deduction stats',
       };
     }
   }
 
-  // Bulk operations
-  async createBulkDeductions(deductions: CreateDeductionRequest[]): Promise<ApiResponse<Deduction[]>> {
+  // ─── Bulk Operations ──────────────────────────────────────────────────
+  async createBulkDeductions(
+    deductions: CreateDeductionRequest[]
+  ): Promise<ApiResponse<Deduction[]>> {
     try {
       const response = await fetch(`${API_URL}/deductions/bulk`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache',
-          'Accept': 'application/json'
+          Accept: 'application/json',
         },
-        body: JSON.stringify({ deductions })
+        body: JSON.stringify({ deductions }),
       });
 
       if (!response.ok) {
@@ -623,7 +595,6 @@ class DeductionService {
 
       const data = await response.json();
 
-      // Clear deductions cache since data has changed
       this.clearCache('deductions');
       this.clearCache('stats');
 
@@ -634,16 +605,19 @@ class DeductionService {
     }
   }
 
-  async updateDeductionStatus(id: string, status: Deduction['status']): Promise<ApiResponse<Deduction>> {
+  async updateDeductionStatus(
+    id: string,
+    status: Deduction['status']
+  ): Promise<ApiResponse<Deduction>> {
     try {
       const response = await fetch(`${API_URL}/deductions/${id}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache',
-          'Accept': 'application/json'
+          Accept: 'application/json',
         },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ status }),
       });
 
       if (!response.ok) {
@@ -653,7 +627,6 @@ class DeductionService {
 
       const data = await response.json();
 
-      // Clear deductions cache since data has changed
       this.clearCache('deductions');
       this.clearCache('stats');
 
@@ -664,25 +637,29 @@ class DeductionService {
     }
   }
 
-  // Export data
+  // ─── Export ───────────────────────────────────────────────────────────
   async exportDeductions(params?: {
     format?: 'csv' | 'excel' | 'pdf';
     startDate?: string;
     endDate?: string;
     status?: string;
     type?: string;
+    site?: string;
   }): Promise<Blob> {
     try {
-      const urlParams = new URLSearchParams({
-        format: params?.format || 'csv',
-        ...params
-      });
+      const urlParams = new URLSearchParams();
+      urlParams.append('format', params?.format || 'csv');
+      if (params?.startDate) urlParams.append('startDate', params.startDate);
+      if (params?.endDate) urlParams.append('endDate', params.endDate);
+      if (params?.status) urlParams.append('status', params.status);
+      if (params?.type) urlParams.append('type', params.type);
+      if (params?.site) urlParams.append('site', params.site);
 
       const response = await fetch(`${API_URL}/deductions/export?${urlParams}`, {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
-        }
+          Pragma: 'no-cache',
+        },
       });
 
       if (!response.ok) {
@@ -696,7 +673,7 @@ class DeductionService {
     }
   }
 
-  // Utility methods
+  // ─── Utility Methods ──────────────────────────────────────────────────
   calculateInstallmentAmount(amount: number, months: number): number {
     if (months <= 0 || amount <= 0) return amount;
     return parseFloat((amount / months).toFixed(2));
@@ -707,7 +684,7 @@ class DeductionService {
       style: 'currency',
       currency: 'INR',
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2
+      maximumFractionDigits: 2,
     }).format(amount);
   }
 
@@ -717,7 +694,7 @@ class DeductionService {
       return new Date(dateString).toLocaleDateString('en-IN', {
         day: '2-digit',
         month: 'short',
-        year: 'numeric'
+        year: 'numeric',
       });
     } catch {
       return dateString;
@@ -726,10 +703,9 @@ class DeductionService {
 
   getStatusBadgeClass(status: string): string {
     const classes = {
-      pending: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100 hover:text-yellow-800',
-      approved: 'bg-blue-100 text-blue-800 hover:bg-blue-100 hover:text-blue-800',
-      rejected: 'bg-red-100 text-red-800 hover:bg-red-100 hover:text-red-800',
-      completed: 'bg-green-100 text-green-800 hover:bg-green-100 hover:text-green-800'
+      active: 'bg-blue-100 text-blue-800 hover:bg-blue-100 hover:text-blue-800',
+      completed: 'bg-green-100 text-green-800 hover:bg-green-100 hover:text-green-800',
+      cancelled: 'bg-red-100 text-red-800 hover:bg-red-100 hover:text-red-800',
     };
     return classes[status as keyof typeof classes] || 'bg-gray-100 text-gray-800';
   }
@@ -738,12 +714,12 @@ class DeductionService {
     const classes = {
       advance: 'bg-purple-100 text-purple-800 hover:bg-purple-100 hover:text-purple-800',
       fine: 'bg-orange-100 text-orange-800 hover:bg-orange-100 hover:text-orange-800',
-      other: 'bg-gray-100 text-gray-800 hover:bg-gray-100 hover:text-gray-800'
+      other: 'bg-gray-100 text-gray-800 hover:bg-gray-100 hover:text-gray-800',
     };
     return classes[type as keyof typeof classes] || 'bg-gray-100 text-gray-800';
   }
 
-  // Transform MongoDB data to frontend format
+  // ─── Transform Helpers ────────────────────────────────────────────────
   transformDeductionData(mongoData: any): Deduction {
     return {
       id: mongoData._id || mongoData.id,
@@ -751,40 +727,42 @@ class DeductionService {
       type: mongoData.type,
       amount: mongoData.amount || 0,
       description: mongoData.description || '',
-      deductionDate: mongoData.deductionDate 
+      deductionDate: mongoData.deductionDate
         ? new Date(mongoData.deductionDate).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0],
-      status: mongoData.status || 'pending',
+      status: mongoData.status || 'active',
       repaymentMonths: mongoData.repaymentMonths || 0,
       installmentAmount: mongoData.installmentAmount || 0,
       fineAmount: mongoData.fineAmount || 0,
-      appliedMonth: mongoData.appliedMonth || new Date().toISOString().slice(0, 7),
+      appliedMonth:
+        mongoData.appliedMonth || new Date().toISOString().slice(0, 7),
       employeeName: mongoData.employeeName,
       employeeCode: mongoData.employeeCode,
       createdAt: mongoData.createdAt,
-      updatedAt: mongoData.updatedAt
+      updatedAt: mongoData.updatedAt,
     };
   }
 
   transformEmployeeData(mongoData: any): Employee {
     return {
       id: mongoData._id || mongoData.id,
-      employeeId: mongoData.employeeId || `EMP${(mongoData._id || mongoData.id).toString().slice(-6)}`,
+      employeeId:
+        mongoData.employeeId ||
+        `EMP${(mongoData._id || mongoData.id).toString().slice(-6)}`,
       name: mongoData.name,
       email: mongoData.email,
       phone: mongoData.phone,
       department: mongoData.department,
       position: mongoData.position,
       status: mongoData.status,
-      salary: mongoData.salary || 0
+      salary: mongoData.salary || 0,
     };
   }
 
-  // Helper to check if API is reachable
   async checkApiHealth(): Promise<boolean> {
     try {
       const response = await fetch(`${API_URL}/health`, {
-        signal: AbortSignal.timeout(5000) // 5 second timeout
+        signal: AbortSignal.timeout(5000),
       });
       return response.ok;
     } catch {

@@ -224,7 +224,10 @@ export default function SupervisorSalarySlip() {
             <tr><td>MEDICAL</td><td class="amount">₹${fmt(structure?.medicalAllowance)}</td></tr>
             <tr><td>ARREARS</td><td class="amount">₹${fmt(structure?.arrears)}</td></tr>
             <tr><td>OTHER ALL</td><td class="amount">₹${fmt(structure?.otherAllowances)}</td></tr>
-            <tr class="total"><td><strong>GROSS TOTAL</strong></td><td class="amount"><strong>₹${fmt(slip.allowances)}</strong></td></tr>
+           <tr class="total">
+  <td><strong>GROSS TOTAL</strong></td>
+  <td class="amount"><strong>₹${(slip.basicSalary + slip.allowances).toLocaleString()}</strong></td>
+</tr>
           </table>
         </div>
 
@@ -348,7 +351,7 @@ export default function SupervisorSalarySlip() {
 
   return (
     <div className="p-4 space-y-6">
-      <DashboardHeader title="Salary Slip" subtitle="Download your salary slips" onMenuClick={() => {}} />
+      <DashboardHeader title="Salary Slip" subtitle="Download your salary slips" onMenuClick={() => { }} />
 
       <Card>
         <CardHeader><CardTitle>My Salary Slip</CardTitle></CardHeader>

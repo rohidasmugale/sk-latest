@@ -6,7 +6,15 @@ import Alert, { IAlert } from '../models/Alert';
 export const getAllAlerts = async (req: Request, res: Response): Promise<Response> => {
   try {
     console.log('📋 Fetching all alerts from database....');
-    const alerts: IAlert[] = await Alert.find().sort({ createdAt: -1 });
+   const { page = '1', limit = '50' } = req.query;
+const pageNum = parseInt(page as string) || 1;
+const limitNum = parseInt(limit as string) || 50;
+const skip = (pageNum - 1) * limitNum;
+
+const [alerts, total] = await Promise.all([
+  Alert.find().sort({ createdAt: -1 }).skip(skip).limit(limitNum).lean(),
+  Alert.countDocuments()
+]);
     
     console.log(`✅ Found ${alerts.length} alerts`);
     
@@ -243,19 +251,23 @@ export const getAlertStats = async (req: Request, res: Response): Promise<Respon
   try {
     console.log('📊 Fetching alert statistics...');
     
-    const alerts: IAlert[] = await Alert.find();
-    
-    const stats = {
-      total: alerts.length,
-      open: alerts.filter(a => a.status === 'open').length,
-      inProgress: alerts.filter(a => a.status === 'in-progress').length,
-      resolved: alerts.filter(a => a.status === 'resolved').length,
-      low: alerts.filter(a => a.severity === 'low').length,
-      medium: alerts.filter(a => a.severity === 'medium').length,
-      high: alerts.filter(a => a.severity === 'high').length,
-      critical: alerts.filter(a => a.severity === 'critical').length
-    };
-    
+  const statsAgg = await Alert.aggregate([
+  {
+    $group: {
+      _id: null,
+      total: { $sum: 1 },
+      open: { $sum: { $cond: [{ $eq: ['$status', 'open'] }, 1, 0] } },
+      inProgress: { $sum: { $cond: [{ $eq: ['$status', 'in-progress'] }, 1, 0] } },
+      resolved: { $sum: { $cond: [{ $eq: ['$status', 'resolved'] }, 1, 0] } },
+      low: { $sum: { $cond: [{ $eq: ['$severity', 'low'] }, 1, 0] } },
+      medium: { $sum: { $cond: [{ $eq: ['$severity', 'medium'] }, 1, 0] } },
+      high: { $sum: { $cond: [{ $eq: ['$severity', 'high'] }, 1, 0] } },
+      critical: { $sum: { $cond: [{ $eq: ['$severity', 'critical'] }, 1, 0] } }
+    }
+  }
+]);
+
+const stats = statsAgg[0] || { total: 0, open: 0, inProgress: 0, resolved: 0, low: 0, medium: 0, high: 0, critical: 0 };
     return res.status(200).json({
       success: true,
       data: stats

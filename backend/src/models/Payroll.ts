@@ -1,5 +1,13 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+
+interface IManualAdjustment {
+  amount: number;        // positive = bonus, negative = deduction
+  reason: string;        // required
+  adjustedBy: string;
+  adjustedAt: Date;
+}
+
 export interface IPayroll extends Document {
   employeeId: string; // This should be string, not ObjectId
   month: string;
@@ -44,6 +52,7 @@ export interface IPayroll extends Document {
   
   createdBy: string;
   updatedBy: string;
+  manualAdjustments?: IManualAdjustment[];
   // Employee details for reference
   employeeDetails?: {
     accountNumber?: string;
@@ -232,6 +241,15 @@ const PayrollSchema: Schema = new Schema(
     }
   ]
 },
+
+manualAdjustments: [
+  {
+    amount: { type: Number, required: true },
+    reason: { type: String, required: true, trim: true },
+    adjustedBy: { type: String, required: true },
+    adjustedAt: { type: Date, default: Date.now },
+  },
+],
     // Employee details for reference
     employeeDetails: {
       accountNumber: {

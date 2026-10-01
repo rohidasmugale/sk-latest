@@ -16,40 +16,40 @@ const cleanObject = (obj: any) => {
 
 // Helper function to get user info from request (you need to implement your auth middleware)
 const getUserInfo = (req: Request): { userId: string; userRole: 'superadmin' | 'admin' | 'manager' } => {
-  // This should come from your authentication middleware
-  // For now, we'll use headers or fallback values
-  const userId = req.headers['x-user-id'] as string || 'unknown-user';
-  const userRole = (req.headers['x-user-role'] as 'superadmin' | 'admin' | 'manager') || 'admin';
-  
+  // Values are set by the auth middleware (req.userId + req.user).
+  const userId = (req as any).userId || 'unknown-user';
+  const userRole = ((req as any).user?.role as 'superadmin' | 'admin' | 'manager') || 'admin';
   return { userId, userRole };
 };
 
-// Get all sites
 export const getAllSites = async (req: Request, res: Response) => {
   try {
     console.log('📋 Fetching all sites');
-    
-    // Get user info for filtering if needed
-    const { userId, userRole } = getUserInfo(req);
-    console.log(`👤 User: ${userId}, Role: ${userRole}`);
-    
-    // You can add filtering based on user role here
+
+    const { userRole } = getUserInfo(req);
+    console.log(`👤 Role: ${userRole}`);
+
     let query = Site.find();
-    
-    // If user is manager, they might only see their own sites
-    if (userRole === 'manager') {
-      query = query.where('addedBy').equals(userId);
-    }
-    
+
+    // if (userRole === 'manager') {
+    //   Managers see sites assigned to them, not sites they created
+    //   const assignedSites = (req as any).user?.assignedSites || [];
+    //   const siteName = (req as any).user?.siteName;
+    //   const names = assignedSites.length > 0
+    //     ? assignedSites
+    //     : (siteName ? [siteName] : []);
+    //   query = query.where('name').in(names);
+    // }
+
     const sites = await query.sort({ createdAt: -1 });
     console.log(`✅ Found ${sites.length} sites`);
-    
+
     res.status(200).json(sites);
   } catch (error: any) {
     console.error('❌ Error fetching sites:', error);
-    res.status(500).json({ 
-      message: 'Error fetching sites', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error fetching sites',
+      error: error.message
     });
   }
 };
@@ -68,12 +68,19 @@ export const getSiteById = async (req: Request, res: Response) => {
     }
     
     // Check permissions for managers
-    const { userId, userRole } = getUserInfo(req);
-    if (userRole === 'manager' && site.addedBy !== userId) {
-      console.log(`⛔ Manager ${userId} trying to access site not added by them`);
-      return res.status(403).json({ 
-        message: 'Access denied. You can only view sites you added.' 
-      });
+       const { userRole } = getUserInfo(req);
+    if (userRole === 'manager') {
+      const assignedSites = (req as any).user?.assignedSites || [];
+      const siteName = (req as any).user?.siteName;
+      const names = assignedSites.length > 0
+        ? assignedSites
+        : (siteName ? [siteName] : []);
+      if (!names.includes(site.name)) {
+        console.log(`⛔ Manager trying to access site not assigned to them: ${site.name}`);
+        return res.status(403).json({ 
+          message: 'Access denied. You can only view sites assigned to you.' 
+        });
+      }
     }
     
     console.log(`✅ Found site: ${site.name}, Added by: ${site.addedBy} (${site.addedByRole})`);
@@ -145,6 +152,16 @@ export const createSite = async (req: Request, res: Response) => {
     siteData.shifts = Array.isArray(cleanedData.shifts)
   ? cleanedData.shifts.filter((s: any) => s && s.name && s.startTime && s.endTime)
   : [];
+  // ✅ Geofence coordinates — accept only if the admin actually sent them
+if (cleanedData.latitude !== undefined) {
+  siteData.latitude = Number(cleanedData.latitude);
+}
+if (cleanedData.longitude !== undefined) {
+  siteData.longitude = Number(cleanedData.longitude);
+}
+if (cleanedData.geofenceRadius !== undefined) {
+  siteData.geofenceRadius = Number(cleanedData.geofenceRadius);
+}
     // Only include clientId if it exists and is not empty
     if (cleanedData.clientId && cleanedData.clientId.trim() !== '') {
       siteData.clientId = String(cleanedData.clientId).trim();
@@ -430,10 +447,14 @@ export const getSiteStats = async (req: Request, res: Response) => {
     let filter = {};
     
     // If user is manager, only get stats for their sites
-    if (userRole === 'manager') {
-      filter = { addedBy: userId };
+        if (userRole === 'manager') {
+      const assignedSites = (req as any).user?.assignedSites || [];
+      const siteName = (req as any).user?.siteName;
+      const names = assignedSites.length > 0
+        ? assignedSites
+        : (siteName ? [siteName] : []);
+      filter = { name: { $in: names } };
     }
-    
     const stats = await Site.aggregate([
       {
         $match: filter
@@ -498,8 +519,13 @@ export const searchSites = async (req: Request, res: Response) => {
     let filter: any = {};
     
     // If user is manager, only search their sites
-    if (userRole === 'manager') {
-      filter.addedBy = userId;
+       if (userRole === 'manager') {
+      const assignedSites = (req as any).user?.assignedSites || [];
+      const siteName = (req as any).user?.siteName;
+      const names = assignedSites.length > 0
+        ? assignedSites
+        : (siteName ? [siteName] : []);
+      filter.name = { $in: names };
     }
     
     if (query) {

@@ -107,7 +107,8 @@ export const getAllAssignTasks = async (req: Request, res: Response) => {
 export const getAssignTaskById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    console.log(`📋 Fetching assign task with ID: ${id}`);const task = await AssignTask.findById(id).lean() as any;
+    console.log(`📋 Fetching assign task with ID: ${id}`);
+     const task = await AssignTask.findById(id).lean() as any;
 
 if (!task) {
   return res.status(404).json({ message: 'Assign task not found' });

@@ -89,7 +89,7 @@ class AdvanceController {
         paymentDate: new Date(paymentDate),
         deductionType,
         appliedMonth: appliedMonth || new Date().toISOString().slice(0, 7),
-        status: status || 'pending',
+        status: status || 'active',
         repaidAmount: 0,
         remainingAmount: parsedAmount
       };
@@ -458,10 +458,11 @@ class AdvanceController {
       const skip = (pageNum - 1) * limitNum;
 
       const total = await Advance.countDocuments(query);
-      const advances = await Advance.find(query)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limitNum);
+     const advances = await Advance.find(query)
+  .sort({ createdAt: -1 })
+  .skip(skip)
+  .limit(limitNum)
+  .lean();
 
       res.status(200).json({
         success: true,
@@ -484,6 +485,7 @@ class AdvanceController {
   }
 
   // Get advances summary
+  // Get advances summary
   async getAdvancesSummary(req: Request, res: Response) {
     try {
       const { appliedMonth, employeeId } = req.query;
@@ -492,72 +494,103 @@ class AdvanceController {
       if (appliedMonth) query.appliedMonth = appliedMonth;
       if (employeeId) query.employeeId = employeeId;
 
-      const advances = await Advance.find(query);
-
-      const totalAdvanceAmount = advances.reduce((sum, adv) => sum + adv.advanceAmount, 0);
-      const totalRepaidAmount = advances.reduce((sum, adv) => sum + (adv.repaidAmount || 0), 0);
-      const totalRemainingAmount = advances.reduce((sum, adv) => sum + (adv.remainingAmount || 0), 0);
-
-      const pendingCount = advances.filter(adv => adv.status === 'pending').length;
-      const approvedCount = advances.filter(adv => adv.status === 'approved').length;
-      const completedCount = advances.filter(adv => adv.status === 'completed').length;
-      const rejectedCount = advances.filter(adv => adv.status === 'rejected').length;
-
-      // Monthly breakdown
-      const monthlyBreakdown = advances.reduce((acc: any, adv) => {
-        const month = adv.appliedMonth;
-        if (!acc[month]) {
-          acc[month] = {
-            totalAmount: 0,
-            count: 0,
-            repaidAmount: 0,
-            remainingAmount: 0
-          };
-        }
-        acc[month].totalAmount += adv.advanceAmount;
-        acc[month].count++;
-        acc[month].repaidAmount += adv.repaidAmount || 0;
-        acc[month].remainingAmount += adv.remainingAmount || 0;
-        return acc;
-      }, {});
-
-      // Type breakdown
-      const typeBreakdown = {
-        monthly: {
-          count: advances.filter(adv => adv.deductionType === 'monthly').length,
-          totalAmount: advances
-            .filter(adv => adv.deductionType === 'monthly')
-            .reduce((sum, adv) => sum + adv.advanceAmount, 0)
+      // Aggregate totals — Mongo does the math
+      const summaryAgg = await Advance.aggregate([
+        { $match: query },
+        {
+          $group: {
+            _id: null,
+            totalAdvanceAmount: { $sum: '$advanceAmount' },
+            totalRepaidAmount: { $sum: { $ifNull: ['$repaidAmount', 0] } },
+            totalRemainingAmount: { $sum: { $ifNull: ['$remainingAmount', 0] } },
+            totalAdvances: { $sum: 1 },
+            activeCount: { $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] } },
+            completedCount: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
+            cancelledCount: { $sum: { $cond: [{ $eq: ['$status', 'cancelled'] }, 1, 0] } },
+          },
         },
-        custom: {
-          count: advances.filter(adv => adv.deductionType === 'custom').length,
-          totalAmount: advances
-            .filter(adv => adv.deductionType === 'custom')
-            .reduce((sum, adv) => sum + adv.advanceAmount, 0)
-        }
+      ]);
+
+      // Default zeros if no records match
+      const totals = summaryAgg[0] || {
+        totalAdvanceAmount: 0,
+        totalRepaidAmount: 0,
+        totalRemainingAmount: 0,
+        totalAdvances: 0,
+        activeCount: 0,
+        completedCount: 0,
+        cancelledCount: 0,
       };
+
+      // Monthly breakdown — aggregate in Mongo, not JS
+      const monthlyAgg = await Advance.aggregate([
+        { $match: query },
+        {
+          $group: {
+            _id: '$appliedMonth',
+            totalAmount: { $sum: '$advanceAmount' },
+            count: { $sum: 1 },
+            repaidAmount: { $sum: { $ifNull: ['$repaidAmount', 0] } },
+            remainingAmount: { $sum: { $ifNull: ['$remainingAmount', 0] } },
+          },
+        },
+      ]);
+
+      const monthlyBreakdown: any = {};
+      monthlyAgg.forEach((m) => {
+        if (!m._id) return;
+        monthlyBreakdown[m._id] = {
+          totalAmount: m.totalAmount,
+          count: m.count,
+          repaidAmount: m.repaidAmount,
+          remainingAmount: m.remainingAmount,
+        };
+      });
+
+      // Type breakdown — aggregate in Mongo
+      const typeAgg = await Advance.aggregate([
+        { $match: query },
+        {
+          $group: {
+            _id: '$deductionType',
+            count: { $sum: 1 },
+            totalAmount: { $sum: '$advanceAmount' },
+          },
+        },
+      ]);
+
+      const typeBreakdown = {
+        monthly: { count: 0, totalAmount: 0 },
+        custom: { count: 0, totalAmount: 0 },
+      };
+      typeAgg.forEach((t) => {
+        if (t._id === 'monthly') {
+          typeBreakdown.monthly = { count: t.count, totalAmount: t.totalAmount };
+        } else if (t._id === 'custom') {
+          typeBreakdown.custom = { count: t.count, totalAmount: t.totalAmount };
+        }
+      });
 
       res.status(200).json({
         success: true,
         data: {
-          totalAdvanceAmount,
-          totalRepaidAmount,
-          totalRemainingAmount,
-          totalAdvances: advances.length,
-          pendingCount,
-          approvedCount,
-          completedCount,
-          rejectedCount,
+          totalAdvanceAmount: totals.totalAdvanceAmount,
+          totalRepaidAmount: totals.totalRepaidAmount,
+          totalRemainingAmount: totals.totalRemainingAmount,
+          totalAdvances: totals.totalAdvances,
+          activeCount: totals.activeCount,
+          completedCount: totals.completedCount,
+          cancelledCount: totals.cancelledCount,
           monthlyBreakdown,
-          typeBreakdown
-        }
+          typeBreakdown,
+        },
       });
 
     } catch (error: any) {
       console.error('Error fetching advances summary:', error);
       res.status(500).json({
         success: false,
-        message: error.message || 'Error fetching advances summary'
+        message: error.message || 'Error fetching advances summary',
       });
     }
   }

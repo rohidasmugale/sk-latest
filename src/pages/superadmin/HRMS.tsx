@@ -181,7 +181,7 @@ const HRMS = () => {
         setLoading(true);
         setError(null);
         console.log('🟡 Fetching employees...');
-        const response = await employeeService.getEmployees();
+        const response = await employeeService.getEmployees({ limit: 10000 });
         console.log('🟡 Employees response:', response);
         setEmployees(response.employees || []);
       } catch (err: any) {

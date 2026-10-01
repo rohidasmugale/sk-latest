@@ -110,11 +110,19 @@ const attendanceSchema = new Schema<IAttendance>(
       default: null,
     },
    siteId: { type: mongoose.Schema.Types.ObjectId, ref: 'Site', index: true },
+
+   supervisorId: {
+  type: String,
+  default: null,
+  index: true,
+},
+
   
     remarks: {
       type: String,
       default: '',
     },
+
     latitude: {
       type: Number,
       default: null,
@@ -157,7 +165,7 @@ isOutOfGeofence:  { type: Boolean, default: false },
 attendanceSchema.index({ employeeId: 1, date: 1 }, { unique: true });
 attendanceSchema.index({ status: 1 });
 attendanceSchema.index({ createdAt: -1 });
-attendanceSchema.index({ supervisorId: 1, date: 1 });
+
 
 const Attendance: Model<IAttendance> = mongoose.model<IAttendance>('Attendance', attendanceSchema);
 

@@ -199,20 +199,23 @@ export const uploadDocumentToCloudinary = async (
       return;
     }
 
-    // Detect file type from buffer
-    const isPDF = fileBuffer.length > 4 && 
-                  fileBuffer[0] === 0x25 && // %
-                  fileBuffer[1] === 0x50 && // P
-                  fileBuffer[2] === 0x44 && // D
-                  fileBuffer[3] === 0x46;    // F
+    const isPDF = fileBuffer.length > 4 &&
+                  fileBuffer[0] === 0x25 &&
+                  fileBuffer[1] === 0x50 &&
+                  fileBuffer[2] === 0x44 &&
+                  fileBuffer[3] === 0x46;
 
-    const isOfficeDoc = fileBuffer.length > 4 && 
-                       (fileBuffer[0] === 0x50 && fileBuffer[1] === 0x4B); // PK (zip) - for docx/xlsx
+    const isOfficeDoc = fileBuffer.length > 4 &&
+                       (fileBuffer[0] === 0x50 && fileBuffer[1] === 0x4B);
 
     let resourceType: 'auto' | 'image' | 'video' | 'raw' = 'auto';
     let format: string | undefined = undefined;
-    
+
     if (isPDF) {
+      // PDFs get 'image' resource type, not 'raw' — Cloudinary explicitly
+      // supports this, and only 'image'/'video' deliveries get CORS headers
+      // by default. Without this, pdf.js's cross-origin fetch() (used for
+      // print/preview) silently fails and the file can't be rendered.
       resourceType = 'image';
       format = 'pdf';
     } else if (isOfficeDoc) {
@@ -233,13 +236,12 @@ export const uploadDocumentToCloudinary = async (
       unique_filename: true,
     };
 
-    if (resourceType === 'raw') {
-      uploadOptions.flags = 'attachment';
-    }
-
-    if (isPDF) {
-      uploadOptions.flags = 'attachment';
-    }
+    // Removed: flags: 'attachment' — this forced Content-Disposition:
+    // attachment on every raw/PDF upload, which fights inline preview and
+    // printing. The frontend's own "Download" button already handles
+    // saving the file when the user explicitly wants that, via
+    // fetch(url) + blob download, so we don't need Cloudinary to force it
+    // at the delivery-URL level.
 
     const uploadStream = cloudinary.uploader.upload_stream(
       uploadOptions,

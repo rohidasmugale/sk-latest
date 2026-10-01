@@ -19,15 +19,12 @@ import AssignTaskPage from "./components/AssignTaskPage";
 import SitesSection from "./components/SitesSection"; // superadmin version
 import TrainingAndBriefing from "./components/TrainingAndBriefing"; // superadmin version
 import { PullToRefreshWrapper } from '@/components/shared/PullToRefreshWrapper';
-import axios from "axios";
+import apiClient from "@/lib/apiClient";
 
 // Import the new components (you'll need to create these or import from manager)
 import RosterSection from "./components/RosterSection";
 import ServicesSection from "./components/ServicesSection";
 import { WorkQueryList } from "@/components/shared/WorkQueryList";
-
-const API_URL = import.meta.env.VITE_API_URL ||
-  (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 // Mobile responsive tab selector
 const MobileTabSelector = ({
@@ -116,27 +113,31 @@ const SuperAdminOperations = () => {
       }
 
       const [tasksRes, sitesRes, rosterRes, servicesRes, alertsRes] = await Promise.all([
-        axios.get(`${API_URL}/tasks`),
-        axios.get(`${API_URL}/sites`),
-        axios.get(`${API_URL}/roster`).catch(() => ({ data: { data: [] } })),
-        axios.get(`${API_URL}/services`).catch(() => ({ data: { data: [] } })),
-        axios.get(`${API_URL}/alerts`).catch(() => ({ data: { data: [] } })),
+        apiClient.get(`/tasks`),
+        apiClient.get(`/sites`),
+        apiClient.get(`/roster`).catch(() => ({ data: { data: [] } })),
+        apiClient.get(`/services`).catch(() => ({ data: { data: [] } })),
+        apiClient.get(`/alerts`).catch(() => ({ data: { data: [] } })),
       ]);
 
+      const tasksData = tasksRes.data.data || tasksRes.data || [];
       const sitesData = sitesRes.data.data || sitesRes.data || [];
-      setAllSites(sitesData);
+      const rosterPayload = rosterRes.data.data || rosterRes.data || [];
+      const servicesPayload = servicesRes.data.data || servicesRes.data || [];
+      const alertsPayload = alertsRes.data.data || alertsRes.data || [];
 
-      setRosterData(rosterRes.data.data || rosterRes.data || []);
-      setServicesData(servicesRes.data.data || servicesRes.data || []);
-      setAlertsData(alertsRes.data.data || alertsRes.data || []);
+      setAllSites(sitesData);
+      setRosterData(rosterPayload);
+      setServicesData(servicesPayload);
+      setAlertsData(alertsPayload);
 
       window.dispatchEvent(new CustomEvent('refreshOperations', {
         detail: {
-          tasks: tasksRes.data.data || tasksRes.data || [],
+          tasks: tasksData,
           sites: sitesData,
-          roster: rosterData,
-          services: servicesData,
-          alerts: alertsData
+          roster: rosterPayload,
+          services: servicesPayload,
+          alerts: alertsPayload
         }
       }));
 

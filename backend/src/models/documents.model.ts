@@ -1,6 +1,22 @@
 // src/models/documents.model.ts
 import mongoose, { Schema, Document as MongooseDocument } from 'mongoose';
 
+export const ALLOWED_MIMETYPES = [
+  'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.template',
+  'text/plain', 'text/html', 'text/csv', 'application/rtf',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/zip', 'application/x-zip-compressed',
+  'application/x-rar-compressed', 'application/vnd.rar', 'application/x-7z-compressed',
+  'application/octet-stream',
+];
+
 // Define the interface
 export interface IDocument extends MongooseDocument {
   cloudinaryPublicId: any;
@@ -39,19 +55,10 @@ const documentSchema = new Schema<IDocument>({
     required: true,
     trim: true
   },
-  mimetype: {
+   mimetype: {
     type: String,
-    required: true,
-    enum: [
-      'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
-      'application/pdf', 
-      'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'text/plain', 'text/html',
-      'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      'application/zip', 'application/x-zip-compressed',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.template'
-    ]
+    required: true
+    // no enum — enforce ALLOWED_MIMETYPES in the multer fileFilter
   },
   size: {
     type: Number,
@@ -107,28 +114,26 @@ documentSchema.index({ tags: 1 });
 documentSchema.index({ uploadedBy: 1 });
 documentSchema.index({ isArchived: 1 });
 
-// Middleware to auto-set category based on mimetype if not already set
-documentSchema.pre<IDocument>('save', function(next) {
-  const doc = this;
-  
-  // Only auto-determine category if it's not explicitly set to a frontend value
-  if (!doc.category || !['uploaded', 'generated', 'template'].includes(doc.category)) {
-    if (doc.mimetype.startsWith('image/')) {
-      doc.category = 'image';
-    } else if (doc.mimetype === 'application/pdf' || 
-               doc.mimetype.includes('text') || 
-               doc.mimetype.includes('word') || 
-               doc.mimetype.includes('document')) {
-      doc.category = 'document';
-    } else if (doc.mimetype.includes('spreadsheet') || doc.mimetype.includes('excel')) {
-      doc.category = 'spreadsheet';
-    } else if (doc.mimetype.includes('presentation') || doc.mimetype.includes('powerpoint')) {
-      doc.category = 'presentation';
+// Only derive a category when none was supplied at all.
+documentSchema.pre<IDocument>('save', function (next) {
+  if (!this.category) {
+    if (this.mimetype.startsWith('image/')) {
+      this.category = 'image';
+    } else if (this.mimetype.includes('spreadsheet') || this.mimetype.includes('excel')) {
+      this.category = 'spreadsheet';
+    } else if (this.mimetype.includes('presentation') || this.mimetype.includes('powerpoint')) {
+      this.category = 'presentation';
+    } else if (
+      this.mimetype === 'application/pdf' ||
+      this.mimetype.includes('word') ||
+      this.mimetype.includes('document') ||
+      this.mimetype.includes('text')
+    ) {
+      this.category = 'document';
     } else {
-      doc.category = 'other';
+      this.category = 'other';
     }
   }
-  
   next();
 });
 

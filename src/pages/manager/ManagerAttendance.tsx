@@ -373,7 +373,7 @@ const fetchAttendanceRecords = async (start: string, end: string): Promise<Atten
 
         // Filter records by date range if API doesn't support range filtering
         const filteredRecords = records.filter((record: any) => {
-          const recordDate = record.date;
+          const recordDate = normalizeDateStr(record.date); // you already have this helper
           return recordDate >= start && recordDate <= end;
         });
 
@@ -493,7 +493,8 @@ const fetchAttendanceRecords = async (start: string, end: string): Promise<Atten
             _id: record._id || record.id || `att_${Math.random()}`,
             employeeId: record.employeeId || record.employee?._id || '',
             employeeName: record.employeeName || record.employee?.name || 'Unknown',
-            date: record.date || dateStr,
+            // ✅ change to
+            date: normalizeDateStr(record.date) || dateStr,
             checkInTime: record.checkInTime || null,
             checkOutTime: record.checkOutTime || null,
             checkInPhoto: record.checkInPhoto || null,
@@ -554,9 +555,20 @@ const generateEmployeeData = async (
     }
 
     const allEmployees = await fetchEmployees();
-    const siteEmployees = allEmployees.filter(
-      emp => emp.site === siteName || emp.siteName === siteName
-    );
+    const targetSite = (siteName || '').trim().toLowerCase();
+
+    // Exclude employees explicitly marked as left/inactive/terminated/resigned.
+    // Anything else (active, missing, "Active", unknown) counts as active —
+    // this is fail-open, so it will never drop everyone and show "no employees".
+    const isNotLeftOrInactive = (emp: any): boolean => {
+      const s = String(emp.employeeStatus ?? emp.status ?? '').trim().toLowerCase();
+      return s !== 'left' && s !== 'inactive' && s !== 'terminated' && s !== 'resigned';
+    };
+
+    const siteEmployees = allEmployees.filter(emp => {
+      const empSite = (emp.site || emp.siteName || '').trim().toLowerCase();
+      return empSite === targetSite && isNotLeftOrInactive(emp);
+    });
 
     if (siteEmployees.length === 0) return [];
 
@@ -906,7 +918,7 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
   );
   const [employees, setEmployees] = useState<any[]>(siteData?.employees || []);
   const [refreshing, setRefreshing] = useState(false);
-  const [dailyView, setDailyView] = useState<boolean>(siteData?.daysInPeriod === 1);
+
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [selectedPhotoType, setSelectedPhotoType] = useState<"checkin" | "checkout">("checkin");
@@ -933,6 +945,10 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
   // Cleaning photos
   const [cleaningPhotos, setCleaningPhotos] = useState<any[]>([]);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
+
+  // Grooming count for this site
+  const [groomingCount, setGroomingCount] = useState(0);
+  const [loadingGroomingCount, setLoadingGroomingCount] = useState(false);
 
   // Shift deployment
   const [shiftText, setShiftText] = useState<string>("");
@@ -1132,9 +1148,7 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
       setLoadingIncidents(false);
     }
   };
-  // Grooming count for this site
-  const [groomingCount, setGroomingCount] = useState(0);
-  const [loadingGroomingCount, setLoadingGroomingCount] = useState(false);
+
 
 
 
@@ -1165,7 +1179,13 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
     return () => { cancelled = true; };
   }, [selectedDate, siteName, viewType, department, fetchTrigger]); // 👈 fetchTrigger added
 
-
+  // ✅ Sync selectedDate when the parent passes a new siteData (date or site change)
+  useEffect(() => {
+    if (siteData?.startDate && siteData.startDate !== selectedDate) {
+      setSelectedDate(siteData.startDate);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siteData?.startDate, siteData?.endDate, siteData?.siteId]);
   useEffect(() => {
     const checkMobile = () => setIsMobileView(window.innerWidth < 768);
     checkMobile();
@@ -1318,11 +1338,11 @@ const SiteEmployeeDetails: React.FC<SiteEmployeeDetailsProps> = ({
 
 
   const filteredEmployeesByDate = useMemo(() => {
-    if (dailyView && selectedDate) {
+    if (selectedDate) {
       return employees.filter((emp) => emp.date === selectedDate);
     }
     return employees;
-  }, [employees, dailyView, selectedDate]);
+  }, [employees, selectedDate]);
 
   const allEmployees = filteredEmployeesByDate;
   const presentEmployees = allEmployees.filter((emp: any) => emp.status === "present");
@@ -1909,10 +1929,8 @@ table { width: 100%; border-collapse: collapse; font-size: 10px; }
               setSelectedDate(e.target.value);
               setFetchTrigger(prev => prev + 1);
             }}
+            className="w-36 h-8 text-sm"
           />
-          <Button variant="outline" size="sm" onClick={() => setDailyView(false)} className="h-8">
-            Cumulative
-          </Button>
         </div>
         <div className="relative w-64">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -2053,14 +2071,16 @@ table { width: 100%; border-collapse: collapse; font-size: 10px; }
                 <th className="p-2 text-left text-xs">Check Out</th>
                 <th className="p-2 text-left text-xs">In Photo</th>
                 <th className="p-2 text-left text-xs">Out Photo</th>
+                <th className="p-2 text-left text-xs">Date</th>
+                <th className="p-2 text-left text-xs">Action</th>
                 <th className="p-2 text-left text-xs">Remark</th>
               </tr>
             </thead>
             <tbody>
               {refreshing ? (
-                <tr><td colSpan={14} className="p-4 text-center"><Loader2 className="animate-spin h-5 w-5 mx-auto" /></td></tr>
+                <tr><td colSpan={15} className="p-4 text-center"><Loader2 className="animate-spin h-5 w-5 mx-auto" /></td></tr>
               ) : paginatedEmployees.length === 0 ? (
-                <tr><td colSpan={14} className="p-4 text-center text-muted-foreground">No employees found</td></tr>
+                <tr><td colSpan={15} className="p-4 text-center text-muted-foreground">No employees found</td></tr>
               ) : (
                 paginatedEmployees.map((emp: any, index: number) => {
                   const { status: displayStatus, isLate } = getDerivedAttendanceStatus(emp);
@@ -2800,42 +2820,48 @@ const ManagerAttendanceView = () => {
   const loadDepartmentAttendance = async () => {
     setLoadingDept(true);
     try {
-      const allEmployees = await fetchEmployees();           // your existing fetch
-      const attendanceRecords = await fetchAttendanceRecords(startDate, endDate);
+      // ONE summary call — get per-employee totals
+      const response = await axios.get(`${API_URL}/attendance/summary`, {
+        params: { startDate, endDate },
+      });
+      const perEmployee = response.data?.perEmployee || [];
 
-      // Map employee ID -> department (staff only)
+      // Fetch employee → department mapping (staff only)
+      const employeesResponse = await axios.get(`${API_URL}/employees`, {
+        params: { limit: 5000 },
+      });
+      const allEmployees = employeesResponse.data?.data
+        || employeesResponse.data?.employees
+        || employeesResponse.data
+        || [];
+
       const empDeptMap = new Map<string, string>();
-      const empIsStaff = new Map<string, boolean>();
-      allEmployees.forEach(emp => {
-        if (emp.isManager || emp.isSupervisor) return;
-        const dept = emp.department?.trim();
-        if (dept) {
-          empDeptMap.set(emp.id, dept);
-          empIsStaff.set(emp.id, true);
-        }
+      allEmployees.forEach((emp: any) => {
+        const pos = (emp.position || '').toLowerCase();
+        const dept = (emp.department || '').toLowerCase();
+        const isManager = pos.includes('manager') || dept.includes('manager');
+        const isSupervisor = pos.includes('supervisor') || dept.includes('supervisor');
+        if (isManager || isSupervisor) return;
+        const empId = emp._id || emp.id;
+        if (empId && emp.department) empDeptMap.set(empId, emp.department.trim());
       });
 
-      // Track which staff employees were present (at least once)
-      const presentEmpIds = new Set<string>();
-      attendanceRecords.forEach(rec => {
-        const status = rec.status?.toLowerCase() || '';
-        if (status === 'present' || status === 'half-day') {
-          const empId = rec.employeeId;
-          if (empIsStaff.get(empId)) presentEmpIds.add(empId);
-        }
-      });
-
-      // Count totals and presents per department
       const deptTotalMap = new Map<string, number>();
       const deptPresentMap = new Map<string, number>();
+
       for (const [empId, dept] of empDeptMap.entries()) {
         deptTotalMap.set(dept, (deptTotalMap.get(dept) || 0) + 1);
-        if (presentEmpIds.has(empId)) {
-          deptPresentMap.set(dept, (deptPresentMap.get(dept) || 0) + 1);
-        }
       }
 
-      // Always show the six fixed departments
+      perEmployee.forEach((row: any) => {
+        const empId = row._id?.employeeId;
+        const present = (row.present || 0) + (row.halfDay || 0) * 0.5;
+        if (empId && empDeptMap.has(empId) && present > 0) {
+          const dept = empDeptMap.get(empId)!;
+          deptPresentMap.set(dept, (deptPresentMap.get(dept) || 0) + 1);
+        }
+      });
+
       const desiredDepts = [
         'Housekeeping',
         'Security',
@@ -2858,7 +2884,6 @@ const ManagerAttendanceView = () => {
       setLoadingDept(false);
     }
   };
-
   // Re‑fetch department stats when date range changes
   useEffect(() => {
     loadDepartmentAttendance();
@@ -2993,10 +3018,12 @@ const ManagerAttendanceView = () => {
       isRealData: employeeData.length > 0 && employeeData[0]?.employeeId?.startsWith?.('DEMO') === false
     };
   };
+
   const calculateDisplayData = useCallback(
     async (sitesData: Site[]) => {
       try {
         setRefreshing(true);
+
         let filteredSites = sitesData;
         if (viewType === 'department' && selectedService) {
           const serviceLower = selectedService.toLowerCase().trim();
@@ -3005,51 +3032,127 @@ const ManagerAttendanceView = () => {
           );
         }
 
-        const calculatedData = [];
-        for (const site of filteredSites) {
-          const siteData = await calculateSiteAttendanceData(site, startDate, endDate);
-          if (!siteData.employees) siteData.employees = [];
-          calculatedData.push(siteData);
-          await new Promise(resolve => setTimeout(resolve, 100));
+        if (filteredSites.length === 0) { setDisplayData([]); return; }
+
+        const [allEmployees, attendanceRecords] = await Promise.all([
+          fetchEmployees(),
+          fetchAttendanceRecords(startDate, endDate),
+        ]);
+
+        // Group ACTIVE employees by current site, deduped by id
+        const siteToEmployees = new Map<string, { id: string; name: string }[]>();
+        const seenEmpIds = new Set<string>();
+        allEmployees.forEach(emp => {
+          const site = (emp.site || emp.siteName || '').trim();
+          const empId = String(emp._id || emp.id || '');
+          if (!site || site === 'Main Site' || !empId || seenEmpIds.has(empId)) return;
+
+          const s = String(emp.employeeStatus ?? (emp as any).status ?? '').trim().toLowerCase();
+          if (s === 'left' || s === 'inactive' || s === 'terminated' || s === 'resigned') return;
+
+          seenEmpIds.add(empId);
+          if (!siteToEmployees.has(site)) siteToEmployees.set(site, []);
+          siteToEmployees.get(site)!.push({ id: empId, name: (emp.name || '').trim().toLowerCase() });
+        });
+
+        // attendance lookup: (empId|name, date) -> status, first record wins
+        const byEmpDate = new Map<string, string>();
+        const byNameDate = new Map<string, string>();
+        attendanceRecords.forEach(record => {
+          const empId = String(record.employeeId || '');
+          const name = (record.employeeName || '').trim().toLowerCase();
+          const date = record.date;
+          if (empId) {
+            const k = `${empId}_${date}`;
+            if (!byEmpDate.has(k)) byEmpDate.set(k, record.status);
+          }
+          if (name) {
+            const k = `${name}_${date}`;
+            if (!byNameDate.has(k)) byNameDate.set(k, record.status);
+          }
+        });
+
+        const daysInPeriod = calculateDaysBetween(startDate, endDate);
+        const dateKeys: string[] = [];
+        {
+          const s = parseLocalDate(startDate);
+          const e = parseLocalDate(endDate);
+          for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) dateKeys.push(formatDate(d));
         }
+
+        const groupedBySite = new Map<string, {
+          present: number; absent: number; weeklyOff: number; leave: number; halfDay: number;
+        }>();
+
+        siteToEmployees.forEach((employeesAtSite, site) => {
+          const g = { present: 0, absent: 0, weeklyOff: 0, leave: 0, halfDay: 0 };
+          employeesAtSite.forEach(emp => {
+            dateKeys.forEach(date => {
+              const status =
+                byEmpDate.get(`${emp.id}_${date}`) ??
+                byNameDate.get(`${emp.name}_${date}`) ??
+                'absent'; // no record = absent
+              if (status === 'present') g.present += 1;
+              else if (status === 'half-day') { g.halfDay += 1; g.present += 0.5; }
+              else if (status === 'weekly-off') g.weeklyOff += 1;
+              else if (status === 'leave') g.leave += 1;
+              else g.absent += 1;
+            });
+          });
+          groupedBySite.set(site, g);
+        });
+
+        const calculatedData = filteredSites.map(site => {
+          const g = groupedBySite.get(site.name) || { present: 0, absent: 0, weeklyOff: 0, leave: 0, halfDay: 0 };
+          const actualHeadcount = (siteToEmployees.get(site.name) || []).length;
+          const dailyRequirement = site.staffDeployment
+            ? site.staffDeployment
+              .filter(d => !d.role?.toLowerCase().includes('manager') && !d.role?.toLowerCase().includes('supervisor'))
+              .reduce((sum, d) => sum + (Number(d.count) || 0), 0)
+            : 0;
+          const totalRequiredForPeriod = actualHeadcount * daysInPeriod;
+          const totalPresent = Math.round(g.present);
+
+          return {
+            id: `${site._id}-${startDate}-${endDate}`,
+            siteId: `${site._id}-${startDate}-${endDate}`,
+            name: site.name,
+            siteName: site.name,
+            dailyRequirement,
+            totalEmployees: actualHeadcount,
+            totalRequiredForPeriod,
+            totalPresent,
+            totalWeeklyOff: g.weeklyOff,
+            totalLeave: g.leave,
+            totalAbsent: g.absent,
+            present: totalPresent,
+            weeklyOff: g.weeklyOff,
+            leave: g.leave,
+            absent: g.absent,
+            durationTotalRequired: totalRequiredForPeriod,
+            durationWeeklyOff: g.weeklyOff,
+            durationOnSiteRequirement: totalRequiredForPeriod - g.weeklyOff,
+            durationPresent: totalPresent,
+            durationAbsent: g.absent + g.leave,
+            daysInPeriod,
+            startDate,
+            endDate,
+            employees: [],
+            originalSite: site,
+            isRealData: true,
+          };
+        });
+
         setDisplayData(calculatedData);
       } catch (error) {
         console.error('Error calculating display data:', error);
-        setDisplayData(
-          sitesData.map(site => ({
-            ...site,
-            employees: [],
-            isRealData: false,
-            daysInPeriod: calculateDaysBetween(startDate, endDate),
-            startDate,
-            endDate,
-            dailyRequirement: 0,
-            totalEmployees: 0,
-            totalRequiredForPeriod: 0,
-            totalPresent: 0,
-            totalWeeklyOff: 0,
-            totalLeave: 0,
-            totalAbsent: 0,
-            deploymentStats: {
-              totalStaff: 0,
-              managerCount: 0,
-              supervisorCount: 0,
-              staffCount: 0,
-              managerRequirement: site.managerCount || 0,
-              supervisorRequirement: site.supervisorCount || 0,
-              staffRequirement: 0,
-              dailyStaffRequirement: 0,
-              totalStaffRequirementForPeriod: 0,
-              isStaffFull: false,
-              remainingStaff: 0,
-            },
-          }))
-        );
+        toast.error('Failed to load attendance summary');
+        setDisplayData([]);
       } finally {
         setRefreshing(false);
       }
     },
-    [viewType, selectedService, startDate, endDate] // ✅ dependencies
+    [viewType, selectedService, startDate, endDate]
   );
 
 
@@ -3382,15 +3485,41 @@ const ManagerAttendanceView = () => {
               </h1>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Date range picker */}
+            <div className="flex items-center gap-1 bg-muted/50 px-2 py-1 rounded-md">
+              <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  if (e.target.value > endDate) setEndDate(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-32 h-7 text-xs border-0 bg-transparent focus:outline-none"
+              />
+              <span className="text-xs text-muted-foreground">to</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  if (e.target.value < startDate) setStartDate(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-32 h-7 text-xs border-0 bg-transparent focus:outline-none"
+              />
+            </div>
+
             <Button
               variant="outline"
               size="sm"
               onClick={handleRefreshAll}
               disabled={refreshing || loading}
+              className="h-8"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
-              All
+              <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
             </Button>
           </div>
         </div>
@@ -3526,16 +3655,20 @@ const ManagerAttendanceView = () => {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/50">
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Site Name</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-indigo-700 bg-indigo-50">Daily Req</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-blue-700 bg-blue-50">Total Required</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-green-700 bg-green-50">Present</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-purple-700 bg-purple-50">Weekly Off</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-red-700 bg-red-50">Absent</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Rate</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Status</th>
-                        <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Attendance</th>
-
+                        <th className="h-8 px-2 text-left text-xs font-medium text-muted-foreground w-10">#</th>
+                        <th className="h-8 px-2 text-left text-xs font-medium text-muted-foreground">Site Name</th>
+                        <th className="h-8 px-2 text-center text-xs font-medium text-indigo-700 bg-indigo-50">Daily Req</th>
+                        {daysInPeriod > 1 && (
+                          <th className="h-8 px-2 text-center text-xs font-medium text-blue-700 bg-blue-50">
+                            Total Req ({daysInPeriod}d)
+                          </th>
+                        )}
+                        <th className="h-8 px-2 text-center text-xs font-medium text-green-700 bg-green-50">Present</th>
+                        <th className="h-8 px-2 text-center text-xs font-medium text-purple-700 bg-purple-50">WO</th>
+                        <th className="h-8 px-2 text-center text-xs font-medium text-red-700 bg-red-50">Absent</th>
+                        <th className="h-8 px-2 text-center text-xs font-medium text-muted-foreground">Rate</th>
+                        <th className="h-8 px-2 text-center text-xs font-medium text-muted-foreground">Status</th>
+                        <th className="h-8 px-2 text-center text-xs font-medium text-muted-foreground">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -3546,34 +3679,44 @@ const ManagerAttendanceView = () => {
                         const absent = (item.totalAbsent || 0) + (item.totalLeave || 0);
                         const rate = totalRequired > 0 ? ((present / totalRequired) * 100).toFixed(1) : '0.0';
                         const status = parseFloat(rate) >= 90 ? 'Excellent' : parseFloat(rate) >= 80 ? 'Good' : parseFloat(rate) >= 70 ? 'Average' : 'Poor';
+                        const srNo = (currentPage - 1) * itemsPerPage + index + 1;
 
                         return (
-                          <tr key={item.siteId || item.id || index} className="border-b hover:bg-muted/50">
-                            <td className="p-4 align-middle font-medium">
-                              <div className="font-medium text-sm">{item.siteName || item.name}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {item.daysInPeriod} {item.daysInPeriod === 1 ? 'day' : 'days'}
-                              </div>
+                          <tr
+                            key={item.siteId || item.id || index}
+                            className="border-b hover:bg-muted/50 cursor-pointer"
+                            onClick={() => handleViewDetails(item)}
+                          >
+                            <td className="px-2 py-1.5 text-xs text-muted-foreground">{srNo}</td>
+                            <td className="px-2 py-1.5">
+                              <div className="font-medium text-xs">{item.siteName || item.name}</div>
+                              {daysInPeriod > 1 && (
+                                <div className="text-[10px] text-muted-foreground">{item.daysInPeriod} days</div>
+                              )}
                             </td>
-                            <td className="p-4 align-middle font-bold text-indigo-700 bg-indigo-50">{dailyRequirement}</td>
-                            <td className="p-4 align-middle font-bold text-blue-700 bg-blue-50">{totalRequired}</td>
-                            <td className="p-4 align-middle font-bold text-green-700 bg-green-50">{present}</td>
-                            <td className="p-4 align-middle font-bold text-purple-700 bg-purple-50">
+                            <td className="px-2 py-1.5 text-center font-semibold text-xs text-indigo-700 bg-indigo-50">{dailyRequirement}</td>
+                            {daysInPeriod > 1 && (
+                              <td className="px-2 py-1.5 text-center font-semibold text-xs text-blue-700 bg-blue-50">{totalRequired}</td>
+                            )}
+                            <td className="px-2 py-1.5 text-center font-semibold text-xs text-green-700 bg-green-50">{present}</td>
+                            <td className="px-2 py-1.5 text-center font-semibold text-xs text-purple-700 bg-purple-50">
                               {item.totalWeeklyOff || item.weeklyOffCount || 0}
                             </td>
-                            <td className="p-4 align-middle font-bold text-red-700 bg-red-50">{absent}</td>
-                            <td className="p-4 align-middle font-bold">{rate}%</td>
-                            <td className="p-4 align-middle">
-                              <Badge variant={status === 'Excellent' ? 'default' : status === 'Good' ? 'secondary' : status === 'Average' ? 'outline' : 'destructive'}>
+                            <td className="px-2 py-1.5 text-center font-semibold text-xs text-red-700 bg-red-50">{absent}</td>
+                            <td className="px-2 py-1.5 text-center text-xs font-medium">{rate}%</td>
+                            <td className="px-2 py-1.5 text-center">
+                              <Badge
+                                variant={status === 'Excellent' ? 'default' : status === 'Good' ? 'secondary' : status === 'Average' ? 'outline' : 'destructive'}
+                                className="text-[10px] px-1.5 py-0"
+                              >
                                 {status}
                               </Badge>
                             </td>
-                            <td className="p-4 align-middle">
-                              <Button variant="outline" size="sm" onClick={() => handleViewDetails(item)}>
-                                <Eye className="h-4 w-4 mr-1" /> Details
+                            <td className="px-2 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
+                              <Button variant="outline" size="sm" onClick={() => handleViewDetails(item)} className="h-6 px-2 text-xs">
+                                <Eye className="h-3 w-3 mr-1" /> View
                               </Button>
                             </td>
-
                           </tr>
                         );
                       })}

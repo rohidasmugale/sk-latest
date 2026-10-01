@@ -3,7 +3,7 @@ import { relative } from 'path';
 
 // KYC Document Interface
 interface KYCdocument {
-  documentType: 'aadhar' | 'pan' | 'electricity' | 'driving' | 'police' | 'voter' | 'passport' | 'other';
+  documentType: 'aadhar' | 'pan' | 'passbook' | 'electricity' | 'driving' | 'police' | 'voter' | 'passport' | 'other';
   documentName: string;
   documentNumber?: string;
   fileUrl: string;
@@ -14,7 +14,6 @@ interface KYCdocument {
   verifiedBy?: string;
   expiryDate?: Date;
 }
-
 // Site History Entry Interface
 interface SiteHistoryEntry {
   siteName: string;
@@ -429,7 +428,7 @@ employeeId: {
       type: [{
         documentType: {
           type: String,
-          enum: ['aadhar', 'pan', 'electricity', 'driving', 'police', 'voter', 'passport', 'other'],
+          enum: ['aadhar', 'pan','passbook', 'electricity', 'driving', 'police', 'voter', 'passport', 'other'],
           required: true
         },
         documentName: {
@@ -574,7 +573,7 @@ EmployeeSchema.virtual('formattedDateOfExit').get(function() {
 
 // Virtual for KYC completion status
 EmployeeSchema.virtual('kycCompletionPercentage').get(function() {
-  const requiredDocs = ['aadhar', 'pan']; // police verification is optional
+   const requiredDocs = ['aadhar', 'passbook']; // was ['aadhar', 'pan']
   const uploadedDocs = this.kycDocuments?.map((doc: any) => doc.documentType) || [];
   const verifiedDocs = this.kycDocuments?.filter((doc: any) => doc.verified).map((doc: any) => doc.documentType) || [];
   
@@ -676,13 +675,15 @@ EmployeeSchema.statics.getValidGenders = function() {
   return ['Male', 'Female', 'Transgender'];
 };
 
-EmployeeSchema.statics.getDocumentTypes = function() {
+
+  EmployeeSchema.statics.getDocumentTypes = function() {
   return {
     aadhar: { label: 'Aadhaar Card', required: true },
-    pan: { label: 'PAN Card', required: true },
+    pan: { label: 'PAN Card', required: false },        // was true
+    passbook: { label: 'Bank Passbook', required: true }, // NEW
     electricity: { label: 'Electricity Bill', required: false },
     driving: { label: 'Driving License', required: false },
-    police: { label: 'Police Verification', required: false },  // ← CHANGED TO false
+    police: { label: 'Police Verification', required: false },
     voter: { label: 'Voter ID', required: false },
     passport: { label: 'Passport', required: false },
     other: { label: 'Other Document', required: false }

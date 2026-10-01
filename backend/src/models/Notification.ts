@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface INotification extends Document {
-  userId?: string; // Who receives the notification (superadmin, manager, etc.)
+  userId?: string;
   title: string;
   message: string;
   type: 'success' | 'warning' | 'info' | 'urgent';
@@ -9,6 +9,7 @@ export interface INotification extends Document {
   read: boolean;
   notificationType?: string;
   metadata?: Record<string, any>;
+  expiresAt: Date;        // ✅ NEW
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,14 +31,18 @@ const NotificationSchema = new Schema<INotification>(
     },
     read: { type: Boolean, default: false },
     notificationType: { type: String },
-    metadata: { type: Schema.Types.Mixed, default: {} },
+   metadata: { type: Schema.Types.Mixed, default: {} },
+expiresAt: {
+  type: Date,
+  default: () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+},
   },
   { timestamps: true }
 );
 
-// Index for faster queries
 NotificationSchema.index({ userId: 1, createdAt: -1 });
 NotificationSchema.index({ read: 1, createdAt: -1 });
+NotificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });   // ✅ NEW — TTL
 
 const Notification = mongoose.model<INotification>('Notification', NotificationSchema);
 export default Notification;

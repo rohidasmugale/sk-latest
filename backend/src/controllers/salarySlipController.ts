@@ -4,6 +4,8 @@ import SalarySlip from '../models/SalarySlip';
 import Payroll from '../models/Payroll';
 import Employee from '../models/Employee';
 import SalaryStructure from '../models/SalaryStructure';
+import { logAudit, getUserFromReq } from '../utils/auditLogger';
+
 // Get logged-in user's own salary slip
 export const getMySalarySlip = async (req: Request, res: Response) => {
   try {
@@ -109,11 +111,11 @@ export const generateSalarySlip = async (req: Request, res: Response) => {
     // Generate slip number
     const year = new Date().getFullYear();
     const month = (new Date().getMonth() + 1).toString().padStart(2, '0');
-    
+
     const lastSlip = await SalarySlip.findOne({
       slipNumber: new RegExp(`^SS/${year}/${month}/`)
     }).sort({ createdAt: -1 });
-    
+
     let sequence = 1;
     if (lastSlip && lastSlip.slipNumber) {
       const matches = lastSlip.slipNumber.match(/SS\/\d{4}\/\d{2}\/(\d+)/);
@@ -121,31 +123,44 @@ export const generateSalarySlip = async (req: Request, res: Response) => {
         sequence = parseInt(matches[1]) + 1;
       }
     }
-    
+
     const slipNumber = `SS/${year}/${month}/${sequence.toString().padStart(4, '0')}`;
 
     // Create salary slip
-    const salarySlipData = {
-      payrollId,
-      employeeId: payroll.employeeId,
-      month: payroll.month,
-      basicSalary: payroll.basicSalary,
-      allowances: payroll.allowances,
-      deductions: payroll.deductions,
-      netSalary: payroll.netSalary,
-      generatedDate: new Date(),
-      presentDays: payroll.presentDays,
-      absentDays: payroll.absentDays,
-      halfDays: payroll.halfDays,
-      leaves: payroll.leaves,
-      slipNumber
-    };
+   const salarySlipData = {
+  payrollId,
+  employeeId: payroll.employeeId,
+  month: payroll.month,
+  basicSalary: payroll.basicSalary,
+  allowances: payroll.allowances,
+  deductions: payroll.deductions,
+  netSalary: payroll.netSalary,
+  generatedDate: new Date(),
+  presentDays: payroll.presentDays,
+  absentDays: payroll.absentDays,
+  halfDays: payroll.halfDays,
+  leaves: payroll.leaves,
+  slipNumber,
+  // Optional extras (only if the SalarySlip model has these fields):
+  // deductionBreakdown: payroll.deductionBreakdown,
+};
 
     const salarySlip = new SalarySlip(salarySlipData);
     await salarySlip.save();
 
     // Populate employee data
     const populatedSlip = await SalarySlip.findById(salarySlip._id);
+
+    await logAudit({
+      action: 'slip.generate',
+      entity: 'salarySlip',
+      entityId: String(salarySlip._id),
+      month: salarySlip.month,
+      employeeId: salarySlip.employeeId,
+      performedBy: getUserFromReq(req),
+      description: `Generated salary slip for ${salarySlip.employeeId} (${salarySlip.month})`,
+      metadata: { slipNumber: salarySlip.slipNumber, netSalary: salarySlip.netSalary },
+    });
 
     res.status(201).json({
       success: true,
@@ -301,7 +316,7 @@ export const markAsEmailed = async (req: Request, res: Response) => {
 
     const salarySlip = await SalarySlip.findByIdAndUpdate(
       id,
-      { 
+      {
         emailSent: true,
         emailSentAt: new Date(),
         updatedAt: new Date()
@@ -315,6 +330,16 @@ export const markAsEmailed = async (req: Request, res: Response) => {
         message: 'Salary slip not found'
       });
     }
+
+    await logAudit({
+      action: 'slip.send',
+      entity: 'salarySlip',
+      entityId: String(salarySlip._id),
+      month: salarySlip.month,
+      employeeId: salarySlip.employeeId,
+      performedBy: getUserFromReq(req),
+      description: `Marked slip as emailed for ${salarySlip.employeeId} (${salarySlip.month})`,
+    });
 
     res.status(200).json({
       success: true,
@@ -350,6 +375,17 @@ export const deleteSalarySlip = async (req: Request, res: Response) => {
         message: 'Salary slip not found'
       });
     }
+
+    await logAudit({
+      action: 'slip.delete',
+      entity: 'salarySlip',
+      entityId: String(salarySlip._id),
+      month: salarySlip.month,
+      employeeId: salarySlip.employeeId,
+      performedBy: getUserFromReq(req),
+      description: `Deleted salary slip for ${salarySlip.employeeId} (${salarySlip.month})`,
+      before: { slipNumber: salarySlip.slipNumber, netSalary: salarySlip.netSalary },
+    });
 
     res.status(200).json({
       success: true,
@@ -397,6 +433,16 @@ export const updateSalarySlip = async (req: Request, res: Response) => {
         message: 'Salary slip not found'
       });
     }
+
+    await logAudit({
+      action: 'slip.update',
+      entity: 'salarySlip',
+      entityId: String(salarySlip._id),
+      month: salarySlip.month,
+      employeeId: salarySlip.employeeId,
+      performedBy: getUserFromReq(req),
+      description: `Updated salary slip for ${salarySlip.employeeId} (${salarySlip.month})`,
+    });
 
     res.status(200).json({
       success: true,

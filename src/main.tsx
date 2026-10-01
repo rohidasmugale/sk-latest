@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-
+import "@/lib/apiClient";
 // ✅ Service Worker logic
 if ('serviceWorker' in navigator) {
   if (import.meta.env.PROD) {

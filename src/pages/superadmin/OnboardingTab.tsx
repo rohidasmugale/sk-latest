@@ -2176,7 +2176,7 @@ const OnboardingTab = ({
     }
   };
   // ─── Print Joining Form ──────────────────────────────────────────────
-  const printJoiningForm = (employee: Employee) => {
+     const printJoiningForm = (employee: Employee) => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
       toast.error("Please allow popups to print the form");
@@ -2184,8 +2184,6 @@ const OnboardingTab = ({
     }
 
     const photoUrl = employee.photo || '';
-
-    // --- KYC Documents ---
     const documents = employee.kycDocuments || [];
 
     const isImageDoc = (doc: any) =>
@@ -2193,33 +2191,22 @@ const OnboardingTab = ({
       /\.(jpe?g|png|gif|webp)$/i.test(doc.fileUrl || '');
 
     const imageDocs = documents.filter(isImageDoc);
-    const otherDocs = documents.filter((d: any) => !isImageDoc(d));
+    const pdfCandidateDocs = documents.filter((d: any) => !isImageDoc(d));
 
-    // One printable page per scanned image document
+    const docTitle = (doc: any) =>
+      `${doc.documentName}${doc.documentNumber ? ' — ' + doc.documentNumber : ''}`;
+
     const documentImagePages = imageDocs.map((doc: any) => `
     <div class="page doc-page">
-      <div class="doc-header">
-        <h2>${doc.documentName}${doc.documentNumber ? ' — ' + doc.documentNumber : ''}</h2>
-      </div>
-      <div class="doc-image-wrap">
-        <img src="${doc.fileUrl}" class="doc-image" />
-      </div>
-    </div>
-  `).join('');
+      <div class="doc-header"><h2>${docTitle(doc)}</h2></div>
+      <div class="doc-image-wrap"><img src="${doc.fileUrl}" class="doc-image" /></div>
+    </div>`).join('');
 
-    // Non-image files (PDF/Word/etc.) can't be reliably embedded in a print popup —
-    // list them instead so nothing silently gets left out.
-    const otherDocsListPage = otherDocs.length > 0 ? `
-    <div class="page doc-page">
-      <div class="doc-header"><h2>Other Attached Documents</h2></div>
-      <ul class="doc-list">
-        ${otherDocs.map((doc: any) => `
-          <li>${doc.documentName}${doc.documentNumber ? ' — ' + doc.documentNumber : ''} (${doc.fileType || 'file'})</li>
-        `).join('')}
-      </ul>
-      <p class="doc-note">These files are not images and were not auto-printed. Open them from the Documents tab to print separately.</p>
-    </div>
-  ` : '';
+    const pdfDocPages = pdfCandidateDocs.map((doc: any) => `
+    <div class="page doc-page pdf-doc-page" data-pdf-url="${doc.fileUrl}" data-doc-name="${docTitle(doc)}">
+      <div class="doc-header"><h2>${docTitle(doc)}</h2></div>
+      <div class="pdf-container"><p class="pdf-loading">Loading document…</p></div>
+    </div>`).join('');
 
     const formContent = `
 <!DOCTYPE html>
@@ -2227,319 +2214,126 @@ const OnboardingTab = ({
 <head>
   <title>Joining Form - ${employee.name}</title>
   <style>
-    @page {
-      size: A4 portrait;
-      margin: 12mm 15mm;
-    }
-    * {
-      box-sizing: border-box;
-    }
-    body {
-      font-family: 'Times New Roman', Georgia, serif;
-      margin: 0;
-      padding: 0;
-      background: #fff;
-      color: #000;
-    }
-    .page {
-      width: 100%;
-      max-width: 100%;
-      margin: 0;
-      padding: 0;
-      background: #fff;
-      page-break-after: always;
-    }
-    .page:last-child {
-      page-break-after: auto;
-    }
+    @page { size: A4 portrait; margin: 0; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #fff; color: #000;
+      font-family: 'Times New Roman', Georgia, serif; }
 
-    /* ---------- PAGE 1: JOINING FORM ---------- */
-    .header {
-      position: relative;
-      border-bottom: 2px solid #000;
-      padding-bottom: 8px;
-      margin-bottom: 10px;
-    }
-    .header h1 {
-      margin: 0;
-      font-size: 30px;
-      letter-spacing: 3px;
-      font-weight: bold;
-    }
-    .header .subtitle {
-      font-size: 12px;
-      margin-top: 2px;
-    }
-    .header .form-title {
-      font-size: 17px;
-      font-weight: bold;
-      text-align: center;
-      margin-top: 6px;
-      text-decoration: underline;
-    }
-    .photo-box {
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 95px;
-      height: 110px;
-      border: 1px solid #000;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 10px;
-      color: #999;
-    }
-    .photo-box img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
+    .page { width: 210mm; height: 296mm; padding: 14mm 16mm; overflow: hidden; background: #fff; }
+    .page + .page { break-before: page; page-break-before: always; }
 
-    .field-row {
-      display: flex;
-      align-items: baseline;
-      border-bottom: 1px solid #000;
-      padding: 5px 0;
-      min-height: 24px;
-    }
-    .field-row .label {
-      font-size: 13px;
-      width: 150px;
-      flex-shrink: 0;
-    }
-    .field-row .colon {
-      width: 14px;
-      flex-shrink: 0;
-    }
-    .field-row .value {
-      font-size: 13px;
-      flex: 1;
-    }
-    .field-row .pin {
-      display: flex;
-      align-items: baseline;
-      margin-left: 20px;
-      flex-shrink: 0;
-    }
-    .field-row .pin .plabel {
-      font-size: 13px;
-      margin-right: 4px;
-    }
-    .field-row .pin .pvalue {
-      font-size: 13px;
-      min-width: 90px;
-      border-bottom: 1px solid #000;
-    }
-    .cont-row {
-      border-bottom: 1px solid #000;
-      min-height: 22px;
-    }
+    /* ---------- PAGE 1: FORM (fills whole page) ---------- */
+    .form-page { display: flex; flex-direction: column; }
+    .header { position: relative; min-height: 135px; border-bottom: 2px solid #000;
+      padding-bottom: 10px; margin-bottom: 4mm; }
+    .header h1 { margin: 0; font-size: 36px; letter-spacing: 3px; font-weight: bold; }
+    .header .subtitle { font-size: 14px; margin-top: 4px; }
+    .header .form-title { font-size: 20px; font-weight: bold; text-align: center;
+      margin-top: 14px; text-decoration: underline; }
+    .photo-box { position: absolute; top: 0; right: 0; width: 110px; height: 130px;
+      border: 1px solid #000; overflow: hidden; display: flex; align-items: center;
+      justify-content: center; font-size: 11px; color: #999; }
+    .photo-box img { width: 100%; height: 100%; object-fit: cover; }
 
-    .uniform-row {
-      border-bottom: 1px solid #000;
-      padding: 6px 0;
-      font-size: 13px;
-    }
-    .uniform-row .label {
-      display: inline-block;
-      width: 150px;
-    }
-    .uniform-row .issued {
-      font-weight: bold;
-      text-decoration: underline;
-    }
+    .form-rows { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .form-rows > .field-row, .form-rows > .uniform-row {
+      flex: 1; display: flex; align-items: center; border-bottom: 1px solid #000; }
+    .field-row .label, .uniform-row .label { font-size: 16px; width: 190px; flex-shrink: 0; }
+    .field-row .colon { width: 14px; flex-shrink: 0; font-size: 16px; }
+    .field-row .value { font-size: 16px; flex: 1; }
+    .field-row .pin { display: flex; align-items: baseline; margin-left: 20px; flex-shrink: 0; }
+    .field-row .pin .plabel { font-size: 15px; margin-right: 4px; }
+    .field-row .pin .pvalue { font-size: 15px; min-width: 100px; border-bottom: 1px solid #000; }
+    .uniform-row { font-size: 16px; }
+    .uniform-row .issued { font-weight: bold; text-decoration: underline; }
 
-    .signature-section {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 45px;
-    }
-    .signature-box {
-      text-align: center;
-      width: 45%;
-      font-size: 13px;
-      font-weight: bold;
-    }
-    .signature-box .line {
-      border-top: 1px solid #000;
-      margin-top: 4px;
-      padding-top: 4px;
-    }
+    .signature-section { display: flex; justify-content: space-between; margin-top: 16mm; }
+    .signature-box { text-align: center; width: 45%; font-size: 15px; font-weight: bold; }
+    .signature-box .line { border-top: 1px solid #000; margin-top: 4px; padding-top: 4px; }
+    .footer { text-align: center; font-size: 10px; color: #666; margin-top: 6mm; }
 
-    .footer {
-      text-align: center;
-      font-size: 9px;
-      color: #666;
-      margin-top: 15px;
-    }
-
-    /* ---------- PAGE 2: DECLARATION (BACKSIDE) ---------- */
-    .declaration-title {
-      text-align: center;
-      font-size: 20px;
-      font-weight: bold;
-      margin-bottom: 22px;
-    }
-    .declaration-intro {
-      font-size: 13.5px;
-      line-height: 1.9;
-      margin-bottom: 10px;
-    }
-    .declaration-name-line {
-      border-bottom: 1px solid #000;
-      display: inline-block;
-      min-width: 320px;
-    }
-    .declaration-list {
-      font-size: 13.5px;
-      line-height: 1.9;
-      margin: 0;
-      padding-left: 0;
-      list-style: none;
-    }
-    .declaration-list li {
-      margin-bottom: 14px;
-      display: flex;
-    }
-    .declaration-list .num {
-      flex-shrink: 0;
-      width: 26px;
-    }
-    .declaration-list .txt {
-      flex: 1;
-      text-align: justify;
-    }
-    .declaration-closing {
-      font-size: 13.5px;
-      line-height: 1.9;
-      margin-top: 20px;
-      text-align: justify;
-    }
-    .declaration-sign {
-      margin-top: 50px;
-      display: flex;
-      justify-content: space-between;
-      font-size: 13.5px;
-    }
+    /* ---------- PAGE 2: DECLARATION ---------- */
+    .declaration-title { text-align: center; font-size: 22px; font-weight: bold; margin-bottom: 8mm; }
+    .declaration-intro { font-size: 14.5px; line-height: 1.9; margin-bottom: 4mm; }
+    .declaration-name-line { border-bottom: 1px solid #000; display: inline-block; min-width: 320px; }
+    .declaration-list { font-size: 14.5px; line-height: 1.9; margin: 0; padding-left: 0; list-style: none; }
+    .declaration-list li { margin-bottom: 4mm; display: flex; }
+    .declaration-list .num { flex-shrink: 0; width: 28px; }
+    .declaration-list .txt { flex: 1; text-align: justify; }
+    .declaration-closing { font-size: 14.5px; line-height: 1.9; margin-top: 6mm; text-align: justify; }
+    .declaration-sign { margin-top: 16mm; display: flex; justify-content: space-between; font-size: 14.5px; }
 
     /* ---------- DOCUMENT PAGES ---------- */
-    .doc-page {
-      display: flex;
-      flex-direction: column;
-      padding: 10mm;
-    }
-    .doc-header h2 {
-      font-size: 14px;
-      margin-bottom: 8mm;
-      border-bottom: 1px solid #000;
-      padding-bottom: 4mm;
-    }
-    .doc-image-wrap {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .doc-image {
-      max-width: 100%;
-      max-height: 250mm;
-      object-fit: contain;
-    }
-    .doc-list {
-      font-size: 13px;
-      line-height: 1.8;
-    }
-    .doc-note {
-      font-size: 11px;
-      color: #666;
-      margin-top: 10mm;
-    }
-
-    @media print {
-      body {
-        padding: 0;
-      }
-      .page {
-        margin: 0 auto;
-        padding: 15mm;
-      }
-    }
+    .doc-page { display: flex; flex-direction: column; }
+    .doc-header h2 { font-size: 16px; margin: 0 0 4mm; border-bottom: 1px solid #000; padding-bottom: 2mm; }
+    .doc-image-wrap, .pdf-container { flex: 1; min-height: 0; display: flex;
+      align-items: center; justify-content: center; }
+    .doc-image, .pdf-page-canvas { max-width: 100%; max-height: 245mm;
+      width: auto; height: auto; object-fit: contain; }
+    .pdf-loading { font-size: 12px; color: #666; text-align: center; }
+    .doc-list { font-size: 14px; line-height: 1.8; }
+    .doc-note { font-size: 11px; color: #666; margin-top: 10mm; }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  </script>
 </head>
 <body>
 
   <!-- PAGE 1: JOINING FORM -->
-  <div class="page">
+  <div class="page form-page">
     <div class="header">
       <h1>SK ENTERPRISES</h1>
       <div class="subtitle">▪ Housekeeping &nbsp;▪ Parking &nbsp;▪ Waste Management</div>
       <div class="form-title">Employee Joining Form</div>
-      <div class="photo-box">
-        ${photoUrl ? `<img src="${photoUrl}" alt="Photo" />` : 'Photo'}
+      <div class="photo-box">${photoUrl ? `<img src="${photoUrl}" alt="Photo" />` : 'Photo'}</div>
+    </div>
+
+    <div class="form-rows">
+      <div class="field-row"><span class="label">Site Name</span><span class="colon">:</span><span class="value">${employee.siteName || ''}</span></div>
+      <div class="field-row"><span class="label">Name</span><span class="colon">:</span><span class="value">${employee.name || ''}</span></div>
+      <div class="field-row"><span class="label">Date of Birth</span><span class="colon">:</span><span class="value">${employee.dateOfBirth || ''}</span></div>
+      <div class="field-row"><span class="label">Date of Joining</span><span class="colon">:</span><span class="value">${employee.joinDate || employee.dateOfJoining || ''}</span></div>
+      <div class="field-row"><span class="label">Contact No.</span><span class="colon">:</span><span class="value">${employee.phone || ''}</span></div>
+      <div class="field-row"><span class="label">Blood Group</span><span class="colon">:</span><span class="value">${employee.bloodGroup || ''}</span></div>
+      <div class="field-row"><span class="label">Nominee Name</span><span class="colon">:</span><span class="value">${employee.nomineeName || ''}</span></div>
+      <div class="field-row"><span class="label">Employee Relation</span><span class="colon">:</span><span class="value">${employee.nomineeRelation || ''}</span></div>
+      <div class="field-row"><span class="label">Aadhaar Card No.</span><span class="colon">:</span><span class="value">${employee.aadharNumber || ''}</span></div>
+      <div class="field-row"><span class="label">ID No.</span><span class="colon">:</span><span class="value">${employee.employeeId || ''}</span></div>
+      <div class="field-row"><span class="label">Emergency Cont. No.</span><span class="colon">:</span><span class="value">${employee.emergencyContactPhone || 'Not provided'}</span></div>
+      <div class="field-row"><span class="label">Emergency Cont. No. 2</span><span class="colon">:</span><span class="value">${employee.emergencyPhone2 || 'Not provided'}</span></div>
+      <div class="field-row">
+        <span class="label">Bank Name</span><span class="colon">:</span><span class="value">${employee.bankName || ''}</span>
+        <span class="pin"><span class="plabel">IFSC Code:</span><span class="pvalue">${employee.ifscCode || ''}</span></span>
       </div>
-    </div>
-
-    <div class="field-row"><span class="label">Site Name</span><span class="colon">:</span><span class="value">${employee.siteName || ''}</span></div>
-    <div class="field-row"><span class="label">Name</span><span class="colon">:</span><span class="value">${employee.name || ''}</span></div>
-    <div class="field-row"><span class="label">Date of Birth</span><span class="colon">:</span><span class="value">${employee.dateOfBirth || ''}</span></div>
-    <div class="field-row"><span class="label">Date of Joining</span><span class="colon">:</span><span class="value">${employee.joinDate || employee.dateOfJoining || ''}</span></div>
-    <div class="field-row"><span class="label">Contact No.</span><span class="colon">:</span><span class="value">${employee.phone || ''}</span></div>
-    <div class="field-row"><span class="label">Blood Group</span><span class="colon">:</span><span class="value">${employee.bloodGroup || ''}</span></div>
-
-   
-
-    <div class="field-row"><span class="label">Nominee Name</span><span class="colon">:</span><span class="value">${employee.nomineeName || ''}</span></div>
-    <div class="field-row"><span class="label">Employee Relation</span><span class="colon">:</span><span class="value">${employee.nomineeRelation || ''}</span></div>
-    <div class="field-row"><span class="label">Aadhaar Card No.</span><span class="colon">:</span><span class="value">${employee.aadharNumber || ''}</span></div>
-    <div class="field-row"><span class="label">ID No.</span><span class="colon">:</span><span class="value">${employee.employeeId || ''}</span></div>
-    <div class="field-row">
-  <span class="label">Emergency Cont. No.</span><span class="colon">:</span>
-  <span class="value">
-    ${employee.emergencyContactPhone ? `<span class="underline-fill">${employee.emergencyContactPhone}</span>` : 'Not provided'}
-  </span>
-</div>
-<div class="field-row">
-  <span class="label">Emergency Cont. No. 2</span><span class="colon">:</span>
-  <span class="value">
-    ${employee.emergencyPhone2 ? `<span class="underline-fill">${employee.emergencyPhone2}</span>` : 'Not provided'}
-  </span>
-</div>
-    <div class="field-row">
-      <span class="label">Bank Name</span><span class="colon">:</span><span class="value">${employee.bankName || ''}</span>
-      <span class="pin"><span class="plabel">IFSC Code:</span><span class="pvalue">${employee.ifscCode || ''}</span></span>
-    </div>
-    <div class="field-row"><span class="label">Branch</span><span class="colon">:</span><span class="value">${employee.branchName || ''}</span></div>
-    <div class="field-row"><span class="label">Account No.</span><span class="colon">:</span><span class="value">${employee.accountNumber || ''}</span></div>
-
-    <div class="uniform-row">
-      <span class="label">Uniform</span>:
-      <span class="${employee.pantSize ? 'issued' : ''}">Pant</span> /
-      <span class="${employee.shirtSize ? 'issued' : ''}">Shirt</span> /
-      <span class="${employee.capSize ? 'issued' : ''}">Cap</span> /
-      <span class="${employee.idCardIssued ? 'issued' : ''}">ID</span> /
-      <span class="${employee.westcoatIssued ? 'issued' : ''}">Westcoat</span> /
-      <span class="${employee.apronIssued ? 'issued' : ''}">Apron</span>
+      <div class="field-row"><span class="label">Branch</span><span class="colon">:</span><span class="value">${employee.branchName || ''}</span></div>
+      <div class="field-row"><span class="label">Account No.</span><span class="colon">:</span><span class="value">${employee.accountNumber || ''}</span></div>
+      <div class="uniform-row">
+        <span class="label">Uniform</span>:&nbsp;
+        <span class="${employee.pantSize ? 'issued' : ''}">Pant</span>&nbsp;/&nbsp;
+        <span class="${employee.shirtSize ? 'issued' : ''}">Shirt</span>&nbsp;/&nbsp;
+        <span class="${employee.capSize ? 'issued' : ''}">Cap</span>&nbsp;/&nbsp;
+        <span class="${employee.idCardIssued ? 'issued' : ''}">ID</span>&nbsp;/&nbsp;
+        <span class="${employee.westcoatIssued ? 'issued' : ''}">Westcoat</span>&nbsp;/&nbsp;
+        <span class="${employee.apronIssued ? 'issued' : ''}">Apron</span>
+      </div>
     </div>
 
     <div class="signature-section">
       <div class="signature-box"><div class="line">Authorized Signature</div></div>
       <div class="signature-box"><div class="line">Employee Signature</div></div>
     </div>
-
     <div class="footer">This is a computer-generated form. Printed on ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
   </div>
 
-  <!-- PAGE 2: DECLARATION (BACKSIDE) -->
+  <!-- PAGE 2: DECLARATION -->
   <div class="page">
     <div class="declaration-title">प्रतिज्ञापत्र</div>
-
     <div class="declaration-intro">
       मी <span class="declaration-name-line">&nbsp;${employee.name || ''}&nbsp;</span><br/><br/>
       खालील लिहिलेल्या अटी व सूचना पूर्णपणे समजून घेतल्या आहेत व मी त्यांना मनापासून मान्य करतो. खालील अटी मी न पाळल्यास त्याचा माझ्यावर आकारण्यात आल्यास माझी हरकत नाही.
     </div>
-
     <ol class="declaration-list">
       <li><span class="num">१)</span><span class="txt">मी काम सोडण्याआधी एस.के. एंटरप्रायझेस यांना लिखितमध्ये १ महिना (३० दिवस) / ३ महिने (९० दिवस) पूर्वी सूचना देणे माझ्यावर बंधनकारक आहे. अन्यथा मी कुठलाही पगार मागणार नाही/घेण्यास पात्र नाही.</span></li>
       <li><span class="num">२)</span><span class="txt">मी सुट्टी घेण्याआधी सुट्टीचा अर्ज मी लिखित देईल, अर्ज न दिल्यास, न कळवता सुट्टी घेतल्यास आकारलेला दंड मला मान्य आहे.</span></li>
@@ -2549,11 +2343,9 @@ const OnboardingTab = ({
       <li><span class="num">६)</span><span class="txt">मी माझे आधार कार्ड, पॅन कार्ड, ४ फोटो, बँक पासबुक व राहत असलेले लाईट बिल याच्या झेरॉक्स प्रती कंपनीला देणे माझ्यावर बंधनकारक आहे.</span></li>
       <li><span class="num">७)</span><span class="txt">मी कामाला लागल्यापासून ७ दिवसांच्या आत काम सोडले तर मी पगार घेण्यास पात्र राहणार नाही.</span></li>
     </ol>
-
     <div class="declaration-closing">
       वरील सर्व माहिती मी वाचली असून त्याच्या सत्यतेसाठी मी आज रोजी पुणे मुक्कामी माझी सही केली आहे.
     </div>
-
     <div class="declaration-sign">
       <span>दिनांक : __________________</span>
       <span>अर्जदाराची सही __________________</span>
@@ -2561,41 +2353,123 @@ const OnboardingTab = ({
   </div>
 
   ${documentImagePages}
-  ${otherDocsListPage}
-
+  ${pdfDocPages}
+  <div id="dynamic-other-docs-placeholder"></div>
 </body>
-</html>
-`;
+</html>`;
 
     printWindow.document.write(formContent);
     printWindow.document.close();
 
-    // Wait for every image (form photo + scanned docs) to actually finish
-    // loading before printing — fixes documents printing blank on slower loads.
-    const waitAndPrint = () => {
+    const waitForImages = () => new Promise<void>((resolve) => {
       const imgs = Array.from(printWindow.document.images);
-      if (imgs.length === 0) {
-        printWindow.print();
-        return;
-      }
+      if (imgs.length === 0) return resolve();
       let remaining = imgs.length;
-      let printed = false;
-      const done = () => {
-        remaining--;
-        if (remaining <= 0 && !printed) {
-          printed = true;
-          setTimeout(() => printWindow.print(), 200);
-        }
-      };
+      const done = () => { remaining--; if (remaining <= 0) resolve(); };
       imgs.forEach((img) => (img.complete ? done() : (img.addEventListener('load', done), img.addEventListener('error', done))));
-      // safety net in case a Cloudinary image hangs
-      setTimeout(() => { if (!printed) { printed = true; printWindow.print(); } }, 8000);
+      setTimeout(resolve, 8000);
+    });
+
+    // Cloudinary blocks PDF delivery on some accounts, but still serves page 1 as an image.
+    const pdfUrlToJpg = (url: string, page: number) =>
+      url.includes('/image/upload/')
+        ? url.replace('/image/upload/', `/image/upload/pg_${page},w_1600,q_auto/`).replace(/\.pdf(\?.*)?$/i, '.jpg')
+        : null;
+
+    const renderAllPdfs = async () => {
+      const doc = printWindow.document;
+      const pdfPages = Array.from(doc.querySelectorAll('.pdf-doc-page')) as HTMLElement[];
+      const failedDocs: string[] = [];
+
+      for (const pageEl of pdfPages) {
+        const url = pageEl.getAttribute('data-pdf-url')!;
+        const docName = pageEl.getAttribute('data-doc-name') || 'Document';
+
+        try {
+          // Try pdf.js first
+          // @ts-ignore - pdfjsLib is loaded inside the popup
+          const pdf = await printWindow.pdfjsLib.getDocument(url).promise;
+          let current: HTMLElement = pageEl;
+
+          for (let p = 1; p <= pdf.numPages; p++) {
+            if (p > 1) {
+              const next = doc.createElement('div');
+              next.className = 'page doc-page';
+              next.innerHTML = `<div class="doc-header"><h2>${docName} (page ${p})</h2></div><div class="pdf-container"></div>`;
+              current.after(next);
+              current = next;
+            }
+            const container = current.querySelector('.pdf-container') as HTMLElement;
+            container.innerHTML = '';
+            const page = await pdf.getPage(p);
+            const viewport = page.getViewport({ scale: 2 });
+            const canvas = doc.createElement('canvas');
+            canvas.className = 'pdf-page-canvas';
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+            container.appendChild(canvas);
+          }
+        } catch (err) {
+          console.error('pdf.js failed, trying image fallback:', url, err);
+
+          // Fallback: Cloudinary serves each PDF page as a JPG
+          let ok = false;
+          let current: HTMLElement = pageEl;
+          const firstContainer = pageEl.querySelector('.pdf-container') as HTMLElement;
+          firstContainer.innerHTML = '';
+
+          for (let p = 1; p <= 10; p++) {
+            const src = pdfUrlToJpg(url, p);
+            if (!src) break;
+            const loaded = await new Promise<HTMLImageElement | null>((resolve) => {
+              const img = doc.createElement('img');
+              img.className = 'doc-image';
+              img.onload = () => resolve(img);
+              img.onerror = () => resolve(null);
+              img.src = src;
+            });
+            if (!loaded) break;
+
+            if (p > 1) {
+              const next = doc.createElement('div');
+              next.className = 'page doc-page';
+              next.innerHTML = `<div class="doc-header"><h2>${docName} (page ${p})</h2></div><div class="pdf-container"></div>`;
+              current.after(next);
+              current = next;
+            }
+            (current.querySelector('.pdf-container') as HTMLElement).appendChild(loaded);
+            ok = true;
+          }
+
+          if (!ok) {
+            failedDocs.push(docName);
+            pageEl.remove();
+          }
+        }
+      }
+
+      if (failedDocs.length > 0) {
+        const placeholder = doc.getElementById('dynamic-other-docs-placeholder');
+        if (placeholder) {
+          placeholder.outerHTML = `
+            <div class="page doc-page">
+              <div class="doc-header"><h2>Other Attached Documents</h2></div>
+              <ul class="doc-list">${failedDocs.map(d => `<li>${d}</li>`).join('')}</ul>
+              <p class="doc-note">These files could not be rendered for printing. Open them from the Documents tab to view/print separately.</p>
+            </div>`;
+        }
+      }
     };
 
-    printWindow.onload = waitAndPrint;
+    printWindow.onload = () => {
+      waitForImages()
+        .then(renderAllPdfs)
+        .then(() => setTimeout(() => printWindow.print(), 300))
+        .catch(() => printWindow.print());
+    };
     printWindow.onafterprint = () => printWindow.close();
   };
-
   // Handle print EPF form
   const handlePrintEPFForm = () => {
     const printWindow = window.open('', '_blank');

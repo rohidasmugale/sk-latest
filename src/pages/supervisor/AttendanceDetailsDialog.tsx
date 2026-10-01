@@ -255,15 +255,17 @@ const AttendanceDetailsDialog: React.FC<AttendanceDetailsDialogProps> = ({
     try {
       setUpdatingStatus(true);
 
-      const response = await axios.post(`${API_URL}/attendance/update-status`, {
-        employeeId: statusUpdateData.employeeId,
-        attendanceId: statusUpdateData.attendanceId || null,
-        date: statusUpdateData.date,
-        status: statusUpdateData.newStatus,
-        remarks: statusUpdateData.remarks,
-        supervisorId: supervisorId,
-        employeeName: selectedEmployee.name
-      });
+     const response = await axios.post(`${API_URL}/attendance/update-status`, {
+  employeeId: statusUpdateData.employeeId,
+  attendanceId: statusUpdateData.attendanceId || null,
+  date: statusUpdateData.date,
+  status: statusUpdateData.newStatus,
+  remarks: statusUpdateData.remarks,
+  supervisorId: supervisorId,
+  employeeName: selectedEmployee.name,
+  siteName: selectedEmployee.siteName || '',        // ✅ ADD THIS LINE
+  department: selectedEmployee.department || '',    // ✅ ADD THIS LINE
+});
 
       const data = response.data;
 

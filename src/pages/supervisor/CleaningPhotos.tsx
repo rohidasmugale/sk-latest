@@ -11,7 +11,7 @@ import CameraCapture from "./CameraCapture";
 import { useRole } from "@/context/RoleContext";
 import { Badge } from "@/components/ui/badge";
 
-const API_URL = import.meta.env.VITE_API_URL || 
+const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
 
 const apiClient = axios.create({ baseURL: API_URL });
@@ -247,6 +247,7 @@ export default function CleaningPhotos() {
         onOpenChange={setCameraOpen}
         onCapture={handlePhotoCapture}
         title="Take Cleaning Photo"
+        description="Take a photo of the cleaning work"
         actionLabel="Upload"
         continuous={true}
       />

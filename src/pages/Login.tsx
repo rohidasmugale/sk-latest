@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Navigate } from "react-router-dom";
+import { useNavigate, Navigate, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -341,6 +341,7 @@ const Login = () => {
                   <Input
                     id="email"
                     type="text"
+                    autoComplete="off"
                     placeholder={getEmailPlaceholder(selectedRole)}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -374,6 +375,7 @@ const Login = () => {
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
                     placeholder={getInputPlaceholder("password", selectedRole)}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -386,14 +388,15 @@ const Login = () => {
                     )}
                     required
                   />
-                  <motion.button
+                  <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300 transition-colors"
-                    whileTap={{ scale: 0.9 }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300 transition-colors"
                   >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </motion.button>
+                    <motion.span whileTap={{ scale: 0.9 }} className="flex">
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </motion.span>
+                  </button>
                 </div>
               </motion.div>
               {/* Remember Me Checkbox - ADD THIS BEFORE THE SIGN IN BUTTON */}
@@ -415,9 +418,9 @@ const Login = () => {
                     Remember Me
                   </Label>
                 </div>
-                <a href="#" className="text-sm text-blue-400 hover:text-blue-300">
-                  Forgot Password?
-                </a>
+               <Link to="/forgot-password" className="text-sm text-blue-400 hover:text-blue-300">
+  Forgot Password?
+</Link>
               </motion.div>
               {/* Sign In Button */}
               <motion.div
@@ -461,35 +464,8 @@ const Login = () => {
                 </Button>
               </motion.div>
 
-              {/* Sign Up Link */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.8 }}
-                className="text-center"
-              >
-                <p className="text-gray-400 text-sm">
-                  Super Admin or Admin?{" "}
-                  <motion.a
-                    href="/signup"
-                    className={cn(
-                      "hover:text-blue-300 font-medium inline-flex items-center gap-1 group",
-                      // Update link color based on role
-                      selectedRole === "employee" ? "text-purple-400" : "text-blue-400"
-                    )}
-                    whileHover={{ x: 2 }}
-                  >
-                    Sign up here
-                    <motion.span
-                      initial={{ x: -5, opacity: 0 }}
-                      animate={{ x: 0, opacity: 1 }}
-                      className="group-hover:translate-x-1 transition-transform"
-                    >
-                      →
-                    </motion.span>
-                  </motion.a>
-                </p>
-              </motion.div>
+
+
             </form>
           </CardContent>
 

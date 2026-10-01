@@ -14,7 +14,7 @@ export interface IAdvance extends Document {
   customEndDate?: Date;
   description: string;
   appliedMonth: string;
-  status: 'pending' | 'approved' | 'rejected' | 'completed';
+ status: 'active' | 'completed' | 'cancelled';
   remainingAmount: number;
   repaidAmount: number;
   nextInstallmentDate?: Date;
@@ -91,10 +91,10 @@ const AdvanceSchema: Schema = new Schema({
     match: [/^\d{4}-\d{2}$/, 'Applied month must be in YYYY-MM format']
   },
   status: {
-    type: String,
-    enum: ['pending', 'approved', 'rejected', 'completed'],
-    default: 'pending'
-  },
+  type: String,
+  enum: ['active', 'completed', 'cancelled'],
+  default: 'active'
+},
   remainingAmount: {
     type: Number,
     default: 0

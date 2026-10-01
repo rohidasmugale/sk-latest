@@ -8,6 +8,9 @@ import path from 'path';
 import fs from 'fs';
 import { v2 as cloudinary, UploadApiResponse } from "cloudinary";
 import User, { IUser } from './models/User';
+import Employee from './models/Employee';
+import auditLogRoutes from './routes/auditLogRoutes';
+// ...
 
 import { PasswordFixer } from './utils/passwordFixer';
 import groomingRoutes from './routes/groomingRoutes';
@@ -285,6 +288,7 @@ app.use('/api/invoices', invoiceRoutes);
 app.use('/api/payments', paymentRoutes); 
 app.use('/api/manager-leaves', managerLeaveRoutes); 
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/supervisors', supervisorRoutes);
 app.use('/api/trainings', trainingRoutes);
 app.use('/api/briefings', briefingRoutes);
@@ -357,7 +361,9 @@ app.post('/api/users', async (req: Request, res: Response) => {
       lastName,
       department,
       phone,
-      joinDate
+      joinDate,
+      assignedSites,   // ✅ ADDED
+      siteName         // ✅ ADDED
     } = req.body;
 
     const existingUser = await User.findOne({ 
@@ -384,10 +390,30 @@ app.post('/api/users', async (req: Request, res: Response) => {
       department: department || 'General',
       phone,
       joinDate: joinDate ? new Date(joinDate) : new Date(),
-      isActive: true
+      isActive: true,
+      assignedSites: Array.isArray(assignedSites) ? assignedSites : [],   // ✅ ADDED
+      siteName: siteName || (Array.isArray(assignedSites) && assignedSites[0]) || ''   // ✅ ADDED
     });
 
-    await newUser.save();
+      await newUser.save();
+
+    // Link to existing Employee record if this role needs one
+    if (['admin', 'manager', 'supervisor'].includes(newUser.role)) {
+      try {
+        const linkedEmployee = await Employee.findOneAndUpdate(
+          { email: newUser.email },
+          { userId: newUser._id },
+          { new: true }
+        );
+        if (linkedEmployee) {
+          console.log(`🔗 Linked new ${newUser.role} ${newUser.email} to Employee ${linkedEmployee.employeeId}`);
+        } else {
+          console.log(`⚠️ No Employee record found for new ${newUser.role} ${newUser.email} — will need manual linking`);
+        }
+      } catch (linkErr) {
+        console.error('⚠️ Employee link failed (user still created):', linkErr);
+      }
+    }
 
     const userResponse = {
       _id: newUser._id.toString(),
@@ -402,7 +428,9 @@ app.post('/api/users', async (req: Request, res: Response) => {
       phone: newUser.phone,
       isActive: newUser.isActive,
       status: newUser.isActive ? 'active' : 'inactive',
-      joinDate: newUser.joinDate.toISOString().split('T')[0]
+      joinDate: newUser.joinDate.toISOString().split('T')[0],
+      assignedSites: newUser.assignedSites || [],   // ✅ ADDED
+      siteName: newUser.siteName || ''              // ✅ ADDED
     };
 
     console.log('User created successfully:', userResponse);
@@ -600,7 +628,24 @@ app.put('/api/users/:id/role', async (req: Request, res: Response) => {
       { role, updatedAt: new Date() },
       { new: true }
     );
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+       if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Sync Employee link if role still requires one
+    if (['admin', 'manager', 'supervisor'].includes(user.role)) {
+      try {
+        await Employee.findOneAndUpdate(
+          { email: user.email },
+          { userId: user._id },
+          { new: true }
+        );
+      } catch (linkErr) {
+        console.error('⚠️ Employee link sync failed:', linkErr);
+      }
+    }
+
+    // ----- Build response -----
     const userObj = user.toJSON();
     const userResponse = {
       ...userObj,
@@ -746,6 +791,42 @@ app.use('/api/roster', rosterRoutes);
 // In your main server file
 
 app.use('/api/work-queries', workQueryRoutes);
+// ==================== 404 HANDLER ====================
+// ==================== ONE-TIME BACKFILL: LINK USERS TO EMPLOYEES ====================
+// Run once via: POST /api/backfill-employee-links
+// Then DELETE this route after use.
+app.post('/api/backfill-employee-links', async (req: Request, res: Response) => {
+  try {
+    console.log('\n🔗 [BACKFILL] Starting employee link backfill...');
+    const users = await User.find({ role: { $in: ['admin', 'manager', 'supervisor'] } });
+    console.log(`📋 Found ${users.length} admin/manager/supervisor users`);
+
+    const results: any[] = [];
+
+    for (const user of users) {
+      const employee = await Employee.findOne({ email: user.email });
+      if (employee && !employee.userId) {
+        employee.userId = user._id;
+        await employee.save();
+        results.push({ email: user.email, linked: true, employeeId: employee.employeeId });
+        console.log(`✅ Linked: ${user.email} → Employee ${employee.employeeId}`);
+      } else if (!employee) {
+        results.push({ email: user.email, linked: false, reason: 'No matching Employee found' });
+        console.log(`⚠️ No Employee record for: ${user.email}`);
+      } else {
+        results.push({ email: user.email, linked: false, reason: 'Already linked' });
+        console.log(`⏭️ Already linked: ${user.email}`);
+      }
+    }
+
+    console.log('🔗 [BACKFILL] Complete\n');
+    res.json({ success: true, totalUsers: users.length, results });
+  } catch (error: any) {
+    console.error('❌ [BACKFILL] Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ==================== 404 HANDLER ====================
 app.use('*', (req: Request, res: Response) => {
   console.log(`❌ 404: ${req.method} ${req.url}`);

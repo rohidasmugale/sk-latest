@@ -43,7 +43,7 @@ interface FormUserData {
   status: "active" | "inactive";
   joinDate: string;
   photoFile?: File | null;
-   assignedSites?: string[];  
+  assignedSites?: string[];
 }
 
 const EnhancedUserForm = ({
@@ -387,6 +387,31 @@ const SiteForm = ({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: ()
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   // Shift Management State
   const [siteShifts, setSiteShifts] = useState<ShiftDefinition[]>([]);
+  // ✅ Geofence state
+  const [siteLatitude, setSiteLatitude] = useState<string>("");
+  const [siteLongitude, setSiteLongitude] = useState<string>("");
+  const [geofenceRadius, setGeofenceRadius] = useState<string>("0.5");
+  const [locating, setLocating] = useState(false);
+  const handleUseMyLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation is not supported by this browser");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setSiteLatitude(pos.coords.latitude.toFixed(6));
+        setSiteLongitude(pos.coords.longitude.toFixed(6));
+        toast.success(`Location captured (±${Math.round(pos.coords.accuracy)}m)`);
+        setLocating(false);
+      },
+      (err) => {
+        toast.error(`Could not get location: ${err.message}`);
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000 },
+    );
+  };
   const SHIFT_COLORS = [
     { name: 'Green', value: '#4CAF50' },
     { name: 'Blue', value: '#2196F3' },
@@ -439,7 +464,7 @@ const SiteForm = ({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: ()
   ];
   const StaffRoles = [
     "Manager", "Supervisor", "Housekeeping Staff", "Security Guard",
-    "Parking Attendant", "Waste Collector"
+    "Parking Attendant", "Waste Collector", "Technician"
   ];
 
   // Client service wrapper
@@ -508,6 +533,11 @@ const SiteForm = ({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: ()
       }
     }
 
+       // ✅ Convert geofence inputs to numbers — only send if actually provided
+    const latNum = siteLatitude.trim() !== "" ? Number(siteLatitude) : undefined;
+    const lngNum = siteLongitude.trim() !== "" ? Number(siteLongitude) : undefined;
+    const radiusNum = geofenceRadius.trim() !== "" ? Number(geofenceRadius) : undefined;
+
     const siteData: CreateSiteRequest = {
       name: formData.get("site-name") as string,
       clientName: clientName,
@@ -518,9 +548,14 @@ const SiteForm = ({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: ()
       contractEndDate: formData.get("contract-end-date") as string,
       services: selectedServices,
       staffDeployment: staffDeployment.filter(item => item.count > 0),
-      shifts: siteShifts.filter(s => s.name && s.startTime && s.endTime), // ✅ ADD THIS
-      status: "active"
+      shifts: siteShifts.filter(s => s.name && s.startTime && s.endTime),
+      status: "active",
+      // ✅ Geofence
+      latitude: latNum,
+      longitude: lngNum,
+      geofenceRadius: radiusNum,
     };
+    
     const validationErrors = siteService.validateSiteData(siteData);
     if (validationErrors.length > 0) {
       validationErrors.forEach(err => toast.error(err));
@@ -668,7 +703,68 @@ const SiteForm = ({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: ()
           />
         </div>
       </div>
+      {/* ✅ Geofence — Site location */}
+      <div className="border p-4 rounded-md space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="font-medium text-sm">Site Location (Geofence)</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleUseMyLocation}
+            disabled={locating}
+          >
+            {locating ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Locating...
+              </>
+            ) : (
+              <>
+                <MapPin className="h-4 w-4 mr-1" /> Use my current location
+              </>
+            )}
+          </Button>
+        </div>
 
+        <div className="text-xs text-muted-foreground">
+          Employees checking in here will be geofenced around these coordinates.
+          Alerts fire when they move beyond the radius below.
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label>Latitude</Label>
+            <Input
+              type="number"
+              step="any"
+              value={siteLatitude}
+              onChange={(e) => setSiteLatitude(e.target.value)}
+              placeholder="e.g. 19.076090"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Longitude</Label>
+            <Input
+              type="number"
+              step="any"
+              value={siteLongitude}
+              onChange={(e) => setSiteLongitude(e.target.value)}
+              placeholder="e.g. 72.877426"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Geofence Radius (km)</Label>
+            <Input
+              type="number"
+              step="0.1"
+              min="0.1"
+              value={geofenceRadius}
+              onChange={(e) => setGeofenceRadius(e.target.value)}
+              placeholder="0.5"
+            />
+          </div>
+        </div>
+      </div>
       <div className="border p-4 rounded-md">
         <p className="font-medium mb-3">Services for this Site</p>
         <div className="grid grid-cols-2 gap-2">

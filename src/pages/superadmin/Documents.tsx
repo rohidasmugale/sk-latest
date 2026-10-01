@@ -162,14 +162,14 @@ const Documents = () => {
         <div className="absolute top-1/2 left-1/4 w-60 h-60 bg-accent/5 rounded-full blur-3xl"></div>
       </div>
 
-      <DashboardHeader 
-        title="Documents Management" 
+      <DashboardHeader
+        title="Documents Management"
         onMenuClick={handleMenuClick}
       />
 
       {/* Mobile Sidebar - Only shown when open */}
       {mobileSidebarOpen && (
-        <DashboardSidebar 
+        <DashboardSidebar
           mobileOpen={mobileSidebarOpen}
           onMobileClose={handleMobileClose}
         />
@@ -219,19 +219,19 @@ const StatsCards = () => {
         const result = await documentService.getDocuments();
         if (result.success && result.data) {
           const documents = result.data;
-          
+
           // Calculate stats based on categories
-          const templateCount = documents.filter((d: DocumentData) => 
+          const templateCount = documents.filter((d: DocumentData) =>
             d.category === "template"
           ).length;
-          
-          const generatedCount = documents.filter((d: DocumentData) => 
+
+          const generatedCount = documents.filter((d: DocumentData) =>
             d.category === "generated"
           ).length;
-          
-          const imageCount = documents.filter((d: DocumentData) => 
-            d.category === "image" || 
-            d.mimetype?.startsWith('image/') || 
+
+          const imageCount = documents.filter((d: DocumentData) =>
+            d.category === "image" ||
+            d.mimetype?.startsWith('image/') ||
             d.originalname?.match(/\.(jpg|jpeg|png|gif|webp)$/i)
           ).length;
 
@@ -437,10 +437,10 @@ const AllDocumentsSection = () => {
       }
 
       const file = fileInput.files[0];
-      
+
       // Map frontend category to backend category
       let backendCategory: string = "document"; // Default
-      
+
       // Map based on the enum in your backend model
       if (frontendCategory === "template") {
         backendCategory = "template";
@@ -651,14 +651,19 @@ const AllDocumentsSection = () => {
   }, [searchQuery]);
 
   const filteredDocuments = documents
-    .filter(doc =>
-      (selectedCategory === "all" || doc.category === selectedCategory) &&
-      (doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    .filter(doc => {
+      const categoryMatch =
+        selectedCategory === "all" ? true :
+          selectedCategory === "uploaded" ? !['template', 'generated'].includes(doc.category) :
+            doc.category === selectedCategory;
+      return categoryMatch && (
+        doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         doc.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
         doc.uploadedBy.toLowerCase().includes(searchQuery.toLowerCase()) ||
         doc.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (doc.description && doc.description.toLowerCase().includes(searchQuery.toLowerCase())))
-    )
+        (doc.description && doc.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
+    })
     .sort((a, b) => {
       if (sortBy === "newest") return new Date(b.date).getTime() - new Date(a.date).getTime();
       if (sortBy === "oldest") return new Date(a.date).getTime() - new Date(b.date).getTime();
@@ -697,12 +702,11 @@ const AllDocumentsSection = () => {
 
   const categories = [
     { id: "all", label: "All Categories", count: documents.length, color: "from-primary to-blue-500" },
-    { id: "uploaded", label: "Uploaded", count: documents.filter(d => d.category === "uploaded").length, color: "from-green-500 to-emerald-500" },
+    { id: "uploaded", label: "Uploaded", count: documents.filter(d => !['template', 'generated'].includes(d.category)).length, color: "from-green-500 to-emerald-500" },
     { id: "template", label: "Templates", count: documents.filter(d => d.category === "template").length, color: "from-purple-500 to-violet-500" },
     { id: "generated", label: "Generated", count: documents.filter(d => d.category === "generated").length, color: "from-orange-500 to-amber-500" },
     { id: "image", label: "Images", count: documents.filter(d => d.category === "image").length, color: "from-pink-500 to-rose-500" },
   ];
-
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Premium Header - Responsive */}
@@ -1047,12 +1051,11 @@ const AllDocumentsSection = () => {
                             </Badge>
                           </TableCell>
                           <TableCell className="py-2 md:py-4 px-2 md:px-4 hidden lg:table-cell">
-                            <Badge className={`gap-1 md:gap-2 px-1.5 md:px-3 py-0.5 md:py-1.5 text-[8px] md:text-xs ${
-                              doc.category === 'template' ? 'bg-gradient-to-r from-purple-500 to-violet-500' :
-                              doc.category === 'generated' ? 'bg-gradient-to-r from-orange-500 to-amber-500' :
-                              doc.category === 'image' ? 'bg-gradient-to-r from-pink-500 to-rose-500' :
-                              'bg-gradient-to-r from-green-500 to-emerald-500'
-                            }`}>
+                            <Badge className={`gap-1 md:gap-2 px-1.5 md:px-3 py-0.5 md:py-1.5 text-[8px] md:text-xs ${doc.category === 'template' ? 'bg-gradient-to-r from-purple-500 to-violet-500' :
+                                doc.category === 'generated' ? 'bg-gradient-to-r from-orange-500 to-amber-500' :
+                                  doc.category === 'image' ? 'bg-gradient-to-r from-pink-500 to-rose-500' :
+                                    'bg-gradient-to-r from-green-500 to-emerald-500'
+                              }`}>
                               {doc.category.charAt(0).toUpperCase() + doc.category.slice(1)}
                             </Badge>
                           </TableCell>
@@ -1144,12 +1147,11 @@ const AllDocumentsSection = () => {
                 )}
 
                 <div className="flex items-center justify-between mb-2 md:mb-4">
-                  <Badge className={`text-[8px] md:text-xs px-1.5 md:px-3 py-0.5 md:py-1.5 ${
-                    doc.category === 'template' ? 'bg-gradient-to-r from-purple-500 to-violet-500' :
-                    doc.category === 'generated' ? 'bg-gradient-to-r from-orange-500 to-amber-500' :
-                    doc.category === 'image' ? 'bg-gradient-to-r from-pink-500 to-rose-500' :
-                    'bg-gradient-to-r from-green-500 to-emerald-500'
-                  }`}>
+                  <Badge className={`text-[8px] md:text-xs px-1.5 md:px-3 py-0.5 md:py-1.5 ${doc.category === 'template' ? 'bg-gradient-to-r from-purple-500 to-violet-500' :
+                      doc.category === 'generated' ? 'bg-gradient-to-r from-orange-500 to-amber-500' :
+                        doc.category === 'image' ? 'bg-gradient-to-r from-pink-500 to-rose-500' :
+                          'bg-gradient-to-r from-green-500 to-emerald-500'
+                    }`}>
                     {doc.category}
                   </Badge>
                   <span className="text-[10px] md:text-sm font-medium">{doc.size}</span>

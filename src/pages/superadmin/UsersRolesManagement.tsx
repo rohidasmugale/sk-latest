@@ -156,7 +156,33 @@ const formatTimeForDisplay = (timestamp: string | null): string => {
     return timestamp || "-";
   }
 };
-
+const normalizeAssignedSites = (value: any): string[] => {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    // Flatten nested arrays and filter out empty strings
+    return value
+      .flat(Infinity)
+      .filter((s: any) => typeof s === 'string' && s.trim());
+  }
+  if (typeof value === 'string') {
+    try {
+      let parsed: any = value;
+      // Try parsing up to 4 times (handles nested stringification)
+      for (let i = 0; i < 4; i++) {
+        if (typeof parsed !== 'string') break;
+        parsed = JSON.parse(parsed);
+      }
+      if (Array.isArray(parsed)) {
+        return parsed
+          .flat(Infinity)
+          .filter((s: any) => typeof s === 'string' && s.trim());
+      }
+    } catch (e) {
+      console.warn('Failed to parse assignedSites:', value);
+    }
+  }
+  return [];
+};
 const formatDuration = (hours: number): string => {
   if (!hours || hours === 0) return "0m";
   const totalMinutes = Math.round(hours * 60);
@@ -297,6 +323,10 @@ const UserForm = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [availableSites, setAvailableSites] = useState<{ _id: string; name: string }[]>([]);
   const [loadingSites, setLoadingSites] = useState(false);
+
+  // State for validation errors
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
   const [formData, setFormData] = useState<FormUserData>({
     name: user?.name || '',
     email: user?.email || '',
@@ -308,7 +338,7 @@ const UserForm = ({
     joinDate: user?.joinDate
       ? (typeof user.joinDate === 'string' ? user.joinDate.split('T')[0] : new Date(user.joinDate).toISOString().split('T')[0])
       : new Date().toISOString().split('T')[0],
-    assignedSites: user?.assignedSites || [],
+    assignedSites: normalizeAssignedSites(user?.assignedSites),
   });
 
   const startCamera = async () => {
@@ -388,11 +418,19 @@ const UserForm = ({
     if (file) {
       if (!file.type.startsWith('image/')) {
         toast.error("Please select an image file");
+        setErrors(prev => ({ ...prev, photo: "Please select an image file" }));
         return;
       }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Image size should be less than 5MB");
+        setErrors(prev => ({ ...prev, photo: "Image size should be less than 5MB" }));
+        return;
+      }
+
       setPhotoFile(file);
       if (photoPreview) URL.revokeObjectURL(photoPreview);
       setPhotoPreview(URL.createObjectURL(file));
+      setErrors(prev => ({ ...prev, photo: "" }));
       toast.success("Photo selected");
     }
   };
@@ -419,7 +457,12 @@ const UserForm = ({
     const fetchSites = async () => {
       try {
         setLoadingSites(true);
-        const response = await axios.get(`${API_URL}/sites`);
+        const token = localStorage.getItem('sk_token');
+        const response = await axios.get(`${API_URL}/sites`, {
+          headers: {
+            ...(token && { 'Authorization': `Bearer ${token}` }),
+          },
+        });
         let sitesData = [];
         if (response.data?.success && Array.isArray(response.data.data)) {
           sitesData = response.data.data;
@@ -439,8 +482,66 @@ const UserForm = ({
     fetchSites();
   }, []);
 
+  // Validation Logic
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    // Name Validation - ONLY letters and spaces
+    const nameRegex = /^[a-zA-Z\s]+$/;
+    if (!formData.name.trim()) {
+      newErrors.name = "Full Name is required";
+    } else if (formData.name.trim().length < 2) {
+      newErrors.name = "Name must be at least 2 characters";
+    } else if (!nameRegex.test(formData.name)) {
+      newErrors.name = "Name can only contain letters and spaces";
+    }
+
+    // Email Validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.email.trim()) {
+      newErrors.email = "Email is required";
+    } else if (!emailRegex.test(formData.email)) {
+      newErrors.email = "Please enter a valid email address";
+    }
+
+    // Password Validation
+    if (!isEditing && !formData.password) {
+      newErrors.password = "Password is required for new users";
+    } else if (formData.password && formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters long";
+    }
+
+    // Department Validation
+    if (!formData.department) {
+      newErrors.department = "Department is required";
+    }
+
+    // Phone Validation - Strictly exactly 10 digits
+    const digitsOnly = formData.phone.replace(/\D/g, ''); // Strip all non-digit characters
+    if (!formData.phone.trim()) {
+      newErrors.phone = "Phone number is required";
+    } else if (digitsOnly.length !== 10) {
+      newErrors.phone = "Phone number must be exactly 10 digits";
+    }
+
+    // Join Date Validation
+    if (!formData.joinDate) {
+      newErrors.joinDate = "Join Date is required";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!validateForm()) {
+      toast.error("Please fix the validation errors before submitting.");
+      return;
+    }
+
+    setErrors({});
     onSubmit({ ...formData, photoFile });
   };
 
@@ -452,22 +553,29 @@ const UserForm = ({
       className="space-y-6 p-1"
     >
       <div className="space-y-4">
+        {/* Full Name */}
         <div className="space-y-2">
           <Label htmlFor="name" className="text-sm font-medium">Full Name</Label>
           <div className="relative">
             <Input
               id="name"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) => {
+                // REAL-TIME FIX: Strictly allow only letters and spaces
+                const filteredValue = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                setFormData({ ...formData, name: filteredValue });
+                if (errors.name) setErrors({ ...errors, name: "" });
+              }}
               placeholder="John Doe"
-              required
-              className="pl-10 h-11 rounded-lg"
+              className={`pl-10 h-11 rounded-lg ${errors.name ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
             />
             <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           </div>
+          {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Email */}
           <div className="space-y-2">
             <Label htmlFor="email" className="text-sm font-medium">Email</Label>
             <div className="relative">
@@ -475,14 +583,19 @@ const UserForm = ({
                 id="email"
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, email: e.target.value });
+                  if (errors.email) setErrors({ ...errors, email: "" });
+                }}
                 placeholder="john@company.com"
-                required
-                className="pl-10 h-11 rounded-lg"
+                className={`pl-10 h-11 rounded-lg ${errors.email ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
               />
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             </div>
+            {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
           </div>
+
+          {/* Password */}
           <div className="space-y-2">
             <Label htmlFor="password" className="text-sm font-medium">
               Password {!isEditing && <span className="text-red-500">*</span>}
@@ -491,15 +604,19 @@ const UserForm = ({
               id="password"
               type="password"
               value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, password: e.target.value });
+                if (errors.password) setErrors({ ...errors, password: "" });
+              }}
               placeholder={isEditing ? "Leave blank to keep current" : "••••••••"}
-              required={!isEditing}
-              className="h-11 rounded-lg"
+              className={`h-11 rounded-lg ${errors.password ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
             />
+            {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Role */}
           {!presetRole && (
             <div className="space-y-2">
               <Label className="text-sm font-medium">Role</Label>
@@ -526,13 +643,18 @@ const UserForm = ({
               </Select>
             </div>
           )}
+
+          {/* Department */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Department</Label>
             <Select
               value={formData.department}
-              onValueChange={(value) => setFormData({ ...formData, department: value })}
+              onValueChange={(value) => {
+                setFormData({ ...formData, department: value });
+                if (errors.department) setErrors({ ...errors, department: "" });
+              }}
             >
-              <SelectTrigger className="h-11 rounded-lg">
+              <SelectTrigger className={`h-11 rounded-lg ${errors.department ? 'border-red-500 focus-visible:ring-red-500' : ''}`}>
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
               <SelectContent>
@@ -541,8 +663,11 @@ const UserForm = ({
                 ))}
               </SelectContent>
             </Select>
+            {errors.department && <p className="text-red-500 text-xs mt-1">{errors.department}</p>}
           </div>
-          {formData.role === 'supervisor' && (
+
+          {/* Assigned Sites */}
+          {['admin', 'manager', 'supervisor'].includes(formData.role) && (
             <div className="space-y-2 col-span-full">
               <Label className="text-sm font-medium">Assigned Sites</Label>
               <div className="border rounded-lg p-3 max-h-40 overflow-y-auto space-y-2">
@@ -585,6 +710,7 @@ const UserForm = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Join Date */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Join Date</Label>
             <div className="relative">
@@ -592,28 +718,45 @@ const UserForm = ({
               <Input
                 type="date"
                 value={formData.joinDate}
-                onChange={(e) => setFormData({ ...formData, joinDate: e.target.value })}
-                required
-                className="pl-10 h-11 rounded-lg"
+                onChange={(e) => {
+                  setFormData({ ...formData, joinDate: e.target.value });
+                  if (errors.joinDate) setErrors({ ...errors, joinDate: "" });
+                }}
+                className={`pl-10 h-11 rounded-lg ${errors.joinDate ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
               />
             </div>
+            {errors.joinDate && <p className="text-red-500 text-xs mt-1">{errors.joinDate}</p>}
           </div>
+
+          {/* Phone */}
           <div className="space-y-2">
             <Label htmlFor="phone" className="text-sm font-medium">Phone</Label>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 id="phone"
+                type="tel"
+                inputMode="numeric"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="+1 (555) 123-4567"
-                required
-                className="pl-10 h-11 rounded-lg"
+                onChange={(e) => {
+                  // REAL-TIME FIX: Prevent typing more than 10 digits
+                  const rawValue = e.target.value;
+                  const digitsOnly = rawValue.replace(/\D/g, ''); // Strip non-digits
+
+                  if (digitsOnly.length <= 10) {
+                    setFormData({ ...formData, phone: rawValue });
+                    if (errors.phone) setErrors({ ...errors, phone: "" });
+                  }
+                }}
+                placeholder="1234567890"
+                className={`pl-10 h-11 rounded-lg ${errors.phone ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
               />
             </div>
+            {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
           </div>
         </div>
 
+        {/* Profile Photo */}
         <div className="space-y-2">
           <Label>Profile Photo (for Face Recognition)</Label>
           <div className="flex flex-wrap gap-3">
@@ -625,6 +768,7 @@ const UserForm = ({
             </Button>
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
           </div>
+          {errors.photo && <p className="text-red-500 text-xs mt-1">{errors.photo}</p>}
           {photoPreview && (
             <div className="flex items-center gap-2 mt-2">
               <img src={photoPreview} alt="Preview" className="w-12 h-12 rounded-full object-cover border" />
@@ -635,6 +779,7 @@ const UserForm = ({
           )}
         </div>
 
+        {/* Status */}
         <div className="space-y-2">
           <Label className="text-sm font-medium">Status</Label>
           <div className="grid grid-cols-2 gap-3">
@@ -1381,6 +1526,7 @@ const UsersRolesManagement = () => {
                           title="Supervisors"
                           icon={Shield}
                           roleFilter={['supervisor']}
+                          description="Department leadership and oversight"
                           refreshTrigger={refreshTrigger}
                           autoOpen={activeTab === 'supervisors' && autoOpenAdd === 'supervisors'}
                         />

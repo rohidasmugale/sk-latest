@@ -8,7 +8,7 @@ export interface IDeduction extends Document {
   amount: number;
   description?: string;
   deductionDate: Date;
-  status: 'pending' | 'approved' | 'rejected' | 'completed';
+status: 'active' | 'completed' | 'cancelled';
   repaymentMonths?: number;
   installmentAmount?: number;
   fineAmount?: number;
@@ -50,11 +50,11 @@ const DeductionSchema: Schema = new Schema({
     type: Date,
     default: Date.now,
   },
-  status: {
-    type: String,
-    enum: ['pending', 'approved', 'rejected', 'completed'],
-    default: 'pending',
-  },
+ status: {
+  type: String,
+  enum: ['active', 'completed', 'cancelled'],
+  default: 'active'
+},
   repaymentMonths: {
     type: Number,
     default: 0,

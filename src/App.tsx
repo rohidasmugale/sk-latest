@@ -4,14 +4,19 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { RoleProvider, useRole } from "@/context/RoleContext";
+import { SiteProvider } from "@/context/SiteContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 // In your router file (e.g., App.tsx or router.tsx)
 import ManagerHRMS from "./pages/manager/ManagerHRMS";
-import AdminDashboard from "./pages/admin/AdminDashboard";  
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
+
+// inside <Routes>
 
 // Auth Pages
 import Login from "./pages/Login";
-import Signup from "./pages/Signup";
+
 
 // Layouts
 import SuperAdminLayout from "./layouts/SuperAdminLayout";
@@ -167,169 +172,173 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <RoleProvider>
-      <NotificationProvider>
-        {/* <AuthProvider> */}
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              {/* Public Routes */}
+      <SiteProvider>
+        <NotificationProvider>
+          {/* <AuthProvider> */}
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                {/* Public Routes */}
 
-              <Route path="/" element={<RootRedirect />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
+                <Route path="/" element={<RootRedirect />} />
+                <Route path="/login" element={<Login />} />
 
-
-              {/* Super Admin Routes */}
-              <Route
-                path="/superadmin"
-                element={
-                  <ProtectedRoute allowedRoles={["superadmin"]}>
-                    <SuperAdminLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route path="dashboard" element={<SuperAdminDashboard />} />
-                <Route path="users" element={<UsersRolesManagement />} />
-                <Route path="managers" element={<Managers />} />
-                <Route path="supervisors" element={<Supervisors />} />
-                <Route path="employees" element={<Employees />} />
-                <Route path="hrms" element={<HRMS />} />
-                <Route path="documents" element={<Documents />} />
-               
-                <Route path="operations" element={<Operations />} />
-                <Route path="notifications" element={<Notifications />} />
-                <Route path="crm" element={<CRM />} />
-                <Route path="erp" element={<ERP />} />
-                <Route path="site-visits" element={<SuperAdminReports />} />
-                <Route path="billing" element={<Billing />} />
-                <Route path="reports" element={<Reports />} />
-                <Route path="settings" element={<Settings />} />
-                <Route path="attendanceview" element={<AttendanceTab />} />
-                <Route path="profile" element={<SuperAdminProfile />} />
-
-                <Route path="/superadmin/machines/:siteId" element={<SiteMachinesView />} />
-              </Route>
-
-              {/* Admin Routes */}
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
-                    <AdminLayout />
-                  </ProtectedRoute>
-                }
-              >
-               <Route path="dashboard" element={<AdminDashboard />} />
-                <Route path="attendanceview" element={<AttendanceTab />} />
-                <Route path="profile" element={<AdminProfile />} />
-                <Route path="team" element={<AdminTeam />} />
-
-                <Route path="tasks" element={<AdminTasks />} />
-                <Route path="reports" element={<AdminReports />} />
-                <Route path="leave" element={<AdminLeave />} />
-                <Route path="notifications" element={<AdminNotifications />} />
-                <Route path="settings" element={<AdminSettings />} />
-                <Route path="crm" element={<AdminCRM />} />
-                <Route path="erp" element={<AdminERP />} />
-                <Route path="billing" element={<Billing />} />
-                <Route path="operations" element={<AdminOperations />} />
-                <Route path="documents" element={<AdminDocuments />} />
-                <Route path="hrms" element={<HRMS />} />
-              </Route>
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password/:token" element={<ResetPassword />} />
 
 
-              {/* Manager Routes */}
-              <Route
-                path="/manager"
-                element={
-                  <ProtectedRoute allowedRoles={["manager"]}>
-                    <ManagerLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route path="dashboard" element={<ManagerDashboard />} />
-                <Route path="profile" element={<ManagerProfile />} />
-                <Route path="supervisors" element={<ManagerSupervisors />} />
-                <Route path="tasks" element={<ManagerTasks />} />
-                <Route path="reports" element={<ManagerReports />} />
-                <Route path="leave" element={<ManagerLeave />} />
-                <Route path="operations" element={<ManagerOperations />} />
-                <Route path="managerattendance" element={<ManagerAttendance />} />
-                <Route path="notifications" element={<ManagerNotifications />} />
-                <Route path="settings" element={<ManagerSettings />} />
-                <Route path="sites" element={<ManagerSites />} />
-                <Route path="assigntask" element={<ManagerAssignTask />} />
-                <Route path="/manager/machine-status" element={<ManagerMachineStatus />} />
-                <Route path="/manager/grooming" element={<ManagerGrooming />} />
-                <Route path="/manager/incidents" element={<ManagerIncidents />} />
-                <Route path="/manager/cleaning-photos" element={<ManagerCleaningPhotos />} />
-                <Route path="/manager/shift-deployment" element={<ManagerShiftDeployment />} />
-                <Route path="/manager/training" element={<ManagerTraining />} />
-                <Route path="/manager/briefing" element={<ManagerBriefing />} />
-                <Route path="hrms" element={<ManagerHRMS />} />
-                <Route path="notifications" element={<ManagerNotifications />} />
+                {/* Super Admin Routes */}
+                <Route
+                  path="/superadmin"
+                  element={
+                    <ProtectedRoute allowedRoles={["superadmin"]}>
+                      <SuperAdminLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route path="dashboard" element={<SuperAdminDashboard />} />
+                  <Route path="users" element={<UsersRolesManagement />} />
+                  <Route path="managers" element={<Managers />} />
+                  <Route path="supervisors" element={<Supervisors />} />
+                  <Route path="employees" element={<Employees />} />
+                  <Route path="hrms" element={<HRMS />} />
+                  <Route path="documents" element={<Documents />} />
+
+                  <Route path="operations" element={<Operations />} />
+                  <Route path="notifications" element={<Notifications />} />
+                  <Route path="crm" element={<CRM />} />
+                  <Route path="erp" element={<ERP />} />
+                  <Route path="site-visits" element={<SuperAdminReports />} />
+                  <Route path="billing" element={<Billing />} />
+                  <Route path="reports" element={<Reports />} />
+                  <Route path="settings" element={<Settings />} />
+                  <Route path="attendanceview" element={<AttendanceTab />} />
+                  <Route path="profile" element={<SuperAdminProfile />} />
+
+                  <Route path="machines/:siteId" element={<SiteMachinesView />} />
+                </Route>
+
+                {/* Admin Routes */}
+                <Route
+                  path="/admin"
+                  element={
+                    <ProtectedRoute allowedRoles={["admin"]}>
+                      <AdminLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route path="dashboard" element={<AdminDashboard />} />
+                  <Route path="attendanceview" element={<AttendanceTab />} />
+                  <Route path="profile" element={<AdminProfile />} />
+                  <Route path="team" element={<AdminTeam />} />
+
+                  <Route path="tasks" element={<AdminTasks />} />
+                  <Route path="reports" element={<AdminReports />} />
+                  <Route path="leave" element={<AdminLeave />} />
+                  <Route path="notifications" element={<AdminNotifications />} />
+                  <Route path="settings" element={<AdminSettings />} />
+                  <Route path="crm" element={<AdminCRM />} />
+                  <Route path="erp" element={<AdminERP />} />
+                  <Route path="billing" element={<Billing />} />
+                  <Route path="operations" element={<AdminOperations />} />
+                  <Route path="documents" element={<AdminDocuments />} />
+                  <Route path="hrms" element={<HRMS />} />
+                </Route>
 
 
-              </Route>
+                {/* Manager Routes */}
+                <Route
+                  path="/manager"
+                  element={
+                    <ProtectedRoute allowedRoles={["manager"]}>
+                      <ManagerLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route path="dashboard" element={<ManagerDashboard />} />
+                  <Route path="profile" element={<ManagerProfile />} />
+                  <Route path="supervisors" element={<ManagerSupervisors />} />
+                  <Route path="tasks" element={<ManagerTasks />} />
+                  <Route path="reports" element={<ManagerReports />} />
+                  <Route path="leave" element={<ManagerLeave />} />
+                  <Route path="operations" element={<ManagerOperations />} />
+                  <Route path="managerattendance" element={<ManagerAttendance />} />
 
-              {/* Supervisor Routes */}
-              <Route
-                path="/supervisor"
-                element={
-                  <ProtectedRoute allowedRoles={["supervisor"]}>
-                    <SupervisorLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route path="dashboard" element={<SupervisorDashboard />} />
-                <Route path="profile" element={<SupervisorProfile />} />
-                <Route path="tasks" element={<Tasks />} />
+                  <Route path="settings" element={<ManagerSettings />} />
+                  <Route path="sites" element={<ManagerSites />} />
+                  <Route path="assigntask" element={<ManagerAssignTask />} />
+                  <Route path="/manager/machine-status" element={<ManagerMachineStatus />} />
+                  <Route path="/manager/grooming" element={<ManagerGrooming />} />
+                  <Route path="/manager/incidents" element={<ManagerIncidents />} />
+                  <Route path="/manager/cleaning-photos" element={<ManagerCleaningPhotos />} />
+                  <Route path="/manager/shift-deployment" element={<ManagerShiftDeployment />} />
+                  <Route path="/manager/training" element={<ManagerTraining />} />
+                  <Route path="/manager/briefing" element={<ManagerBriefing />} />
+                  <Route path="hrms" element={<ManagerHRMS />} />
+                  <Route path="notifications" element={<ManagerNotifications />} />
 
-                <Route path="inventory" element={<InventoryPage />} /> {/* ADD THIS ROUTE */}
-                <Route path="query" element={<WorkQuery />} />
-                <Route path="attendance" element={<Attendance />} />
-                <Route path="leave" element={<SupervisorLeave />} />
-                <Route path="reports" element={<SupervisorReports />} />
-                <Route path="settings" element={<SupervisorSettings />} />
-                <Route path="assigntask" element={<SupervisorAssignTask />} />
-                <Route path="supervisortraining" element={<SupervisorTrainingBriefing />} />
-                <Route path="hrms" element={<SupervisorHRMS />} />
-                <Route path="machine-status" element={<MachineStatus />} />
-                <Route path="grooming" element={<GroomingStatus />} />
-                <Route path="incidents" element={<IncidentReports />} />
-                <Route path="cleaning-photos" element={<CleaningPhotos />} />
-                <Route path="shift-deployment" element={<ShiftDeployment />} />
-                <Route path="salary-slip" element={<SalarySlip />} />
-                <Route path="notifications" element={<SupervisorNotification />} />
-                <Route path="supervisorroster" element={<SupervisorRosterSection />} />
-              </Route>
 
-              {/* Employee Routes */}
-              <Route
-                path="/employee"
-                element={
-                  <ProtectedRoute allowedRoles={["employee"]}>
-                    <EmployeeLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route path="dashboard" element={<EmployeeDashboard />} />
-                <Route path="tasks" element={<EmployeeTasks />} />
-                <Route path="documents" element={<EmployeeDocuments />} />
-                <Route path="salary" element={<SalarySlip />} />
-                <Route path="leave" element={<ApplyLeave />} />
-                <Route path="attendance" element={<EmployeeAttendance />} />
-                <Route path="notifications" element={<Notifications />} />
-              </Route>
+                </Route>
 
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </NotificationProvider>
-      {/* </AuthProvider> */}
+                {/* Supervisor Routes */}
+                <Route
+                  path="/supervisor"
+                  element={
+                    <ProtectedRoute allowedRoles={["supervisor"]}>
+                      <SupervisorLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route path="dashboard" element={<SupervisorDashboard />} />
+                  <Route path="profile" element={<SupervisorProfile />} />
+                  <Route path="tasks" element={<Tasks />} />
+
+                  <Route path="inventory" element={<InventoryPage />} /> {/* ADD THIS ROUTE */}
+                  <Route path="query" element={<WorkQuery />} />
+                  <Route path="attendance" element={<Attendance />} />
+                  <Route path="leave" element={<SupervisorLeave />} />
+                  <Route path="reports" element={<SupervisorReports />} />
+                  <Route path="settings" element={<SupervisorSettings />} />
+                  <Route path="assigntask" element={<SupervisorAssignTask />} />
+                  <Route path="supervisortraining" element={<SupervisorTrainingBriefing />} />
+                  <Route path="hrms" element={<SupervisorHRMS />} />
+                  <Route path="machine-status" element={<MachineStatus />} />
+                  <Route path="grooming" element={<GroomingStatus />} />
+                  <Route path="incidents" element={<IncidentReports />} />
+                  <Route path="cleaning-photos" element={<CleaningPhotos />} />
+                  <Route path="shift-deployment" element={<ShiftDeployment />} />
+                  <Route path="salary-slip" element={<SalarySlip />} />
+                  <Route path="notifications" element={<SupervisorNotification />} />
+                  <Route path="supervisorroster" element={<SupervisorRosterSection />} />
+                </Route>
+
+                {/* Employee Routes */}
+                <Route
+                  path="/employee"
+                  element={
+                    <ProtectedRoute allowedRoles={["employee"]}>
+                      <EmployeeLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route path="dashboard" element={<EmployeeDashboard />} />
+                  <Route path="tasks" element={<EmployeeTasks />} />
+                  <Route path="documents" element={<EmployeeDocuments />} />
+                  <Route path="salary" element={<SalarySlip />} />
+                  <Route path="leave" element={<ApplyLeave />} />
+                  <Route path="attendance" element={<EmployeeAttendance />} />
+                  <Route path="notifications" element={<Notifications />} />
+                </Route>
+
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+          {/* </AuthProvider> */}
+        </NotificationProvider>
+      </SiteProvider>
     </RoleProvider>
   </QueryClientProvider>
 );

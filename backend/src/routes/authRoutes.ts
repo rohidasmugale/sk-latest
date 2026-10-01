@@ -6,105 +6,13 @@ import Employee from '../models/Employee';
 import AssignTask from '../models/AssignTask';
 import Site from '../models/Site';
 import { auth } from '../middleware/auth';
+import crypto from 'crypto';
+import { Resend } from 'resend';
 
+const resend = new Resend(process.env.RESEND_API_KEY);
 const router = express.Router();
 
-// =============================================
-// AUTH ENDPOINTS (Signup, Login, etc.)
-// =============================================
 
-router.post('/signup', async (req: Request, res: Response) => {
-  try {
-    const { name, email, password, role } = req.body;
-
-    if (!name || !email || !password || !role) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide all required fields'
-      });
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide a valid email address'
-      });
-    }
-
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(409).json({
-        success: false,
-        message: 'Email address is already registered'
-      });
-    }
-
-    if (role !== 'superadmin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Only Super Admin can sign up directly'
-      });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: 'Password must be at least 6 characters long'
-      });
-    }
-
-    const newUser = new User({
-      name,
-      email,
-      password,
-      role: 'superadmin',
-      username: email.split('@')[0],
-      firstName: name.split(' ')[0],
-      lastName: name.split(' ').slice(1).join(' ') || '',
-      isActive: true,
-      joinDate: new Date()
-    });
-
-    await newUser.save();
-
-    const token = jwt.sign(
-      { userId: newUser._id, role: newUser.role },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '30d' }
-    );
-
-    const userResponse = {
-      _id: newUser._id.toString(),
-      id: newUser._id.toString().slice(-6),
-      name: newUser.name,
-      email: newUser.email,
-      role: newUser.role,
-      isActive: newUser.isActive,
-      joinDate: newUser.joinDate.toISOString().split('T')[0],
-      department: newUser.department || ''
-    };
-
-    res.status(201).json({
-      success: true,
-      message: 'Super Admin account created successfully!',
-      user: userResponse,
-      token
-    });
-  } catch (error: any) {
-    console.error('Signup error:', error);
-    if (error.code === 11000) {
-      return res.status(409).json({
-        success: false,
-        message: 'Email already registered'
-      });
-    }
-    res.status(500).json({
-      success: false,
-      message: error.message || 'An error occurred during signup'
-    });
-  }
-});
 
 router.post('/login', async (req: Request, res: Response) => {
   try {
@@ -262,6 +170,89 @@ router.post('/verify', async (req: Request, res: Response) => {
       success: false,
       message: 'Invalid token'
     });
+  }
+});
+
+// =============================================
+// PASSWORD RESET
+// =============================================
+router.post('/forgot-password', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message: 'If that email is registered, a reset link has been sent.'
+      });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpires = new Date(Date.now() + 30 * 60 * 1000);
+    await user.save();
+
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:8080'}/reset-password/${resetToken}`;
+
+    const { data, error } = await resend.emails.send({
+      from: process.env.EMAIL_FROM || 'SK PROJECT <onboarding@resend.dev>',
+      to: user.email,
+      subject: 'Reset your SK PROJECT password',
+      html: `<p>Click the link below to reset your password. This link expires in 30 minutes.</p>
+             <a href="${resetUrl}">${resetUrl}</a>`
+    });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return res.status(500).json({ success: false, message: 'Failed to send reset email' });
+    }
+
+    console.log(`✅ Reset email sent to ${user.email}, id: ${data?.id}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'If that email is registered, a reset link has been sent.'
+    });
+  } catch (error: any) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ success: false, message: 'Error processing request' });
+  }
+});
+
+router.post('/reset-password/:token', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+    }
+
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+const user = await User.findOne({
+  resetPasswordToken: hashedToken,
+  resetPasswordExpires: { $gt: new Date() }
+}).select('+resetPasswordToken +resetPasswordExpires');
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'Reset link is invalid or has expired' });
+    }
+
+    user.password = newPassword; // hashed by pre-save hook
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    res.status(200).json({ success: true, message: 'Password has been reset. Please log in.' });
+  } catch (error: any) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ success: false, message: 'Error resetting password' });
   }
 });
 

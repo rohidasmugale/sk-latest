@@ -27,17 +27,8 @@ router.get('/', auth, async (req: any, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
-// Test endpoint - no auth required
-router.get('/test', async (req, res) => {
-  try {
-    const notifications = await Notification.find()
-      .sort({ createdAt: -1 })
-      .limit(10);
-    res.json({ success: true, data: notifications });
-  } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
+
+
 // Get unread notifications count
 router.get('/unread-count', auth, async (req: any, res) => {
   try {

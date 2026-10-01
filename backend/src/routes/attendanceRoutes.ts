@@ -11,6 +11,7 @@ import {
   getAttendanceHistory,
   getTeamAttendance,
   getAllAttendance,
+  getAttendanceSummary,   
   updateAttendance,
   getWeeklySummary,
   manualAttendance,
@@ -40,6 +41,7 @@ router.get('/status/:employeeId', getTodayStatus);
 router.get('/history', getAttendanceHistory);
 router.get('/team', getTeamAttendance);
 router.get('/', getAllAttendance);
+router.get('/summary', getAttendanceSummary);
 router.post('/face-recognize', upload.single('photo'), faceRecognize);
 router.post('/register-face/:employeeId', upload.single('photo'), registerFace);
 // Update attendance (admin/supervisor)

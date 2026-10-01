@@ -8,6 +8,8 @@ import axios from 'axios';
 import FormData from 'form-data';
 import path from 'path';
 import Notification from '../models/Notification';
+import Site from '../models/Site';
+import { notifyRolesServerSide } from '../utils/notifyRoles';
 const FACE_SERVICE_URL = process.env.FACE_SERVICE_URL || 
   (process.env.NODE_ENV === 'production' 
     ? 'https://sk-face-service.onrender.com' 
@@ -18,13 +20,7 @@ console.log("FACE_SERVICE_URL =", FACE_SERVICE_URL);
 
 
 
-function cosineSimilarity(vecA: number[], vecB: number[]): number {
-  if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
-  const dot = vecA.reduce((sum, a, i) => sum + a * vecB[i], 0);
-  const magA = Math.sqrt(vecA.reduce((sum, a) => sum + a * a, 0));
-  const magB = Math.sqrt(vecB.reduce((sum, b) => sum + b * b, 0));
-  return dot / (magA * magB);
-}
+
 
 function calculateHours(startTime: string | null, endTime: string | null): number {
   if (!startTime || !endTime) return 0;
@@ -295,45 +291,26 @@ export const faceRecognize = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'Photo is required' });
     }
 
+    // Use the SAME /match endpoint autoAttendance uses — don't reimplement in Node
     const formData = new FormData();
     formData.append('file', photoFile.buffer, { filename: 'photo.jpg' });
-    const pyRes = await axios.post(`${FACE_SERVICE_URL}/embedding`, formData, {
+    const pyRes = await axios.post(`${FACE_SERVICE_URL}/match`, formData, {
       headers: { ...formData.getHeaders() },
       timeout: 60000,
     });
 
-    const data = pyRes.data as { success: boolean; message?: string; embedding?: number[] };
+    const data = pyRes.data as { success: boolean; message?: string; data?: any };
     if (!data.success) {
-      return res.status(400).json({ success: false, message: data.message });
-    }
-    const capturedEmbedding = data.embedding!;
-
-    const employees = await Employee.find({
-      faceEmbeddings: { $exists: true, $not: { $size: 0 } },
-    });
-
-    let bestMatch: IEmployee | null = null;
-    let bestScore = 0.45;
-
-    for (const emp of employees) {
-      // ✅ Safe guard
-      if (!emp.faceEmbeddings || emp.faceEmbeddings.length === 0) continue;
-      for (const storedEmb of emp.faceEmbeddings) {
-        const sim = cosineSimilarity(capturedEmbedding, storedEmb);
-        if (sim > bestScore) {
-          bestScore = sim;
-          bestMatch = emp;
-        }
-      }
+      return res.status(404).json({ success: false, message: data.message || 'Face not recognized' });
     }
 
-    if (!bestMatch) {
-      return res.status(404).json({ success: false, message: 'Face not recognized' });
-    }
-
+    const payload = data.data || data;
     res.json({
       success: true,
-      data: { employeeId: bestMatch._id, employeeName: bestMatch.name },
+      data: {
+        employeeId: payload.employeeId,
+        employeeName: payload.employeeName,
+      },
     });
   } catch (error: any) {
     console.error('Face recognition error:', error);
@@ -926,13 +903,77 @@ export const getTodayStatus = async (req: Request, res: Response) => {
   }
 };
  
+// NEW: Fast summary endpoint for dashboards — returns counts, not raw docs
+export const getAttendanceSummary = async (req: Request, res: Response) => {
+  try {
+    const { startDate, endDate, siteName } = req.query;
 
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'startDate and endDate are required',
+      });
+    }
 
+    const match: any = {
+      date: { $gte: startDate.toString(), $lte: endDate.toString() },
+    };
+    if (siteName && siteName !== 'all') match.siteName = siteName.toString();
+
+    // Mongo does the counting — returns a few hundred rows max
+    const data = await Attendance.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: {
+            date: '$date',
+            siteName: '$siteName',
+            status: '$status',
+          },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { '_id.date': -1 } },
+    ]);
+
+    // Also return per-employee totals for the dashboard
+    const perEmployee = await Attendance.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: {
+            employeeId: '$employeeId',
+            employeeName: '$employeeName',
+          },
+          present: { $sum: { $cond: [{ $eq: ['$status', 'present'] }, 1, 0] } },
+          absent:  { $sum: { $cond: [{ $eq: ['$status', 'absent'] }, 1, 0] } },
+          halfDay: { $sum: { $cond: [{ $eq: ['$status', 'half-day'] }, 1, 0] } },
+          leave:   { $sum: { $cond: [{ $eq: ['$status', 'leave'] }, 1, 0] } },
+          weeklyOff: { $sum: { $cond: [{ $eq: ['$status', 'weekly-off'] }, 1, 0] } },
+          totalHours: { $sum: '$totalHours' },
+        },
+      },
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data,
+      perEmployee,
+    });
+  } catch (error: any) {
+    console.error('❌ getAttendanceSummary error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching attendance summary',
+      error: error.message,
+    });
+  }
+};
 // Get attendance history
 export const getAttendanceHistory = async (req: Request, res: Response) => {
   try {
     const { employeeId, startDate, endDate, page = 1, limit = 20 } = req.query;
-    
+
     if (!employeeId) {
       return res.status(400).json({
         success: false,
@@ -941,7 +982,7 @@ export const getAttendanceHistory = async (req: Request, res: Response) => {
     }
 
     const query: any = { employeeId: employeeId.toString() };
-    
+
     if (startDate && endDate) {
       query.date = {
         $gte: startDate.toString(),
@@ -949,16 +990,18 @@ export const getAttendanceHistory = async (req: Request, res: Response) => {
       };
     }
 
-    const pageNum = parseInt(page.toString());
-    const limitNum = parseInt(limit.toString());
+    const MAX_LIMIT = 500;
+    const pageNum = Math.max(parseInt(page.toString()) || 1, 1);
+    const limitNum = Math.min(parseInt(limit.toString()) || 20, MAX_LIMIT);
     const skip = (pageNum - 1) * limitNum;
 
     const [attendanceHistory, total] = await Promise.all([
       Attendance.find(query)
         .sort({ date: -1, createdAt: -1 })
         .skip(skip)
-        .limit(limitNum),
-      Attendance.countDocuments(query)
+        .limit(limitNum)
+        .lean(),
+      Attendance.countDocuments(query),
     ]);
 
     res.status(200).json({
@@ -969,8 +1012,8 @@ export const getAttendanceHistory = async (req: Request, res: Response) => {
         page: pageNum,
         limit: limitNum,
         total,
-        pages: Math.ceil(total / limitNum)
-      }
+        pages: Math.ceil(total / limitNum),
+      },
     });
   } catch (error: any) {
     console.error('❌ Get history error:', error.message);
@@ -982,6 +1025,7 @@ export const getAttendanceHistory = async (req: Request, res: Response) => {
   }
 };
 
+   
 // Get team attendance
 export const getTeamAttendance = async (req: Request, res: Response) => {
   try {
@@ -997,9 +1041,9 @@ export const getTeamAttendance = async (req: Request, res: Response) => {
     const queryDate = date ? date.toString() : formatDate(new Date());
     
     const teamAttendance = await Attendance.find({
-      date: queryDate,
-      supervisorId: supervisorId.toString(),
-    }).sort({ checkInTime: -1 });
+  date: queryDate,
+  supervisorId: supervisorId.toString(),
+}).sort({ checkInTime: -1 }).lean();
 
     res.status(200).json({
       success: true,
@@ -1019,19 +1063,25 @@ export const getTeamAttendance = async (req: Request, res: Response) => {
 };
 
 // Get all attendance
+// Get all attendance
 export const getAllAttendance = async (req: Request, res: Response) => {
   try {
-    const { page = 1, limit = 20, date, employeeId, startDate, endDate } = req.query;
-    
+    const {
+      page = 1,
+      limit = 20,
+      date,
+      employeeId,
+      siteName,
+      startDate,
+      endDate,
+      withCount = 'false',
+    } = req.query;
+
     const query: any = {};
-    
-    if (date) {
-      query.date = date.toString();
-    }
-    
-    if (employeeId) {
-      query.employeeId = employeeId.toString();
-    }
+
+    if (date) query.date = date.toString();
+    if (employeeId) query.employeeId = employeeId.toString();
+    if (siteName && siteName !== 'all') query.siteName = siteName.toString();
 
     if (startDate && endDate) {
       query.date = {
@@ -1040,17 +1090,25 @@ export const getAllAttendance = async (req: Request, res: Response) => {
       };
     }
 
-    const pageNum = parseInt(page.toString());
-    const limitNum = parseInt(limit.toString());
+    // HARD CAP — never return more than 500 rows from this endpoint
+    const MAX_LIMIT = 500;
+    const pageNum = Math.max(parseInt(page.toString()) || 1, 1);
+    const limitNum = Math.min(parseInt(limit.toString()) || 20, MAX_LIMIT);
     const skip = (pageNum - 1) * limitNum;
 
-    const [attendanceRecords, total] = await Promise.all([
-      Attendance.find(query)
-        .sort({ date: -1, createdAt: -1 })
-        .skip(skip)
-        .limit(limitNum),
-      Attendance.countDocuments(query)
-    ]);
+    // Build query chain
+    const findQuery = Attendance.find(query)
+      .sort({ date: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
+
+    // Only run countDocuments if caller explicitly asked
+    const wantCount = withCount === 'true';
+
+    const [attendanceRecords, total] = wantCount
+      ? await Promise.all([findQuery, Attendance.countDocuments(query)])
+      : [await findQuery, undefined];
 
     res.status(200).json({
       success: true,
@@ -1059,9 +1117,10 @@ export const getAllAttendance = async (req: Request, res: Response) => {
       pagination: {
         page: pageNum,
         limit: limitNum,
-        total,
-        pages: Math.ceil(total / limitNum)
-      }
+        total: total ?? null,
+        pages: total ? Math.ceil(total / limitNum) : null,
+        hasMore: attendanceRecords.length === limitNum,
+      },
     });
   } catch (error: any) {
     console.error('❌ Get all attendance error:', error.message);
@@ -1143,6 +1202,7 @@ export const manualAttendance = async (req: Request, res: Response) => {
       shiftId,
     } = req.body;
 
+    // Validate required fields
     if (!employeeId || !employeeName || !date) {
       return res.status(400).json({
         success: false,
@@ -1150,7 +1210,6 @@ export const manualAttendance = async (req: Request, res: Response) => {
       });
     }
 
-    // Validate date
     const attendanceDate = new Date(date);
     if (isNaN(attendanceDate.getTime())) {
       return res.status(400).json({
@@ -1159,70 +1218,44 @@ export const manualAttendance = async (req: Request, res: Response) => {
       });
     }
 
-    const formattedDate = formatDate(attendanceDate);
+    const formattedDate = formatDate(attendanceDate); // YYYY-MM-DD
 
-    // Get employee details
+    // Get employee details (optional, for department/site)
     const employee = await Employee.findById(employeeId);
 
-    // Check if record already exists
-    const existingRecord = await Attendance.findOne({
-      employeeId,
-      date: formattedDate,
-    });
+    // Build update object with all fields (null values are allowed by schema)
+    const updateData: any = {
+      employeeName,
+      checkInTime: checkInTime || null,
+      checkOutTime: checkOutTime || null,
+      checkInPhoto: checkInPhoto || null,
+      checkOutPhoto: checkOutPhoto || null,
+      breakStartTime: breakStartTime || null,
+      breakEndTime: breakEndTime || null,
+      status: status || 'present',
+      remarks: remarks || '',
+      totalHours: totalHours || 0,
+      isCheckedIn: isCheckedIn && !checkOutTime,
+      isOnBreak: !!(breakStartTime && !breakEndTime),
+      supervisorId: supervisorId || null,
+      department: employee?.department || 'General',
+      siteName: employee?.siteName || null,
+      shiftId: shiftId || null,
+      isManual: true,           // ✅ mark as manually entered
+      updatedAt: new Date(),
+    };
 
-    let attendance;
-    
-    if (existingRecord) {
-      // Update existing record
-      attendance = await Attendance.findByIdAndUpdate(
-        existingRecord._id,
-        {
-          employeeName,
-          checkInTime,
-          checkOutTime,
-          checkInPhoto,
-          checkOutPhoto,
-          breakStartTime,
-          breakEndTime,
-          status,
-          remarks,
-          totalHours,
-          isCheckedIn: isCheckedIn && !checkOutTime,
-          isOnBreak: !!breakStartTime && !breakEndTime,
-          supervisorId: supervisorId || existingRecord.supervisorId,
-          department: employee?.department || existingRecord.department,
-          siteName: employee?.siteName || existingRecord.siteName,
-          updatedAt: new Date(),
-          shiftId: shiftId || existingRecord.shiftId,
-          isManual: true,   // ✅ ADD THIS
-        },
-        { new: true }
-      );
-    } else {
-      // Create new record
-      attendance = await Attendance.create({
-        employeeId,
-        employeeName,
-        date: formattedDate,
-        checkInTime,
-        checkOutTime,
-        checkInPhoto,
-        checkOutPhoto,
-        breakStartTime,
-        breakEndTime,
-        status: status || 'present',
-        remarks: remarks || '',
-        totalHours,
-        isCheckedIn: isCheckedIn && !checkOutTime,
-        isOnBreak: !!breakStartTime && !breakEndTime,
-        supervisorId: supervisorId || null,
-        department: employee?.department || 'General',
-        siteName: employee?.siteName || null,
-        shiftId: shiftId || existingRecord.shiftId,
-        isManual: true,   // ✅ ADD THIS
-        
-      });
-    }
+    // Atomically update or insert
+    const attendance = await Attendance.findOneAndUpdate(
+      { employeeId, date: formattedDate }, // match by employee + day
+      { $set: updateData },                // apply all fields
+      {
+        upsert: true,                      // create if not exists
+        new: true,                         // return the updated/created doc
+        setDefaultsOnInsert: true,         // use schema defaults for missing fields
+        runValidators: true,               // validate against schema (optional)
+      }
+    );
 
     res.status(200).json({
       success: true,
@@ -1230,11 +1263,16 @@ export const manualAttendance = async (req: Request, res: Response) => {
       data: attendance,
     });
   } catch (error: any) {
-    console.error('❌ Manual attendance error:', error.message);
+    // ✅ IMPORTANT: log the full error stack to your terminal
+    console.error('❌ Manual attendance error:', error);
+    console.error('Stack:', error.stack);
+
+    // ✅ Send the actual error message to the frontend
     res.status(500).json({
       success: false,
-      message: 'Error recording attendance',
-      error: error.message,
+      message: error.message || 'Error recording attendance',
+      // (optional) include stack for debugging in dev only
+      ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
     });
   }
 };
@@ -1399,12 +1437,12 @@ export const getWeeklySummary = async (req: Request, res: Response) => {
     }
 
     // Get all attendance records for the week
-    const attendanceRecords = await Attendance.find({
-      date: {
-        $gte: startDate.toString(),
-        $lte: endDate.toString(),
-      },
-    });
+   const attendanceRecords = await Attendance.find({
+  date: {
+    $gte: startDate.toString(),
+    $lte: endDate.toString(),
+  },
+}).lean();
 
     // Group by employee
     const employeeMap = new Map();
@@ -1495,7 +1533,7 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 }
 export const updateEmployeeLocation = async (req: Request, res: Response) => {
   try {
-    const { employeeId, latitude, longitude, shiftId } = req.body;
+    const { employeeId, latitude, longitude } = req.body;
 
     if (!employeeId || latitude == null || longitude == null) {
       return res.status(400).json({
@@ -1518,18 +1556,34 @@ export const updateEmployeeLocation = async (req: Request, res: Response) => {
       });
     }
 
+    // ✅ Geofence center = site's fixed coordinates (NOT check-in location)
+    const site = record.siteName
+      ? await Site.findOne({ name: record.siteName })
+          .collation({ locale: 'en', strength: 2 })
+      : null;
+
     const wasOutOfGeofence = record.isOutOfGeofence || false;
     let isOutOfGeofence = false;
     let distanceKm = 0;
+    let geofenceConfigured = false;
 
-    if (record.checkInLatitude != null && record.checkInLongitude != null) {
+    // Note: Site defaults lat/lng to 0, so `site.latitude` being truthy
+    // means it was genuinely configured by an admin.
+    if (site?.latitude && site?.longitude) {
+      geofenceConfigured = true;
+      const radiusKm = site.geofenceRadius ?? 0.5;
+
       distanceKm = haversineKm(
-        record.checkInLatitude,
-        record.checkInLongitude,
+        site.latitude,
+        site.longitude,
         Number(latitude),
         Number(longitude),
       );
-      isOutOfGeofence = distanceKm > 0.5;
+      isOutOfGeofence = distanceKm > radiusKm;
+    } else {
+      console.warn(
+        `⚠️ No coordinates set for site "${record.siteName}" — skipping geofence check for ${record.employeeName}`,
+      );
     }
 
     await Attendance.findByIdAndUpdate(record._id, {
@@ -1543,13 +1597,11 @@ export const updateEmployeeLocation = async (req: Request, res: Response) => {
 
     if (justLeft) {
       console.log(`🚨 EMPLOYEE LEFT GEOFENCE: ${record.employeeName} (${record.employeeId})`);
-
-      // ✅ FIXED: Use imported Notification directly
       try {
-        await Notification.create({
-          title: '🚨 Employee Left Site',
+        await notifyRolesServerSide(['superadmin'], {
+          title: '🚨 Supervisor Left Site',
           message: `${record.employeeName} has left the ${record.siteName || 'site'} geofence (${Math.round(distanceKm * 1000)}m away)`,
-          type: 'warning',
+          type: 'urgent',
           priority: 'high',
           notificationType: 'employee_left_site',
           metadata: {
@@ -1559,11 +1611,11 @@ export const updateEmployeeLocation = async (req: Request, res: Response) => {
             distanceKm: Math.round(distanceKm * 1000) / 1000,
             supervisorId: record.supervisorId,
           },
-          createdAt: new Date(),
+          ttlMs: 7 * 24 * 60 * 60 * 1000, // 7 days
         });
-        console.log('✅ Geofence notification saved to database');
+        console.log('✅ Geofence notification sent to superadmin');
       } catch (err) {
-        console.warn('Could not save geofence notification:', err);
+        console.warn('Could not send geofence notification:', err);
       }
     }
 
@@ -1575,6 +1627,7 @@ export const updateEmployeeLocation = async (req: Request, res: Response) => {
         justLeft,
         employeeName: record.employeeName,
         siteName: record.siteName,
+        geofenceConfigured,
       },
     });
   } catch (error: any) {
