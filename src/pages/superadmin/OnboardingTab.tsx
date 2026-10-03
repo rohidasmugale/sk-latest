@@ -17,7 +17,22 @@ import { DOCUMENT_TYPES } from "../../pages/superadmin/DocumentUpload";
 // Define the API Base URL
 const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? 'http://localhost:5001/api' : 'https://sk-backend-btbj.onrender.com/api');
+const getAuthHeaders = (): Record<string, string> => {
+  const token =
+    localStorage.getItem("token") ||
+    localStorage.getItem("authToken") ||
+    localStorage.getItem("accessToken") ||
+    (() => {
+      try {
+        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        return user.token || user.accessToken || user.access_token || "";
+      } catch {
+        return "";
+      }
+    })();
 
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 // Types
 interface Employee {
@@ -484,21 +499,25 @@ const OnboardingTab = ({
   const fetchSites = async () => {
     try {
       setLoadingSites(true);
-      const response = await fetch(`${API_URL}/sites`);
-      const data = await response.json();
+
+      const response = await fetch(`${API_URL}/sites`, {
+        headers: { ...getAuthHeaders() },
+      });
+
+      const data = await response.json().catch(() => ({}));
 
       if (response.ok) {
-        const sitesData = data.sites || data.data || data || [];
+        const sitesData = Array.isArray(data) ? data : data.sites || data.data || [];
         setSites(sitesData);
         setFilteredSites(sitesData);
         console.log(`✅ Loaded ${sitesData.length} sites`);
       } else {
-        console.error('Failed to fetch sites:', data.message);
-        toast.error('Failed to load sites');
+        console.error("Failed to fetch sites:", response.status, data);
+        toast.error(`Failed to load sites (${response.status})`);
       }
     } catch (error) {
-      console.error('Error fetching sites:', error);
-      toast.error('Error loading sites. Please check your connection.');
+      console.error("Error fetching sites:", error);
+      toast.error("Error loading sites. Please check your connection.");
     } finally {
       setLoadingSites(false);
     }
@@ -1195,7 +1214,7 @@ const OnboardingTab = ({
 
     const sitesExceedingCapacity: string[] = [];
     for (const siteName in employeesBySite) {
-      const site = siteDetails[siteName];
+     const site = sites.find((s) => s.name === siteName);
       if (!site) {
         sitesExceedingCapacity.push(`${siteName} (Site not found)`);
         continue;
@@ -1308,6 +1327,7 @@ const OnboardingTab = ({
 
           const response = await fetch(`${API_URL}/employees`, {
             method: "POST",
+            headers: { ...getAuthHeaders() },
             body: formData
           });
 
@@ -1854,9 +1874,9 @@ const OnboardingTab = ({
 
       const response = await fetch(`${API_URL}/employees`, {
         method: "POST",
+        headers: { ...getAuthHeaders() },
         body: formData
       });
-
       const data = await response.json();
       console.log('Server response:', data);
 
@@ -1948,7 +1968,13 @@ const OnboardingTab = ({
         try {
           const faceFormData = new FormData();
           faceFormData.append('photo', newEmployee.photo);
-          await axios.post(`${API_URL}/attendance/register-face/${processedEmployee._id}`, faceFormData);
+          await axios.post(
+            `${API_URL}/attendance/register-face/${processedEmployee._id}`,
+            faceFormData,
+            {
+              headers: { ...getAuthHeaders() },
+            }
+          );
           toast.success("Face registered successfully for attendance");
         } catch (faceErr) {
           console.error("Face registration failed:", faceErr);
@@ -1976,6 +2002,7 @@ const OnboardingTab = ({
 
             const res = await fetch(`${API_URL}/employees/${processedEmployee._id}/documents`, {
               method: 'POST',
+              headers: { ...getAuthHeaders() },
               body: docFormData
             });
 
@@ -2005,7 +2032,9 @@ const OnboardingTab = ({
       let employeeForEPF = processedEmployee;
       if (hadDocs && successCount > 0) {
         try {
-          const refreshRes = await fetch(`${API_URL}/employees/${processedEmployee._id}`);
+          const refreshRes = await fetch(`${API_URL}/employees/${processedEmployee._id}`, {
+            headers: { ...getAuthHeaders() },
+          });
           const refreshData = await refreshRes.json();
           if (refreshRes.ok && (refreshData.employee || refreshData.data)) {
             employeeForEPF = refreshData.employee || refreshData.data;
@@ -2104,7 +2133,8 @@ const OnboardingTab = ({
       const response = await fetch(`${API_URL}/epf-forms`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({
           ...epfFormData,
@@ -2176,7 +2206,7 @@ const OnboardingTab = ({
     }
   };
   // ─── Print Joining Form ──────────────────────────────────────────────
-     const printJoiningForm = (employee: Employee) => {
+  const printJoiningForm = (employee: Employee) => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
       toast.error("Please allow popups to print the form");

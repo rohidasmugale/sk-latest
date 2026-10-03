@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import ExcelJS from 'exceljs';
 import Employee from '../models/Employee';
-import path, { relative } from 'path';
+import path from 'path';
 import fs from 'fs';
 
 // Function to clean and validate data
@@ -91,67 +91,64 @@ const determineDepartment = (position: string = ''): string => {
   return 'General Staff';
 };
 
-// Function to map Excel row to Employee schema based on YOUR Excel columns
 const mapExcelRowToEmployee = async (row: any, index: number): Promise<any> => {
- const employeeId = req.body.employeeId;
+  // 1. Read Employee ID from Excel (Column C). Change 'C' if it's in a different column.
+  const employeeId = cleanValue(row.getCell('C')?.text)?.toUpperCase();
   
-  // Extract position from column T (Position) or department from column AM
+  // 2. Extract position and department
   const position = cleanValue(row.getCell('T')?.value) || 'Employee';
   const departmentFromExcel = cleanValue(row.getCell('AM')?.value);
-  
-  // Determine department
   const department = departmentFromExcel || determineDepartment(position);
   
-  // Map ALL columns from your Excel sheet
+  // 3. Parse the exit date. CHANGE 'G' TO THE COLUMN THAT ACTUALLY HAS THE EXIT DATE.
+  const dateOfExit = parseExcelDate(row.getCell('G')?.value); 
+
   return {
     // Basic Information
     employeeId,
-    name: cleanValue(row.getCell('B')?.value), // Employee Name
-    email: cleanValue(row.getCell('H')?.value), // Email
-    phone: cleanValue(row.getCell('F')?.value), // Contact No
-    aadharNumber: cleanValue(row.getCell('I')?.value), // Aadhar Number
-    panNumber: cleanValue(row.getCell('J')?.value), // PAN Number
-    esicNumber: cleanValue(row.getCell('K')?.value), // ESIC Number
-    uanNumber: cleanValue(row.getCell('L')?.value), // PF/UAN Number
+    name: cleanValue(row.getCell('B')?.value), 
+    email: cleanValue(row.getCell('H').text)?.toLowerCase(), // Fixes empty email bug
+    phone: cleanValue(row.getCell('F')?.value)?.toString(), // Fixes number bug
+    aadharNumber: cleanValue(row.getCell('I')?.value)?.toString().replace(/\s/g, ''), // Fixes spaces bug
+    panNumber: cleanValue(row.getCell('J')?.value), 
+    esicNumber: cleanValue(row.getCell('K')?.value)?.toString(), 
+    uanNumber: cleanValue(row.getCell('L')?.value)?.toString(), 
     
     // Personal Details
-    dateOfBirth: parseExcelDate(row.getCell('D')?.value), // Date of Birth
-    dateOfJoining: parseExcelDate(row.getCell('E')?.value) || new Date(), // Date of Joining
-    dateOfExit: parseExcelDate(row.getCell('F')?.value), // Date of Exit (same as Contact No column)
-    bloodGroup: cleanValue(row.getCell('G')?.value), // Blood Group
-    // Note: Gender and MaritalStatus not in your Excel, can add if needed
+    dateOfBirth: parseExcelDate(row.getCell('D')?.value), 
+    dateOfJoining: parseExcelDate(row.getCell('E')?.value) || new Date(), 
+    dateOfExit: dateOfExit, 
+    bloodGroup: cleanValue(row.getCell('H')?.value), 
     
     // Address
-    permanentAddress: cleanValue(row.getCell('M')?.value), // Permanent Address
-   
-    localAddress: cleanValue(row.getCell('O')?.value), // Local Address
-   
+    permanentAddress: cleanValue(row.getCell('M')?.value), 
+    localAddress: cleanValue(row.getCell('O')?.value), 
     
     // Bank Details
-    bankName: cleanValue(row.getCell('Q')?.value), // Bank Name
-    accountNumber: cleanValue(row.getCell('R')?.value), // Account Number
-    ifscCode: cleanValue(row.getCell('S')?.value), // IFSC Code
-    branchName: cleanValue(row.getCell('T')?.value), // Branch Name
+    bankName: cleanValue(row.getCell('Q')?.value), 
+    accountNumber: cleanValue(row.getCell('R')?.value)?.toString(), 
+    ifscCode: cleanValue(row.getCell('S')?.value), 
+    branchName: cleanValue(row.getCell('U')?.value), // CHANGED FROM 'T' TO 'U' (Verify this!)
     
     // Family Details
-   relativeName: cleanValue(row.getCell('U')?.value), // Relative Name
-    relation: cleanValue(row.getCell('V')?.value), // Relation
-    numberOfChildren: parseInt(cleanValue(row.getCell('X')?.value) || '0'), // Number of Children
+    relativeName: cleanValue(row.getCell('V')?.value), // CHANGED FROM 'U' TO 'V' (Verify this!)
+    relation: cleanValue(row.getCell('W')?.value), // CHANGED FROM 'V' TO 'W' (Verify this!)
+    numberOfChildren: parseInt(cleanValue(row.getCell('X')?.value) || '0'), 
     
     // Emergency Contact
-  
-    emergencyContactPhone: cleanValue(row.getCell('Z')?.value), // Emergency Contact Phone
-    emergencyPhone2: cleanValue(row.getCell('AA')?.value), // Emergency Phone 2
+    emergencyContactPhone: cleanValue(row.getCell('Z')?.value), 
+    emergencyPhone2: cleanValue(row.getCell('AA')?.value), 
+    
     // Nominee Details
-    nomineeName: cleanValue(row.getCell('AB')?.value), // Nominee Name
-    nomineeRelation: cleanValue(row.getCell('AC')?.value), // Nominee Relation
+    nomineeName: cleanValue(row.getCell('AB')?.value), 
+    nomineeRelation: cleanValue(row.getCell('AC')?.value), 
     
     // Uniform Details
-    pantSize: cleanValue(row.getCell('AD')?.value), // Pant Size
-    shirtSize: cleanValue(row.getCell('AE')?.value), // Shirt Size
-    capSize: cleanValue(row.getCell('AF')?.value), // Cap Size
+    pantSize: cleanValue(row.getCell('AD')?.value), 
+    shirtSize: cleanValue(row.getCell('AE')?.value), 
+    capSize: cleanValue(row.getCell('AF')?.value), 
     
-    // Issued Items (convert Yes/No to boolean)
+    // Issued Items
     idCardIssued: (cleanValue(row.getCell('AG')?.value) || '').toString().toLowerCase() === 'yes',
     westcoatIssued: (cleanValue(row.getCell('AH')?.value) || '').toString().toLowerCase() === 'yes',
     apronIssued: (cleanValue(row.getCell('AI')?.value) || '').toString().toLowerCase() === 'yes',
@@ -159,15 +156,17 @@ const mapExcelRowToEmployee = async (row: any, index: number): Promise<any> => {
     // Employment Details
     department,
     position,
-    siteName: cleanValue(row.getCell('A')?.value), // Site Name
-    salary: parseFloat(cleanValue(row.getCell('AL')?.value) || '0'), // Monthly Salary
-    status: row.getCell('F')?.value ? 'left' : 'active', // Has Date of Exit?
+    siteName: cleanValue(row.getCell('A')?.value), 
+    salary: parseFloat(cleanValue(row.getCell('AL')?.value) || '0'), 
     
-    // Role - determine from position
+    // Status is now based on the parsed exit date, not the raw column
+    status: dateOfExit ? 'left' : 'active', 
+    
+    // Role
     role: position.toLowerCase().includes('supervisor') ? 'supervisor' : 
           position.toLowerCase().includes('manager') ? 'manager' : 'employee',
     
-    // Cloudinary fields (empty for now, can be added later)
+    // Cloudinary fields
     photo: '',
     photoPublicId: '',
     employeeSignature: '',
@@ -175,10 +174,8 @@ const mapExcelRowToEmployee = async (row: any, index: number): Promise<any> => {
     authorizedSignature: '',
     authorizedSignaturePublicId: '',
     
-    // Bank Branch (same as branch name for now)
-    bankBranch: cleanValue(row.getCell('T')?.value),
-    
-    // System fields will be added by timestamps
+    // Bank Branch
+    bankBranch: cleanValue(row.getCell('U')?.value), // CHANGED FROM 'T' TO 'U' (Verify this!)
   };
 };
 
@@ -234,9 +231,14 @@ export const importEmployeesFromExcel = async (req: Request, res: Response): Pro
       try {
         const employeeData = await mapExcelRowToEmployee(row, i);
         
-        // Check required fields
+               // Check required fields
         if (!employeeData.name) {
           throw new Error('Missing required field: name');
+        }
+        
+        // ADDED: Required Employee ID check
+        if (!employeeData.employeeId) {
+          throw new Error('Missing required field: employeeId');
         }
         
         if (!employeeData.aadharNumber) {
@@ -253,7 +255,7 @@ export const importEmployeesFromExcel = async (req: Request, res: Response): Pro
           aadharNumber: employeeData.aadharNumber 
         });
         
-        if (existingAadhar) {
+               if (existingAadhar) {
           console.log(`⚠️ Skipping duplicate Aadhar: ${employeeData.aadharNumber}`);
           results.failed++;
           results.errors.push({
@@ -264,7 +266,20 @@ export const importEmployeesFromExcel = async (req: Request, res: Response): Pro
           });
           continue;
         }
-        
+
+        // ADD THIS BLOCK RIGHT HERE:
+        const existingId = await Employee.findOne({ employeeId: employeeData.employeeId });
+        if (existingId) {
+          console.log(`⚠️ Skipping duplicate Employee ID: ${employeeData.employeeId}`);
+          results.failed++;
+          results.errors.push({
+            row: i,
+            name: employeeData.name,
+            employeeId: employeeData.employeeId,
+            error: 'Duplicate employee ID'
+          });
+          continue;
+        }
         // Check for duplicate email if email exists
         if (employeeData.email) {
           const existingEmail = await Employee.findOne({ 
