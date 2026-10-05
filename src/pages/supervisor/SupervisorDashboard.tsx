@@ -2619,13 +2619,12 @@ const SupervisorDashboard = () => {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <DashboardHeader title="Supervisor Dashboard" subtitle="Manage team and operations" onMenuClick={onMenuClick} />
 
-      {/* Floating Plus button at top right corner */}
-      <div className="fixed top-4 right-4 z-50">
+      <div className="px-4 mt-3 flex justify-end">
         <Button
           onClick={() => setQuickCreateOpen(true)}
-          className="rounded-full h-12 w-12 shadow-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+          className="rounded-full h-10 w-10 shadow-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
         >
-          <Plus className="h-6 w-6" />
+          <Plus className="h-5 w-5" />
         </Button>
       </div>
 

@@ -71,6 +71,7 @@ app.use(cors({
     
     // List of allowed origins
     const allowedOrigins = [
+       'https://app.skfacilitymanagement.com',
       'http://localhost:8080',
       'http://localhost:8081',  // ← Your React app port
       'http://localhost:5001',
@@ -121,9 +122,10 @@ const authenticate = async (req: Request, res: Response, next: NextFunction) => 
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any;
     (req as any).user = { id: decoded.id, role: decoded.role };
     next();
-  } catch {
-    return res.status(401).json({ success: false, message: 'Invalid token' });
-  }
+  }  catch (err: any) {
+  console.error('JWT error:', err.message);
+  return res.status(401).json({ success: false, message: 'Invalid token' });
+
 };
 
 // Then, when registering the route:

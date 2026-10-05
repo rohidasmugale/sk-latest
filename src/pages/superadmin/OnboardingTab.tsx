@@ -74,7 +74,15 @@ interface Employee {
   numberOfChildren?: string | number;
 
   emergencyContactPhone?: string;
+  emergencyPhone2?: string;
 
+  kycDocuments?: Array<{
+    documentType?: string;
+    documentName?: string;
+    documentNumber?: string;
+    fileUrl: string;
+    fileType?: string;
+  }>;
   nomineeName?: string;
   nomineeRelation?: string;
   pantSize?: string;
@@ -1214,7 +1222,7 @@ const OnboardingTab = ({
 
     const sitesExceedingCapacity: string[] = [];
     for (const siteName in employeesBySite) {
-     const site = sites.find((s) => s.name === siteName);
+      const site = sites.find((s) => s.name === siteName);
       if (!site) {
         sitesExceedingCapacity.push(`${siteName} (Site not found)`);
         continue;
@@ -1985,10 +1993,11 @@ const OnboardingTab = ({
       // ─── Upload documents from Step 4 — now that employee exists ───
       const hadDocs = uploadedDocuments.length > 0;
 
+      let successCount = 0;
+
       if (hadDocs) {
         toast.loading(`Uploading ${uploadedDocuments.length} document(s)...`, { id: 'doc-upload' });
 
-        let successCount = 0;
         let failCount = 0;
 
         for (const doc of uploadedDocuments) {
